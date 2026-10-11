@@ -13,7 +13,7 @@ import { type Ref, ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
-import { useT } from '../../runtime/use-t.ts';
+import { translateMessage, useT } from '../../runtime/use-t.ts';
 import { button } from '../../ui/button.ts';
 import { icon } from '../../ui/icon.ts';
 import { structure, type StructureHandle } from '../../ui/structure.ts';
@@ -318,7 +318,7 @@ export const blocksType: FieldType = {
           allowCrossDrop: true,
           disabled: () => off,
           isDraggable: !off,
-          dropItemsHereLabel: t('dashboard.dropItemsHere'),
+          dropItemsHereLabel: () => t('dashboard.dropItemsHere'),
           expose: (handle) => {
             surface = handle;
           },
@@ -549,10 +549,12 @@ function editable(name: string, blocks: readonly DashboardBlock[]): boolean {
 }
 
 /**
- * The block type's label, or its bare name when the discovery read omits the type.
+ * The block type's label in the dashboard language, or its bare name when the discovery read omits the type.
+ * The read is reactive, so a caller inside a function child follows the language.
  */
 function labelOf(name: string, blocks: readonly DashboardBlock[]): string {
-  return blockNamed(blocks, name)?.label ?? name;
+  const block = blockNamed(blocks, name);
+  return isUndefined(block) ? name : translateMessage(block.label);
 }
 
 /**

@@ -3,6 +3,7 @@ import type { Child } from '../render/insert.ts';
 
 import { isPositiveInteger } from '../../utils/is/is-positive-integer.ts';
 import { computed } from '../../utils/reactive/computed.ts';
+import { toValue } from '../../utils/reactive/to-value.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { icon } from './icon.ts';
@@ -26,28 +27,31 @@ export interface PaginationOptions {
 
   /**
    * The text to display in the `title` attribute of the previous button.
+   * A getter reads reactively.
    *
    * @default
    * 'Previous'
    */
-  previousPageTitle?: string;
+  previousPageTitle?: string | (() => string);
 
   /**
    * The text to display in the `title` attribute of the next button.
+   * A getter reads reactively.
    *
    * @default
    * 'Next'
    */
-  nextPageTitle?: string;
+  nextPageTitle?: string | (() => string);
 
   /**
    * The text to display in the `title` attribute of the page number buttons.
    * The page number follows it.
+   * A getter reads reactively.
    *
    * @default
    * 'Go to page'
    */
-  goToPageTitle?: string;
+  goToPageTitle?: string | (() => string);
 
   /**
    * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
@@ -275,7 +279,7 @@ export function pagination(options: PaginationOptions): HTMLElement {
             : h(
                 'button',
                 {
-                  title: `${goToTitle} ${entry}`,
+                  title: () => `${toValue(goToTitle)} ${entry}`,
                   type: 'button',
                   class:
                     'ohne-pagination-button ohne-raw' +

@@ -11,7 +11,7 @@ export type { CellEditorOptions } from './fields/cell-editor.ts';
 export { watchOSClipboard } from './fields/clipboard.ts';
 export { createFieldForm, scopedErrors } from './fields/field-form.ts';
 export type { FieldForm, FieldFormOptions } from './fields/field-form.ts';
-export { describeControl, fieldRow } from './fields/field-row.ts';
+export { describeControl, fieldPlaceholder, fieldRow } from './fields/field-row.ts';
 export type { FieldRowOptions } from './fields/field-row.ts';
 export { controlIDs, dimMark, fieldTypeFor, registerFieldType } from './fields/field-type.ts';
 export type {
@@ -90,7 +90,7 @@ export type {
   DashboardOperations,
   DashboardTable,
 } from './runtime/meta.ts';
-export { login, logout, sessionUser, updateSessionUser } from './runtime/session.ts';
+export { login, logout, sessionUser, signInCount, updateSessionUser } from './runtime/session.ts';
 export type { LoginOutcome, SessionUser, UpdateOutcome } from './runtime/session.ts';
 export { countVerdicts, loadVerdicts } from './runtime/verdicts.ts';
 export type { RowVerdicts, VerdictCounts } from './runtime/verdicts.ts';
@@ -232,7 +232,7 @@ export type { TimeRangeOptions } from './ui/time-range.ts';
 export { time } from './ui/time.ts';
 export type { TimeLabels, TimeOptions } from './ui/time.ts';
 export { dismissToast, queueToast, toast, toaster } from './ui/toaster.ts';
-export type { ToastAction, ToastOptions } from './ui/toaster.ts';
+export type { ToastAction, ToasterOptions, ToastOptions } from './ui/toaster.ts';
 export { attachTooltip } from './ui/tooltip.ts';
 export type { TooltipOptions } from './ui/tooltip.ts';
 export { treeItem } from './ui/tree-item.ts';
@@ -280,5 +280,6 @@ export type { MessageCatalog, MessageEntry } from './runtime/messages.ts';
 export { setDashboardLanguage } from './runtime/set-dashboard-language.ts';
 export type { DashboardLanguage, DashboardLanguages } from './runtime/use-dashboard-language.ts';
 export { useDashboardLanguage } from './runtime/use-dashboard-language.ts';
+export type { MessageData } from '../utils/i18n/message-data.ts';
 export type { MessageParams, Translate } from './runtime/use-t.ts';
-export { useT } from './runtime/use-t.ts';
+export { translateMessage, useT } from './runtime/use-t.ts';

@@ -1,4 +1,6 @@
+import { computed, type ComputedRef } from '../../utils/reactive/computed.ts';
 import { type Ref, ref } from '../../utils/reactive/ref.ts';
+import { untracked } from '../../utils/reactive/untracked.ts';
 import { dashboardConfig } from './config.ts';
 
 /**
@@ -28,15 +30,16 @@ export type DashboardLanguage = [keyof DashboardLanguages] extends [never]
   ? string
   : keyof DashboardLanguages;
 
-let current: Ref<DashboardLanguage> | undefined;
+let requested: Ref<DashboardLanguage> | undefined;
+const committed = ref<DashboardLanguage | undefined>(undefined);
+let rendered: ComputedRef<DashboardLanguage> | undefined;
 
 /**
- * Returns the reactive language the dashboard renders messages in, a process-wide singleton.
+ * Returns the language the dashboard renders in: the one on screen, read-only and reactive.
  *
- * Reading `.value` inside a reactive render subscribes to it.
- * When it changes, the page rebuilds and every `useT` string renders in the new language.
+ * Reading `.value` inside a function child subscribes it, so a `useT` string follows a switch in place.
  * Switch it through `setDashboardLanguage`, which loads the new language's catalogs first.
- * A direct write rebuilds the page before they load, so its messages render as raw keys.
+ * A switch lands at once while no navigation is pending, and together with the arriving page otherwise.
  * It starts at the app's `messages.defaultLanguage`.
  *
  * @example
@@ -45,6 +48,22 @@ let current: Ref<DashboardLanguage> | undefined;
  * h('p', null, () => useT()('nav.home'))          // renders in the active language
  * ```
  */
-export function useDashboardLanguage(): Ref<DashboardLanguage> {
-  return (current ??= ref(dashboardConfig().defaultLanguage));
+export function useDashboardLanguage(): ComputedRef<DashboardLanguage> {
+  return (rendered ??= computed(() => committed.value ?? requestedLanguage().value));
+}
+
+/**
+ * The language the dashboard was last asked for: the one its catalogs load and its requests speak.
+ * The router commits it as the rendered language through `commitDashboardLanguage`.
+ */
+export function requestedLanguage(): Ref<DashboardLanguage> {
+  return (requested ??= ref(dashboardConfig().defaultLanguage));
+}
+
+/**
+ * Makes the requested language the rendered one, so every live string switches to it.
+ * Before the first commit the rendered language follows the request.
+ */
+export function commitDashboardLanguage(): void {
+  committed.value = untracked(() => requestedLanguage().value);
 }

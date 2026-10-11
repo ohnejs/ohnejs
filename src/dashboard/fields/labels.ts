@@ -1,4 +1,4 @@
-import type { DashboardCollection, DashboardMeta } from '../runtime/meta-types.ts';
+import type { DashboardCollection } from '../runtime/meta-types.ts';
 
 import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isString } from '../../utils/is/is-string.ts';
@@ -9,7 +9,7 @@ import { untracked } from '../../utils/reactive/untracked.ts';
 import { renderLabel } from '../../utils/template/render-label.ts';
 import { shortUUID } from '../../utils/uuid/short-uuid.ts';
 import { api } from '../runtime/api.ts';
-import { dashboardMeta } from '../runtime/meta.ts';
+import { dashboardMeta, dashboardMetaIdentity } from '../runtime/meta.ts';
 import { labelBatchKey, labelKey, labelScope } from './_label-keys.ts';
 
 const CAPACITY = 2000;
@@ -28,7 +28,7 @@ const pending = new Map<string, Batch>();
 const inFlight = new Set<string>();
 let scheduled = false;
 let awaitingMeta = false;
-let basis: DashboardMeta | undefined;
+let basis = dashboardMetaIdentity();
 
 /**
  * The resolved label for one record of the target collection, `undefined` while unresolved.
@@ -249,17 +249,15 @@ function readableCollection(name: string): DashboardCollection | undefined {
 }
 
 /**
- * Empties the cache once the discovery data it resolved under is gone, so labels follow the current user.
- * Data arriving into an empty store adopts the cache as is, since its entries were made while it loaded.
+ * Empties the cache once the identity it resolved under is gone, so labels follow the current user.
+ * An in-place refresh of the discovery data keeps it, since the same user reads the same labels.
  */
 function sync(): void {
-  const current = untracked(dashboardMeta);
+  const current = dashboardMetaIdentity();
   if (current === basis) return;
-  if (!isUndefined(basis)) {
-    entries.clear();
-    pending.clear();
-    inFlight.clear();
-  }
+  entries.clear();
+  pending.clear();
+  inFlight.clear();
   basis = current;
 }
 

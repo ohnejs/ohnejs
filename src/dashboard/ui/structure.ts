@@ -69,11 +69,12 @@ export interface StructureOptions<TItem extends Record<string, unknown>> {
 
   /**
    * Text label for the empty dropzone.
+   * A getter reads reactively.
    *
    * @default
    * 'Drop items here'
    */
-  dropItemsHereLabel?: string;
+  dropItemsHereLabel?: string | (() => string);
 
   /**
    * Disables the structure reactively while it returns `true`, making it read-only.

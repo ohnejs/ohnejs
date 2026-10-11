@@ -37,7 +37,6 @@ import {
 import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { User } from '../auth/types.ts';
 
-import { resolveMessage, translate } from '../../ohne/http/translate.ts';
 import { landsWithoutInput } from '../../ohne/query/validate-when.ts';
 import { userCan } from '../auth/capabilities.ts';
 
@@ -114,36 +113,37 @@ export interface DashboardField {
   logicalType?: LogicalType;
 
   /**
-   * The display label, resolved in the request's language.
+   * The display label: a message the dashboard translates where it renders, through `translateMessage`.
+   * A system field's label is its catalog key; an undeclared one is the sentence-cased name.
    */
-  label: string;
+  label: Message;
 
   /**
-   * The field's plain description, resolved in the request's language.
+   * The field's plain description, a message the dashboard translates where it renders.
    * Absent when none is declared, or when the declared one is expandable.
    */
-  description?: string;
+  description?: Message;
 
   /**
    * The field's description when it starts collapsed behind a toggle; absent for the plain form.
-   * Every string is resolved in the request's language; an omitted toggle label takes the catalog's.
+   * Each text is a message the dashboard translates; an omitted toggle label is the catalog's key.
    */
   expandable?: {
     /**
      * The content, shown once expanded.
      * Markdown is supported.
      */
-    text: string;
+    text: Message;
 
     /**
      * The toggle's label while the content is collapsed.
      */
-    showLabel: string;
+    showLabel: Message;
 
     /**
      * The toggle's label while the content is expanded.
      */
-    hideLabel: string;
+    hideLabel: Message;
 
     /**
      * Whether the content starts expanded.
@@ -152,9 +152,9 @@ export interface DashboardField {
   };
 
   /**
-   * The empty-input hint, resolved in the request's language; absent when none is declared.
+   * The empty-input hint, a message the dashboard translates; absent when none is declared.
    */
-  placeholder?: string;
+  placeholder?: Message;
 
   /**
    * Whether the field's value admits `null`.
@@ -279,9 +279,9 @@ export interface DashboardLayoutCard {
   kind: 'card';
 
   /**
-   * The header label, resolved in the request's language; absent when the card declares none.
+   * The header label, a message the dashboard translates; absent when the card declares none.
    */
-  label?: string;
+  label?: Message;
 
   /**
    * Whether the viewer can collapse the card.
@@ -314,9 +314,9 @@ export interface DashboardLayoutTabs {
  */
 export interface DashboardLayoutTab {
   /**
-   * The tab label, resolved in the request's language.
+   * The tab label, a message the dashboard translates.
    */
-  label: string;
+  label: Message;
 
   /**
    * The panel's nodes, top to bottom; never empty.
@@ -336,7 +336,7 @@ export interface DashboardLayoutRule {
 
 /**
  * One node of a resolved field layout, as the dashboard renders it.
- * Labels arrive translated and widths split from their names, so the client parses nothing.
+ * Labels arrive as messages and widths split from their names, so the client parses nothing.
  * A name the host does not describe is already dropped, and so is any container that left empty.
  */
 export type DashboardLayoutNode =
@@ -446,7 +446,7 @@ const OPERATION_ROUTES: Readonly<
  * A collection appears when it is exposed and the user may run at least one of its operations.
  * Operations carry their verdicts, so a client disables what the capability guard would refuse.
  * An operation whose route the app does not serve is closed, like one the collection does not expose.
- * Fields carry the metadata a sheet needs: type, kind, flags, labels resolved in the request's language.
+ * Fields carry the metadata a sheet needs: type, kind, flags, and labels as messages the dashboard translates.
  * A declared layout arrives resolved on its collection or composite field.
  * `GET /dashboard` answers it as `collections`.
  */
@@ -497,7 +497,7 @@ export function describeFields(
 }
 
 /**
- * Resolves a declared layout for the wire: labels translated, widths split, names outside `fields` dropped.
+ * Resolves a declared layout for the wire: widths split, names outside `fields` dropped, labels as declared.
  * A row, card, or tab left empty drops with them; a layout left empty resolves to `undefined`.
  */
 export function resolveLayout(
@@ -587,21 +587,17 @@ function describeField(
   if (isExpandableDescription(description)) {
     const { text, showLabel, hideLabel, expanded = false } = description;
     field.expandable = {
-      text: resolveMessage(text),
-      showLabel: isUndefined(showLabel)
-        ? translate('dashboard.field.showDescription')
-        : resolveMessage(showLabel),
-      hideLabel: isUndefined(hideLabel)
-        ? translate('dashboard.field.hideDescription')
-        : resolveMessage(hideLabel),
+      text,
+      showLabel: 'dashboard.field.showDescription',
+      hideLabel: 'dashboard.field.hideDescription',
       expanded,
     };
+    if (!isUndefined(showLabel)) field.expandable.showLabel = showLabel;
+    if (!isUndefined(hideLabel)) field.expandable.hideLabel = hideLabel;
   } else if (!isUndefined(description)) {
-    field.description = resolveMessage(description as Message);
+    field.description = description as Message;
   }
-  if (!isUndefined(options.placeholder)) {
-    field.placeholder = resolveMessage(options.placeholder as Message);
-  }
+  if (!isUndefined(options.placeholder)) field.placeholder = options.placeholder as Message;
   const wire = wireOptions(meta, options);
   if (!isUndefined(wire)) field.options = wire;
   if (!isUndefined(meta.target)) field.target = meta.target;
@@ -640,12 +636,12 @@ function resolveNodes(nodes: FieldLayout, names: ReadonlySet<string>): Dashboard
         collapsible: options.collapsible ?? false,
         nodes: inner,
       };
-      if (!isUndefined(options.label)) card.label = resolveMessage(options.label);
+      if (!isUndefined(options.label)) card.label = options.label;
       resolved.push(card);
     } else {
       const tabs = node.tabs
         .map((tab) => ({
-          label: resolveMessage(tab.label),
+          label: tab.label,
           nodes: resolveNodes(tab.fields, names),
         }))
         .filter((tab) => !isEmpty(tab.nodes));
@@ -680,11 +676,11 @@ function wireOptions(
 /**
  * The field's display label: its declared `label`, a system field's catalog key, or the name sentence-cased.
  */
-function labelOf(name: string, label: unknown): string {
-  if (!isUndefined(label)) return resolveMessage(label as Message);
-  if (name === 'UUID') return translate('dashboard.fields.uuid.label');
-  if (name === '_updatedAt') return translate('dashboard.fields.updatedAt.label');
-  if (name === '_translations') return translate('dashboard.fields.translations.label');
+function labelOf(name: string, label: unknown): Message {
+  if (!isUndefined(label)) return label as Message;
+  if (name === 'UUID') return 'dashboard.fields.uuid.label';
+  if (name === '_updatedAt') return 'dashboard.fields.updatedAt.label';
+  if (name === '_translations') return 'dashboard.fields.translations.label';
   return toSentenceCase(name);
 }
 

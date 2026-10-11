@@ -14,7 +14,7 @@ import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
-import { useT } from '../runtime/use-t.ts';
+import { translateMessage, useT } from '../runtime/use-t.ts';
 import { bubble } from '../ui/bubble.ts';
 import { button } from '../ui/button.ts';
 import { dropdownItem } from '../ui/dropdown-item.ts';
@@ -408,7 +408,9 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
       return h(
         'span',
         { class: 'ohne-blocks-tree-item' },
-        h('span', { class: 'ohne-blocks-tree-slot ohne-truncate' }, row.label),
+        h('span', { class: 'ohne-blocks-tree-slot ohne-truncate' }, () =>
+          translateMessage(row.label),
+        ),
         editable() ? h('span', { class: 'ohne-blocks-tree-actions' }, plusButton(item)) : null,
       );
     }
@@ -416,7 +418,7 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
     const label = (): string => {
       const field = block?.titleField;
       const value = isUndefined(field) ? undefined : valueOf(row.node, field);
-      const name = block?.label ?? row.node.block;
+      const name = isUndefined(block) ? row.node.block : translateMessage(block.label);
       return isUndefined(value) || value === '' ? name : `${name} (${value})`;
     };
     const errored = h('span', { class: 'ohne-shrink-0' }, () =>

@@ -6,7 +6,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { dialogHost } from './dialog.ts';
 import { isMac } from './hotkeys.ts';
-import { toaster } from './toaster.ts';
+import { type ToasterOptions, toaster } from './toaster.ts';
 import './tokens.ts';
 
 /**
@@ -24,6 +24,11 @@ export interface BaseOptions {
    * Omitted inherits the ancestor value.
    */
   spacing?: number;
+
+  /**
+   * The labels of the app-wide toaster, passed to `toaster`.
+   */
+  toaster?: ToasterOptions;
 }
 
 css`
@@ -98,6 +103,6 @@ export function base(content: Child | (() => Child), options: BaseOptions = {}):
     { class: 'ohne-base', style: style === '' ? undefined : style },
     h('div', { class: 'ohne-base-content' }, content),
     dialogHost(),
-    toaster(),
+    toaster(options.toaster),
   );
 }

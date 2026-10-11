@@ -6,14 +6,15 @@ import {
   type DashboardCollection,
   type DashboardField,
   fallbackLabel,
-  fieldMessage,
   type FieldForm,
+  fieldMessage,
   h,
   icon,
   labelOf,
   popup,
   type Popup,
   toast,
+  translateMessage,
   useDashboardLanguage,
   useHotkeys,
   useRoute,
@@ -209,7 +210,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       const state = { [field.name]: record[field.name] };
       form.value.rebase(record);
       history.push(state).setOriginalState(state);
-      toast(t('dashboard.saved'), { type: 'success', description: field.label });
+      toast(t('dashboard.saved'), { type: 'success', description: translateMessage(field.label) });
       options.onUpdated?.(outcome.record);
       options.onClose(handle.close);
       return;
@@ -414,5 +415,5 @@ function namedMessage(
   const owner = isUndefined(path)
     ? undefined
     : collection.fields.find((field) => isDotPathInside(path, field.name));
-  return isUndefined(owner) ? message : `${owner.label}: ${message}`;
+  return isUndefined(owner) ? message : `${translateMessage(owner.label)}: ${message}`;
 }

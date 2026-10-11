@@ -77,8 +77,7 @@ css`
  * Leaving dirty edits routes through the `unsavedChanges` prompt, in-app and on tab close.
  * Cmd/Ctrl+S saves while no overlay is open.
  * Save patches the dirty fields through `updateSessionUser`; a `422` routes onto the rows it names.
- * A saved language change resets the discovery data, so the form rebuilds on labels in the new language.
- * The history and the guard live outside that rebuild, so the rebuilt form starts clean.
+ * A saved language change keeps the form: its labels follow the language in place.
  */
 export function accountEditor(): Child {
   const t = useT();
@@ -116,7 +115,6 @@ export function accountEditor(): Child {
     // The saving fieldset blurs whatever was focused; the element survives the save, so restore.
     if (focused instanceof HTMLElement && focused.isConnected) focused.focus();
     if (outcome.kind === 'saved') {
-      // A language change has already torn `live` down; its controls still answer the settled state.
       live.rebase({ ...outcome.user });
       const settled = live.snapshot(history.getCurrentState()) as AccountState;
       history.push(settled).setOriginalState(settled);
@@ -171,7 +169,6 @@ export function accountEditor(): Child {
   /**
    * The editor proper, built once the discovery data and the session both stand.
    * Its reads run untracked, so the region rebuilds only when the data vanishes and returns.
-   * A saved language change does exactly that, by resetting the discovery data.
    */
   function editor(): Child {
     const meta = untracked(dashboardMeta);

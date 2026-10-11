@@ -1,4 +1,4 @@
-import { type DashboardCollection, dashboardMeta } from 'ohnejs/dashboard';
+import { type DashboardCollection, dashboardMeta, type MessageData } from 'ohnejs/dashboard';
 import { isUndefined, parseRouteID } from 'ohnejs/utils';
 
 declare module 'ohnejs/dashboard' {
@@ -36,12 +36,12 @@ export interface AIMeta {
   transformModel?: string;
 
   /**
-   * The skills the person may start, in the viewer's language.
+   * The skills the person may start, their texts as messages to translate with `translateMessage`.
    */
   skills: AISkillMeta[];
 
   /**
-   * The flows the person may start, in the viewer's language.
+   * The flows the person may start, their texts as messages to translate with `translateMessage`.
    */
   flows: AIFlowMeta[];
 
@@ -68,12 +68,12 @@ export interface AISkillMeta {
   /**
    * The skill's title, or its name in sentence case when it declares none.
    */
-  title: string;
+  title: MessageData;
 
   /**
    * What the skill does.
    */
-  description: string;
+  description: MessageData;
 }
 
 /**
@@ -88,12 +88,12 @@ export interface AIFlowMeta {
   /**
    * The flow's title, or its name in sentence case when it declares none.
    */
-  title: string;
+  title: MessageData;
 
   /**
    * What the flow does.
    */
-  description: string;
+  description: MessageData;
 }
 
 const COLLECTION_ROUTE = /^\/collections\/([^/]+)/;

@@ -96,8 +96,8 @@ export const recordsType: FieldType = {
       error: () => routed.value !== '',
       erroredItems: () => erroredIndices.value,
       name: context.path,
-      noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
-      removeItemLabel: untracked(() => t('dashboard.removeItem')),
+      noResultsLabel: () => t('dashboard.noResultsFound'),
+      removeItemLabel: () => t('dashboard.removeItem'),
       onDblclick: (value) => {
         window.open(recordHref(target, String(value)), '_blank');
       },

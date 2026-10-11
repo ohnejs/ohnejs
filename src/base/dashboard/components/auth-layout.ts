@@ -1,5 +1,6 @@
 import { base, type Child, css, h } from 'ohnejs/dashboard';
 
+import { toasterLabels } from './toaster-labels.ts';
 import { wrapper } from './wrapper.ts';
 
 css`
@@ -47,7 +48,7 @@ css`
  * The footer balances the header, so the card centers vertically.
  */
 export function authLayout(header: Child, ...children: Child[]): HTMLElement {
-  return base(layout(header, children));
+  return base(layout(header, children), { toaster: toasterLabels() });
 }
 
 /**

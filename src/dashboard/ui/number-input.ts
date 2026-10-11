@@ -68,13 +68,15 @@ export interface NumberInputOptions {
 
   /**
    * Placeholder text shown while the input is empty.
+   * A getter reads reactively.
    */
-  placeholder?: string;
+  placeholder?: string | (() => string);
 
   /**
    * Plain text rendered after the value, inside the border box.
+   * A getter reads reactively.
    */
-  suffix?: string;
+  suffix?: string | (() => string);
 
   /**
    * Reports the error state reactively.
@@ -132,11 +134,12 @@ export interface NumberInputOptions {
 
   /**
    * The accessibility label of the drag button.
+   * A getter reads reactively.
    *
    * @default
    * 'Drag to adjust value'
    */
-  ariaDragLabel?: string;
+  ariaDragLabel?: string | (() => string);
 
   /**
    * Called with each settled value: after blur, arrow key steps, stepper clicks, and drag end.

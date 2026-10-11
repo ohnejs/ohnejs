@@ -13,7 +13,7 @@ import { ref } from '../../../utils/reactive/ref.ts';
 import { h } from '../../render/h.ts';
 import { translateMessage } from '../../runtime/use-t.ts';
 import { select, type SelectChoice } from '../../ui/select.ts';
-import { describeControl } from '../field-row.ts';
+import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 /**
@@ -53,7 +53,7 @@ export const selectType: FieldType = {
       disabled: () => disabled === true,
       error: () => routed.value !== '',
       name: path,
-      placeholder: field.placeholder,
+      placeholder: fieldPlaceholder(field),
       // `onCommit` runs before the select writes the model; writing here lets the history push see it.
       onCommit: (next) => {
         model.value = isString(next) ? next : null;

@@ -54,6 +54,7 @@
   "deletedPartial": "{count} obrisano, {failed} neuspješno",
   "deselect": "Poništi odabir",
   "disable": "Onemogući",
+  "dragToAdjust": "Povuci za podešavanje vrijednosti",
   "dropItemsHere": "Ispustite stavke ovdje",
   "duplicate": "Dupliciraj",
   "edit": "Uredi",
@@ -294,6 +295,15 @@
     "selectedOnPage": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} na ovoj stranici"
   },
   "tableOverview": "Pregled tabele",
+  "time": {
+    "hours": "h",
+    "minutes": "m",
+    "seconds": "s"
+  },
+  "toaster": {
+    "close": "Zatvori obavještenje",
+    "label": "Obavještenja alt+T"
+  },
   "translations": {
     "confirmDelete": "Da li zaista želite obrisati prijevod `{locale}`?",
     "copied": "Kopirano",

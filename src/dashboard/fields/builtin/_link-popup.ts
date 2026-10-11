@@ -145,8 +145,8 @@ export function openLinkPopup(editor: RichTextEditor, choices: LinkChoices): voi
             : 'dashboard.link.urlPlaceholder',
         ),
       ),
-      searchLabel: untracked(() => t('dashboard.searchPlaceholder')),
-      noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
+      searchLabel: () => t('dashboard.searchPlaceholder'),
+      noResultsLabel: () => t('dashboard.noResultsFound'),
       get initialKeyword() {
         return choiceKeyword(model.value);
       },

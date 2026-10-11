@@ -253,8 +253,8 @@ export const recordType: FieldType = {
           isString(value) ? source.choiceOf(value) : Promise.resolve(null),
         error: () => routed.value !== '',
         name: context.path,
-        searchLabel: untracked(() => t('dashboard.searchPlaceholder')),
-        noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
+        searchLabel: () => t('dashboard.searchPlaceholder'),
+        noResultsLabel: () => t('dashboard.noResultsFound'),
         // `onCommit` runs before the select writes the model; writing here lets the history push see it.
         onCommit: (value) => {
           model.value = isString(value) ? value : null;
@@ -296,14 +296,14 @@ export const recordType: FieldType = {
           variant: 'outline',
           href: recordHref(target, value),
           target: '_blank',
-          ariaLabel: t(canUpdate ? 'dashboard.edit' : 'dashboard.view'),
+          ariaLabel: () => t(canUpdate ? 'dashboard.edit' : 'dashboard.view'),
         });
         onCleanup(attachTooltip(open, () => t(canUpdate ? 'dashboard.edit' : 'dashboard.view')));
         if (!context.field.nullable) return open;
         const clear = button(icon('x'), {
           variant: 'outline',
           disabled: off ? (): boolean => true : undefined,
-          ariaLabel: t('dashboard.clearSelection'),
+          ariaLabel: () => t('dashboard.clearSelection'),
           onClick: () => {
             model.value = null;
             change();
@@ -395,8 +395,8 @@ export const recordType: FieldType = {
         selectedChoiceResolver: (value) =>
           isString(value) && value !== '' ? source.choiceOf(value) : Promise.resolve(null),
         name: context.inputID,
-        searchLabel: untracked(() => t('dashboard.searchPlaceholder')),
-        noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
+        searchLabel: () => t('dashboard.searchPlaceholder'),
+        noResultsLabel: () => t('dashboard.noResultsFound'),
       });
       if (isUndefined(picker)) return select;
       return h('div', { class: 'ohne-row' }, picker.trigger, select, picker.host);

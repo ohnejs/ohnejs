@@ -32,7 +32,7 @@ export interface DashboardConfig {
 
   /**
    * Every message group the stack defines, the first segment of each key.
-   * `loadMessages` fetches each of them before a language renders.
+   * `loadLanguage` fetches each of them before a language renders.
    */
   messageGroups: string[];
 }

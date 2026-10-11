@@ -1,13 +1,13 @@
-import { loadMessages } from './messages.ts';
-import { invalidateDashboardMeta } from './meta.ts';
-import { type DashboardLanguage, useDashboardLanguage } from './use-dashboard-language.ts';
+import { loadLanguage } from './messages.ts';
+import { type DashboardLanguage, requestedLanguage } from './use-dashboard-language.ts';
 
 let latest: DashboardLanguage | undefined;
 
 /**
  * Switches the dashboard language once its message catalogs have loaded.
- * The page then rebuilds in the new language with every message ready, so no raw key flashes.
- * The discovery store refetches too, so its labels follow.
+ * Every live string then re-renders in place, with every message ready, so no raw key flashes.
+ * The page keeps its state: a draft, the focus, a scroll position, an open popup.
+ * A switch made while a navigation is pending lands together with the arriving page.
  * When switches overlap, the last one called wins, however their loads finish.
  *
  * @example
@@ -17,17 +17,16 @@ let latest: DashboardLanguage | undefined;
  */
 export async function setDashboardLanguage(next: DashboardLanguage): Promise<void> {
   latest = next;
-  await loadMessages(next);
-  if (latest !== next || useDashboardLanguage().value === next) return;
-  writeDashboardLanguage(next);
-  invalidateDashboardMeta();
+  await loadLanguage(next);
+  if (latest !== next || requestedLanguage().value === next) return;
+  requestDashboardLanguage(next);
 }
 
 /**
- * Writes the dashboard language at once, overriding any switch still loading its catalogs.
- * The caller loads the catalogs first, through `loadMessages`, so the page rebuilds with every message ready.
+ * Requests the dashboard language at once, overriding any switch still loading its catalogs.
+ * The caller loads the catalogs first, through `loadLanguage`, so the text switches with every message ready.
  */
-export function writeDashboardLanguage(next: DashboardLanguage): void {
+export function requestDashboardLanguage(next: DashboardLanguage): void {
   latest = next;
-  useDashboardLanguage().value = next;
+  requestedLanguage().value = next;
 }

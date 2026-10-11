@@ -16,6 +16,7 @@ import {
   navigate,
   type RouteContext,
   setDocumentTitle,
+  signInCount,
   useHotkeys,
   when,
 } from 'ohnejs/dashboard';
@@ -339,6 +340,8 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
   effect(() => {
     void view.directory.value;
     void view.query.value;
+    // A sign-in in place reloads the grid an expired session failed to load.
+    void signInCount();
     // Read here, so a content-language switch reloads the grid at that locale.
     if (uploadsCollection()?.translatable) void activeContentLocale();
     untracked(() => {

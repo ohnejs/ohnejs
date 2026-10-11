@@ -119,7 +119,7 @@ export function header(options: HeaderOptions): HTMLElement {
     'a',
     {
       href: '/',
-      title: t('dashboard.goBackHome'),
+      title: () => t('dashboard.goBackHome'),
       class: 'o-header-logo ohne-raw',
       onMouseenter: () => mark.expand(),
       onMouseleave: () => mark.collapse(),
@@ -134,7 +134,9 @@ export function header(options: HeaderOptions): HTMLElement {
     class: 'o-header-menu-button',
     onClick: () => options.onToggleSidebar(),
   });
-  menuButton.title = t('dashboard.header.toggleSidebar');
+  effect(() => {
+    menuButton.title = t('dashboard.header.toggleSidebar');
+  });
   effect(() => {
     const expanded = options.sidebarExpanded();
     menuButton.classList.toggle('ohne-button-accent', expanded);

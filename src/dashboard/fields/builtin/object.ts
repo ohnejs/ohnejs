@@ -10,7 +10,7 @@ import { effect } from '../../../utils/reactive/effect.ts';
 import { type Ref, ref } from '../../../utils/reactive/ref.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
-import { useT } from '../../runtime/use-t.ts';
+import { translateMessage, useT } from '../../runtime/use-t.ts';
 import { card } from '../../ui/card.ts';
 import { switchInput } from '../../ui/switch.ts';
 import { blocksOf } from '../_blocks.ts';
@@ -172,7 +172,7 @@ export const objectType: FieldType = {
             field.required ? ' ohne-object-required' : ''
           }`,
         },
-        field.label,
+        () => translateMessage(field.label),
       );
 
     // Built once and re-parented across card rebuilds, so a click never unmounts the focused knob.

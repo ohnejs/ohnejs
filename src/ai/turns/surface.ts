@@ -380,7 +380,7 @@ async function offeredPages(
       const path = to.split(/[?#]/, 1)[0];
       if (pages.has(to) || !isLocalPath(to) || CLOSED_PAGES.has(path)) continue;
       if (closed.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) continue;
-      pages.set(to, label);
+      pages.set(to, resolveMessage(label));
     }
   }
   if (!pages.has('/account') && (await hasAccountPage(user))) {
@@ -628,7 +628,9 @@ function fieldLine(field: DashboardField, meta: CollectionQueryMeta): string {
   ].filter((flag) => flag !== '');
   const shape = [fieldType(field, meta), ...flags].join(', ');
   const detail = fieldDetail(field);
-  const description = isUndefined(field.description) ? '' : ` - ${field.description}`;
+  const description = isUndefined(field.description)
+    ? ''
+    : ` - ${resolveMessage(field.description)}`;
   return `${field.name}: ${shape}${detail}${description}`;
 }
 

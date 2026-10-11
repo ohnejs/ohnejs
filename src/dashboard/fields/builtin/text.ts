@@ -10,7 +10,7 @@ import { useT } from '../../runtime/use-t.ts';
 import { textArea } from '../../ui/text-area.ts';
 import { textInput } from '../../ui/text-input.ts';
 import { cellEditor } from '../cell-editor.ts';
-import { describeControl } from '../field-row.ts';
+import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { parseTextValue } from '../parse.ts';
 
@@ -56,7 +56,7 @@ export const textType: FieldType = {
     };
 
     const singleLine = (): HTMLElement => {
-      const control = textInput(raw, { disabled: () => off, placeholder: field.placeholder });
+      const control = textInput(raw, { disabled: () => off, placeholder: fieldPlaceholder(field) });
       const input = control.querySelector('input') as HTMLInputElement;
       input.addEventListener('input', touch);
       input.addEventListener('keydown', (event) => {
@@ -75,7 +75,7 @@ export const textType: FieldType = {
     };
 
     const multiLine = (): HTMLElement => {
-      const control = textArea(raw, { disabled: () => off, placeholder: field.placeholder });
+      const control = textArea(raw, { disabled: () => off, placeholder: fieldPlaceholder(field) });
       const area = control.querySelector('textarea') as HTMLTextAreaElement;
       area.addEventListener('input', touch);
       describeControl(area, field, path, error);

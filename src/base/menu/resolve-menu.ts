@@ -11,15 +11,14 @@ import type { DashboardMenuGroup, DashboardMenuItem } from '../api/dashboard.get
 import type { User } from '../auth/types.ts';
 import type { DashboardCollection } from '../collections-api/describe.ts';
 
-import { resolveMessage } from '../../ohne/http/translate.ts';
-
 declare module 'ohnejs' {
   interface Hooks {
     /**
      * Filters the sidebar menu after `dashboard.menu` resolves, before `GET /dashboard` answers.
-     * Fires once per discovery read, inside the request context, so the viewer's language is in scope.
-     * The assistant fires it too, in the default language, to list the pages it may open.
-     * The groups arrive resolved: every row carries a `to`, a translated `label`, and any icon.
+     * Fires once per discovery read, inside the request context.
+     * The assistant fires it too, to list the pages it may open.
+     * The groups arrive resolved: every row carries a `to`, a `label` message, and any icon.
+     * Give a new row's label as a message; the dashboard translates it where it renders.
      * Append a group, reorder the rows, or drop a link the `context.user` should not see.
      * Collection rows are already scoped to what the user may reach; a declared link is not.
      * Return a replacement `DashboardMenuGroup[]`, or mutate the array in place and return nothing.
@@ -68,9 +67,10 @@ function resolveMenu(collections: DashboardCollection[]): DashboardMenuGroup[] {
       unplaced.delete(entry);
       items.push(collectionItem(collection));
     }
-    if (!isEmpty(items)) {
-      groups.push({ label: isUndefined(group.label) ? '' : resolveMessage(group.label), items });
-    }
+    if (isEmpty(items)) continue;
+    const heading: DashboardMenuGroup = { label: '', items };
+    if (!isUndefined(group.label)) heading.label = group.label;
+    groups.push(heading);
   }
   if (unplaced.size > 0) {
     groups.push({ label: '', items: [...unplaced.values()].map(collectionItem) });
@@ -91,10 +91,10 @@ function collectionItem(collection: DashboardCollection): DashboardMenuItem {
 }
 
 /**
- * One declared link's row, its label resolved in the request's language.
+ * One declared link's row, its label as declared.
  */
 function linkItem(link: DashboardMenuLink): DashboardMenuItem {
-  const item: DashboardMenuItem = { to: link.to, label: resolveMessage(link.label) };
+  const item: DashboardMenuItem = { to: link.to, label: link.label };
   if (!isUndefined(link.icon)) item.icon = link.icon;
   return item;
 }

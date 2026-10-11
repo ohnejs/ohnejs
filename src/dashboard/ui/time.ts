@@ -17,27 +17,30 @@ import './tokens.ts';
 export interface TimeLabels {
   /**
    * The suffix displayed after the hours input.
+   * A getter reads reactively.
    *
    * @default
    * 'h'
    */
-  hoursSuffix?: string;
+  hoursSuffix?: string | (() => string);
 
   /**
    * The suffix displayed after the minutes input.
+   * A getter reads reactively.
    *
    * @default
    * 'm'
    */
-  minutesSuffix?: string;
+  minutesSuffix?: string | (() => string);
 
   /**
    * The suffix displayed after the seconds input.
+   * A getter reads reactively.
    *
    * @default
    * 's'
    */
-  secondsSuffix?: string;
+  secondsSuffix?: string | (() => string);
 }
 
 /**

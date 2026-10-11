@@ -1,6 +1,6 @@
 import { paletteQuery, paletteView } from 'app/components/palette-state.ts';
 import { button, type Child, css, dropdown, dropdownItem, h, icon, when } from 'ohnejs/dashboard';
-import { ref } from 'ohnejs/utils';
+import { effect, ref } from 'ohnejs/utils';
 
 import { useAIT } from './_ai-messages.ts';
 import { aiMeta } from './_ai-meta.ts';
@@ -62,7 +62,9 @@ export function aiModelMenu(): Child {
           },
         },
       );
-      trigger.title = t('ai.dashboard.model');
+      effect(() => {
+        trigger.title = t('ai.dashboard.model');
+      });
       const pick = (name: string): void => {
         setPickedModel(name === aiMeta()?.model ? null : name);
         open.value = false;

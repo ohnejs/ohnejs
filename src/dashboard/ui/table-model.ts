@@ -5,8 +5,9 @@ export interface TableColumn<T = unknown> {
   /**
    * The column label.
    * If not provided, the column key is used.
+   * A getter reads reactively.
    */
-  label?: string;
+  label?: string | (() => string);
 
   /**
    * Controls if the column can be sorted.

@@ -6,7 +6,7 @@ import { resetLayoutState } from '../components/shell.ts';
 /**
  * The logout page: a blank frame that renders nothing.
  * Construction fires the sign-out; once the session has ended it lands on the login page.
- * A visitor already signed out leaves at once, so the rebuild a language reset causes signs out only once.
+ * A visitor already signed out leaves at once instead of signing out again.
  * The persisted sidebar state resets.
  */
 export default defineDashboardPage(() => {

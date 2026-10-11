@@ -111,8 +111,9 @@ export interface DynamicSelectOptions {
 
   /**
    * Placeholder text shown when no label or value is displayed in the select field.
+   * A getter reads reactively.
    */
-  placeholder?: string;
+  placeholder?: string | (() => string);
 
   /**
    * Reports the error state reactively.
@@ -139,19 +140,21 @@ export interface DynamicSelectOptions {
 
   /**
    * The placeholder for the search input field.
+   * A getter reads reactively.
    *
    * @default
    * 'Search...'
    */
-  searchLabel?: string;
+  searchLabel?: string | (() => string);
 
   /**
    * Text label for the no results found message in the choices dropdown.
+   * A getter reads reactively.
    *
    * @default
    * 'No results found'
    */
-  noResultsLabel?: string;
+  noResultsLabel?: string | (() => string);
 
   /**
    * An optional keyword used to pre-fill the search input each time the dropdown opens.

@@ -7,10 +7,11 @@ import {
   h,
   icon,
   type Translate,
+  translateMessage,
   useRoute,
   useT,
-  type VerticalMenuItemModel,
   verticalMenu,
+  type VerticalMenuItemModel,
   when,
 } from 'ohnejs/dashboard';
 import { isEmpty, isUndefined, withTrailingSlash } from 'ohnejs/utils';
@@ -50,10 +51,10 @@ function menuSection(group: () => DashboardMenuGroup, t: Translate): Child {
     () => !isEmpty(group().items),
     () =>
       verticalMenu({
-        title: group().label === '' ? undefined : group().label,
+        title: group().label === '' ? undefined : () => translateMessage(group().label),
         items: () => itemsOf(group()),
-        ariaCollapseLabel: t('dashboard.menu.collapse'),
-        ariaExpandLabel: t('dashboard.menu.expand'),
+        ariaCollapseLabel: () => t('dashboard.menu.collapse'),
+        ariaExpandLabel: () => t('dashboard.menu.expand'),
       }),
   );
 }
@@ -67,7 +68,7 @@ function itemsOf(group: DashboardMenuGroup): VerticalMenuItemModel[] {
     const to = withTrailingSlash(entry.to);
     const item: VerticalMenuItemModel = {
       to: entry.to,
-      label: entry.label,
+      label: translateMessage(entry.label),
       // Every path sits under the root, so a row targeting it matches exactly instead.
       active: to === '/' ? path === '/' : path.startsWith(to),
     };

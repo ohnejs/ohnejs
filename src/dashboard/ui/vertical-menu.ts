@@ -6,6 +6,7 @@ import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { toValue } from '../../utils/reactive/to-value.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
@@ -98,20 +99,22 @@ export interface VerticalMenuOptions {
   /**
    * The label for the expand buttons.
    * Only applies for items with submenus.
+   * A getter reads reactively.
    *
    * @default
    * 'Expand'
    */
-  ariaExpandLabel?: string;
+  ariaExpandLabel?: string | (() => string);
 
   /**
    * The label for the collapse buttons.
    * Only applies for items with submenus.
+   * A getter reads reactively.
    *
    * @default
    * 'Collapse'
    */
-  ariaCollapseLabel?: string;
+  ariaCollapseLabel?: string | (() => string);
 
   /**
    * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
@@ -144,20 +147,22 @@ export interface VerticalMenuItemOptions {
   /**
    * The label for the expand button.
    * Only applies when the item has a submenu.
+   * A getter reads reactively.
    *
    * @default
    * 'Expand'
    */
-  ariaExpandLabel?: string;
+  ariaExpandLabel?: string | (() => string);
 
   /**
    * The label for the collapse button.
    * Only applies when the item has a submenu.
+   * A getter reads reactively.
    *
    * @default
    * 'Collapse'
    */
-  ariaCollapseLabel?: string;
+  ariaCollapseLabel?: string | (() => string);
 }
 
 css`
@@ -457,7 +462,7 @@ export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement 
         {
           'aria-expanded': () => String(isExpanded()),
           'aria-label': () =>
-            item().submenu?.length ? (isExpanded() ? collapseLabel : expandLabel) : null,
+            item().submenu?.length ? toValue(isExpanded() ? collapseLabel : expandLabel) : null,
           type: 'button',
           class: 'ohne-vertical-menu-item-button ohne-raw',
           onClick: () => {

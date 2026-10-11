@@ -11,6 +11,7 @@ import {
   type Primitive,
   select,
   type SelectChoice,
+  translateMessage,
   useT,
   when,
 } from 'ohnejs/dashboard';
@@ -188,8 +189,8 @@ export function orderBy(options: OrderByOptions): HTMLElement {
           .map((field) =>
             field.name === item().field ||
             items.value.every((candidate) => candidate.field !== field.name)
-              ? { label: field.label, value: field.name }
-              : { label: field.label, value: field.name, disabled: true },
+              ? { label: translateMessage(field.label), value: field.name }
+              : { label: translateMessage(field.label), value: field.name, disabled: true },
           ),
       // Untracked: the id is static, and a tracked read would rebuild the row on every toggle.
       { id: `${id}-${untracked(() => item().field)}-field`, name: id },

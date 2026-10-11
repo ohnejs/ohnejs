@@ -11,7 +11,6 @@ import { useFlows } from '../../../src/ohne/flows/use-flows.ts';
 import { applyHook } from '../../../src/ohne/hooks/apply-hook.ts';
 import { hook } from '../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
-import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { useSkills } from '../../../src/ohne/skills/use-skills.ts';
 import { userWith, withAI } from '../_fixture.ts';
 
@@ -28,7 +27,6 @@ const ai: Config['ai'] = {
   },
 };
 
-useMessages().register('en', { 'skills.translate.title': 'Translate items' });
 useSkills().register('translate-items', {
   name: 'translate-items',
   skill: {
@@ -70,14 +68,14 @@ useFlows().register('weekly', {
 
 const raidOfficer = {
   name: 'raid-officer',
-  title: 'Translate items',
+  title: 'skills.translate.title',
   description: 'Routes a request.',
 };
 const weekly = { name: 'weekly', title: 'Weekly', description: 'Runs the weekly report.' };
 
 const translate = {
   name: 'translate-items',
-  title: 'Translate items',
+  title: 'skills.translate.title',
   description: 'Translate item names and tooltips.',
 };
 const report = { name: 'weekly-report', title: 'Weekly report', description: 'Sum up the week.' };

@@ -1,3 +1,4 @@
+import type { MessageData } from '../../utils/i18n/message-data.ts';
 import type { TreeDropTarget, TreeItemModel, TreeModel } from '../ui/tree-model.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -29,14 +30,14 @@ export interface TreeBlockList<N extends TreeBlock> {
  */
 export type BlockTreeRow<N extends TreeBlock> =
   | { kind: 'block'; node: N; list: TreeBlockList<N> }
-  | { kind: 'slot'; name: string; label: string; list: TreeBlockList<N>; owner: N };
+  | { kind: 'slot'; name: string; label: MessageData; list: TreeBlockList<N>; owner: N };
 
 /**
  * The `blocks` lists a block holds, one per `blocks` field, in field order.
  */
 export type BlockSlots<N extends TreeBlock> = (
   node: N,
-) => { name: string; label: string; list: TreeBlockList<N> }[];
+) => { name: string; label: MessageData; list: TreeBlockList<N> }[];
 
 /**
  * Where a drop lands: a list and the index in its current nodes.

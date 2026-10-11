@@ -208,7 +208,7 @@ export const repeaterType: FieldType = {
         allowCrossDrop: true,
         disabled: () => off,
         isDraggable: !off,
-        dropItemsHereLabel: t('dashboard.dropItemsHere'),
+        dropItemsHereLabel: () => t('dashboard.dropItemsHere'),
         header: (entry, index) => [
           h('span', { class: 'ohne-muted ohne-truncate' }, () => `#${index() + 1}`),
           off

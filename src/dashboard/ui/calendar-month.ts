@@ -1,5 +1,7 @@
+import type { MaybeGetter } from '../../utils/reactive/to-value.ts';
 import type { CalendarLabels } from './calendar.ts';
 
+import { toValue } from '../../utils/reactive/to-value.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import {
@@ -56,8 +58,9 @@ export interface CalendarMonthOptions {
 
   /**
    * The labels of the calendar; the grid uses `daysShort` and `selectDate`.
+   * A getter reads reactively.
    */
-  labels: Required<CalendarLabels>;
+  labels: MaybeGetter<Required<CalendarLabels>>;
 
   /**
    * Called with the clicked day of the month and the click event.
@@ -225,7 +228,7 @@ function dayButton(cell: DayCell, options: CalendarMonthOptions): HTMLElement {
       'data-day': cell.day,
       disabled: cell.disabled ? true : null,
       tabindex: cell.disabled ? -1 : null,
-      title: cell.disabled ? null : options.labels.selectDate,
+      title: () => (cell.disabled ? null : toValue(options.labels).selectDate),
       type: 'button',
       class:
         'ohne-calendar-day-button ohne-raw' +
@@ -259,7 +262,7 @@ export function calendarMonth(options: CalendarMonthOptions): HTMLElement {
       h(
         'tr',
         null,
-        days.map((day) => h('th', null, options.labels.daysShort[day - 1])),
+        days.map((day) => h('th', null, () => toValue(options.labels).daysShort[day - 1])),
       ),
     ),
     h('tbody', null, () =>

@@ -5,7 +5,6 @@ import type { IconName } from './icon.ts';
 
 import { foldCase } from '../../utils/case/fold-case.ts';
 import { withDefaults } from '../../utils/defaults/with-defaults.ts';
-import { isFunction } from '../../utils/is/is-function.ts';
 import { isNull } from '../../utils/is/is-null.ts';
 import { isNumber } from '../../utils/is/is-number.ts';
 import { isString } from '../../utils/is/is-string.ts';
@@ -15,6 +14,7 @@ import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { nextTick } from '../../utils/reactive/next-tick.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { type MaybeGetter, toValue } from '../../utils/reactive/to-value.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { searchByKeywords } from '../../utils/search/search-by-keywords.ts';
 import { sleep } from '../../utils/sleep/sleep.ts';
@@ -188,8 +188,9 @@ export interface CalendarOptions {
 
   /**
    * Placeholder text shown while the value is `null`.
+   * A getter reads reactively.
    */
-  placeholder?: string;
+  placeholder?: string | (() => string);
 
   /**
    * Whether the clear button renders while a value is selected.
@@ -256,8 +257,9 @@ export interface CalendarOptions {
 
   /**
    * Labels used for the calendar component.
+   * A getter reads reactively, so the labels can follow the language.
    */
-  labels?: CalendarLabels;
+  labels?: MaybeGetter<CalendarLabels>;
 
   /**
    * Called with the settled value when the picker closes, and immediately on clear.
@@ -425,10 +427,7 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
   const withTime = options.withTime ?? false;
   const formatter =
     options.formatter ?? ((timestamp: number): string => new Date(timestamp).toUTCString());
-  const resolvedLabels: Required<CalendarLabels> = withDefaults(
-    options.labels ?? {},
-    LABEL_DEFAULTS,
-  );
+  const labels = computed(() => withDefaults(toValue(options.labels ?? {}), LABEL_DEFAULTS));
   const headerSize = isNumber(options.size) ? options.size - 1 : -2;
 
   const zone = (): string => resolveTimezone(options.timezone);
@@ -470,10 +469,8 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
   const selectedYear = ref(seed.year);
   const selectedMonth = ref(seed.month);
 
-  const minInput = (): number | string =>
-    (isFunction(options.min) ? options.min() : options.min) ?? MIN_TIMESTAMP;
-  const maxInput = (): number | string =>
-    (isFunction(options.max) ? options.max() : options.max) ?? 8640000000000000;
+  const minInput = (): number | string => toValue(options.min) ?? MIN_TIMESTAMP;
+  const maxInput = (): number | string => toValue(options.max) ?? 8640000000000000;
   const minDate = computed(() => {
     const value = minInput();
     return zonedFromTimestamp(
@@ -546,7 +543,7 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
       } else if (/^0*([1-9]|[1-9][0-9]|[1-9][0-9]{2}|[1-9][0-9]{3})$/.test(entry)) {
         year = Number(entry);
       } else {
-        const months = resolvedLabels.months.map((name) => foldCase(name));
+        const months = labels.value.months.map((name) => foldCase(name));
         const results = searchByKeywords(months, entry);
         month = results[0] ? months.indexOf(results[0]) + 1 : undefined;
       }
@@ -639,7 +636,9 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
         else prevMonth();
       },
     });
-    previousButton.title = resolvedLabels.previousMonth;
+    effect(() => {
+      previousButton.title = labels.value.previousMonth;
+    });
     const nextButton = button(icon('chevron-right'), {
       variant: 'ghost',
       size: headerSize,
@@ -650,11 +649,13 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
         else nextMonth();
       },
     });
-    nextButton.title = resolvedLabels.nextMonth;
+    effect(() => {
+      nextButton.title = labels.value.nextMonth;
+    });
     return h(
       'div',
       { class: 'ohne-calendar-header' },
-      button(() => resolvedLabels.months[selectedMonth.value - 1], {
+      button(() => labels.value.months[selectedMonth.value - 1], {
         variant: 'secondary',
         size: headerSize,
         onClick: () => void openSelector('month'),
@@ -680,7 +681,7 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
 
   const monthSelector = (): HTMLElement =>
     selectorPane(() =>
-      resolvedLabels.months.map((month, index) => {
+      labels.value.months.map((month, index) => {
         const element = button(month, {
           variant: index + 1 === selectedMonth.value ? 'primary' : 'secondary',
           type: 'button',
@@ -688,7 +689,7 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
             (selectedYear.value === minDate.value.year && index < minDate.value.month - 1) ||
             (selectedYear.value === maxDate.value.year && index > maxDate.value.month - 1),
           onClick: () => {
-            selectedMonth.value = resolvedLabels.months.indexOf(month) + 1;
+            selectedMonth.value = index + 1;
             isMonthSelectorVisible.value = false;
             scrollPanelTop();
           },
@@ -776,6 +777,11 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
         min: () => minTime.value,
         max: () => maxTime.value,
         showSeconds: options.showSeconds ?? true,
+        labels: {
+          hoursSuffix: () => labels.value.hoursSuffix,
+          minutesSuffix: () => labels.value.minutesSuffix,
+          secondsSuffix: () => labels.value.secondsSuffix,
+        },
         onCommit: () => {
           const current = untracked(() => date.value);
           if (!isNull(current)) model.value = prepareEmitValue(clampDate(current));
@@ -803,7 +809,7 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
         startDay: options.startDay ?? 1,
         today,
         resolveTimezone: zone,
-        labels: resolvedLabels,
+        labels: () => labels.value,
         onSelectDay,
       }),
     ),
@@ -852,7 +858,9 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
       },
     });
     element.tabIndex = 0;
-    element.title = resolvedLabels.clear;
+    effect(() => {
+      element.title = labels.value.clear;
+    });
     element.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();

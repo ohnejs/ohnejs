@@ -3,6 +3,8 @@ import {
   attachTooltip,
   type Child,
   css,
+  type DashboardField,
+  type DashboardMeta,
   dashboardMeta,
   each,
   fallbackLabel,
@@ -14,6 +16,7 @@ import {
   navigate,
   type Popup,
   popup,
+  translateMessage,
   useT,
   verticalMenu,
   when,
@@ -43,6 +46,7 @@ import {
   type PaletteEntry,
   type PaletteGroup,
   type PaletteHit,
+  type PaletteField,
   type PaletteMeta,
   paletteActive,
   paletteActiveIndex,
@@ -224,10 +228,10 @@ export function palette(): Child {
         );
         if (onMore && !isUndefined(last)) paletteActive.value = last.key;
       };
+      const meta = computed(() => paletteMeta(dashboardMeta()));
       const groups = computed(() => {
-        const meta = dashboardMeta();
         const rows = paletteSlots('row').flatMap((list) => list());
-        return paletteGroups(paletteQuery.value, paletteHits.value, meta ?? NO_META, rows, {
+        return paletteGroups(paletteQuery.value, paletteHits.value, meta.value, rows, {
           groups: more.value,
           label: t('dashboard.palette.loadMore'),
           load: (collection, via) => void loadMore(collection, via),
@@ -498,6 +502,44 @@ export function palette(): Child {
       return null;
     },
   );
+}
+
+/**
+ * The palette's slice of the dashboard meta, every label read in the dashboard language.
+ * The read is reactive, so a language switch rewords the groups in place.
+ */
+function paletteMeta(meta: DashboardMeta | undefined): PaletteMeta {
+  if (isUndefined(meta)) return NO_META;
+  return {
+    collections: meta.collections.map((collection) => ({
+      ...collection,
+      fields: paletteFields(collection.fields),
+    })),
+    menu: meta.menu.map((group) => ({
+      label: translateMessage(group.label),
+      items: group.items.map((item) => ({ to: item.to, label: translateMessage(item.label) })),
+    })),
+    blocks: meta.blocks.map((block) => ({
+      name: block.name,
+      label: translateMessage(block.label),
+      fields: paletteFields(block.fields),
+    })),
+  };
+}
+
+/**
+ * The palette's slice of described fields, labels translated, subfields followed.
+ */
+function paletteFields(fields: readonly DashboardField[]): PaletteField[] {
+  return fields.map((field) => {
+    const entry: PaletteField = {
+      name: field.name,
+      label: translateMessage(field.label),
+      kind: field.kind,
+    };
+    if (!isUndefined(field.subfields)) entry.subfields = paletteFields(field.subfields);
+    return entry;
+  });
 }
 
 /**

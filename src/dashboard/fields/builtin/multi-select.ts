@@ -18,7 +18,7 @@ import { translateMessage, useT } from '../../runtime/use-t.ts';
 import { type ChipsChoice, chips } from '../../ui/chips.ts';
 import { select, type SelectChoice } from '../../ui/select.ts';
 import { textInput } from '../../ui/text-input.ts';
-import { describeControl } from '../field-row.ts';
+import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 /**
@@ -86,12 +86,12 @@ export const multiSelectType: FieldType = {
         ? (): ChipsChoice[] => choicesOf(context.field)
         : undefined,
       maxItems: isNumber(max) ? max : undefined,
-      placeholder: context.field.placeholder,
+      placeholder: fieldPlaceholder(context.field),
       error: () => routed.value !== '',
       erroredItems: () => erroredIndices.value,
       name: context.path,
-      noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
-      removeItemLabel: untracked(() => t('dashboard.removeItem')),
+      noResultsLabel: () => t('dashboard.noResultsFound'),
+      removeItemLabel: () => t('dashboard.removeItem'),
     });
     const input = element.querySelector<HTMLInputElement>('.ohne-chips-input');
     if (!isNull(input)) describeControl(input, context.field, context.path, () => routed.value);

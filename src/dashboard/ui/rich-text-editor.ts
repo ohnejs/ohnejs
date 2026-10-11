@@ -5,11 +5,11 @@ import type { RichTextBlockType, RichTextState } from './rich-text-commands.ts';
 import type { RichTextCommand, RichTextInputHost } from './rich-text-input.ts';
 import type { Leaf, Selection } from './rich-text-model.ts';
 
-import { isFunction } from '../../utils/is/is-function.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { toValue } from '../../utils/reactive/to-value.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { RICH_TEXT_MARKS } from '../../utils/rich-text/rich-text.ts';
 import { css } from '../render/css.ts';
@@ -332,7 +332,7 @@ export function richTextEditor<C extends string>(
     role: 'textbox',
     spellcheck: String(config.spellcheck ?? true),
     'aria-multiline': String(!options.inline || options.lineBreaks !== false),
-    'aria-placeholder': () => textOf(config.placeholder) || undefined,
+    'aria-placeholder': () => toValue(config.placeholder) || undefined,
     'aria-readonly': () => disabled() && 'true',
     contenteditable: () => !disabled() && 'true',
   });
@@ -354,7 +354,7 @@ export function richTextEditor<C extends string>(
   const view = createRichTextView<C>(surface, {
     href: links.href,
     missing: links.missing,
-    missingLabel: () => textOf(config.missingLabel),
+    missingLabel: () => toValue(config.missingLabel) ?? '',
   });
 
   const now = () => untracked(() => current.value);
@@ -372,7 +372,7 @@ export function richTextEditor<C extends string>(
     }
     stale = false;
     const { doc, selection } = now();
-    const placeholder = untracked(() => textOf(config.placeholder));
+    const placeholder = untracked(() => toValue(config.placeholder) ?? '');
     untracked(() => view.render(doc, { typed, errors, placeholder }));
     if (focused()) view.writeSelection(selection);
     renders.value++;
@@ -522,7 +522,7 @@ export function richTextEditor<C extends string>(
   });
 
   batchedEffect(() => {
-    textOf(config.placeholder);
+    toValue(config.placeholder);
     untracked(() => draw());
   });
 
@@ -539,11 +539,4 @@ export function richTextEditor<C extends string>(
  */
 function sameSelection(a: Selection, b: Selection): boolean {
   return comparePos(a.anchor, b.anchor) === 0 && comparePos(a.head, b.head) === 0;
-}
-
-/**
- * Reads a static or reactive text option.
- */
-function textOf(value: string | (() => string) | undefined): string {
-  return (isFunction(value) ? value() : value) ?? '';
 }

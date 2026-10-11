@@ -52,8 +52,9 @@ export interface FloaterOptions {
 
   /**
    * Text for the `title` attribute of the handle.
+   * A getter reads reactively.
    */
-  handleTitle?: string;
+  handleTitle?: string | (() => string);
 
   /**
    * A scrollable ancestor locked alongside the window while the floater is open.

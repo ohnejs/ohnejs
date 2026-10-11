@@ -22,6 +22,7 @@ import {
   labelOf,
   renderProse,
   seedLabel,
+  translateMessage,
   when,
 } from 'ohnejs/dashboard';
 import {
@@ -523,7 +524,7 @@ function pageLine(turn: () => Turn, batch: () => TurnBatch, t: AITranslate): Chi
 function pageLabel(path: string, t: AITranslate): string {
   const meta = dashboardMeta();
   const row = meta?.menu.flatMap((group) => group.items).find((item) => item.to === path);
-  if (!isUndefined(row)) return row.label;
+  if (!isUndefined(row)) return translateMessage(row.label);
   const uuid = path.split(/[/?&=#]/).find(isUUID);
   for (const collection of meta?.collections ?? []) {
     if (path === `/collections/${collection.segment}`) return collection.label;
@@ -770,8 +771,10 @@ function reasonText(reason: string | null, t: AITranslate): string {
  */
 function starterTitle({ skill, flow }: Turn): string {
   const meta = aiMeta();
-  if (!isNull(skill)) return meta?.skills.find((entry) => entry.name === skill)?.title ?? skill;
-  return meta?.flows.find((entry) => entry.name === flow)?.title ?? flow ?? '';
+  const entry = isNull(skill)
+    ? meta?.flows.find(({ name }) => name === flow)
+    : meta?.skills.find(({ name }) => name === skill);
+  return isUndefined(entry) ? (skill ?? flow ?? '') : translateMessage(entry.title);
 }
 
 /**

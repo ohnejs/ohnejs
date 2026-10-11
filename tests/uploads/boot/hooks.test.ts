@@ -47,7 +47,7 @@ const usersRow = { to: '/collections/users', label: 'Users' };
 const uploadsRow = { to: '/collections/uploads', label: 'Uploads', icon: 'library-photo' as const };
 const journalRow = { to: '/collections/uploads-journal', label: 'Uploads journal' };
 const sessionsRow = { to: '/collections/uploads-sessions', label: 'Uploads sessions' };
-const mediaRow = { to: '/media', label: 'Media', icon: 'library-photo' };
+const mediaRow = { to: '/media', label: 'uploads.menu.media', icon: 'library-photo' };
 
 const folder = await queryUntyped('Uploads').createOrThrow({
   kind: 'folder',

@@ -1,12 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { afterEach, before, describe, it, mock } from 'node:test';
 
-import {
-  loadMessages,
-  messageCatalog,
-  messageRepairs,
-} from '../../../src/dashboard/runtime/messages.ts';
-import { useDashboardLanguage } from '../../../src/dashboard/runtime/use-dashboard-language.ts';
+import { loadLanguage, messageCatalog } from '../../../src/dashboard/runtime/messages.ts';
 
 const NAV = { 'nav.home': { template: 'Start', language: 'de' } };
 const FIELD = { 'field.required': { template: 'Pflichtfeld', language: 'de' } };
@@ -38,7 +33,7 @@ function settle(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
-describe('loadMessages', () => {
+describe('loadLanguage', () => {
   before(() => {
     Object.assign(globalThis, {
       document: {
@@ -68,7 +63,7 @@ describe('loadMessages', () => {
         pending.push(() => resolve(new Response(JSON.stringify(body)))),
       );
     });
-    const load = loadMessages('de');
+    const load = loadLanguage('de');
     await settle();
     deepStrictEqual(urls, ['http://api/messages/nav/de', 'http://api/messages/field/de']);
     for (const answer of pending) answer();
@@ -80,8 +75,8 @@ describe('loadMessages', () => {
 
   it('loads a language once', async () => {
     const urls = serve(catalogs);
-    await loadMessages('fr');
-    await loadMessages('fr');
+    await loadLanguage('fr');
+    await loadLanguage('fr');
     strictEqual(urls.length, 2);
   });
 
@@ -90,7 +85,7 @@ describe('loadMessages', () => {
     mock.method(globalThis, 'fetch', async () => {
       throw new TypeError('Failed to fetch');
     });
-    await loadMessages('it');
+    await loadLanguage('it');
     deepStrictEqual(messageCatalog('it', 'nav'), {});
     mock.restoreAll();
     serve(catalogs);
@@ -99,38 +94,25 @@ describe('loadMessages', () => {
     deepStrictEqual(messageCatalog('it', 'nav'), NAV);
   });
 
-  it('repairs the dashboard language once every failed group has loaded on retry', async () => {
-    mock.timers.enable({ apis: ['setTimeout'] });
-    const before = messageRepairs();
-    serve(() => [503, {}]);
-    await loadMessages('en');
-    mock.restoreAll();
-    let calls = 0;
-    serve((url) => (url.includes('/nav/') || ++calls > 1 ? catalogs(url) : [503, {}]));
-    mock.timers.tick(3000);
-    await settle();
-    strictEqual(messageRepairs(), before);
-    mock.timers.tick(3000);
-    await settle();
-    strictEqual(messageRepairs(), before + 1);
-  });
-
-  it('does not repair a load that succeeds at once, or one for another language', async () => {
-    mock.timers.enable({ apis: ['setTimeout'] });
-    const before = messageRepairs();
-    const language = useDashboardLanguage();
-    language.value = 'bs';
-    serve(catalogs);
-    await loadMessages('bs');
-    mock.restoreAll();
-    serve(() => [500, {}]);
-    await loadMessages('pt');
-    mock.restoreAll();
-    serve(catalogs);
-    mock.timers.tick(3000);
-    await settle();
-    deepStrictEqual(messageCatalog('pt', 'nav'), NAV);
-    strictEqual(messageRepairs(), before);
-    language.value = 'en';
+  it('loads the Intl data alongside only for a language the engine lacks', async () => {
+    const Native = Intl.DateTimeFormat;
+    const Stub = function (locales?: string | string[], options?: Intl.DateTimeFormatOptions) {
+      const tag = Array.isArray(locales) ? locales[0] : locales;
+      return tag === 'bs' ? { format: () => 'M09' } : new Native(tag, options);
+    } as unknown as typeof Intl.DateTimeFormat;
+    Stub.supportedLocalesOf = Native.supportedLocalesOf;
+    Intl.DateTimeFormat = Stub;
+    try {
+      const urls = serve(catalogs);
+      await loadLanguage('pt');
+      strictEqual(
+        urls.some((url) => url.includes('/intl/')),
+        false,
+      );
+      await loadLanguage('bs');
+      strictEqual(urls.includes('http://api/intl/bs'), true);
+    } finally {
+      Intl.DateTimeFormat = Native;
+    }
   });
 });

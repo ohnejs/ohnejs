@@ -1,10 +1,9 @@
 import type { User } from 'ohnejs/auth';
 
-import { hook, useSkills } from 'ohnejs';
+import { hook, type Message, useSkills } from 'ohnejs';
 import { userCan } from 'ohnejs/auth';
 import { isUndefined, parseBytes, parseDuration, toSentenceCase } from 'ohnejs/utils';
 
-import { resolveMessage } from '../../ohne/http/translate.ts';
 import { useAIConfig } from '../config.ts';
 import { canUseModel, defaultModel } from '../providers/use-provider.ts';
 import { flowModels, startableFlows } from '../turns/run-flow.ts';
@@ -38,12 +37,12 @@ declare module '../../base/api/dashboard.get.ts' {
       transformModel?: string;
 
       /**
-       * The skills the person may start, in the viewer's language.
+       * The skills the person may start, their texts as messages the dashboard translates.
        */
       skills: DashboardSkill[];
 
       /**
-       * The flows the person may start, in the viewer's language.
+       * The flows the person may start, their texts as messages the dashboard translates.
        */
       flows: DashboardFlow[];
 
@@ -72,12 +71,12 @@ interface DashboardFlow {
   /**
    * The flow's title, or its name in sentence case when it declares none.
    */
-  title: string;
+  title: Message;
 
   /**
    * What the flow does.
    */
-  description: string;
+  description: Message;
 }
 
 /**
@@ -92,12 +91,12 @@ interface DashboardSkill {
   /**
    * The skill's title, or its name in sentence case when it declares none.
    */
-  title: string;
+  title: Message;
 
   /**
    * What the skill does.
    */
-  description: string;
+  description: Message;
 }
 
 hook('dashboard:meta', async (meta, { user }) => {
@@ -131,8 +130,8 @@ function skillsFor(user: User): DashboardSkill[] {
     .filter(([name]) => !isUndefined(usableSkill(user, name)))
     .map(([name, { skill }]) => ({
       name,
-      title: isUndefined(skill.title) ? toSentenceCase(name) : resolveMessage(skill.title),
-      description: resolveMessage(skill.description),
+      title: skill.title ?? toSentenceCase(name),
+      description: skill.description,
     }));
 }
 
@@ -148,8 +147,8 @@ async function flowsFor(user: User, model: string): Promise<DashboardFlow[]> {
     if (!callable) continue;
     flows.push({
       name,
-      title: isUndefined(flow.title) ? toSentenceCase(name) : resolveMessage(flow.title),
-      description: resolveMessage(flow.description),
+      title: flow.title ?? toSentenceCase(name),
+      description: flow.description,
     });
   }
   return flows;

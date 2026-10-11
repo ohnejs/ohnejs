@@ -268,3 +268,19 @@ The dashboard uses this endpoint: it fetches every group of its language before 
 and again before a language switch. Its
 [browser-side `useT`](../dashboard/data.md#translations-in-the-browser) then renders the same keys your
 handlers use.
+
+## Intl data for the browser
+
+A browser can list a language it has no date or number data for. Asked for Bosnian, it would show
+English month names, or placeholders like `M10`.
+
+The dashboard notices this when it loads a language, and fetches the data from your server instead,
+which derives it from its own engine:
+
+```sh
+curl http://localhost:9001/intl/bs
+```
+
+The answer holds month and weekday names, the date and time layouts, the relative-time words like
+"prije 26 minuta", and the number separators. Dates, relative times and numbers in messages then render
+in that language. A browser that has the data never makes the request.

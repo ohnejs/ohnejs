@@ -15,6 +15,7 @@ import {
   table,
   tableColumn,
   textArea,
+  translateMessage,
   when,
 } from 'ohnejs/dashboard';
 import {
@@ -262,9 +263,12 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
   };
 
   const columns = {
-    record: tableColumn<string>({ label: t('ai.dashboard.batch.record'), width: '10rem' }),
+    record: tableColumn<string>({ label: () => t('ai.dashboard.batch.record'), width: '10rem' }),
     ...Object.fromEntries(
-      fields.map((name) => [name, tableColumn<string>({ label: fieldLabel(collection, name) })]),
+      fields.map((name) => [
+        name,
+        tableColumn<string>({ label: () => fieldLabel(collection, name) }),
+      ]),
     ),
   };
   const grid = table({
@@ -681,8 +685,9 @@ function formatValue(value: string | null): Child {
 }
 
 /**
- * The label of a field of `collection`, or the name itself when it has none.
+ * The label of a field of `collection` in the dashboard language, or the name itself when it has none.
  */
 function fieldLabel(collection: DashboardCollection | null, name: string): string {
-  return collection?.fields.find((field) => field.name === name)?.label ?? name;
+  const field = collection?.fields.find((entry) => entry.name === name);
+  return isUndefined(field) ? name : translateMessage(field.label);
 }

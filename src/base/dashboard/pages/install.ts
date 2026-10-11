@@ -90,9 +90,6 @@ function installForm(): HTMLElement {
   const passwordError = ref('');
   const busy = ref(false);
 
-  // This warms the catalog, so a first failed attempt toasts translated text, not the raw key.
-  t('dashboard.unreachable');
-
   const submit = async (): Promise<void> => {
     if (busy.value) return;
     busy.value = true;

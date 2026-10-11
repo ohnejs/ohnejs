@@ -1,18 +1,19 @@
 import {
   button,
   cellEditor,
-  type ChipsChoice,
   chips,
+  type ChipsChoice,
   css,
   dashboardMeta,
   dateTimePreferences,
   describeControl,
   dimMark,
+  dynamicSelect,
   type DynamicSelectChoice,
   type DynamicSelectPaginatedChoices,
-  dynamicSelect,
   type FieldControl,
   type FieldControlContext,
+  fieldPlaceholder,
   type FieldType,
   h,
   icon,
@@ -22,6 +23,7 @@ import {
   type SelectChoice,
   textInput,
   timezones,
+  translateMessage,
   useT,
 } from 'ohnejs/dashboard';
 import {
@@ -214,15 +216,15 @@ registerFieldType('roles', {
         (dashboardMeta()?.roles ?? []).map(
           ({ name, label, description }): ChipsChoice => ({
             value: name,
-            label,
-            tooltip: description,
+            label: translateMessage(label),
+            tooltip: isUndefined(description) ? undefined : translateMessage(description),
           }),
         ),
       error: () => routed.value !== '',
       erroredItems: () => erroredIndices.value,
       name: context.path,
-      noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
-      removeItemLabel: untracked(() => t('dashboard.removeItem')),
+      noResultsLabel: () => t('dashboard.noResultsFound'),
+      removeItemLabel: () => t('dashboard.removeItem'),
     });
     const input = element.querySelector<HTMLInputElement>('.ohne-chips-input');
     if (!isNull(input)) describeControl(input, context.field, context.path, () => routed.value);
@@ -277,7 +279,10 @@ registerFieldType('roles', {
       return select(
         bridged,
         (): SelectChoice[] =>
-          (dashboardMeta()?.roles ?? []).map(({ name, label }) => ({ value: name, label })),
+          (dashboardMeta()?.roles ?? []).map(({ name, label }) => ({
+            value: name,
+            label: translateMessage(label),
+          })),
         { id: inputID, name: inputID },
       );
     },
@@ -305,31 +310,26 @@ registerFieldType('timezone', {
   control(context) {
     const t = useT();
     let combobox: HTMLElement | null = null;
-    return codeControl(context, (model, commit, error) => ({
-      // `placeholder` is static, so the picker rebuilds when its catalog lands or the language changes.
-      element: h('div', null, () => {
-        const auto = t('auth.timezone.auto');
-        const searchLabel = t('dashboard.searchPlaceholder');
-        const noResultsLabel = t('dashboard.noResultsFound');
-        const picker = untracked(() =>
-          dynamicSelect(model, {
-            choicesResolver: (page, keyword) => Promise.resolve(timezonePage(page, keyword, auto)),
-            selectedChoiceResolver: (value) => Promise.resolve({ value, label: String(value) }),
-            placeholder: auto,
-            searchLabel,
-            noResultsLabel,
-            disabled: () => context.disabled === true,
-            error: () => error() !== '',
-            name: context.path,
-            onCommit: commit,
-          }),
-        );
-        combobox = picker.querySelector<HTMLElement>('[role="combobox"]');
-        if (!isNull(combobox)) describeControl(combobox, context.field, context.path, error);
-        return picker;
-      }),
-      focus: () => combobox?.focus(),
-    }));
+    return codeControl(context, (model, commit, error) => {
+      const picker = dynamicSelect(model, {
+        choicesResolver: (page, keyword) =>
+          Promise.resolve(timezonePage(page, keyword, t('auth.timezone.auto'))),
+        selectedChoiceResolver: (value) => Promise.resolve({ value, label: String(value) }),
+        placeholder: () => t('auth.timezone.auto'),
+        searchLabel: () => t('dashboard.searchPlaceholder'),
+        noResultsLabel: () => t('dashboard.noResultsFound'),
+        disabled: () => context.disabled === true,
+        error: () => error() !== '',
+        name: context.path,
+        onCommit: commit,
+      });
+      combobox = picker.querySelector<HTMLElement>('[role="combobox"]');
+      if (!isNull(combobox)) describeControl(combobox, context.field, context.path, error);
+      return {
+        element: picker,
+        focus: () => combobox?.focus(),
+      };
+    });
   },
 });
 
@@ -373,7 +373,7 @@ registerFieldType('datePattern', {
 
     const box = textInput(raw, {
       disabled: () => off,
-      placeholder: field.placeholder,
+      placeholder: fieldPlaceholder(field),
     });
     const input = box.querySelector('input') as HTMLInputElement;
     input.addEventListener('input', () => {
@@ -423,10 +423,11 @@ function listOf(value: unknown): readonly string[] {
 }
 
 /**
- * A role's served label; a name no role declares any more shows as is.
+ * A role's label in the dashboard language; a name no role declares any more shows as is.
  */
 function roleLabelOf(name: string): string {
-  return dashboardMeta()?.roles.find((role) => role.name === name)?.label ?? name;
+  const role = dashboardMeta()?.roles.find((entry) => entry.name === name);
+  return isUndefined(role) ? name : translateMessage(role.label);
 }
 
 /**
@@ -458,7 +459,7 @@ function codeType(list: () => string[], label: (code: string) => string): FieldT
             disabled: () => context.disabled === true,
             error: () => error() !== '',
             name: context.path,
-            placeholder: context.field.placeholder,
+            placeholder: fieldPlaceholder(context.field),
             onCommit: commit,
           },
         );

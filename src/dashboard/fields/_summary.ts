@@ -9,6 +9,7 @@ import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { h } from '../render/h.ts';
+import { translateMessage } from '../runtime/use-t.ts';
 import { summarizable } from './_search.ts';
 import { dimMark, fieldTypeFor } from './field-type.ts';
 import { labelOf } from './labels.ts';
@@ -78,7 +79,8 @@ function titleRows(
   for (const field of subfields) {
     if (!summarizable(field)) continue;
     const value = item[field.name];
-    const label = prefix === '' ? field.label : `${prefix} › ${field.label}`;
+    const own = translateMessage(field.label);
+    const label = prefix === '' ? own : `${prefix} › ${own}`;
     if (field.kind === 'column') {
       const text = isBoolean(value)
         ? value

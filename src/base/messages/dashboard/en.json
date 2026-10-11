@@ -54,6 +54,7 @@
   "deletedPartial": "{count} deleted, {failed} failed",
   "deselect": "Deselect",
   "disable": "Disable",
+  "dragToAdjust": "Drag to adjust value",
   "dropItemsHere": "Drop items here",
   "duplicate": "Duplicate",
   "edit": "Edit",
@@ -294,6 +295,15 @@
     "selectedOnPage": "Selected {count, plural, one {# record} other {# records}} on this page"
   },
   "tableOverview": "Table overview",
+  "time": {
+    "hours": "h",
+    "minutes": "m",
+    "seconds": "s"
+  },
+  "toaster": {
+    "close": "Close notification",
+    "label": "Notifications alt+T"
+  },
   "translations": {
     "confirmDelete": "Are you sure you want to delete the `{locale}` translation?",
     "copied": "Copied",

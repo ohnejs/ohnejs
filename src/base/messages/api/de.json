@@ -21,6 +21,9 @@
     "unprocessableContent": "Nicht verarbeitbarer Inhalt",
     "unsupportedMediaType": "Nicht unterstützter Medientyp"
   },
+  "intl": {
+    "unknownLanguage": "Keine Datums- und Zahlendaten für die Sprache `{language}`"
+  },
   "messages": {
     "invalidLanguage": "Ungültige Sprache `{language}`",
     "unknownGroup": "Unbekannte Nachrichtengruppe `{group}`"

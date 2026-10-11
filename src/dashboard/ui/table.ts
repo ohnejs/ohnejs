@@ -2,7 +2,6 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 import type { TableColumn, TableColumns, TableCell, TableRow, TableSort } from './table-model.ts';
 
-import { isFunction } from '../../utils/is/is-function.ts';
 import { isNull } from '../../utils/is/is-null.ts';
 import { isNullish } from '../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -10,6 +9,7 @@ import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { toValue } from '../../utils/reactive/to-value.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
@@ -353,8 +353,7 @@ export function table<TColumns extends TableColumns>(options: TableOptions<TColu
   trackShift();
 
   const rows = (): TableRow<TColumns>[] => options.data?.() ?? [];
-  const labels = (): TableLabels =>
-    (isFunction<() => TableLabels>(options.labels) ? options.labels() : options.labels) ?? {};
+  const labels = (): TableLabels => toValue(options.labels) ?? {};
   const selectable = (): boolean => options.selectable?.() ?? false;
   const rowSelectable = (row: TableRow<TColumns>): boolean => options.rowSelectable?.(row) ?? true;
   const selectAllState = (): boolean | 'indeterminate' => options.selectAllState?.() ?? false;

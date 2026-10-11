@@ -18,11 +18,12 @@ import {
   type Popup,
   registerRecordPicker,
   type Table,
+  table,
+  tableColumn,
   type TableColumns,
   type TableRow,
   type TableSort,
-  table,
-  tableColumn,
+  translateMessage,
   useHotkeys,
   useT,
   when,
@@ -43,7 +44,6 @@ import {
   type Ref,
   ref,
   uniqueArray,
-  untracked,
 } from 'ohnejs/utils';
 
 import {
@@ -332,7 +332,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     const columns: TableColumns = {};
     for (const spec of specs()) {
       const definition: Parameters<typeof tableColumn>[0] = {
-        label: spec.label,
+        label: () => translateMessage(spec.label),
         sortable: spec.sortable,
       };
       if (!isUndefined(spec.width)) definition.width = spec.width;
@@ -429,9 +429,9 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   const paginationEl = pagination({
     currentPage: () => paginated.value.currentPage,
     lastPage: () => paginated.value.lastPage,
-    goToPageTitle: untracked(() => t('dashboard.pagination.goToPage')),
-    nextPageTitle: untracked(() => t('dashboard.pagination.next')),
-    previousPageTitle: untracked(() => t('dashboard.pagination.previous')),
+    goToPageTitle: () => t('dashboard.pagination.goToPage'),
+    nextPageTitle: () => t('dashboard.pagination.next'),
+    previousPageTitle: () => t('dashboard.pagination.previous'),
     onChange: (page) => push({ page }),
     button: ({ currentPage, index, onClick }) => {
       const el = h(
@@ -710,7 +710,7 @@ function cloneState(state: TableURLState): TableURLState {
 registerRecordPicker((request) => {
   dataTablePopup({
     collection: request.target,
-    title: request.field.label,
+    title: () => translateMessage(request.field.label),
     values: request.values,
     multiple: request.multiple,
     onApply: request.onApply,

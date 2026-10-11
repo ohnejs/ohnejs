@@ -30,7 +30,7 @@ import type {
 } from '../collections-api/describe.ts';
 
 import { resolveLocales } from '../../ohne/collections/resolve-locales.ts';
-import { defaultLanguage, resolveMessage } from '../../ohne/http/translate.ts';
+import { defaultLanguage } from '../../ohne/http/translate.ts';
 import { accountFields, accountLayout } from '../auth/account-layout.ts';
 import { userCapabilities } from '../auth/capabilities.ts';
 import { requireUser } from '../auth/require-user.ts';
@@ -50,15 +50,15 @@ export interface DashboardBlock {
   name: string;
 
   /**
-   * The display label, resolved in the request's language.
-   * A declared `label` resolves through the message catalogs; omitted falls back to the sentence-cased name.
+   * The display label, a message the dashboard translates where it renders, through `translateMessage`.
+   * It is the declared `label`, or the sentence-cased name when none is declared.
    */
-  label: string;
+  label: Message;
 
   /**
-   * The declared `description`, resolved in the request's language; absent when the block declares none.
+   * The declared `description`, a message the dashboard translates; absent when the block declares none.
    */
-  description?: string;
+  description?: Message;
 
   /**
    * The block's icon, or the field whose value picks it; absent when the block declares none.
@@ -91,15 +91,15 @@ export interface DashboardRole {
   name: string;
 
   /**
-   * The display label, resolved in the request's language.
-   * A declared `label` resolves through the message catalogs; omitted falls back to the sentence-cased name.
+   * The display label, a message the dashboard translates where it renders, through `translateMessage`.
+   * It is the declared `label`, or the sentence-cased name when none is declared.
    */
-  label: string;
+  label: Message;
 
   /**
-   * The declared `description`, resolved in the request's language; absent when the role declares none.
+   * The declared `description`, a message the dashboard translates; absent when the role declares none.
    */
-  description?: string;
+  description?: Message;
 }
 
 /**
@@ -113,9 +113,9 @@ export interface DashboardMenuItem {
   to: string;
 
   /**
-   * The row label, resolved in the request's language.
+   * The row label, a message the dashboard translates where it renders, through `translateMessage`.
    */
-  label: string;
+  label: Message;
 
   /**
    * The Tabler icon shown before the label; absent when the row declares none.
@@ -128,9 +128,9 @@ export interface DashboardMenuItem {
  */
 export interface DashboardMenuGroup {
   /**
-   * The group heading, resolved in the request's language; `''` renders the group without one.
+   * The group heading, a message the dashboard translates; `''` renders the group without one.
    */
-  label: string;
+  label: Message;
 
   /**
    * The rows the group holds, in order.
@@ -208,7 +208,8 @@ declare module 'ohnejs' {
   interface Hooks {
     /**
      * Extends the discovery payload after everything else resolved, before `GET /dashboard` answers.
-     * Fires once per read, inside the request context, so the viewer and their language are in scope.
+     * Fires once per read, inside the request context, so the viewer is in scope.
+     * Put labels in as messages; the dashboard translates them where it renders.
      * Mutate the object in place; whatever it holds afterwards is the answer.
      * A layer types its key by augmenting `DashboardMeta` in `ohnejs/dashboard`, where the browser reads it.
      */
@@ -224,7 +225,8 @@ declare module 'ohnejs' {
  * Operations carry their verdicts, so the dashboard disables what the capability guard would refuse.
  * An operation whose route the app does not serve is closed, like one the collection does not expose.
  * `routes` lists the served route ids, so a layer's screen can hide a control whose route is dropped.
- * Fields carry the metadata a sheet needs: type, kind, flags, labels resolved in the request's language.
+ * Fields carry the metadata a sheet needs: type, kind, flags, and labels as messages the dashboard translates.
+ * Labels stay messages, so the answer is the same in every language and a language switch refetches nothing.
  * `languages` lists the catalog languages the dashboard language setting offers, the default first.
  * `accountFields` describes the `Users` fields the account page edits, as `auth:account-layout` places them.
  * A declared layout arrives resolved on its collection, block, or composite field, and on `accountLayout`.
@@ -297,7 +299,7 @@ function describeBlocks(roots: readonly DashboardField[]): DashboardBlock[] {
     const fields = describeFields(blockQueryMetadata(name).fields, meta.block.fields);
     const { description, dashboard } = meta.block;
     const block: DashboardBlock = { name, label: declaredLabelOf(name, meta.block.label), fields };
-    if (!isUndefined(description)) block.description = resolveMessage(description);
+    if (!isUndefined(description)) block.description = description;
     if (!isUndefined(dashboard?.icon)) block.icon = dashboard.icon;
     if (!isUndefined(dashboard?.titleField)) block.titleField = dashboard.titleField;
     const layout = resolveLayout(dashboard?.layout, fields);
@@ -319,12 +321,12 @@ function collectAllowed(fields: readonly DashboardField[], into: string[]): void
 }
 
 /**
- * Every registered role with its label and description resolved in the request's language.
+ * Every registered role with its label and description as declared.
  */
 function describeRoles(): DashboardRole[] {
   return Object.values(useRoles().all()).map(({ name, role }) => {
     const described: DashboardRole = { name, label: declaredLabelOf(name, role.label) };
-    if (!isUndefined(role.description)) described.description = resolveMessage(role.description);
+    if (!isUndefined(role.description)) described.description = role.description;
     return described;
   });
 }
@@ -332,6 +334,6 @@ function describeRoles(): DashboardRole[] {
 /**
  * A file-named declaration's display label: its declared `label`, or the name sentence-cased.
  */
-function declaredLabelOf(name: string, label: Message | undefined): string {
-  return isUndefined(label) ? toSentenceCase(name) : resolveMessage(label);
+function declaredLabelOf(name: string, label: Message | undefined): Message {
+  return label ?? toSentenceCase(name);
 }

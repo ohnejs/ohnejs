@@ -22,12 +22,14 @@ import {
   pagination,
   queueToast,
   type RowVerdicts,
+  signInCount,
   table,
   tableColumn,
   type TableColumns,
   type TableRow,
   type TableSort,
   toast,
+  translateMessage,
   useHotkeys,
   useT,
   when,
@@ -204,7 +206,7 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   const columns: TableColumns = {};
   for (const spec of specs) {
     const definition: Parameters<typeof tableColumn>[0] = {
-      label: spec.label,
+      label: () => translateMessage(spec.label),
       sortable: spec.sortable,
     };
     if (!isUndefined(spec.width)) definition.width = spec.width;
@@ -258,6 +260,8 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
 
   effect(() => {
     void reload.value;
+    // A sign-in in place refetches the page an expired session failed to load.
+    void signInCount();
     if (redirected) return;
     const mine = (generation += 1);
     // Read inside the load effect, so a content-language switch reloads the page at that locale.
@@ -646,9 +650,9 @@ export function collectionTable(collection: DashboardCollection): HTMLElement {
   const paginationEl = pagination({
     currentPage: () => paginated.value.currentPage,
     lastPage: () => paginated.value.lastPage,
-    goToPageTitle: t('dashboard.pagination.goToPage'),
-    nextPageTitle: t('dashboard.pagination.next'),
-    previousPageTitle: t('dashboard.pagination.previous'),
+    goToPageTitle: () => t('dashboard.pagination.goToPage'),
+    nextPageTitle: () => t('dashboard.pagination.next'),
+    previousPageTitle: () => t('dashboard.pagination.previous'),
     onChange: (page) => push({ page }),
     button: ({ currentPage, index, onClick }) => {
       const el = h(

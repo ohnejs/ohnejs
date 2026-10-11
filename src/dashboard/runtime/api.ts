@@ -8,7 +8,7 @@ import {
   withAcceptLanguage,
 } from './_request.ts';
 import { dashboardConfig } from './config.ts';
-import { useDashboardLanguage } from './use-dashboard-language.ts';
+import { requestedLanguage } from './use-dashboard-language.ts';
 
 export { setUnauthorizedHandler } from './_request.ts';
 
@@ -17,7 +17,7 @@ export { setUnauthorizedHandler } from './_request.ts';
  * The `route` is a root-relative path, optionally prefixed with a method (`GET /authors/[id]`).
  * A leading method overrides `init.method`; the rest is the path appended to the base URL.
  * Requests carry credentials, so the session cookie flows to the API; `init.credentials` overrides.
- * They also carry `Accept-Language` for the dashboard language, so answers speak it; a given one wins.
+ * They carry `Accept-Language` for the requested dashboard language, so answers speak it; a given one wins.
  * A `401` from a route outside `/auth/` calls the handler installed with `setUnauthorizedHandler`.
  * A request sent while signed out, or before the user last signed in or out, never calls it.
  * Returns the raw `Response`; the caller decides how to read it.
@@ -38,7 +38,7 @@ export { setUnauthorizedHandler } from './_request.ts';
 export async function api(route: APIRouteID, init?: RequestInit): Promise<Response> {
   const { method, path, url } = requestTarget(dashboardConfig().apiURL, route);
   // Untracked: a fetch started inside a render must not subscribe that region to the language.
-  const language = untracked(() => useDashboardLanguage().value);
+  const language = untracked(() => requestedLanguage().value);
   const request: RequestInit = {
     credentials: 'include',
     ...init,

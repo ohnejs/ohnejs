@@ -4,13 +4,14 @@ import type { DashboardField } from '../runtime/meta-types.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
+import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { append } from '../render/insert.ts';
 import { when } from '../render/when.ts';
 import { dashboardMeta } from '../runtime/meta.ts';
-import { useT } from '../runtime/use-t.ts';
+import { translateMessage, useT } from '../runtime/use-t.ts';
 import { fieldLabel } from '../ui/field-label.ts';
 import { fieldMessage } from '../ui/field-message.ts';
 import { field } from '../ui/field.ts';
@@ -197,6 +198,20 @@ css`
 `;
 
 /**
+ * The field's declared placeholder as a getter that reads it in the dashboard language.
+ * `undefined` when the field declares none, so a control renders no placeholder at all.
+ *
+ * @example
+ * ```ts
+ * textInput(raw, { placeholder: fieldPlaceholder(field) })
+ * ```
+ */
+export function fieldPlaceholder(field: DashboardField): (() => string) | undefined {
+  const { placeholder } = field;
+  return isUndefined(placeholder) ? undefined : () => translateMessage(placeholder);
+}
+
+/**
  * Wires a control's focusable element to its row: id, label, description, and the invalid mark.
  * Call it once with the element a control wants the row's label to address.
  *
@@ -281,7 +296,7 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
   const label = h(
     'span',
     { class: 'ohne-label', id: ids.label, onClick: () => options.onLabelClick?.() },
-    options.field.label,
+    () => translateMessage(options.field.label),
   );
 
   const name = options.field.unique
@@ -312,9 +327,9 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
     append(options.marks, extras);
   }
 
-  const proseBlock = (text: string, className = 'ohne-prose', links = true): HTMLElement => {
+  const proseBlock = (text: () => string, className = 'ohne-prose', links = true): HTMLElement => {
     const flow = h('div', { class: className, id: ids.description });
-    renderProse(flow, text, { links });
+    effect(() => renderProse(flow, text(), { links }));
     return flow;
   };
 
@@ -331,11 +346,17 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
         },
       },
       icon('chevron-right'),
-      h('span', null, () => (expanded.value ? expandable.hideLabel : expandable.showLabel)),
+      h('span', null, () =>
+        translateMessage(expanded.value ? expandable.hideLabel : expandable.showLabel),
+      ),
     ),
     when(
       () => expanded.value,
-      () => proseBlock(expandable.text, 'ohne-prose ohne-field-description-content'),
+      () =>
+        proseBlock(
+          () => translateMessage(expandable.text),
+          'ohne-prose ohne-field-description-content',
+        ),
     ),
   ];
 
@@ -352,10 +373,11 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
               () => {
                 const current = failure();
                 // An error can echo a submitted value, so a link in it renders as plain text.
-                if (current !== '') return proseBlock(current, 'ohne-prose', false);
+                if (current !== '') return proseBlock(() => current, 'ohne-prose', false);
                 const { description, expandable } = options.field;
                 if (!isUndefined(expandable)) return expandableDescription(expandable);
-                if (!isUndefined(description)) return proseBlock(description);
+                if (!isUndefined(description))
+                  return proseBlock(() => translateMessage(description));
                 return null;
               },
               { error: () => failure() !== '' },

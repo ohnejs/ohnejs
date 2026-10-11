@@ -1,4 +1,5 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
+import type { MaybeGetter } from '../../utils/reactive/to-value.ts';
 import type { CalendarLabels } from './calendar.ts';
 import type { IconName } from './icon.ts';
 
@@ -66,13 +67,15 @@ export interface CalendarRangeOptions {
 
   /**
    * Placeholder text shown while the start value is `null`.
+   * A getter reads reactively.
    */
-  placeholderFrom?: string;
+  placeholderFrom?: string | (() => string);
 
   /**
    * Placeholder text shown while the end value is `null`.
+   * A getter reads reactively.
    */
-  placeholderTo?: string;
+  placeholderTo?: string | (() => string);
 
   /**
    * Whether the clear buttons render while a value is selected.
@@ -172,8 +175,9 @@ export interface CalendarRangeOptions {
 
   /**
    * Labels used for the calendar components.
+   * A getter reads reactively, so the labels can follow the language.
    */
-  labels?: CalendarLabels;
+  labels?: MaybeGetter<CalendarLabels>;
 
   /**
    * The position of the bracket decorator connecting the two inputs.

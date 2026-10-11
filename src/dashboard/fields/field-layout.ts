@@ -12,7 +12,7 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
-import { useT } from '../runtime/use-t.ts';
+import { translateMessage, useT } from '../runtime/use-t.ts';
 import { bubble } from '../ui/bubble.ts';
 import { button } from '../ui/button.ts';
 import { card } from '../ui/card.ts';
@@ -340,7 +340,7 @@ function renderCard(
     isUndefined(node.label) && !node.collapsible
       ? undefined
       : [
-          h('span', { class: 'ohne-truncate ohne-muted' }, node.label),
+          h('span', { class: 'ohne-truncate ohne-muted' }, () => translateMessage(node.label)),
           node.collapsible ? toggle : null,
         ];
   const inner = chain.concat(node.collapsible ? [() => setExpanded(true)] : []);
@@ -422,7 +422,7 @@ function renderTabs(
               hidden: hiders[index],
               onClick: () => setActive(index),
             },
-            h('span', null, tab.label),
+            h('span', null, () => translateMessage(tab.label)),
             when(
               () => count() > 0,
               () => {
@@ -440,7 +440,8 @@ function renderTabs(
       ),
     );
   const root = tabs(() => panels, {
-    list: () => node.tabs.map((tab, index) => ({ name: index, label: tab.label })),
+    list: () =>
+      node.tabs.map((tab, index) => ({ name: index, label: () => translateMessage(tab.label) })),
     active: () => active.value,
     onChange: activate,
     nav: node.tabs.length > 1 ? nav : () => null,

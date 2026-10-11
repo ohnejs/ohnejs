@@ -2,9 +2,9 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 
 import { coerceToString } from '../../utils/coerce/coerce-to-string.ts';
-import { isFunction } from '../../utils/is/is-function.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
+import { toValue } from '../../utils/reactive/to-value.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { mirrorWidth } from './mirror-width.ts';
@@ -258,12 +258,10 @@ export function textInput(model: Ref<string>, options: TextInputOptions = {}): H
   });
   let shadow: HTMLElement | null = null;
   if (options.autoWidth) {
-    const placeholder = (): string | undefined =>
-      isFunction(options.placeholder) ? options.placeholder() : options.placeholder;
     shadow = h(
       'span',
       { class: 'ohne-input-control ohne-input-shadow' },
-      () => model.value || placeholder(),
+      () => model.value || toValue(options.placeholder),
     );
     mirrorWidth(input, shadow);
   }

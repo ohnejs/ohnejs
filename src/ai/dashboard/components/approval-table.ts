@@ -12,6 +12,7 @@ import {
   table,
   tableColumn,
   textArea,
+  translateMessage,
   when,
 } from 'ohnejs/dashboard';
 import {
@@ -258,9 +259,12 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
       : t(which === 'all' ? 'ai.dashboard.batch.approveAll' : 'ai.dashboard.batch.approveSelected');
 
   const columns = {
-    record: tableColumn<string>({ label: t('ai.dashboard.batch.record'), width: '30%' }),
-    action: tableColumn<string>({ label: t('ai.dashboard.batch.action'), width: '6em' }),
-    changes: tableColumn<Change[]>({ label: t('ai.dashboard.batch.changes'), minWidth: '8em' }),
+    record: tableColumn<string>({ label: () => t('ai.dashboard.batch.record'), width: '30%' }),
+    action: tableColumn<string>({ label: () => t('ai.dashboard.batch.action'), width: '6em' }),
+    changes: tableColumn<Change[]>({
+      label: () => t('ai.dashboard.batch.changes'),
+      minWidth: '8em',
+    }),
   };
 
   const grid = table({
@@ -387,7 +391,7 @@ function headerLine(
   const filter = (): string => {
     if (isUndefined(proposal.where) || isUndefined(collection)) return '';
     const described = describeWhere(proposal.where, {
-      field: (name) => collection.fields.find((field) => field.name === name)?.label ?? name,
+      field: (name) => fieldLabel(collection, name),
       t: (key, params) => t(key as `ai.${string}`, params),
     });
     return described === ''
@@ -554,10 +558,11 @@ function formatValue(value: unknown): Child {
 }
 
 /**
- * The label of a field of `collection`, or the name itself when it has none.
+ * The label of a field of `collection` in the dashboard language, or the name itself when it has none.
  */
 function fieldLabel(collection: DashboardCollection, name: string): string {
-  return collection.fields.find((field) => field.name === name)?.label ?? name;
+  const field = collection.fields.find((entry) => entry.name === name);
+  return isUndefined(field) ? name : translateMessage(field.label);
 }
 
 /**

@@ -2,12 +2,12 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 import type { Primitive } from './button-group.ts';
 
-import { isFunction } from '../../utils/is/is-function.ts';
 import { deepEqual } from '../../utils/object/deep-equal.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { toValue } from '../../utils/reactive/to-value.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
@@ -173,7 +173,7 @@ export function tabs<T extends number | string>(
   const variant = options.variant ?? 'accent';
   const choices = computed(() =>
     options.list().map(({ name, label }) => ({
-      label: (isFunction<() => string>(label) ? label() : label) ?? String(name),
+      label: toValue(label) ?? String(name),
       value: name,
     })),
   );
@@ -307,6 +307,6 @@ export function tab(name: number | string, content: Child | (() => Child)): Chil
   if (active === null) return null;
   return when(
     () => active.value === name,
-    () => (isFunction(content) ? content() : content),
+    () => toValue(content),
   );
 }

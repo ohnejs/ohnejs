@@ -558,11 +558,11 @@ hook('dashboard:menu', (menu, { user }) => {
 });
 ```
 
-- It fires once per discovery read, inside the request context, so the viewer's language is
-  available.
-- The [assistant](../ai/assistant.md) runs it too, in the default language, to learn which pages
-  it may open.
-- Every row already carries a `to`, a translated `label`, and any icon.
+- It fires once per discovery read, inside the request context.
+- The [assistant](../ai/assistant.md) runs it too, to learn which pages it may open.
+- Every row already carries a `to`, a `label`, and any icon. A label is a
+  [message](../i18n/messages.md): a key, a `{ key, params }` object, or plain text. The dashboard
+  translates it where it renders, so a row you add may carry a key as well.
 - The threaded value is a `DashboardMenuGroup[]`.
 - The `context` also carries `collections`: the collections the user can access, as the same read
   describes them. You can build a group from the registered collections instead of naming each one.
@@ -581,8 +581,10 @@ hook('dashboard:meta', (meta) => {
 });
 ```
 
-- It fires once per discovery read, inside the request context, so the viewer and their language
-  are in scope. The `context` carries the `user`.
+- It fires once per discovery read, inside the request context, so the viewer is in scope. The
+  `context` carries the `user`.
+- Put labels in as messages, not translated text. The dashboard translates them where it renders,
+  so the payload stays the same in every language.
 - Mutate the object in place; whatever it holds afterwards is the answer.
 - Type the key for the browser by augmenting `DashboardMeta` in `ohnejs/dashboard`, where
   `dashboardMeta()` reads it.

@@ -25,6 +25,7 @@ import {
   type RowVerdicts,
   seedLabel,
   setNavigationGuard,
+  signInCount,
   toast,
   useDashboardLanguage,
   useHotkeys,
@@ -219,6 +220,7 @@ export interface RecordEditor {
  * Cmd/Ctrl+S saves while no overlay is open.
  * A `422` routes onto the rows it names and raises the error count toast.
  * A vanished record redirects to the collection with a toast, a singleton's to the overview.
+ * A load that failed retries once the user signs in again in place, after an expired session.
  * An edit asks the record's verdicts too: update refused opens read-only, delete refused hides Delete.
  * Fields outside the update scope's `select` lock, and a save names the sent fields the scope dropped.
  * Create posts the touched fields so server defaults apply, then navigates to the new record.
@@ -342,6 +344,10 @@ export function useRecordEditor(
   } else {
     if (collection.translatable) applyLinkedLocale();
     void load();
+    const signedIn = untracked(signInCount);
+    effect(() => {
+      if (signInCount() !== signedIn && untracked(() => state.value) === 'failed') void load();
+    });
     if (collection.translatable) {
       let applied = untracked(activeContentLocale);
       const switchLocale = async (next: string | undefined): Promise<void> => {

@@ -72,8 +72,9 @@ export interface ButtonOptions {
 
   /**
    * The accessible name, for a button whose visible content is only an icon.
+   * A getter reads reactively.
    */
-  ariaLabel?: string;
+  ariaLabel?: string | (() => string);
 
   /**
    * Click handler; a `submit` button inside a form submits through the form as well.

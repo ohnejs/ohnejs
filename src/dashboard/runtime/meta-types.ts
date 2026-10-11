@@ -1,4 +1,5 @@
 import type { ConditionObject } from '../../utils/condition/condition-object.ts';
+import type { MessageData } from '../../utils/i18n/message-data.ts';
 import type { IconName } from '../../utils/icon/icon-name.ts';
 
 /**
@@ -74,36 +75,37 @@ export interface DashboardField {
   logicalType?: 'text' | 'integer' | 'real' | 'boolean' | 'json';
 
   /**
-   * The display label, resolved in the request's language.
+   * The display label: a message the dashboard translates where it renders, through `translateMessage`.
+   * A system field's label is its catalog key; an undeclared one is the sentence-cased name.
    */
-  label: string;
+  label: MessageData;
 
   /**
-   * The field's plain description, resolved in the request's language.
+   * The field's plain description, a message the dashboard translates where it renders.
    * Absent when none is declared, or when the declared one is expandable.
    */
-  description?: string;
+  description?: MessageData;
 
   /**
    * The field's description when it starts collapsed behind a toggle; absent for the plain form.
-   * Every string is resolved in the request's language; an omitted toggle label takes the catalog's.
+   * Each text is a message the dashboard translates; an omitted toggle label is the catalog's key.
    */
   expandable?: {
     /**
      * The content, shown once expanded.
      * Markdown is supported.
      */
-    text: string;
+    text: MessageData;
 
     /**
      * The toggle's label while the content is collapsed.
      */
-    showLabel: string;
+    showLabel: MessageData;
 
     /**
      * The toggle's label while the content is expanded.
      */
-    hideLabel: string;
+    hideLabel: MessageData;
 
     /**
      * Whether the content starts expanded.
@@ -112,9 +114,9 @@ export interface DashboardField {
   };
 
   /**
-   * The empty-input hint, resolved in the request's language; absent when none is declared.
+   * The empty-input hint, a message the dashboard translates; absent when none is declared.
    */
-  placeholder?: string;
+  placeholder?: MessageData;
 
   /**
    * Whether the field's value admits `null`.
@@ -241,9 +243,9 @@ export interface DashboardLayoutCard {
   kind: 'card';
 
   /**
-   * The header label, resolved in the request's language; absent when the card declares none.
+   * The header label, a message the dashboard translates; absent when the card declares none.
    */
-  label?: string;
+  label?: MessageData;
 
   /**
    * Whether the viewer can collapse the card.
@@ -276,9 +278,9 @@ export interface DashboardLayoutTabs {
  */
 export interface DashboardLayoutTab {
   /**
-   * The tab label, resolved in the request's language.
+   * The tab label, a message the dashboard translates.
    */
-  label: string;
+  label: MessageData;
 
   /**
    * The panel's nodes, top to bottom; never empty.
@@ -298,7 +300,7 @@ export interface DashboardLayoutRule {
 
 /**
  * One node of a resolved field layout, as the dashboard renders it.
- * Labels arrive translated and widths split from their names, so the client parses nothing.
+ * Labels arrive as messages and widths split from their names, so the client parses nothing.
  * A name the host does not describe is already dropped, and so is any container that left empty.
  */
 export type DashboardLayoutNode =
@@ -397,15 +399,15 @@ export interface DashboardBlock {
   name: string;
 
   /**
-   * The display label, resolved in the request's language.
-   * A declared `label` resolves through the message catalogs; omitted falls back to the sentence-cased name.
+   * The display label, a message the dashboard translates where it renders, through `translateMessage`.
+   * It is the declared `label`, or the sentence-cased name when none is declared.
    */
-  label: string;
+  label: MessageData;
 
   /**
-   * The declared `description`, resolved in the request's language; absent when the block declares none.
+   * The declared `description`, a message the dashboard translates; absent when the block declares none.
    */
-  description?: string;
+  description?: MessageData;
 
   /**
    * The block's icon, or the field whose value picks it; absent when the block declares none.
@@ -438,15 +440,15 @@ export interface DashboardRole {
   name: string;
 
   /**
-   * The display label, resolved in the request's language.
-   * A declared `label` resolves through the message catalogs; omitted falls back to the sentence-cased name.
+   * The display label, a message the dashboard translates where it renders, through `translateMessage`.
+   * It is the declared `label`, or the sentence-cased name when none is declared.
    */
-  label: string;
+  label: MessageData;
 
   /**
-   * The declared `description`, resolved in the request's language; absent when the role declares none.
+   * The declared `description`, a message the dashboard translates; absent when the role declares none.
    */
-  description?: string;
+  description?: MessageData;
 }
 
 /**
@@ -460,9 +462,9 @@ export interface DashboardMenuItem {
   to: string;
 
   /**
-   * The row label, resolved in the request's language.
+   * The row label, a message the dashboard translates where it renders, through `translateMessage`.
    */
-  label: string;
+  label: MessageData;
 
   /**
    * The Tabler icon shown before the label; absent when the row declares none.
@@ -475,9 +477,9 @@ export interface DashboardMenuItem {
  */
 export interface DashboardMenuGroup {
   /**
-   * The group heading, resolved in the request's language; `''` renders the group without one.
+   * The group heading, a message the dashboard translates; `''` renders the group without one.
    */
-  label: string;
+  label: MessageData;
 
   /**
    * The rows the group holds, in order.

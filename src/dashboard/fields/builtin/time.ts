@@ -6,10 +6,23 @@ import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { h } from '../../render/h.ts';
 import { formatTime } from '../../runtime/date-time.ts';
+import { useT } from '../../runtime/use-t.ts';
 import { parseTime } from '../../ui/time-model.ts';
-import { time as timeInput } from '../../ui/time.ts';
+import { type TimeLabels, time as timeInput } from '../../ui/time.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
+
+/**
+ * The segment suffixes of a time input, live in the dashboard language.
+ */
+function timeLabels(): TimeLabels {
+  const t = useT();
+  return {
+    hoursSuffix: () => t('dashboard.time.hours'),
+    minutesSuffix: () => t('dashboard.time.minutes'),
+    secondsSuffix: () => t('dashboard.time.seconds'),
+  };
+}
 
 /**
  * A time-of-day in ms back in its stored `HH:MM:SS` form.
@@ -68,6 +81,7 @@ export const timeType: FieldType = {
     };
 
     const element = timeInput(model, {
+      labels: timeLabels(),
       min: field.options?.min as string | undefined,
       max: field.options?.max as string | undefined,
       disabled: () => disabled === true,
@@ -125,7 +139,7 @@ export const timeType: FieldType = {
           commit(clockValue(next));
         },
       };
-      return timeInput(model, { id: inputID, name: inputID });
+      return timeInput(model, { id: inputID, name: inputID, labels: timeLabels() });
     },
   },
 };

@@ -158,9 +158,9 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
   const paginationEl = pagination({
     currentPage: () => view.paginated.value.currentPage,
     lastPage: () => view.paginated.value.lastPage,
-    goToPageTitle: untracked(() => t('dashboard.pagination.goToPage')),
-    nextPageTitle: untracked(() => t('dashboard.pagination.next')),
-    previousPageTitle: untracked(() => t('dashboard.pagination.previous')),
+    goToPageTitle: () => t('dashboard.pagination.goToPage'),
+    nextPageTitle: () => t('dashboard.pagination.next'),
+    previousPageTitle: () => t('dashboard.pagination.previous'),
     onChange: (page) => view.push({ page }),
     button: ({ currentPage, index, onClick }) => {
       const el = h(

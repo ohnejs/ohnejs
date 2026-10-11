@@ -6,6 +6,7 @@ import type { AnyHandler, Route } from '../../../src/ohne/routes/route.ts';
 
 import dashboardGet, {
   type DashboardBlock,
+  type DashboardMenuGroup,
   type DashboardMeta,
 } from '../../../src/base/api/dashboard.get.ts';
 import { hashSessionToken } from '../../../src/base/auth/_token.ts';
@@ -366,7 +367,7 @@ function names(body: DashboardMeta): string[] {
   return body.collections.map((collection) => collection.name);
 }
 
-function menuPaths(body: DashboardMeta): { label: string; items: string[] }[] {
+function menuPaths(body: DashboardMeta): { label: DashboardMenuGroup['label']; items: string[] }[] {
   return body.menu.map((group) => ({
     label: group.label,
     items: group.items.map((item) => item.to),
@@ -510,7 +511,7 @@ describe('routes', () => {
       deepStrictEqual(names(body), []);
       deepStrictEqual(menuPaths(body), [
         { label: 'Content', items: ['/reports'] },
-        { label: '2 tools', items: ['/tools'] },
+        { label: { key: 'dashMenu.tools', params: { n: 2 } }, items: ['/tools'] },
       ]);
     } finally {
       await serve();
@@ -596,13 +597,13 @@ describe('fields', () => {
     );
   });
 
-  it('marks the system fields unwritable and labels them from the catalog', async () => {
+  it('marks the system fields unwritable and labels them with catalog keys', async () => {
     const { body } = await call(user);
     const fields = keyBy(collection(body, 'DashNotes').fields, (entry) => entry.name);
     strictEqual(fields.UUID?.type, null);
-    strictEqual(fields.UUID?.label, 'UUID');
+    strictEqual(fields.UUID?.label, 'dashboard.fields.uuid.label');
     strictEqual(fields.UUID?.writable, false);
-    strictEqual(fields._updatedAt?.label, 'Updated');
+    strictEqual(fields._updatedAt?.label, 'dashboard.fields.updatedAt.label');
     strictEqual(fields._updatedAt?.writable, false);
   });
 
@@ -622,12 +623,12 @@ describe('fields', () => {
     strictEqual(kinds.gatedPicks?.required, false);
   });
 
-  it('resolves labels: declared keys through the catalog, omitted to the sentence-cased name', async () => {
+  it('ships labels as messages: declared keys as written, omitted ones sentence-cased', async () => {
     const { body } = await call(user);
     const notes = keyBy(collection(body, 'DashNotes').fields, (entry) => entry.name);
     const owners = keyBy(collection(body, 'DashOwners').fields, (entry) => entry.name);
     strictEqual(notes.title?.label, 'Title');
-    strictEqual(owners.name?.label, 'Owner name');
+    strictEqual(owners.name?.label, 'dash.owners.name.label');
   });
 
   it('carries type, kind, flags, and relation targets', async () => {
@@ -662,32 +663,32 @@ describe('fields', () => {
     strictEqual(owners.profile?.options, undefined);
   });
 
-  it('resolves a declared placeholder in the request language', async () => {
+  it('ships a declared placeholder as its message', async () => {
     const { body } = await call(user);
     const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
-    strictEqual(kinds.title?.placeholder, 'Short name');
+    strictEqual(kinds.title?.placeholder, 'dash.kinds.title.placeholder');
     strictEqual(kinds.status?.placeholder, undefined);
   });
 
-  it('describes an expandable description with the catalog toggle labels, collapsed', async () => {
+  it('describes an expandable description with the catalog toggle keys, collapsed', async () => {
     const { body } = await call(user);
     const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
     deepStrictEqual(kinds.help?.expandable, {
-      text: 'Long help',
-      showLabel: 'Show description',
-      hideLabel: 'Hide description',
+      text: 'dash.kinds.help.text',
+      showLabel: 'dashboard.field.showDescription',
+      hideLabel: 'dashboard.field.hideDescription',
       expanded: false,
     });
     strictEqual(kinds.help?.description, undefined);
     strictEqual(kinds.title?.expandable, undefined);
   });
 
-  it('resolves custom toggle labels on an expandable description', async () => {
+  it('ships custom toggle labels on an expandable description as declared', async () => {
     const { body } = await call(user);
     const kinds = keyBy(collection(body, 'DashKinds').fields, (entry) => entry.name);
     deepStrictEqual(kinds.guide?.expandable, {
       text: 'Plain guide',
-      showLabel: 'Read the guide',
+      showLabel: 'dash.kinds.guide.show',
       hideLabel: 'Fold it away',
       expanded: true,
     });
@@ -706,12 +707,12 @@ describe('fields', () => {
 });
 
 describe('layout', () => {
-  it('ships a collection layout resolved: labels translated, widths split, and omits the key elsewhere', async () => {
+  it('ships a collection layout resolved: labels as messages, widths split, and omits the key elsewhere', async () => {
     const { body } = await call(user);
     deepStrictEqual(collection(body, 'DashNotes').layout, [
       {
         kind: 'card',
-        label: 'Main',
+        label: 'dash.notes.main',
         collapsible: true,
         nodes: [
           {
@@ -726,19 +727,13 @@ describe('layout', () => {
       {
         kind: 'tabs',
         tabs: [
-          { label: 'More', nodes: [{ kind: 'field', name: 'owner' }] },
+          { label: 'dash.notes.more', nodes: [{ kind: 'field', name: 'owner' }] },
           { label: 'Secret', nodes: [{ kind: 'field', name: 'secret' }] },
         ],
       },
       { kind: 'rule' },
     ]);
     strictEqual('layout' in collection(body, 'DashPublic'), false);
-  });
-
-  it('resolves card and tab labels in the request language', async () => {
-    const layout = collection((await call(user, 'de')).body, 'DashNotes').layout ?? [];
-    strictEqual(layout[0]?.kind === 'card' ? layout[0].label : '', 'Allgemein');
-    strictEqual(layout[1]?.kind === 'tabs' ? layout[1].tabs[0]?.label : '', 'Mehr');
   });
 
   it("describes a composite's layout on the field, stripped from its options", async () => {
@@ -758,7 +753,7 @@ describe('menu', () => {
   it('folds the configured groups over the accessible collections, the rest trailing', async () => {
     deepStrictEqual(menuPaths((await call(user)).body), [
       { label: 'Content', items: ['/collections/dash-notes', '/reports'] },
-      { label: '2 tools', items: ['/tools'] },
+      { label: { key: 'dashMenu.tools', params: { n: 2 } }, items: ['/tools'] },
       {
         label: '',
         items: [
@@ -780,7 +775,7 @@ describe('menu', () => {
   it('scopes the groups per user', async () => {
     deepStrictEqual(menuPaths((await call(admin)).body), [
       { label: 'Content', items: ['/collections/dash-notes', '/reports'] },
-      { label: '2 tools', items: ['/tools'] },
+      { label: { key: 'dashMenu.tools', params: { n: 2 } }, items: ['/tools'] },
       {
         label: '',
         items: [
@@ -811,10 +806,17 @@ describe('menu', () => {
     });
   });
 
-  it('resolves a declared link as authored, its label in the request language', async () => {
+  it('ships a declared link as authored, its label the declared message', async () => {
     const { menu } = (await call(user)).body;
-    deepStrictEqual(menu[0]?.items[1], { to: '/reports', label: 'Reports', icon: 'chart-bar' });
-    deepStrictEqual(menu[1], { label: '2 tools', items: [{ to: '/tools', label: 'Tools' }] });
+    deepStrictEqual(menu[0]?.items[1], {
+      to: '/reports',
+      label: 'dash.menu.reports',
+      icon: 'chart-bar',
+    });
+    deepStrictEqual(menu[1], {
+      label: { key: 'dashMenu.tools', params: { n: 2 } },
+      items: [{ to: '/tools', label: 'Tools' }],
+    });
   });
 
   it('leads with the overview row when no menu is declared, the collections trailing', async () => {
@@ -823,7 +825,7 @@ describe('menu', () => {
       const { body } = await call(user);
       deepStrictEqual(body.menu[0], {
         label: '',
-        items: [{ to: '/overview', label: 'Overview', icon: 'layout-dashboard' }],
+        items: [{ to: '/overview', label: 'dashboard.overview.title', icon: 'layout-dashboard' }],
       });
       deepStrictEqual(menuPaths(body), [
         { label: '', items: ['/overview'] },
@@ -897,7 +899,7 @@ describe('translatable', () => {
         name: '_translations',
         type: null,
         kind: 'translations',
-        label: 'Translations',
+        label: 'dashboard.fields.translations.label',
         nullable: false,
         required: false,
         unique: false,
@@ -952,11 +954,14 @@ describe('account', () => {
     strictEqual(fields.dateFormat?.description, undefined);
   });
 
-  it('resolves the labels in the request language', async () => {
-    const english = keyBy((await call(user)).body.accountFields, (entry) => entry.name);
-    const german = keyBy((await call(user, 'de')).body.accountFields, (entry) => entry.name);
-    strictEqual(english.timezone?.label, 'Time zone');
-    strictEqual(german.timezone?.label, 'Zeitzone');
+  it('ships the labels as messages, the same under any `Accept-Language`', async () => {
+    const english = (await call(user)).body;
+    strictEqual(
+      keyBy(english.accountFields, (entry) => entry.name).timezone?.label,
+      'auth.users.timezone.label',
+    );
+    deepStrictEqual((await call(user, 'de')).body, english);
+    deepStrictEqual((await call(user, 'bs')).body, english);
   });
 
   it('ships the default layout resolved, the name card first', async () => {
@@ -1013,13 +1018,13 @@ describe('account', () => {
 });
 
 describe('roles', () => {
-  it('serves every role in registry order, labels resolved and descriptions where declared', async () => {
+  it('serves every role in registry order, labels as messages and descriptions where declared', async () => {
     deepStrictEqual((await call(user)).body.roles, [
       { name: 'admin', label: 'Admin' },
       {
         name: 'dash-user',
-        label: 'Dashboard user',
-        description: 'Reads owners and edits notes.',
+        label: 'dash.roles.user.label',
+        description: 'dash.roles.user.description',
       },
     ]);
   });
@@ -1039,16 +1044,16 @@ describe('blocks', () => {
     );
   });
 
-  it('resolves a declared label and sentence-cases an omitted one', async () => {
+  it('ships a declared label as its message and sentence-cases an omitted one', async () => {
     const { body } = await call(user);
-    strictEqual(block(body, 'DashHero').label, 'Hero section');
+    strictEqual(block(body, 'DashHero').label, 'dash.blocks.hero.label');
     strictEqual(block(body, 'DashAside').label, 'Dash aside');
   });
 
-  it('resolves a declared description and passes the icon and title field through', async () => {
+  it('ships a declared description and passes the icon and title field through', async () => {
     const { body } = await call(user);
     const hero = block(body, 'DashHero');
-    strictEqual(hero.description, 'A big heading over the page');
+    strictEqual(hero.description, 'dash.blocks.hero.description');
     deepStrictEqual(hero.icon, { field: 'heading', map: { big: 'photo' }, default: 'cube' });
     strictEqual(hero.titleField, 'heading');
     const aside = block(body, 'DashAside');

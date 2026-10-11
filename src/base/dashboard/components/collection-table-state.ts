@@ -6,6 +6,7 @@ import {
   isPositiveInteger,
   isString,
   isUndefined,
+  type MessageData,
   parseSearchParams,
   type SearchParamValue,
   stringifySearchParams,
@@ -36,9 +37,9 @@ export interface TableFieldMeta {
   name: string;
 
   /**
-   * The display label, resolved in the request's language.
+   * The display label, a message the table translates where it renders.
    */
-  label: string;
+  label: MessageData;
 
   /**
    * How the field stores and reads; only `column` and `record` back a sortable column.
@@ -66,9 +67,9 @@ export interface TableColumnSpec {
   name: string;
 
   /**
-   * The column header label.
+   * The column header label, a message the table translates where it renders.
    */
-  label: string;
+  label: MessageData;
 
   /**
    * Whether the column sorts, and which sort icons it shows.

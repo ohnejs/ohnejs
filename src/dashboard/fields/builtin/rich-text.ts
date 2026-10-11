@@ -31,7 +31,7 @@ import { useT } from '../../runtime/use-t.ts';
 import { richTextEditor } from '../../ui/rich-text-editor.ts';
 import { denormalizePath } from '../../ui/rich-text-model.ts';
 import { richTextToolbar } from '../../ui/rich-text-toolbar.ts';
-import { describeControl } from '../field-row.ts';
+import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { controlIDs, dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { labelOf } from '../labels.ts';
 import { linkChoices, targetHref } from './_link-choices.ts';
@@ -122,7 +122,7 @@ export const richTextType: FieldType = {
       options,
       disabled: () => off,
       error: () => routed.value !== '',
-      placeholder: field.placeholder,
+      placeholder: fieldPlaceholder(field),
       missingLabel: () => t('dashboard.richText.missingLink'),
       links: {
         open: openLink,

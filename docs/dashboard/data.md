@@ -155,36 +155,41 @@ import { defineDashboardPage, h, useT } from 'ohnejs/dashboard';
 const t = useT();
 
 export default defineDashboardPage(() => [
-  h('h1', null, t('page.title')),
-  h('p', null, t('field.minLength', { min: 3 })),
+  h('h1', null, () => t('page.title')),
+  h('p', null, () => t('field.minLength', { min: 3 })),
 ]);
 ```
 
 The dashboard loads every catalog of its language through the
-[catalog endpoint](../i18n/messages.md#the-catalog-endpoint) before the first page renders. A language
-switch loads the new catalogs first, then rebuilds the page. So `t` is ready inside your page, and a
-plain `t('page.title')` there renders translated.
+[catalog endpoint](../i18n/messages.md#the-catalog-endpoint) before the first page renders, so `t` is
+ready inside your page.
 
-Keep each `t` call inside the page function. A call at the top level of a module runs once, when the
-module loads, which can be before the catalogs arrive, and it never follows a language switch.
+Keep each `t` call inside a function child, so it follows a language switch and a catalog that arrives
+late. A call outside one is a snapshot: it renders once and never changes.
 
 If the API cannot answer, the page renders anyway, with the key itself in place of each missing message.
-The dashboard keeps retrying, and rebuilds the page once the catalogs arrive.
+The dashboard keeps retrying, and each live `t` call fills in once the catalogs arrive.
+
+Labels from the discovery data, like a field's `label` or a menu row's, arrive as messages. Render them
+with `translateMessage`, inside a function child too:
+
+```ts
+h('span', null, () => translateMessage(field.label));
+```
 
 A key that no catalog defines renders as the key itself. When a key is missing in the active language,
 the server fills it from the [fallback chain](../i18n/messages.md#translating-with-uset).
 
 ## Switching the language
 
-`useDashboardLanguage` returns the ref that holds the language the dashboard renders messages in.
-The whole page shares one ref:
+`useDashboardLanguage` returns a read-only ref to the language on screen. The whole page shares it:
 
 - It starts at the configured [default language](../project/config.md#messages).
 - It switches to the signed-in user's [dashboard language](./account.md#the-settings) once the
   session has loaded.
 
-To switch it yourself, call `setDashboardLanguage`. It loads the new language's catalogs, then writes
-the ref. The page rebuilds in the new language, and the menu and field labels refetch in it:
+To switch it yourself, call `setDashboardLanguage`. It loads the new language's catalogs, then switches
+the text in place. The page keeps its state, like a draft or the scroll position:
 
 ```ts
 import { h, setDashboardLanguage } from 'ohnejs/dashboard';
@@ -192,10 +197,11 @@ import { h, setDashboardLanguage } from 'ohnejs/dashboard';
 h('button', { onClick: () => void setDashboardLanguage('de') }, 'Deutsch');
 ```
 
-Do not write the ref yourself. The page would rebuild before the new catalogs arrive, and show raw keys.
+A switch made while a navigation is pending lands together with the arriving page, so the page you
+leave never changes language on its way out.
 
-`api()` sends the active language as `Accept-Language`, so labels and messages that the server
-resolves arrive in the same language.
+`api()` sends the language you asked for as `Accept-Language`, so messages that the server resolves,
+like a validation error, arrive in it.
 
 Codegen types the ref to the languages your catalogs define, so `'de'` compiles only when a `de`
 catalog exists somewhere in the stack.

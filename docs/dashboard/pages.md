@@ -55,9 +55,9 @@ The runtime defines what the component returns and how it updates:
 - [`ref`](./reactivity.md#ref) holds state.
 - [`api`](./data.md#loading-into-a-ref) loads data from your API.
 
-The page component runs once per visit. It runs again when you navigate or switch the
-[dashboard language](./data.md#switching-the-language), but not when a ref it read changes. Bind a live
-value with a [function child](./rendering.md#children) instead.
+The page component runs once per visit. It runs again when you navigate, never when a ref it read
+changes or the [dashboard language](./data.md#switching-the-language) switches. Bind a live value, and
+every `t` call, with a [function child](./rendering.md#children) instead.
 
 ## The page title
 

@@ -50,7 +50,7 @@ export function loginPopup(): Child {
             alert(
               h('p', null, () => t('dashboard.session.expiredBody')),
               {
-                title: t('dashboard.session.expired'),
+                title: () => t('dashboard.session.expired'),
                 icon: icon('info-circle'),
               },
             ),

@@ -3,10 +3,11 @@ import {
   attachTooltip,
   css,
   describeControl,
+  dynamicChips,
   type DynamicChipsChoice,
   type DynamicChipsPaginatedChoices,
-  dynamicChips,
   fallbackLabel,
+  fieldPlaceholder,
   type FieldType,
   h,
   icon,
@@ -369,9 +370,9 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
       erroredItems: () => erroredIndices.value,
       maxItems: isNumber(max) ? max : false,
       name: context.path,
-      placeholder: context.field.placeholder,
-      noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
-      removeItemLabel: untracked(() => t('dashboard.removeItem')),
+      placeholder: fieldPlaceholder(context.field),
+      noResultsLabel: () => t('dashboard.noResultsFound'),
+      removeItemLabel: () => t('dashboard.removeItem'),
       onDblclick: (value, event) => {
         const record = untracked(() => mediaRecords.get(String(value)));
         if (isNullish(record)) return;

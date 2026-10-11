@@ -17,9 +17,9 @@ export interface AlertOptions {
   variant?: 'primary' | 'destructive';
 
   /**
-   * The title of the alert, rendered bold above the content.
+   * The title of the alert, rendered bold above the content; a getter reads reactively.
    */
-  title?: string;
+  title?: string | (() => string);
 
   /**
    * An icon rendered in front of the content, at `1.5em`.

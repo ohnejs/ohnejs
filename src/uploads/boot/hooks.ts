@@ -6,7 +6,6 @@ import { hasRoute, isEmpty, isUndefined, parseBytes, parseDuration } from 'ohnej
 
 import type { DashboardMenuGroup, DashboardMenuItem } from '../../base/api/dashboard.get.ts';
 
-import { translate } from '../../ohne/http/translate.ts';
 import { useUploadsConfig } from '../config.ts';
 import { useStorage } from '../storage/use-storages.ts';
 import { decorateUploads } from '../uploads/decorate.ts';
@@ -91,10 +90,10 @@ function replaceRow(item: DashboardMenuItem): DashboardMenuItem[] {
 }
 
 /**
- * The media page's row, its label in the viewer's language.
+ * The media page's row, its label a message the dashboard translates.
  */
 function mediaRow(): DashboardMenuItem {
-  return { to: MEDIA_ROW, label: translate('uploads.menu.media'), icon: 'library-photo' };
+  return { to: MEDIA_ROW, label: 'uploads.menu.media', icon: 'library-photo' };
 }
 
 /**

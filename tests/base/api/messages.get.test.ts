@@ -77,10 +77,10 @@ describe('GET /messages/:group/:language', () => {
         'api.messages.unknownGroup': 'Unknown message group `{group}`',
       },
     });
-    throws(
-      () => handler({ params: { group: 'dashboard', language: 'en' } }),
-      /Unknown message group `dashboard`/,
-    );
+    throws(() => handler({ params: { group: 'dashboard', language: 'en' } }), {
+      status: 404,
+      message: 'Unknown message group `dashboard`',
+    });
   });
 
   it('responds 400 for a malformed language tag', async () => {
@@ -90,9 +90,9 @@ describe('GET /messages/:group/:language', () => {
         'api.messages.invalidLanguage': 'Invalid language `{language}`',
       },
     });
-    throws(
-      () => handler({ params: { group: 'field', language: 'en_US' } }),
-      /Invalid language `en_US`/,
-    );
+    throws(() => handler({ params: { group: 'field', language: 'en_US' } }), {
+      status: 400,
+      message: 'Invalid language `en_US`',
+    });
   });
 });

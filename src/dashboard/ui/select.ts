@@ -86,8 +86,9 @@ export interface SelectOptions {
 
   /**
    * Placeholder text shown when no label or value is displayed in the select field.
+   * A getter reads reactively.
    */
-  placeholder?: string;
+  placeholder?: string | (() => string);
 
   /**
    * Reports the error state reactively.

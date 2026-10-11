@@ -54,6 +54,7 @@
   "deletedPartial": "{count} gelöscht, {failed} fehlgeschlagen",
   "deselect": "Abwählen",
   "disable": "Deaktivieren",
+  "dragToAdjust": "Ziehen, um den Wert anzupassen",
   "dropItemsHere": "Elemente hier ablegen",
   "duplicate": "Duplizieren",
   "edit": "Bearbeiten",
@@ -294,6 +295,15 @@
     "selectedOnPage": "{count, plural, one {# Datensatz} other {# Datensätze}} auf dieser Seite ausgewählt"
   },
   "tableOverview": "Tabellenübersicht",
+  "time": {
+    "hours": "h",
+    "minutes": "m",
+    "seconds": "s"
+  },
+  "toaster": {
+    "close": "Benachrichtigung schließen",
+    "label": "Benachrichtigungen alt+T"
+  },
   "translations": {
     "confirmDelete": "Die Übersetzung `{locale}` wirklich löschen?",
     "copied": "Kopiert",

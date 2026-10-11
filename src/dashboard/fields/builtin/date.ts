@@ -11,7 +11,7 @@ import { dateTimePreferences, formatDate } from '../../runtime/date-time.ts';
 import { resolveTimezone, zonedFromTimestamp, zonedFromWallClock } from '../../ui/calendar-date.ts';
 import { calendar } from '../../ui/calendar.ts';
 import { calendarLabels } from '../_calendar-labels.ts';
-import { describeControl } from '../field-row.ts';
+import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 /**
@@ -97,8 +97,8 @@ export const dateType: FieldType = {
       timezone: 'UTC',
       today: todayStamp(),
       formatter: formatDate,
-      labels: calendarLabels(language()),
-      placeholder: field.placeholder,
+      labels: () => calendarLabels(language()),
+      placeholder: fieldPlaceholder(field),
       min: field.options?.min as string | undefined,
       max: field.options?.max as string | undefined,
       clearable: field.nullable,
@@ -162,7 +162,7 @@ export const dateType: FieldType = {
         timezone: 'UTC',
         today: todayStamp(),
         formatter: formatDate,
-        labels: calendarLabels(language()),
+        labels: () => calendarLabels(language()),
         clearable: false,
         id: inputID,
         name: inputID,

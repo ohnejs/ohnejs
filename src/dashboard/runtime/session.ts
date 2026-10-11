@@ -2,16 +2,17 @@ import type { LoginOutcome } from './_session.ts';
 import type { DashboardLanguage } from './use-dashboard-language.ts';
 
 import { isNull } from '../../utils/is/is-null.ts';
+import { isNullish } from '../../utils/is/is-nullish.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { deepEqual } from '../../utils/object/deep-equal.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { endSession, startSession } from './_request.ts';
 import { loginRefusal } from './_session.ts';
 import { api } from './api.ts';
 import { dashboardConfig } from './config.ts';
-import { loadMessages } from './messages.ts';
-import { invalidateDashboardMeta } from './meta.ts';
-import { writeDashboardLanguage } from './set-dashboard-language.ts';
-import { useDashboardLanguage } from './use-dashboard-language.ts';
+import { loadLanguage } from './messages.ts';
+import { invalidateDashboardMeta, resetDashboardMeta } from './meta.ts';
+import { requestDashboardLanguage } from './set-dashboard-language.ts';
 
 export type { LoginOutcome };
 
@@ -113,6 +114,7 @@ export type UpdateOutcome =
     };
 
 const user = ref<SessionUser | null | undefined>(undefined);
+const signIns = ref(0);
 let requested = false;
 
 /**
@@ -133,8 +135,25 @@ export function sessionUser(): SessionUser | null | undefined {
 }
 
 /**
+ * Counts the successful `login` calls since the page loaded; every read is reactive.
+ * A load that failed on an expired session reads it to retry once the user signs in again in place.
+ *
+ * @example
+ * ```ts
+ * effect(() => {
+ *   signInCount()
+ *   void loadRows()
+ * })
+ * ```
+ */
+export function signInCount(): number {
+  return signIns.value;
+}
+
+/**
  * Signs in with an email and password.
- * Success stores the session cookie, updates `sessionUser` reactively, and resets the discovery store.
+ * Success stores the session cookie and updates `sessionUser` reactively.
+ * A same-user sign-in refreshes the discovery store in place; another user empties it first.
  * The user's dashboard language applies at once, so every message renders in it.
  * `remember` picks the session's lifetime: with it the long one, without it the short one.
  * A session opened without it also gets a cookie that ends with the browser.
@@ -156,9 +175,10 @@ export async function login(
   }
   if (!response.ok) return loginRefusal(response);
   const answer = (await response.json()) as SessionUser;
-  await loadMessages(languageOf(answer));
+  await loadLanguage(languageOf(answer));
   startSession();
   apply(answer, true);
+  signIns.value += 1;
   return { kind: 'signed-in' };
 }
 
@@ -166,7 +186,6 @@ export async function login(
  * Writes a partial of the signed-in user's own record through `PATCH /auth/me` and stores the answer.
  * The patch takes the account fields and `password`; an unknown key is a `422`, like a collection write.
  * A saved answer applies at once: the dashboard language switches, and every preference reads fresh.
- * The discovery store resets only when the language changed, since its labels are baked in one language.
  */
 export async function updateSessionUser(patch: Record<string, unknown>): Promise<UpdateOutcome> {
   try {
@@ -176,8 +195,8 @@ export async function updateSessionUser(patch: Record<string, unknown>): Promise
     });
     if (response.ok) {
       const answer = (await response.json()) as SessionUser;
-      await loadMessages(languageOf(answer));
-      if (apply(answer)) invalidateDashboardMeta();
+      await loadLanguage(languageOf(answer));
+      apply(answer);
       return { kind: 'saved', user: answer };
     }
     if (response.status === 422) {
@@ -202,9 +221,8 @@ export async function logout(): Promise<void> {
   try {
     await api('POST /auth/logout');
   } catch {}
-  await loadMessages(languageOf(null));
+  await loadLanguage(languageOf(null));
   apply(null);
-  invalidateDashboardMeta();
 }
 
 /**
@@ -217,7 +235,7 @@ async function resolve(): Promise<void> {
     const response = await api('GET /auth/me');
     if (response.status === 200) answer = (await response.json()) as SessionUser;
   } catch {}
-  await loadMessages(languageOf(answer));
+  await loadLanguage(languageOf(answer));
   if (!isUndefined(user.value)) return;
   if (isNull(answer)) {
     apply(null);
@@ -236,15 +254,22 @@ function languageOf(user: SessionUser | null): DashboardLanguage {
 
 /**
  * Stores a user and applies their dashboard language, the app's default for a signed-out or unset one.
- * Its catalogs must have loaded first, through `loadMessages`, so the page rebuilds with every message ready.
- * Answers whether the language changed, since the discovery store's labels are baked in one language.
- * With `refresh`, the discovery store resets between the two, so it refetches once, in the new language.
+ * Its catalogs must have loaded first, through `loadLanguage`, so the text switches with every message ready.
+ * The discovery store empties on a new identity, since it describes what one user may see.
+ * Otherwise `refresh` refetches it in place, keeping the current data until the answer lands.
  */
-function apply(next: SessionUser | null, refresh = false): boolean {
-  const tag = languageOf(next);
-  const changed = useDashboardLanguage().value !== tag;
-  writeDashboardLanguage(tag);
-  if (refresh) invalidateDashboardMeta();
+function apply(next: SessionUser | null, refresh = false): void {
+  const previous = user.value;
+  requestDashboardLanguage(languageOf(next));
+  if (!sameIdentity(previous, next)) resetDashboardMeta();
+  else if (refresh) invalidateDashboardMeta();
   user.value = next;
-  return changed;
+}
+
+/**
+ * Whether two users are one identity: the same `UUID` holding the same roles, in any order.
+ */
+function sameIdentity(a: SessionUser | null | undefined, b: SessionUser | null): boolean {
+  if (isNullish(a) || isNull(b)) return false;
+  return a.UUID === b.UUID && deepEqual(a.roles.toSorted(), b.roles.toSorted());
 }

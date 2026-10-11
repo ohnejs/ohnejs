@@ -11,6 +11,7 @@ import {
   select,
   type SelectChoice,
   structure,
+  translateMessage,
   useT,
   when,
 } from 'ohnejs/dashboard';
@@ -183,8 +184,8 @@ export function tableColumnsConfigurator(options: TableColumnsConfiguratorOption
           .map((field) =>
             field.name === item().name ||
             items.value.every((candidate) => candidate.name !== field.name)
-              ? { label: field.label, value: field.name }
-              : { label: field.label, value: field.name, disabled: true },
+              ? { label: translateMessage(field.label), value: field.name }
+              : { label: translateMessage(field.label), value: field.name, disabled: true },
           ),
       // Untracked: the id is static, and a tracked read would rebuild the row on every width toggle.
       { id: `${id}-${untracked(() => item().name)}-field`, name: id },
@@ -209,6 +210,7 @@ export function tableColumnsConfigurator(options: TableColumnsConfiguratorOption
         suffix: 'px',
         autoWidth: true,
         showDragButton: true,
+        ariaDragLabel: () => t('dashboard.dragToAdjust'),
         onCommit: () => commit([...items.value]),
       }),
     );

@@ -24,6 +24,7 @@ import {
   type Primitive,
   select,
   type SelectChoice,
+  translateMessage,
   useDashboardLanguage,
   useHotkeys,
   useT,
@@ -247,7 +248,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     options
       .fields()
       .filter((field) => field.readable && !isUndefined(filterOf(field)))
-      .sort((a, b) => naturalCompare(a.label, b.label));
+      .sort((a, b) => naturalCompare(translateMessage(a.label), translateMessage(b.label)));
 
   const fieldByName = (name: string): DashboardField | undefined =>
     fieldChoices().find((field) => field.name === name);
@@ -383,7 +384,10 @@ export function filterPopup(options: FilterPopupOptions): Popup {
         select(
           fieldModel,
           (): SelectChoice[] =>
-            fieldChoices().map((field) => ({ label: field.label, value: field.name })),
+            fieldChoices().map((field) => ({
+              label: translateMessage(field.label),
+              value: field.name,
+            })),
           { id: `${inputID}-field`, name: `${inputID}-field` },
         ),
       ),

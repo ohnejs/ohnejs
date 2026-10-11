@@ -21,6 +21,9 @@
     "unprocessableContent": "Neobradiv sadržaj",
     "unsupportedMediaType": "Nepodržan tip medija"
   },
+  "intl": {
+    "unknownLanguage": "Nema podataka o datumima i brojevima za jezik `{language}`"
+  },
   "messages": {
     "invalidLanguage": "Neispravan jezik `{language}`",
     "unknownGroup": "Nepoznata grupa poruka `{group}`"

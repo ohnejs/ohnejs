@@ -110,6 +110,28 @@ export class FakeElement extends FakeNode {
   removeEventListener(): void {}
 }
 
+/**
+ * The first element under `root`, depth first, that `match` accepts.
+ */
+export function findElement(
+  root: FakeNode,
+  match: (element: FakeElement) => boolean,
+): FakeElement | undefined {
+  for (const child of root.childNodes) {
+    if (child instanceof FakeElement && match(child)) return child;
+    const found = findElement(child, match);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Whether `element`'s `class` attribute lists `name`.
+ */
+export function hasClass(element: FakeElement, name: string): boolean {
+  return (element.getAttribute('class') ?? '').split(' ').includes(name);
+}
+
 Object.assign(globalThis, {
   Node: FakeNode,
   Text: FakeText,
@@ -128,5 +150,6 @@ Object.assign(globalThis, {
     createTextNode: (data: string) => new FakeText(data),
     createDocumentFragment: () => new FakeFragment(),
     createElement: (tag: string) => new FakeElement(tag),
+    createElementNS: (_: string, tag: string) => new FakeElement(tag),
   },
 });

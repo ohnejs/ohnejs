@@ -1,7 +1,9 @@
 import type { Child } from '../render/insert.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { type MaybeGetter, toValue } from '../../utils/reactive/to-value.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { button } from './button.ts';
@@ -20,10 +22,10 @@ export interface DialogAction {
   name: string;
 
   /**
-   * The action button label.
+   * The action button label; a getter reads reactively.
    * If not provided, the `name` is used as the label.
    */
-  label?: string;
+  label?: MaybeGetter<string>;
 
   /**
    * The variant of the action button.
@@ -39,9 +41,9 @@ export interface DialogAction {
  */
 export interface DialogOptions<TActions extends readonly DialogAction[]> {
   /**
-   * The text content of the dialog.
+   * The text content of the dialog; a getter reads reactively.
    */
-  content?: string;
+  content?: MaybeGetter<string>;
 
   /**
    * Controls if the `content` is rendered as markdown-lite (see `renderProse`).
@@ -67,11 +69,11 @@ export interface DialogOptions<TActions extends readonly DialogAction[]> {
 }
 
 interface DialogState {
-  content?: string;
+  content?: MaybeGetter<string>;
   markdown: boolean;
   actions: {
     name: string;
-    label: string;
+    label: MaybeGetter<string>;
     variant: NonNullable<DialogAction['variant']>;
     resolve: () => void;
   }[];
@@ -160,7 +162,8 @@ export function dialogHost(): Child {
           ? null
           : (() => {
               const content = h('div', { class: 'ohne-dialog-content ohne-prose' });
-              renderProse(content, dialog.content, { markdown: dialog.markdown });
+              const text = dialog.content;
+              effect(() => renderProse(content, toValue(text), { markdown: dialog.markdown }));
               return content;
             })(),
         h(

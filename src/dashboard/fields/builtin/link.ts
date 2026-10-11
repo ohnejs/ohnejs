@@ -27,7 +27,7 @@ import { textInput } from '../../ui/text-input.ts';
 import { attachTooltip } from '../../ui/tooltip.ts';
 import { choiceKeyword, linkChoiceValue, linkOf, linkTargetOf } from '../_link-model.ts';
 import { readableCollection } from '../_search.ts';
-import { describeControl } from '../field-row.ts';
+import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { fallbackLabel, labelOf } from '../labels.ts';
 import { pickerTrigger } from '../record-picker.ts';
@@ -105,9 +105,9 @@ export const linkType: FieldType = {
         selectedChoiceResolver: choices.selectedChoiceResolver,
         error: () => error() !== '',
         name: path,
-        placeholder: field.placeholder ?? untracked(() => t('dashboard.link.placeholder')),
-        searchLabel: untracked(() => t('dashboard.searchPlaceholder')),
-        noResultsLabel: untracked(() => t('dashboard.noResultsFound')),
+        placeholder: fieldPlaceholder(field) ?? (() => t('dashboard.link.placeholder')),
+        searchLabel: () => t('dashboard.searchPlaceholder'),
+        noResultsLabel: () => t('dashboard.noResultsFound'),
         get initialKeyword() {
           return choiceKeyword(model.value);
         },
@@ -143,7 +143,7 @@ export const linkType: FieldType = {
       const settings = button(icon('settings'), {
         variant: 'outline',
         disabled: off ? (): boolean => true : undefined,
-        ariaLabel: t('dashboard.link.options'),
+        ariaLabel: () => t('dashboard.link.options'),
         onClick: () => openLinkOptions(link, change),
       });
       onCleanup(attachTooltip(settings, () => t('dashboard.link.options')));
@@ -151,7 +151,7 @@ export const linkType: FieldType = {
         ? button(icon('x'), {
             variant: 'outline',
             disabled: off ? (): boolean => true : undefined,
-            ariaLabel: t('dashboard.clearSelection'),
+            ariaLabel: () => t('dashboard.clearSelection'),
             onClick: () => {
               change(null);
               address?.sync();
@@ -284,7 +284,7 @@ function openButton(link: Link): Child {
       variant: 'outline',
       href,
       target: '_blank',
-      ariaLabel: t('dashboard.open'),
+      ariaLabel: () => t('dashboard.open'),
     });
     onCleanup(attachTooltip(open, () => t('dashboard.open')));
     return open;

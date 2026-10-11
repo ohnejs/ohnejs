@@ -12,7 +12,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
-import { useT } from '../runtime/use-t.ts';
+import { translateMessage, useT } from '../runtime/use-t.ts';
 import { button } from '../ui/button.ts';
 import { icon } from '../ui/icon.ts';
 import { popup } from '../ui/popup-overlay.ts';
@@ -160,8 +160,10 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
         const names = allowed ?? registry.map((block) => block.name);
         return names.map((name) => {
           const block = blockNamed(registry, name);
-          const label = block?.label ?? name;
-          const description = block?.description;
+          const label = isUndefined(block) ? name : translateMessage(block.label);
+          const description = isUndefined(block?.description)
+            ? undefined
+            : translateMessage(block.description);
           const search = [label.padEnd(63), name, description ?? ''].join(' ');
           return { name, label, description, icon: blockIcon(block), search };
         });

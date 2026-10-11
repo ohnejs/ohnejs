@@ -8,7 +8,7 @@ import { useT } from '../../runtime/use-t.ts';
 import { numberInput } from '../../ui/number-input.ts';
 import { textInput } from '../../ui/text-input.ts';
 import { cellEditor } from '../cell-editor.ts';
-import { describeControl } from '../field-row.ts';
+import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 import { parseRealValue } from '../parse.ts';
 
@@ -54,7 +54,7 @@ export const numberType: FieldType = {
       onInput();
     };
 
-    const control = textInput(raw, { disabled: () => off, placeholder: field.placeholder });
+    const control = textInput(raw, { disabled: () => off, placeholder: fieldPlaceholder(field) });
     const input = control.querySelector('input') as HTMLInputElement;
     control.classList.add('ohne-input-numeric');
     input.setAttribute('inputmode', 'decimal');

@@ -2,15 +2,20 @@ import { strictEqual } from 'node:assert';
 import { after, before, describe, it, mock } from 'node:test';
 
 import { navigate, startRouter } from '../../../src/dashboard/router/router.ts';
-import { loadMessages } from '../../../src/dashboard/runtime/messages.ts';
-import { writeDashboardLanguage } from '../../../src/dashboard/runtime/set-dashboard-language.ts';
+import { loadLanguage } from '../../../src/dashboard/runtime/messages.ts';
+import {
+  requestDashboardLanguage,
+  setDashboardLanguage,
+} from '../../../src/dashboard/runtime/set-dashboard-language.ts';
+import { useDashboardLanguage } from '../../../src/dashboard/runtime/use-dashboard-language.ts';
 import { translateMessage } from '../../../src/dashboard/runtime/use-t.ts';
 import { flush } from '../../../src/utils/reactive/_scheduler.ts';
 import { FakeElement, FakeText } from '../_fake-dom.ts';
 
-const CATALOGS: Record<string, Record<string, { template: string; language: string }>> = {
-  nav: { 'nav.home': { template: 'Home', language: 'en' } },
-  field: { 'field.required': { template: 'Required', language: 'en' } },
+const WORDS: Record<string, [home: string, required: string]> = {
+  en: ['Home', 'Required'],
+  de: ['Start', 'Pflichtfeld'],
+  bs: ['Početna', 'Obavezno'],
 };
 
 /**
@@ -25,6 +30,7 @@ describe('startRouter', () => {
   let builds = 0;
   let nextBuilds = 0;
   let fieldAttempts = 0;
+  let release!: () => void;
   const container = new FakeElement('div');
 
   before(async () => {
@@ -43,11 +49,10 @@ describe('startRouter', () => {
       window: { addEventListener: () => {} },
       location: { pathname: '/', search: '', hash: '' },
       history: { pushState: (_: unknown, __: string, path: string) => (location.pathname = path) },
+      gate: new Promise<void>((resolve) => (release = resolve)),
       page: () => {
         builds++;
-        return new FakeText(
-          `${translateMessage('nav.home')}|${translateMessage('field.required')}`,
-        );
+        return () => `${translateMessage('nav.home')}|${translateMessage('field.required')}`;
       },
       next: () => {
         nextBuilds++;
@@ -56,16 +61,23 @@ describe('startRouter', () => {
     });
     mock.timers.enable({ apis: ['setTimeout'] });
     mock.method(globalThis, 'fetch', async (url: string) => {
-      const group = url.includes('/nav/') ? 'nav' : 'field';
+      const [group, language] = url.split('/').slice(-2);
       if (group === 'field' && ++fieldAttempts === 1) return new Response('{}', { status: 503 });
-      return new Response(JSON.stringify(CATALOGS[group]));
+      const [home, required] = WORDS[language];
+      const catalog =
+        group === 'nav'
+          ? { 'nav.home': { template: home, language } }
+          : { 'field.required': { template: required, language } };
+      return new Response(JSON.stringify(catalog));
     });
-    const module = (name: string): string =>
-      `data:text/javascript,${encodeURIComponent(`export default (r) => globalThis.${name}(r);`)}`;
+    const module = (body: string): string => `data:text/javascript,${encodeURIComponent(body)}`;
     await startRouter(
       [
-        { pattern: '/', url: module('page') },
-        { pattern: '/next', url: module('next') },
+        { pattern: '/', url: module('export default (r) => globalThis.page(r);') },
+        {
+          pattern: '/next',
+          url: module('await globalThis.gate; export default (r) => globalThis.next(r);'),
+        },
       ],
       container as unknown as Element,
     );
@@ -82,30 +94,35 @@ describe('startRouter', () => {
     strictEqual(container.textContent, 'Home|field.required');
   });
 
-  it('rebuilds the page once when the retry lands, repairing its translations', async () => {
+  it('fills the repaired translation in place without rebuilding', async () => {
     mock.timers.tick(3000);
     await settle();
     strictEqual(fieldAttempts, 2);
-    strictEqual(builds, 2);
+    strictEqual(builds, 1);
     strictEqual(container.textContent, 'Home|Required');
-    mock.timers.tick(3000);
-    await settle();
-    strictEqual(builds, 2);
   });
 
-  it('rebuilds the page once on a language switch', async () => {
-    await loadMessages('de');
-    writeDashboardLanguage('de');
+  it('keeps the page on a language switch, re-rendering its text', async () => {
+    await setDashboardLanguage('de');
     await settle();
-    strictEqual(builds, 3);
+    strictEqual(useDashboardLanguage().value, 'de');
+    strictEqual(builds, 1);
+    strictEqual(container.textContent, 'Start|Pflichtfeld');
   });
 
-  it('builds only the arriving page when a language switch lands with a navigation', async () => {
-    writeDashboardLanguage('en');
+  it('keeps the outgoing page in its language until the arriving page publishes', async () => {
+    await loadLanguage('bs');
+    requestDashboardLanguage('bs');
     void navigate('/next');
+    for (let i = 0; i < 5; i++) {
+      await settle();
+      strictEqual(container.textContent, 'Start|Pflichtfeld');
+      strictEqual(useDashboardLanguage().value, 'de');
+    }
+    release();
     for (let i = 0; i < 5; i++) await settle();
-    strictEqual(builds, 3);
     strictEqual(nextBuilds, 1);
     strictEqual(container.textContent, 'next');
+    strictEqual(useDashboardLanguage().value, 'bs');
   });
 });

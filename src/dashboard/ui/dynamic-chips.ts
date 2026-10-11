@@ -123,19 +123,21 @@ export interface DynamicChipsOptions {
 
   /**
    * Text label for the remove item button.
+   * A getter reads reactively.
    *
    * @default
    * 'Remove'
    */
-  removeItemLabel?: string;
+  removeItemLabel?: string | (() => string);
 
   /**
    * Text label for the no results found message in the choices dropdown.
+   * A getter reads reactively.
    *
    * @default
    * 'No results found'
    */
-  noResultsLabel?: string;
+  noResultsLabel?: string | (() => string);
 
   /**
    * The visual style variant of the chips.
@@ -153,8 +155,9 @@ export interface DynamicChipsOptions {
 
   /**
    * Placeholder text shown while the text input is empty.
+   * A getter reads reactively.
    */
-  placeholder?: string;
+  placeholder?: string | (() => string);
 
   /**
    * The long-press duration in milliseconds that starts dragging on touch devices.

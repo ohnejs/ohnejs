@@ -6,6 +6,7 @@ import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { effectScope, onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { type MaybeGetter, toValue } from '../../utils/reactive/to-value.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
@@ -136,6 +137,7 @@ const queue = ref<{ message: string; options?: ToastOptions }[]>([]);
 
 let counter = 0;
 let outlet: HTMLElement | undefined;
+const labels = ref<ToasterOptions>({});
 
 const TYPE_ICONS: Record<Exclude<ToastRecord['type'], 'default'>, IconName> = {
   success: 'circle-check',
@@ -761,19 +763,44 @@ export function queueToast(message: string, options?: ToastOptions): void {
 }
 
 /**
+ * Options for `toaster`.
+ */
+export interface ToasterOptions {
+  /**
+   * The accessible name of the toast stack, naming its focus hotkey.
+   * A getter reads reactively.
+   *
+   * @default
+   * 'Notifications alt+T'
+   */
+  label?: MaybeGetter<string>;
+
+  /**
+   * The accessible name of a toast's close button.
+   * A getter reads reactively.
+   *
+   * @default
+   * 'Close notification'
+   */
+  closeLabel?: MaybeGetter<string>;
+}
+
+/**
  * The global toast outlet: a top-center stack of at most 3 visible toasts.
  * Timers pause while the stack is hovered or held, a swipe up dismisses, and Alt+T focuses the stack.
  * Mount it once in the shell; `toast` and `queueToast` feed it from anywhere.
  *
  * Every call returns the same element, so a screen swap re-parents it instead of rebuilding it.
  * A showing toast keeps its DOM, its running timer, and its animation state across navigations.
+ * The latest call's `options` label the shared outlet.
  *
  * @example
  * ```ts
  * h('div', null, page, toaster())
  * ```
  */
-export function toaster(): HTMLElement {
+export function toaster(options: ToasterOptions = {}): HTMLElement {
+  labels.value = options;
   outlet ??= effectScope(true).run(createToaster);
   return outlet;
 }
@@ -936,7 +963,7 @@ function createToaster(): HTMLElement {
           ? h(
               'button',
               {
-                'aria-label': 'Close toast',
+                'aria-label': () => toValue(labels.value.closeLabel ?? 'Close notification'),
                 'data-disabled': 'false',
                 'data-close-button': 'true',
                 onClick: () => {
@@ -1125,7 +1152,7 @@ function createToaster(): HTMLElement {
     'section',
     {
       tabindex: '-1',
-      'aria-label': 'Notifications alt+T',
+      'aria-label': () => toValue(labels.value.label ?? 'Notifications alt+T'),
       'aria-live': 'polite',
       'aria-relevant': 'additions text',
       'aria-atomic': 'false',

@@ -27,6 +27,7 @@ import { header } from './header.ts';
 import { loginPopup } from './login-popup.ts';
 import { shellSlots } from './shell-slots.ts';
 import { sidebar } from './sidebar.ts';
+import { toasterLabels } from './toaster-labels.ts';
 import { unsavedChangesGuard } from './unsaved-changes.ts';
 import { wrapper } from './wrapper.ts';
 
@@ -361,12 +362,15 @@ export function shell(content: () => Child, options: ShellOptions = {}): Child {
     }
   });
   const signedIn = (): boolean => !isNullish(sessionUser());
-  const root = base([
-    wrapper(when(signedIn, () => layout(content, options))),
-    when(signedIn, () => shellSlots('global').map((render) => render())),
-    unsavedChangesGuard(),
-    loginPopup(),
-  ]);
+  const root = base(
+    [
+      wrapper(when(signedIn, () => layout(content, options))),
+      when(signedIn, () => shellSlots('global').map((render) => render())),
+      unsavedChangesGuard(),
+      loginPopup(),
+    ],
+    { toaster: toasterLabels() },
+  );
   root.classList.add('o-default-layout');
   return root;
 }

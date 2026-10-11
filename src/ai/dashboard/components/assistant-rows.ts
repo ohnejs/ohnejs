@@ -6,7 +6,7 @@ import {
   type PaletteRowGroup,
   paletteView,
 } from 'app/components/palette-state.ts';
-import { css } from 'ohnejs/dashboard';
+import { css, translateMessage } from 'ohnejs/dashboard';
 import { isUndefined } from 'ohnejs/utils';
 
 import { useAIT } from './_ai-messages.ts';
@@ -32,8 +32,8 @@ export function assistantRows(): PaletteRowGroup[] {
   if (isUndefined(meta)) return [];
   return askRows({
     query: paletteQuery.value.trim(),
-    skills: meta.skills,
-    flows: meta.flows,
+    skills: meta.skills.map(({ name, title }) => ({ name, title: translateMessage(title) })),
+    flows: meta.flows.map(({ name, title }) => ({ name, title: translateMessage(title) })),
     recent: recentChats.value,
     settled: turnSettled(),
     t: useAIT(),

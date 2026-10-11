@@ -8,7 +8,7 @@ import {
   withAcceptLanguage,
 } from './_request.ts';
 import { dashboardConfig } from './config.ts';
-import { useDashboardLanguage } from './use-dashboard-language.ts';
+import { requestedLanguage } from './use-dashboard-language.ts';
 
 /**
  * The bytes `apiUpload` sends, sent whole as the request body.
@@ -47,7 +47,7 @@ const NULL_BODY_STATUSES = new Set([204, 205, 304]);
  * `fetch` cannot report upload progress, so the request rides on `XMLHttpRequest` under `api`'s policy.
  * The route id's method sends the request; a bare path uploads with `POST`.
  * The path joins the base URL, credentials flow, and `401`s outside `/auth/` reach `setUnauthorizedHandler`.
- * `Accept-Language` names the dashboard language unless `headers` sets one.
+ * `Accept-Language` names the requested dashboard language unless `headers` sets one.
  * Resolves a `Response` built from the answer, so it reads exactly like one from `api`.
  * Rejects like `fetch`: a `TypeError` when the request never completes, the signal's reason on abort.
  *
@@ -73,7 +73,7 @@ export function apiUpload(
   if (signal?.aborted) return Promise.reject(signal.reason);
   const { method = 'POST', path, url } = requestTarget(dashboardConfig().apiURL, route);
   // Untracked: an upload started inside a render must not subscribe that region to the language.
-  const language = untracked(() => useDashboardLanguage().value);
+  const language = untracked(() => requestedLanguage().value);
   const sentUnder = currentSession();
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();

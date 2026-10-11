@@ -1,4 +1,5 @@
 import type { MessageAST } from '../../utils/i18n/message-ast.ts';
+import type { MessageData } from '../../utils/i18n/message-data.ts';
 import type { KnownMessages } from './known-messages.ts';
 
 import { formatMessageAST } from '../../utils/i18n/format-message-ast.ts';
@@ -7,6 +8,7 @@ import { parseMessage } from '../../utils/i18n/parse-message.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { dashboardConfig } from './config.ts';
 import { messageCatalog } from './messages.ts';
 import { useDashboardLanguage } from './use-dashboard-language.ts';
 
@@ -28,15 +30,14 @@ export type Translate = [keyof KnownMessages] extends [never]
 type ParamArgs<P> = [keyof P] extends [never] ? [] : [params: P];
 
 const cache = new Map<string, MessageAST>();
+let groups: ReadonlySet<string> | undefined;
 
 /**
  * Returns a translator bound to the dashboard's reactive language.
  *
  * The returned `t` reads `useDashboardLanguage` and the message store on every call.
  * Inside a function child the string stays live, following the language and a catalog that loads late.
- * Anywhere else a call is a snapshot, taken when it runs.
- * A snapshot in a page is safe: the dashboard language's catalogs load before the page builds.
- * The page also rebuilds on a language switch, and when a catalog that failed to load arrives on retry.
+ * Anywhere else a call is a snapshot: it renders once and never changes, since a page never rebuilds.
  * Any other language's catalog is fetched from the API on demand, once per group and language.
  *
  * A key whose catalog has not loaded yet, or that no language defines, renders as the key itself.
@@ -56,11 +57,12 @@ export function useT(): Translate {
 }
 
 /**
- * Translates a `Message` that reached the client as plain data.
+ * Translates a `Message` that reached the client as plain data, like a discovery label.
  * A string resolves as a key, or stays itself when no catalog defines it.
+ * A string outside every message group, like `Blog posts`, answers at once and fetches nothing.
  * A `{ key, params }` object formats.
  * Anything else answers `undefined`, so a caller can fall back.
- * The read is reactive, exactly as `useT` is.
+ * The read is reactive, exactly as `useT` is, so call it inside a function child to stay live.
  *
  * @example
  * ```ts
@@ -74,6 +76,8 @@ export function useT(): Translate {
  * // -> undefined
  * ```
  */
+export function translateMessage(message: MessageData): string;
+export function translateMessage(message: unknown): string | undefined;
 export function translateMessage(message: unknown): string | undefined {
   if (isString(message)) return translate(message, undefined);
   if (isPlainObject(message) && isString(message.key)) {
@@ -84,10 +88,14 @@ export function translateMessage(message: unknown): string | undefined {
 
 /**
  * Formats `key` from its loaded catalog entry, or answers the key itself when there is none.
+ * A key outside every group the stack defines is plain text, so it never fetches a catalog.
  */
 function translate(key: string, params: MessageParams | undefined): string {
+  const group = messageGroup(key);
+  groups ??= new Set(dashboardConfig().messageGroups);
+  if (!groups.has(group)) return key;
   const language = useDashboardLanguage().value;
-  const catalog = messageCatalog(language, messageGroup(key));
+  const catalog = messageCatalog(language, group);
   const entry = catalog?.[key];
   if (isUndefined(entry)) return key;
   return formatMessageAST(astOf(entry.template), params, entry.language);

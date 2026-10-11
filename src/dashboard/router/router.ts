@@ -9,9 +9,9 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { h } from '../render/h.ts';
 import { mount } from '../render/mount.ts';
-import { loadMessages, messageRepairs } from '../runtime/messages.ts';
+import { loadLanguage } from '../runtime/messages.ts';
 import { setDocumentTitle } from '../runtime/title.ts';
-import { useDashboardLanguage } from '../runtime/use-dashboard-language.ts';
+import { commitDashboardLanguage, requestedLanguage } from '../runtime/use-dashboard-language.ts';
 import { compilePages, matchPages, type CompiledPage, type MatchedRoute } from './match-route.ts';
 
 /**
@@ -54,7 +54,6 @@ let pages: CompiledPage[] = [];
 const active = ref<Active | null>(null);
 let token = 0;
 let published = 0;
-let builtIn = '';
 let guard: NavigationGuard | null = null;
 let rendered = '';
 let at = 0;
@@ -68,7 +67,9 @@ let cause: NavigationCause = 'load';
  * Navigation re-renders in place, without a full reload.
  * A same-origin left-click on a link, a `navigate` call, or the back and forward buttons swap the page.
  * The first page builds once its module has loaded and the dashboard language's catalogs have settled.
- * A catalog that failed to load does not hold it back; the page rebuilds once its retry succeeds.
+ * A catalog that failed to load does not hold it back; its live strings fill in once its retry succeeds.
+ * A requested language becomes the rendered one with the page that arrives next.
+ * With no navigation pending it switches at once, re-rendering the live strings in place.
  */
 export async function startRouter(
   manifest: readonly PageRoute[],
@@ -77,9 +78,13 @@ export async function startRouter(
   pages = compilePages(manifest);
   window.addEventListener('popstate', traverse);
   document.addEventListener('click', interceptLink);
-  await Promise.all([render(), loadMessages(useDashboardLanguage().value)]);
+  await Promise.all([render(), loadLanguage(untracked(() => requestedLanguage().value))]);
+  commitDashboardLanguage();
   mount(() => view(), container);
-  batchedEffect(relocalize);
+  batchedEffect(() => {
+    void requestedLanguage().value;
+    if (published === token) untracked(commitDashboardLanguage);
+  });
 }
 
 /**
@@ -224,31 +229,12 @@ export function useRoute(): RouteContext | null {
 /**
  * The active page rendered for its route, or the not-found page when no route matched.
  * The title resets to the bare `ohne` first, so a page that sets none never shows the previous page's.
- * A page rebuilds on navigation and through `relocalize`, never on a ref it reads while building.
+ * A page builds untracked: it rebuilds on navigation, never on a ref it reads or a language switch.
  */
 function view(): Child {
   setDocumentTitle();
   const route = active.value;
-  builtIn = untracked(translation);
   return isNull(route) ? notFound() : untracked(() => route.component(route));
-}
-
-/**
- * Rebuilds the active page on a language switch, and when a late catalog repairs the language.
- * A navigation still rendering builds its own page instead, since the old one would read the new URL.
- */
-function relocalize(): void {
-  const now = translation();
-  const route = untracked(() => active.value);
-  if (now === builtIn || published !== token || isNull(route)) return;
-  active.value = { ...route };
-}
-
-/**
- * The language a page builds in, with the count of its repairs, as one comparable key.
- */
-function translation(): string {
-  return `${useDashboardLanguage().value}\t${messageRepairs()}`;
 }
 
 /**
@@ -286,9 +272,11 @@ async function render(): Promise<void> {
 
 /**
  * Makes `route` the active route on behalf of render `mine`, the latest one.
+ * A language requested meanwhile commits first, so the arriving page builds in it.
  */
 function publish(mine: number, route: Active | null): void {
   published = mine;
+  commitDashboardLanguage();
   active.value = route;
 }
 

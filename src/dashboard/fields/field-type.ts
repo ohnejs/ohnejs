@@ -420,7 +420,7 @@ const FALLBACK: FieldType = {
     );
     content.classList.add('ohne-field-missing');
     const element = alert(content, {
-      title: t('dashboard.field.missing.title'),
+      title: () => t('dashboard.field.missing.title'),
       icon: icon('barrier-block'),
     });
     element.tabIndex = -1;

@@ -14,7 +14,7 @@ import { parseDateTime } from '../../ui/calendar-date.ts';
 import { calendar } from '../../ui/calendar.ts';
 import { attachTooltip } from '../../ui/tooltip.ts';
 import { calendarLabels } from '../_calendar-labels.ts';
-import { describeControl } from '../field-row.ts';
+import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 /**
@@ -83,8 +83,8 @@ export const dateTimeType: FieldType = {
       withTime: true,
       timezone: calendarZone(zone),
       formatter: (timestamp) => formatDateTime(timestamp, zone),
-      labels: calendarLabels(language()),
-      placeholder: field.placeholder,
+      labels: () => calendarLabels(language()),
+      placeholder: fieldPlaceholder(field),
       min: instant(field.options?.min),
       max: instant(field.options?.max),
       clearable: field.nullable,
@@ -146,7 +146,7 @@ export const dateTimeType: FieldType = {
         withTime: true,
         timezone: calendarZone(zone),
         formatter: (timestamp) => formatDateTime(timestamp, zone),
-        labels: calendarLabels(language()),
+        labels: () => calendarLabels(language()),
         clearable: false,
         id: inputID,
         name: inputID,
