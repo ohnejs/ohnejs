@@ -73,6 +73,11 @@ barChart(() => realms.value, { x: (realm) => realm.name, series })
 
 ## Stat
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/stat-ready-with-previous-and-trend-dark.png">
+  <img alt="A stat tile with a large figure, a change pill, and a sparkline" src="../images/kit/stat-ready-with-previous-and-trend-light.png">
+</picture>
+
 `stat` shows a figure with its label. Give it a `previous` and a `trend` to add a change pill and a
 sparkline:
 
@@ -96,6 +101,11 @@ language and follows it when the language switches.
 
 ## Line and area
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/linechart-two-series-the-previous-week-dashed-today-partial-dark.png">
+  <img alt="A line chart of this week against a dashed line for last week, the last day drawn lighter" src="../images/kit/linechart-two-series-the-previous-week-dashed-today-partial-light.png">
+</picture>
+
 `lineChart` draws one line per series over the rows:
 
 ```ts
@@ -117,6 +127,11 @@ lineChart(() => days.value, {
 
 ## Bar
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/barchart-stacked-dark.png">
+  <img alt="A bar chart with two series stacked in each bar" src="../images/kit/barchart-stacked-light.png">
+</picture>
+
 `barChart` takes the same `x` and `series`:
 
 ```ts
@@ -136,6 +151,11 @@ barChart(() => weeks.value, {
 
 ## Donut
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/donutchart-with-a-custom-center-dark.png">
+  <img alt="A donut chart with a figure in its hole and a legend of values and shares" src="../images/kit/donutchart-with-a-custom-center-light.png">
+</picture>
+
 `donutChart` shows each row's share of the whole, with the total in the hole:
 
 ```ts
@@ -149,6 +169,11 @@ Pass `center` to put your own figure in the hole. A legend beside the ring lists
 share.
 
 ## Bar list and funnel
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/barlist-previous-period-links-show-all-dark.png">
+  <img alt="A ranked list of realms, each with a thin bar, a value, and a change pill" src="../images/kit/barlist-previous-period-links-show-all-light.png">
+</picture>
 
 `barList` ranks rows with a thin bar under each label. Pass the rows biggest first:
 
@@ -176,7 +201,7 @@ share of the step before and of the first.
 Colors come from the eight `--ohne-chart-1` to `--ohne-chart-8` tokens, in a fixed order checked for
 color-vision deficiency in light and dark:
 
-- A single series draws in `--ohne-chart-1`, with no legend; the card title names it.
+- A single series draws in `--ohne-chart-1`, with no legend; the [card](./cards-and-tabs.md) title names it.
 - Two or more series take the slots in the order you list them, with a legend. A series keeps its
   color when you add or remove another after it.
 - Past eight series or slices, the rest fold into one "Other" in a muted gray. A donut keeps the

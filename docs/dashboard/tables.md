@@ -34,6 +34,11 @@ export default defineDashboardPage(() =>
 );
 ```
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/table-value-and-render-columns-sorted-by-a-ref-a-help-tooltip-dark.png">
+  <img alt="A raiders table sorted by level, with a role badge column and a help icon in a header" src="../images/kit/table-value-and-render-columns-sorted-by-a-ref-a-help-tooltip-light.png">
+</picture>
+
 The row type comes from the getter, so every `raider` in the columns is a `Raider` and a typo fails
 the typecheck. `key` names each row, the way [`each`](./rendering.md) does.
 
@@ -113,6 +118,11 @@ table(() => raiders.value, { key, columns, href: (raider) => `/raiders/${raider.
 
 ## Selection
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/table-selection-the-guild-master-cannot-be-selected-shift-click-ranges-dark.png">
+  <img alt="A table with a checkbox per row, one row selected and the guild master's box disabled" src="../images/kit/table-selection-the-guild-master-cannot-be-selected-shift-click-ranges-light.png">
+</picture>
+
 `selection` adds a checkbox per row, bound to a set of keys:
 
 ```ts
@@ -132,6 +142,11 @@ table(() => raiders.value, {
 
 ## Row actions
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/table-actions-menu-per-row-dark.png">
+  <img alt="A table with a menu button at the end of each row" src="../images/kit/table-actions-menu-per-row-light.png">
+</picture>
+
 `actions` adds a menu button at the end of each row:
 
 ```ts
@@ -143,7 +158,7 @@ actions: (raider) => [
 ```
 
 The function runs each time a menu opens, so it can read live state. The items are the ones
-`menu` takes.
+[`menu`](./actions.md#menu) takes.
 
 ## Layout and scrolling
 

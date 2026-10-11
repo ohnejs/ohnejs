@@ -84,6 +84,7 @@ The tab now reads `Posts - ohne`.
 - A [message key](../i18n/messages.md#catalogs) translates, and follows a language switch.
 - A function follows its data, with no `effect`: `useDocumentTitle(() => post.value?.title)`.
 - The title lasts while the page or component that set it lives. The newest live one wins.
+- The kit's [`page`](./layout.md#page) sets it from its own `title`.
 
 ## The frame
 

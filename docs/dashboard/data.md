@@ -59,6 +59,11 @@ at once while it refreshes.
 
 ## While it loads
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/error-500-with-retry-dark.png">
+  <img alt="A card whose read failed, showing an error and a retry button" src="../images/kit/error-500-with-retry-light.png">
+</picture>
+
 The resource also tells you where it stands:
 
 ```ts
@@ -73,7 +78,7 @@ quests.busy(); // true during the first load and a reload
 - When only the query changes, like a range switch, the old answer stays on screen as `stale`
   until the new one lands. A read never flashes back to a skeleton.
 
-Kit components that take data handle all of this for you. Reach for `loaded` in a region you
+[Kit components](./components.md) that take data handle all of this for you. Reach for `loaded` in a region you
 render yourself:
 
 ```ts
@@ -81,7 +86,7 @@ loaded(raids, render, { emptyText: 'No raids this week', minHeight: '12rem' });
 ```
 
 - `render` builds once and gets a getter, so a reload updates the region in place.
-- A stale value dims, and a failed reload shows an alert above the old data.
+- A stale value dims, and a failed reload shows an [alert](./display.md#alert-and-note) above the old data.
 - A plain getter works too, with only the loading, empty, and ready states.
 
 ## Picking a slice
@@ -131,7 +136,7 @@ button('Save', {
 - skips a run while the same request is in flight
 - retries a busy `503` once
 - reloads every resource in `reload`, then calls `onDone` with the parsed answer
-- toasts a failure, or calls `onError` instead when you pass it
+- [toasts](./feedback.md#toast) a failure, or calls `onError` instead when you pass it
 
 With a `form`, a run without a `body` sends the form's values, `readPatch` for a `PATCH` and
 `read` otherwise. Local errors and an empty patch send nothing. A `422` puts each message under its

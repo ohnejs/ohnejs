@@ -93,6 +93,16 @@ the browser as type-stripped JavaScript.
 - [Rendering](./dashboard/rendering.md) - `h`, `mount`, `each`, and `when`.
 - [Reactivity](./dashboard/reactivity.md) - `ref`, `computed`, and `effect`.
 - [Data in the dashboard](./dashboard/data.md) - the typed `api()` fetch helper and translations.
+- [Your first page](./dashboard/first-page.md) - build a page step by step: stats, a chart, a
+  table, and a form.
+- [Components](./dashboard/components.md) - the kit at a glance, and the grammar every component
+  shares.
+- [Layout](./dashboard/layout.md) - `page`, sections, stacks, rows, grids, and splits.
+- [Cards and tabs](./dashboard/cards-and-tabs.md) - cards, tabs, and disclosures.
+- [Actions](./dashboard/actions.md) - buttons, button groups, selects, menus, and copy buttons.
+- [Display](./dashboard/display.md) - badges, status, icons, alerts, facts, lists, meters, and
+  states.
+- [Feedback](./dashboard/feedback.md) - toasts, confirmations, and dialogs.
 - [Tables](./dashboard/tables.md) - typed rows with sorting, paging, selection, and row actions.
 - [Stats and charts](./dashboard/charts.md) - stat tiles, line, bar and donut charts, bar lists,
   and funnels.

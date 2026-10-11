@@ -44,6 +44,11 @@ export default defineDashboardPage(() => {
 });
 ```
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/form-useaction-skeleton-rows-until-the-settings-load-a-422-lands-on-its-field-dark.png">
+  <img alt="A settings form in a card, with Save and Revert buttons in its footer" src="../images/kit/form-useaction-skeleton-rows-until-the-settings-load-a-422-lands-on-its-field-light.png">
+</picture>
+
 `RaidSettings` is `{ motd: string; size: '10' | '25' | '40' }`. The form shows skeleton rows until
 the settings load, checks every field before it sends, and puts a `422`'s messages under their
 fields.
@@ -117,6 +122,11 @@ Leaving the page with unsaved changes asks first. Pass `guard: false` for a form
 not matter.
 
 ## Arranging the fields
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/layout-tabs-rows-a-rule-a-collapsible-card-hard-mode-shows-only-for-heroic-dark.png">
+  <img alt="A form laid out in tabs and rows inside a card" src="../images/kit/layout-tabs-rows-a-rule-a-collapsible-card-hard-mode-shows-only-for-heroic-light.png">
+</picture>
 
 `layout` takes the [field layout](./field-layouts.md) a collection takes, checked against the
 field names:
