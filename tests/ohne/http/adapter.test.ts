@@ -5,7 +5,9 @@ import { once } from 'node:events';
 import { createServer, request, type RequestListener } from 'node:http';
 import { text } from 'node:stream/consumers';
 import { describe, it } from 'node:test';
-import { setImmediate } from 'node:timers/promises';
+import { setImmediate, setTimeout as sleep } from 'node:timers/promises';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 
 import {
   clientIP,
@@ -17,6 +19,9 @@ import {
   useHooks,
 } from '../../../src/ohne/index.ts';
 import { createCIDRMatcher } from '../../../src/utils/net/index.ts';
+
+setFlagsFromString('--expose-gc');
+const collectGarbage = runInNewContext('gc') as () => void;
 
 async function withServer(
   handler: RequestListener,
@@ -149,6 +154,24 @@ describe('toRequest', () => {
       async (base) => {
         const res = await fetch(base, { method: 'POST', body: 'Sylvanas' });
         strictEqual(await res.text(), 'true Sylvanas');
+      },
+    );
+  });
+
+  it('keeps `signal` following its source once nothing else holds the request', async () => {
+    await withServer(
+      async (req, res) => {
+        const controller = new AbortController();
+        const { signal } = toRequest(req, { signal: controller.signal });
+        for (let pass = 0; pass < 5; pass++) {
+          collectGarbage();
+          await sleep(10);
+        }
+        controller.abort();
+        await sendResponse(res, new Response(String(signal.aborted)));
+      },
+      async (base) => {
+        strictEqual(await (await fetch(base)).text(), 'true');
       },
     );
   });

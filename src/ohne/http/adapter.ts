@@ -121,7 +121,16 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
   const bodyless = method === 'GET' || method === 'HEAD';
   const body = bodyless ? null : lazyStream(() => openBody(req, options));
 
-  return new Request(url, { method, headers, body, duplex: 'half', signal: options.signal });
+  const request = new Request(url, {
+    method,
+    headers,
+    body,
+    duplex: 'half',
+    signal: options.signal,
+  });
+  // The request follows `signal` only weakly, so a collected request would miss the abort.
+  options.signal?.addEventListener('abort', () => request, { once: true });
+  return request;
 }
 
 /**
