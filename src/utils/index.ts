@@ -92,6 +92,7 @@ export * from './i18n/intl-language.ts';
 export * from './i18n/is-message.ts';
 export * from './i18n/language-fallbacks.ts';
 export * from './i18n/message-ast.ts';
+export * from './i18n/message-data.ts';
 export * from './i18n/message-errors.ts';
 export * from './i18n/message-group.ts';
 export * from './i18n/message-param-types.ts';

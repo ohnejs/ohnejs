@@ -21,6 +21,11 @@ describe('isMessage', () => {
     strictEqual(isMessage(new Map([['key', 'x']])), false);
   });
 
+  it('rejects params that are not a plain object', () => {
+    strictEqual(isMessage({ key: 'field.min', params: 2 }), false);
+    strictEqual(isMessage({ key: 'field.min', params: [2] }), false);
+  });
+
   it('rejects other values', () => {
     strictEqual(isMessage(42), false);
     strictEqual(isMessage(null), false);
