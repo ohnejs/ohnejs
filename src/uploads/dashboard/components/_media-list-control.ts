@@ -12,6 +12,7 @@ import {
   h,
   icon,
   type Primitive,
+  resolveText,
 } from 'ohnejs/dashboard';
 import {
   deepEqual,
@@ -311,11 +312,14 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
       });
     };
 
+    const choiceName = (choice: DynamicChipsChoice): string =>
+      isUndefined(choice.label) ? String(choice.value) : resolveText(choice.label);
+
     const imageLabel = (choice: DynamicChipsChoice): HTMLElement => {
       const uuid = String(choice.value);
       const el = h(
         'div',
-        { class: 'ohne-dynamic-chips-label o-media-chips-label', title: choice.label ?? uuid },
+        { class: 'ohne-dynamic-chips-label o-media-chips-label', title: () => choiceName(choice) },
         h('div', { class: 'o-media-chips-preview o-media-item-box' }, () => {
           const record = mediaRecords.get(uuid);
           if (isUndefined(record)) return null;
@@ -335,7 +339,7 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
     };
 
     const fileLabel = (choice: DynamicChipsChoice): HTMLElement => {
-      const el = mediaFileName((choice.label ?? String(choice.value)) || '-', { title: true });
+      const el = mediaFileName(() => choiceName(choice) || '-', { title: true });
       el.classList.add('ohne-dynamic-chips-label');
       onCleanup(attachTooltip(el, () => choice.tooltip ?? null));
       return el;
@@ -353,7 +357,7 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
           h(
             'span',
             { class: 'ohne-dynamic-chips-dropdown-item-label' },
-            String((choice.label ?? choice.value) || '-'),
+            () => choiceName(choice) || '-',
           ),
           isUndefined(choice.detail)
             ? null
