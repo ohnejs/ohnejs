@@ -2,11 +2,13 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 
 import { isNullish } from '../../utils/is/is-nullish.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
+import { resolveText, type Text } from '../runtime/text.ts';
 import { listenTrigger } from './trigger.ts';
 import './tokens.ts';
 
@@ -20,10 +22,10 @@ export type Primitive = boolean | null | number | string | undefined;
  */
 export interface ButtonGroupChoice<T extends Primitive = Primitive> {
   /**
-   * An optional label to display for the button (choice) in the group.
+   * An optional label to display for the button (choice) in the group, resolved live.
    * If not provided, the `value` is displayed instead.
    */
-  label?: string;
+  label?: Text;
 
   /**
    * The value of the button (choice).
@@ -73,6 +75,7 @@ export interface ButtonGroupOptions<T extends Primitive = Primitive> {
 
   /**
    * Renders one choice's content in place of the default `label || value` text.
+   * The payload's `label` is already resolved to a string.
    */
   renderChoice?: (payload: { index: number; label: string | undefined; value: T }) => Child;
 }
@@ -247,7 +250,7 @@ export function buttonGroup<T extends Primitive>(
             options.renderChoice
               ? options.renderChoice({
                   index: index(),
-                  label: choice().label,
+                  label: choiceLabel(choice()),
                   value: choice().value,
                 })
               : displayChoice(choice()),
@@ -274,9 +277,16 @@ export function buttonGroup<T extends Primitive>(
 }
 
 /**
+ * The choice's `label` resolved in the active language, or `undefined` when it has none.
+ */
+function choiceLabel(choice: ButtonGroupChoice<Primitive>): string | undefined {
+  return isUndefined(choice.label) ? undefined : resolveText(choice.label);
+}
+
+/**
  * The default text of a choice: its `label`, else its stringified `value`, or `''` for a nullish value.
  */
 function displayChoice(choice: ButtonGroupChoice<Primitive>): string {
-  const shown = choice.label || choice.value;
+  const shown = choiceLabel(choice) || choice.value;
   return isNullish(shown) ? '' : String(shown);
 }

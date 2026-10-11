@@ -14,6 +14,7 @@ import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { type Primitive } from './button-group.ts';
 import { nearestContainer } from './container.ts';
@@ -28,10 +29,10 @@ import './tokens.ts';
  */
 export interface DynamicSelectChoice<T extends Primitive = Primitive> {
   /**
-   * An optional label to display for the choice in the select field.
+   * An optional label to display for the choice in the select field, resolved live.
    * If not provided, the `value` is displayed instead.
    */
-  label?: string;
+  label?: Text;
 
   /**
    * An optional detail to display for the choice.
@@ -104,8 +105,8 @@ export interface DynamicSelectOptions<T extends Primitive = Primitive> {
   selectedChoiceResolver: (value: T) => Promise<DynamicSelectChoice<T> | null>;
 
   /**
-   * Adjusts the size of the component, from -2 (very small) to 2 (very large).
-   * Omitted, the value is inherited as `--ohne-size` from the parent element.
+   * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
+   * Omitted inherits `--ohne-size` from the nearest ancestor.
    */
   size?: number;
 
@@ -113,7 +114,7 @@ export interface DynamicSelectOptions<T extends Primitive = Primitive> {
    * Placeholder text shown when no label or value is displayed in the select field.
    * A getter reads reactively.
    */
-  placeholder?: string | (() => string);
+  placeholder?: Text;
 
   /**
    * Disables the select reactively while it returns `true`.
@@ -139,7 +140,7 @@ export interface DynamicSelectOptions<T extends Primitive = Primitive> {
    * @default
    * 'Search...'
    */
-  searchLabel?: string | (() => string);
+  searchLabel?: Text;
 
   /**
    * Text label for the no results found message in the choices dropdown.
@@ -148,7 +149,7 @@ export interface DynamicSelectOptions<T extends Primitive = Primitive> {
    * @default
    * 'No results found'
    */
-  noResultsLabel?: string | (() => string);
+  noResultsLabel?: Text;
 
   /**
    * An optional keyword used to pre-fill the search input each time the dropdown opens.
@@ -404,7 +405,14 @@ function fieldIcon(name: 'selector' | 'check'): SVGSVGElement {
  * Returns the choice's `label`, else its `value`, as text; any falsy result, `0` included, shows `-`.
  */
 function labelOrDash(choice: DynamicSelectChoice<Primitive>): string {
-  return String((choice.label ?? choice.value) || '-');
+  return String((labelOf(choice) ?? choice.value) || '-');
+}
+
+/**
+ * The choice's `label` resolved in the active language, or `undefined` when it has none.
+ */
+function labelOf(choice: DynamicSelectChoice<Primitive>): string | undefined {
+  return isUndefined(choice.label) ? undefined : resolveText(choice.label);
 }
 
 /**
@@ -744,13 +752,13 @@ export function dynamicSelect<T extends Primitive>(
       h(
         'span',
         {
-          title: choice.label ?? String(choice.value),
+          title: () => labelOf(choice) ?? String(choice.value),
           class: 'ohne-dynamic-select-choice-content',
         },
         h(
           'span',
           { class: 'ohne-dynamic-select-choice-label-row' },
-          h('span', { class: 'ohne-dynamic-select-choice-label' }, labelOrDash(choice)),
+          h('span', { class: 'ohne-dynamic-select-choice-label' }, () => labelOrDash(choice)),
           choice.badge ? h('span', { class: 'ohne-dynamic-select-badge' }, choice.badge) : null,
         ),
         choice.detail !== undefined
@@ -764,9 +772,9 @@ export function dynamicSelect<T extends Primitive>(
     );
 
   const keywordInput = h('input', {
-    'aria-label': options.searchLabel ?? 'Search...',
+    'aria-label': () => searchText(options.searchLabel),
     name: options.name ? `${options.name}--keyword` : undefined,
-    placeholder: options.searchLabel ?? 'Search...',
+    placeholder: () => searchText(options.searchLabel),
     autocomplete: 'off',
     spellcheck: 'false',
     type: 'text',
@@ -799,7 +807,7 @@ export function dynamicSelect<T extends Primitive>(
           h(
             'span',
             { class: 'ohne-dynamic-select-no-results' },
-            h('span', null, options.noResultsLabel ?? 'No results found'),
+            h('span', null, () => noResultsText(options.noResultsLabel)),
           ),
       ),
     ],
@@ -862,10 +870,15 @@ export function dynamicSelect<T extends Primitive>(
     () => {
       const selected = selectedChoice.value;
       if (selected) {
-        return h('span', { class: 'ohne-dynamic-select-selected-choice' }, labelOrDash(selected));
+        return h('span', { class: 'ohne-dynamic-select-selected-choice' }, () =>
+          labelOrDash(selected),
+        );
       }
       if (options.placeholder) {
-        return h('span', { class: 'ohne-dynamic-select-placeholder' }, options.placeholder);
+        const placeholder = options.placeholder;
+        return h('span', { class: 'ohne-dynamic-select-placeholder' }, () =>
+          resolveText(placeholder),
+        );
       }
       return null;
     },
@@ -953,7 +966,7 @@ export function dynamicSelect<T extends Primitive>(
       class: 'ohne-dynamic-select-wrapper',
       title: () => {
         const selected = selectedChoice.value;
-        return !selected || isExpanded.value ? null : (selected.label ?? String(selected.value));
+        return !selected || isExpanded.value ? null : (labelOf(selected) ?? String(selected.value));
       },
     },
     combobox,
@@ -964,4 +977,20 @@ export function dynamicSelect<T extends Primitive>(
       hidden: true,
     }),
   );
+}
+
+/**
+ * The search field's label, or the kit's own "Search" when none is given.
+ */
+function searchText(label: Text | undefined): string {
+  return isUndefined(label) ? defaultText('dashboard.search', 'Search') : resolveText(label);
+}
+
+/**
+ * The no-results line, or the kit's own when none is given.
+ */
+function noResultsText(label: Text | undefined): string {
+  return isUndefined(label)
+    ? defaultText('dashboard.noResultsFound', 'No results found')
+    : resolveText(label);
 }

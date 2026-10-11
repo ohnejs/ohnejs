@@ -75,6 +75,7 @@ css`
  * The root host a dashboard screen renders through.
  * It wraps the content and mounts the app-wide singletons beside it: the dialog host and the toaster.
  * Render exactly one per screen; the classes are structural hooks and carry no styling of their own.
+ * A page rendered with `frame: false` wraps itself in `base(...)` to get toasts and dialogs.
  * While mounted it swallows the plain platform-modifier `D` and `S` keydowns.
  * The match is on physical `event.code`.
  * So browser bookmark and save-page never fire and dashboard hotkeys own them.

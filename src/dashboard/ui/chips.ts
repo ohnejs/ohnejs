@@ -1,3 +1,4 @@
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
@@ -9,7 +10,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
-import { defaultText } from '../runtime/text.ts';
+import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { nearestContainer } from './container.ts';
 import { type DropdownHandle, dropdown } from './dropdown.ts';
@@ -22,10 +23,10 @@ import './tokens.ts';
  */
 export interface ChipsChoice<T extends string = string> {
   /**
-   * An optional label to display for the choice.
+   * An optional label to display for the choice, resolved live.
    * If not provided, the `value` is displayed instead.
    */
-  label?: string;
+  label?: Text;
 
   /**
    * The value of the choice.
@@ -363,6 +364,13 @@ css`
 `;
 
 /**
+ * The choice's `label` resolved in the active language, else its `value`.
+ */
+function labelOf(choice: ChipsChoice): string {
+  return (isUndefined(choice.label) ? '' : resolveText(choice.label)) || choice.value;
+}
+
+/**
  * A tag input: free text, or choice-restricted with a filtering dropdown when `choices` is given.
  * With `choices` the model is typed by their values; free text keeps it `string[]`.
  * Chips reorder by mouse drag or touch long-press.
@@ -407,8 +415,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
 
   const labels = computed<Record<string, string>>(() => {
     const map: Record<string, string> = {};
-    if (choicesOf)
-      for (const choice of choicesOf()) map[choice.value] = choice.label ?? choice.value;
+    if (choicesOf) for (const choice of choicesOf()) map[choice.value] = labelOf(choice);
     return map;
   });
 
@@ -423,13 +430,15 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
   const filterChoices = (): void => {
     if (!choicesOf) return;
     const pool = choicesOf();
-    filteredChoices.value = searchByKeywords(
+    const addable =
       (options.enforceUniqueItems ?? true)
         ? pool.filter(({ value }) => !model.value.includes(value))
-        : pool,
+        : pool;
+    filteredChoices.value = searchByKeywords(
+      addable.map((choice) => ({ choice, label: labelOf(choice) })),
       inputValue.value,
-      ['label', 'value'],
-    );
+      ['label', 'choice.value'],
+    ).map(({ choice }) => choice);
     highlightedIndex.value = Math.min(
       filteredChoices.value.length - 1,
       highlightedIndex.value > -1 ? highlightedIndex.value : 0,
@@ -632,7 +641,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
             h(
               'button',
               {
-                title: () => choice().label || choice().value,
+                title: () => labelOf(choice()),
                 class: () =>
                   'ohne-chips-dropdown-item ohne-raw' +
                   (highlightedIndex.value === index()
@@ -652,7 +661,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
                   if (pointerEvents.value) highlightedIndex.value = index();
                 },
               },
-              () => choice().label || choice().value,
+              () => labelOf(choice()),
             ),
         ),
         when(

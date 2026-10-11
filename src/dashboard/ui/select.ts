@@ -15,6 +15,7 @@ import { searchByKeywords } from '../../utils/search/search-by-keywords.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { resolveText, type Text } from '../runtime/text.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { type Primitive } from './button-group.ts';
 import { nearestContainer } from './container.ts';
@@ -29,10 +30,10 @@ import './tokens.ts';
  */
 export interface SelectChoice<T extends Primitive = Primitive> {
   /**
-   * An optional label to display for the choice in the select field.
+   * An optional label to display for the choice in the select field, resolved live.
    * If not provided, the `value` is displayed instead.
    */
-  label?: string;
+  label?: Text;
 
   /**
    * The value of the choice in the select field.
@@ -62,10 +63,10 @@ export interface SelectChoice<T extends Primitive = Primitive> {
  */
 export interface SelectChoiceGroup<T extends Primitive = Primitive> {
   /**
-   * Text that describes a group of selectable options.
+   * Text that describes a group of selectable options, resolved live.
    * The label renders as a sticky row above the group's choices.
    */
-  group: string;
+  group: Text;
 
   /**
    * The choices shown in the group.
@@ -79,16 +80,15 @@ export interface SelectChoiceGroup<T extends Primitive = Primitive> {
  */
 export interface SelectOptions<T extends Primitive = Primitive> {
   /**
-   * Adjusts the size of the component, from -2 (very small) to 2 (very large).
-   * Omitted, the value is inherited as `--ohne-size` from the parent element.
+   * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
+   * Omitted inherits `--ohne-size` from the nearest ancestor.
    */
   size?: number;
 
   /**
-   * Placeholder text shown when no label or value is displayed in the select field.
-   * A getter reads reactively.
+   * Placeholder text shown when no label or value is displayed in the select field, resolved live.
    */
-  placeholder?: string | (() => string);
+  placeholder?: Text;
 
   /**
    * Disables the select reactively while it returns `true`.
@@ -290,6 +290,13 @@ function fieldIcon(name: 'selector' | 'check'): SVGSVGElement {
  */
 function toDisplay(value: Primitive): string {
   return isNullish(value) ? '' : String(value);
+}
+
+/**
+ * The choice's `label` resolved in the active language, or `undefined` when it has none.
+ */
+function labelOf(choice: SelectChoice): string | undefined {
+  return isUndefined(choice.label) ? undefined : resolveText(choice.label);
 }
 
 /**
@@ -534,10 +541,11 @@ export function select<T extends Primitive>(
     }
     if (!event.ctrlKey && !event.metaKey && /^[\p{L}\p{N}]$/u.test(event.key)) {
       keyword += event.key;
-      const found = searchByKeywords(enabledChoices(), keyword, ['label', 'value'])[0];
+      const labeled = enabledChoices().map((choice) => ({ choice, label: labelOf(choice) }));
+      const found = searchByKeywords(labeled, keyword, ['label', 'choice.value'])[0];
       if (found) {
-        highlightedChoice.value = found;
-        const text = found.label ?? (isString(found.value) ? found.value : '');
+        highlightedChoice.value = found.choice;
+        const text = found.label ?? (isString(found.choice.value) ? found.choice.value : '');
         scrollToHighlighted();
         mousePaused.value = true;
         keywordHighlight.value = foldedRange(text, keyword) ?? [-1, -1];
@@ -593,24 +601,21 @@ export function select<T extends Primitive>(
         },
       },
       () => {
-        if (
-          choice.value === highlightedChoice.value?.value &&
-          choice.label &&
-          keywordPending.value
-        ) {
+        const label = labelOf(choice);
+        if (choice.value === highlightedChoice.value?.value && label && keywordPending.value) {
           const [from, to] = keywordHighlight.value;
           return h(
             'span',
             null,
-            choice.label
+            label
               .split('')
               .map((char, index) => h(index >= from && index <= to ? 'u' : 'span', null, char)),
           );
         }
         return h(
           'span',
-          { title: choice.label ?? String(choice.value) },
-          choice.label ?? toDisplay(choice.value),
+          { title: label ?? String(choice.value) },
+          label ?? toDisplay(choice.value),
         );
       },
       when(
@@ -633,7 +638,7 @@ export function select<T extends Primitive>(
                     'ohne-select-group-label' +
                     (topButtonVisible.value ? ' ohne-select-group-label-offset' : ''),
                 },
-                entry.group,
+                () => resolveText(entry.group),
               ),
               entry.choices.map(choiceRow),
             )
@@ -697,7 +702,7 @@ export function select<T extends Primitive>(
     },
     () => {
       const selected = selectedChoice.value;
-      const text = selected?.label ?? toDisplay(selected?.value);
+      const text = (selected && labelOf(selected)) ?? toDisplay(selected?.value);
       if (selected && text) {
         return h(
           'span',
@@ -709,8 +714,9 @@ export function select<T extends Primitive>(
           text,
         );
       }
-      if (options.placeholder) {
-        return h('span', { class: 'ohne-select-placeholder' }, options.placeholder);
+      const placeholder = options.placeholder;
+      if (placeholder) {
+        return h('span', { class: 'ohne-select-placeholder' }, () => resolveText(placeholder));
       }
       return null;
     },
@@ -746,7 +752,7 @@ export function select<T extends Primitive>(
       class: 'ohne-select-wrapper',
       title: () => {
         const selected = selectedChoice.value;
-        return !selected || isExpanded.value ? null : (selected.label ?? String(selected.value));
+        return !selected || isExpanded.value ? null : (labelOf(selected) ?? String(selected.value));
       },
     },
     combobox,

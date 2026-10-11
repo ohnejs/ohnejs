@@ -2,6 +2,7 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 
 import { debounce } from '../../utils/debounce/debounce.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { deepEqual } from '../../utils/object/deep-equal.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
@@ -13,7 +14,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
-import { defaultText } from '../runtime/text.ts';
+import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { type Primitive } from './button-group.ts';
 import { nearestContainer } from './container.ts';
@@ -28,10 +29,10 @@ import './tokens.ts';
  */
 export interface DynamicChipsChoice {
   /**
-   * An optional label to display for the choice in the chips field.
+   * An optional label to display for the choice in the chips field, resolved live.
    * If not provided, the `value` is displayed instead.
    */
-  label?: string;
+  label?: Text;
 
   /**
    * An optional detail to display for the choice in the dropdown.
@@ -138,7 +139,7 @@ export interface DynamicChipsOptions {
    * @default
    * 'No results found'
    */
-  noResultsLabel?: string | (() => string);
+  noResultsLabel?: Text;
 
   /**
    * The visual style variant of the chips.
@@ -149,8 +150,8 @@ export interface DynamicChipsOptions {
   variant?: 'primary' | 'secondary' | 'accent';
 
   /**
-   * Adjusts the size of the component, from -2 (very small) to 2 (very large).
-   * Omitted, the value is inherited as `--ohne-size` from the parent element.
+   * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
+   * Omitted inherits `--ohne-size` from the nearest ancestor.
    */
   size?: number;
 
@@ -158,7 +159,7 @@ export interface DynamicChipsOptions {
    * Placeholder text shown while the text input is empty.
    * A getter reads reactively.
    */
-  placeholder?: string | (() => string);
+  placeholder?: Text;
 
   /**
    * The long-press duration in milliseconds that starts dragging on touch devices.
@@ -450,7 +451,14 @@ css`
  * Returns the choice's `label`, else its `value`, as text; any falsy result, `0` included, shows `-`.
  */
 function labelOrDash(choice: DynamicChipsChoice): string {
-  return String((choice.label ?? choice.value) || '-');
+  return String((labelOf(choice) ?? choice.value) || '-');
+}
+
+/**
+ * The choice's `label` resolved in the active language, or `undefined` when it has none.
+ */
+function labelOf(choice: DynamicChipsChoice): string | undefined {
+  return isUndefined(choice.label) ? undefined : resolveText(choice.label);
 }
 
 /**
@@ -642,7 +650,7 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     },
     id: options.id ? `${options.id}--input` : undefined,
     name: options.name ? `${options.name}--input` : undefined,
-    placeholder: options.placeholder,
+    placeholder: liveText(options.placeholder),
     autocomplete: 'off',
     spellcheck: 'false',
     class: 'ohne-dynamic-chips-input',
@@ -714,7 +722,7 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
       'span',
       {
         class: 'ohne-dynamic-chips-label',
-        title: () => choice().label ?? String(choice().value),
+        title: () => labelOf(choice()) ?? String(choice().value),
       },
       () => labelOrDash(choice()),
     );
@@ -727,7 +735,7 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     return h(
       'button',
       {
-        title: choice.label ?? String(choice.value),
+        title: () => labelOf(choice) ?? String(choice.value),
         class: () =>
           'ohne-dynamic-chips-dropdown-item ohne-raw' +
           (highlightedIndex.value === index
@@ -750,7 +758,9 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
       choiceSlot
         ? choiceSlot({ choice, index })
         : [
-            h('span', { class: 'ohne-dynamic-chips-dropdown-item-label' }, labelOrDash(choice)),
+            h('span', { class: 'ohne-dynamic-chips-dropdown-item-label' }, () =>
+              labelOrDash(choice),
+            ),
             choice.detail !== undefined
               ? h(
                   'span',
@@ -824,7 +834,7 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
                     title: options.removeItemLabel ?? 'Remove',
                     'aria-label': () =>
                       defaultText('dashboard.removeChip', 'Remove {label}', {
-                        label: choice().label ?? String(choice().value),
+                        label: labelOf(choice()) ?? String(choice().value),
                       }),
                     onClick: () => {
                       const at = index();
@@ -870,7 +880,11 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
                 h(
                   'span',
                   { class: 'ohne-dynamic-chips-dropdown-no-results' },
-                  h('span', null, options.noResultsLabel ?? 'No results found'),
+                  h('span', null, () =>
+                    isUndefined(options.noResultsLabel)
+                      ? defaultText('dashboard.noResultsFound', 'No results found')
+                      : resolveText(options.noResultsLabel),
+                  ),
                 ),
             ),
           ],
@@ -1001,4 +1015,11 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
   });
 
   return root;
+}
+
+/**
+ * A getter resolving `text` live, or `undefined` without one.
+ */
+function liveText(text: Text | undefined): (() => string) | undefined {
+  return isUndefined(text) ? undefined : () => resolveText(text);
 }

@@ -73,9 +73,15 @@ Object.assign(document, {
 
 /**
  * Runs every `type` listener `element` holds with a minimal event, and returns that event.
+ * `init` adds event fields, like a keydown's `key`.
  */
-export function fire(element: FakeElement, type: string): { defaultPrevented: boolean } {
+export function fire(
+  element: FakeElement,
+  type: string,
+  init: Record<string, unknown> = {},
+): { defaultPrevented: boolean } {
   const event = {
+    ...init,
     type,
     defaultPrevented: false,
     preventDefault() {

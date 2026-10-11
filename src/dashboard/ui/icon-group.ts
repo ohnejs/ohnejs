@@ -2,12 +2,14 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 
 import { isNullish } from '../../utils/is/is-nullish.ts';
 import { isString } from '../../utils/is/is-string.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
+import { resolveText, type Text } from '../runtime/text.ts';
 import { bubble } from './bubble.ts';
 import { type Primitive } from './button-group.ts';
 import { icon, type IconName } from './icon.ts';
@@ -31,10 +33,10 @@ export interface IconGroupChoice<T extends Primitive = Primitive> {
   icon?: IconName | Node;
 
   /**
-   * Text set as the `title` HTML attribute of the choice element.
+   * Text set as the `title` HTML attribute of the choice element, resolved live.
    * With `showTooltips` enabled, it appears as a styled tooltip on hover instead.
    */
-  title?: string;
+  title?: Text;
 
   /**
    * An optional bubble to display on the top right corner of the icon.
@@ -276,7 +278,7 @@ export function iconGroup<T extends Primitive>(
         const item = h(
           'span',
           {
-            title: options.showTooltips ? undefined : () => choice().title,
+            title: options.showTooltips ? undefined : () => choiceTitle(choice()),
             class: () =>
               'ohne-icon-group-item' +
               (choice().value === model.value ? ' ohne-icon-group-item-active' : ''),
@@ -287,7 +289,8 @@ export function iconGroup<T extends Primitive>(
           () => choiceIcon(choice().icon),
           () => choiceBubble(choice().bubble),
         );
-        if (options.showTooltips) onCleanup(attachTooltip(item, () => choice().title ?? null));
+        if (options.showTooltips)
+          onCleanup(attachTooltip(item, () => choiceTitle(choice()) ?? null));
         return item;
       },
     ),
@@ -309,6 +312,13 @@ export function iconGroup<T extends Primitive>(
   }
 
   return root;
+}
+
+/**
+ * The choice's `title` resolved in the active language, or `undefined` when it has none.
+ */
+function choiceTitle(choice: IconGroupChoice<Primitive>): string | undefined {
+  return isUndefined(choice.title) ? undefined : resolveText(choice.title);
 }
 
 /**

@@ -3,9 +3,9 @@ import type { Child } from '../render/insert.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
-import { type MaybeGetter, toValue } from '../../utils/reactive/to-value.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { resolveText, type Text } from '../runtime/text.ts';
 import { button } from './button.ts';
 import { popup } from './popup-overlay.ts';
 import { renderProse } from './prose.ts';
@@ -22,10 +22,10 @@ export interface DialogAction {
   name: string;
 
   /**
-   * The action button label; a getter reads reactively.
+   * The action button label, resolved live.
    * If not provided, the `name` is used as the label.
    */
-  label?: MaybeGetter<string>;
+  label?: Text;
 
   /**
    * The variant of the action button.
@@ -41,9 +41,9 @@ export interface DialogAction {
  */
 export interface DialogOptions<TActions extends readonly DialogAction[]> {
   /**
-   * The text content of the dialog; a getter reads reactively.
+   * The text content of the dialog, resolved live.
    */
-  content?: MaybeGetter<string>;
+  content?: Text;
 
   /**
    * Controls if the `content` is rendered as markdown-lite (see `renderProse`).
@@ -69,11 +69,11 @@ export interface DialogOptions<TActions extends readonly DialogAction[]> {
 }
 
 interface DialogState {
-  content?: MaybeGetter<string>;
+  content?: Text;
   markdown: boolean;
   actions: {
     name: string;
-    label: MaybeGetter<string>;
+    label: Text;
     variant: NonNullable<DialogAction['variant']>;
     resolve: () => void;
   }[];
@@ -163,7 +163,7 @@ export function dialogHost(): Child {
           : (() => {
               const content = h('div', { class: 'ohne-dialog-content ohne-prose' });
               const text = dialog.content;
-              effect(() => renderProse(content, toValue(text), { markdown: dialog.markdown }));
+              effect(() => renderProse(content, resolveText(text), { markdown: dialog.markdown }));
               return content;
             })(),
         h(
