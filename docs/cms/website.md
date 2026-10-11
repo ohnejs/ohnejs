@@ -25,9 +25,99 @@ const page = await ohne.resolve('/blog/hello');
 - `notFound` - answer with a `404` status. When your site has a [`404` page](./setup.md#routes),
   `page` holds its record.
 
-In `record`, each [block](../database/blocks.md) reads as `{ block, UUID, fields }`. Upload URLs
-are absolute, so they work from another origin. A related record with a route of its own carries
-its `path`, so you can link to it.
+In `record`, each [block](../database/blocks.md) reads as `{ block, UUID, fields }`.
+
+- Every image and file arrives as an upload, wherever it sits: `UUID`, `name`, `type`, `size`,
+  `width`, `height`, `description`, `focalX`, `focalY`, an absolute `url`, and `variants` when
+  [named variants](../uploads/image-variants.md#named-variants) are set.
+- A private file or a folder reads `null`, or drops out of its list.
+- Any other relation loads one level deep. A related record keeps its own relations as `UUID`s,
+  and carries its `path` when it has a route.
+- A related record shows exactly what its collection's read access shows the visitor. To hide a
+  field from the site, narrow that access with [`select`](../api/collections.md#the-scope) or mark
+  the field [`readable: false`](../database/collections.md#write-only-and-locked-fields).
+- A translatable value, an upload's `description` included, reads `null` in a locale without a
+  translation. The CMS never substitutes another language, so fall back on the site, as in
+  `upload.description ?? ''`.
+
+## Types
+
+The CMS describes its pages as a TypeScript file, `ohne.ts`. Pass its `CMS` type to `createOhne`,
+and every page, block, and upload is typed:
+
+```ts
+import { createOhne } from '@ohnejs/client';
+import type { CMS } from './ohne.ts';
+
+const ohne = createOhne<CMS>({ api: 'https://api.example.com' });
+const page = await ohne.resolve('/blog/hello');
+
+if (page.kind === 'page' && page.collection === 'Posts') {
+  console.log(page.record.title);
+}
+```
+
+Checking `collection` narrows `record` to that collection's fields.
+
+`CMS` describes everything your CMS resolves; `Page`, `Block`, `Related` and `Upload` name its
+parts. `Block<'Hero'>` is one `Hero` item, and `Block` alone is any block, narrowed by `block`:
+
+```ts
+import { escapeHTML, richTextToHTML } from '@ohnejs/client';
+import type { Block, Upload } from './ohne.ts';
+
+function image(upload: Upload | null) {
+  if (!upload) return '';
+  return `<img src="${escapeHTML(upload.url)}" alt="${escapeHTML(upload.description ?? '')}">`;
+}
+
+export function renderHero({ fields }: Block<'Hero'>) {
+  return `<h1>${escapeHTML(fields.heading)}</h1>${image(fields.image)}${richTextToHTML(fields.body)}`;
+}
+```
+
+A [custom field type](../database/custom-field-types.md#on-your-website) that the website cannot
+type reads `unknown`.
+
+### Getting the file
+
+When your website lives in its own repository, download the file from your API and commit it:
+
+```json
+{
+  "scripts": {
+    "ohne:types": "curl -fsS $OHNE_API/cms/types.ts -o ohne.ts"
+  }
+}
+```
+
+Run `pnpm ohne:types` again after you change a collection or a block. Your dev API serves the
+same route, so `OHNE_API=http://localhost:9001` works too.
+
+In a monorepo, set `cms.types` and `ohne dev` keeps that file current as you edit collections and
+blocks. `ohne prepare` writes it too. Put it in your website, not in the cms app:
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', 'ohnejs/uploads', '@ohnejs/cms'],
+  cms: {
+    site: 'https://example.com',
+    routes: { Pages: '/[...slug]' },
+    types: '../web/ohne.ts',
+  },
+});
+```
+
+The path is relative to your project. `ohne serve` never writes it.
+
+In CI, `ohne prepare` or `ohne cms types` writes the same file.
+
+`/cms/types.ts` is public, like the pages it describes: it shows only what an anonymous visitor can
+read. When your pages are not public, [override](../api/routes.md#routes-across-layers)
+`GET /cms/types.ts` in your app and call `requireUser()` there.
 
 ## Rich text and links
 
@@ -35,9 +125,12 @@ A [rich text](../database/rich-text.md) value is a tree of blocks, never HTML. `
 renders it, with every text and address escaped:
 
 ```ts
-import { richTextToHTML, type RichText } from '@ohnejs/client';
+import { richTextToHTML } from '@ohnejs/client';
+import type { Block } from './ohne.ts';
 
-const html = richTextToHTML(page.record.body as RichText);
+export function renderText({ fields }: Block<'Text'>) {
+  return richTextToHTML(fields.body);
+}
 ```
 
 - A link to a record carries `href` when the reader can open its page: the target is published,
@@ -79,6 +172,8 @@ if (token) connect({ api, onData: render });
 ```
 
 `render` is your own function that draws a page.
+
+A preview carries the editor's unsaved values in the shape of a saved page.
 
 `onData` receives the new page on every change, with no request of your own. A page rendered on
 the server passes `onRefresh` instead and renders itself again there. With neither, the client

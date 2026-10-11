@@ -4,6 +4,9 @@ Each recipe is the whole loop for one framework: read the page, handle redirects
 fill the `<head>`, and join the [live preview](./website.md#live-preview). Replace the block markup
 with your own components.
 
+The TypeScript recipes read their [types](./website.md#types) from `ohne.ts`, for a `Pages`
+collection whose `content` holds `Hero` and `Text` blocks.
+
 ## Nuxt
 
 Put the API URL in the runtime config:
@@ -20,12 +23,16 @@ One catch-all page renders every route:
 ```vue
 <!-- app/pages/[...slug].vue -->
 <script setup lang="ts">
+import type { Component } from 'vue';
+
 import { connect, createOhne } from '@ohnejs/client';
 import { Hero, Text } from '#components';
 
-const blocks = { Hero, Text };
+import type { Block, CMS } from '~~/ohne';
+
+const blocks = { Hero, Text } satisfies Record<Block['block'], Component>;
 const api = useRuntimeConfig().public.ohneAPI;
-const ohne = createOhne({ api });
+const ohne = createOhne<CMS>({ api });
 const route = useRoute();
 const token = useState('ohne-preview', () => route.query['ohne-preview'] as string | undefined);
 
@@ -45,7 +52,7 @@ if (import.meta.server && token.value) {
 
 onMounted(() => {
   if (!token.value) return;
-  const preview = connect({ api, onData: (next) => (page.value = next) });
+  const preview = connect<CMS>({ api, onData: (next) => (page.value = next) });
   onBeforeUnmount(preview.dispose);
 });
 
@@ -68,11 +75,11 @@ useHead({
 </script>
 
 <template>
-  <main v-if="page?.kind === 'page'">
+  <main v-if="page?.kind === 'page' && page.collection === 'Pages'">
     <h1>{{ page.record.title }}</h1>
     <component
-      :is="blocks[block.block as keyof typeof blocks]"
-      v-for="block in page.record.content as any[]"
+      :is="blocks[block.block]"
+      v-for="block in page.record.content"
       :key="block.UUID"
       :data-ohne-block="block.UUID"
       v-bind="block.fields"
@@ -82,7 +89,8 @@ useHead({
 ```
 
 `onData` swaps in each new page as the editor types, with no request. `useState` keeps the token
-across renders, since the client removes it from the address bar.
+across renders, since the client removes it from the address bar. When you add a block to the CMS,
+`satisfies` fails until `blocks` has a component for it.
 
 A [rich text](./website.md#rich-text-and-links) field renders through one component, which routes
 clicks on links to your pages through `navigateTo`:
@@ -136,10 +144,13 @@ import type { Metadata } from 'next';
 import { createOhne } from '@ohnejs/client';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 
+import type { Block, CMS } from '../../ohne';
+
 import { Preview } from '../../components/preview';
+import { RichText } from '../../components/rich-text';
 
 const api = process.env.NEXT_PUBLIC_OHNE_API!;
-const ohne = createOhne({ api, fetchInit: { cache: 'no-store' } });
+const ohne = createOhne<CMS>({ api, fetchInit: { cache: 'no-store' } });
 
 type Props = {
   params: Promise<{ slug?: string[] }>;
@@ -172,15 +183,24 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   };
 }
 
+function Content({ block }: { block: Block }) {
+  switch (block.block) {
+    case 'Hero':
+      return <h2>{block.fields.heading}</h2>;
+    case 'Text':
+      return <RichText value={block.fields.body} />;
+  }
+}
+
 export default async function Page(props: Props) {
   const { page, token } = await load(props);
-  const blocks = (page.record.content ?? []) as { block: string; UUID: string; fields: any }[];
+  if (page.collection !== 'Pages') notFound();
   return (
     <main>
-      <h1>{String(page.record.title)}</h1>
-      {blocks.map((block) => (
+      <h1>{page.record.title}</h1>
+      {page.record.content.map((block) => (
         <section key={block.UUID} data-ohne-block={block.UUID}>
-          {block.fields.heading}
+          <Content block={block} />
         </section>
       ))}
       {token && <Preview api={api} />}
@@ -188,6 +208,9 @@ export default async function Page(props: Props) {
   );
 }
 ```
+
+The `switch` on `block.block` narrows `fields` to that block's. Narrow on `page.collection` the same
+way to render another collection.
 
 A [rich text](./website.md#rich-text-and-links) field renders through one client component, which
 routes clicks on links to your pages through `router.push`:
@@ -207,8 +230,6 @@ export function RichText({ value }: { value: RichTextValue }) {
   return <div ref={root} dangerouslySetInnerHTML={{ __html: richTextToHTML(value) }} />;
 }
 ```
-
-The server page renders a field with `<RichText value={block.fields.body} />`.
 
 ## React
 
