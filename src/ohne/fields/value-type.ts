@@ -189,6 +189,16 @@ export interface FieldJSONTypeArgs<TOptions extends Record<string, AnyOptionDef>
   name: string;
 
   /**
+   * The name the field type is registered under, named in an error.
+   */
+  type: string;
+
+  /**
+   * The file that defines the field type, the path of an error; absent for a built-in.
+   */
+  file?: string;
+
+  /**
    * The instance options passed to `field(...)` - the type's own options plus the common ones.
    */
   options: Record<string, unknown>;
@@ -229,20 +239,35 @@ export interface FieldJSONType extends FieldBaseType {
  *
  * In `emitJSONType`, an import that `mirror` does not map passes through as a package name.
  * A relative path or an `ohnejs` module throws: the website has neither.
+ * The error names `type` and points at `file`.
  *
  * @example
  * ```ts
- * fieldJSONType({ fieldType: richText, name: 'body', options: { links: ['Pages'] }, imports, mirror })
+ * fieldJSONType({
+ *   fieldType: richText,
+ *   name: 'body',
+ *   type: 'richText',
+ *   options: { links: ['Pages'] },
+ *   imports,
+ *   mirror,
+ * })
  * // -> { base: "RichText<'Pages'>", nullable: false }
  *
- * fieldJSONType({ fieldType: instant, name: 'at', options: { nullable: true }, imports, mirror })
+ * fieldJSONType({
+ *   fieldType: instant,
+ *   name: 'at',
+ *   type: 'instant',
+ *   options: { nullable: true },
+ *   imports,
+ *   mirror,
+ * })
  * // -> { base: 'string', nullable: true }
  * ```
  */
 export function fieldJSONType<TOptions extends Record<string, AnyOptionDef>>(
   args: FieldJSONTypeArgs<TOptions>,
 ): FieldJSONType {
-  const { fieldType, name, options, imports, mirror } = args;
+  const { fieldType, name, type, file, options, imports, mirror } = args;
   if (fieldType.columnType === false) {
     return fieldBaseType({ fieldType, name, options, fieldDir: imports.dir, imports });
   }
@@ -262,12 +287,13 @@ export function fieldJSONType<TOptions extends Record<string, AnyOptionDef>>(
         const mirrored = mirror(path, exportName);
         if (isUndefined(mirrored) && (isLocalPath(path) || isOhnePath(path))) {
           throw ohneError({
-            title: 'Unresolvable type import in `emitJSONType`',
+            title: `Unresolvable type import in field type \`${type}\``,
             body: [
-              `A website cannot import \`${exportName}\` from \`${path}\`.`,
+              `Its \`emitJSONType\` imports \`${exportName}\` from \`${path}\`, which a website cannot import.`,
               '',
               'Inline the type, or import it from a package the website installs.',
             ],
+            path: file,
           });
         }
         return imports.reference({ fromDir: imports.dir, path: mirrored ?? path, exportName });

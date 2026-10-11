@@ -1,6 +1,7 @@
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { OhneError } from '../../../src/ohne/error/ohne-error.ts';
 import type { EmitTypeContext } from '../../../src/ohne/fields/context.ts';
 import type { FieldType } from '../../../src/ohne/fields/define-field.ts';
 import type { AnyOptionDef } from '../../../src/ohne/fields/option.ts';
@@ -161,7 +162,8 @@ describe('fieldJSONType', () => {
     options: Record<string, unknown> = {},
   ) => {
     const imports = createTypeImports('/site');
-    return { ...fieldJSONType({ fieldType, name: 'field', options, imports, mirror }), imports };
+    const args = { fieldType, name: 'field', type: 'geo', options, imports, mirror };
+    return { ...fieldJSONType(args), imports };
   };
 
   it('runs `emitJSONType` before every other tier', () => {
@@ -208,8 +210,30 @@ describe('fieldJSONType', () => {
         columnType: 'json',
         emitJSONType: (ctx) => ctx.importType(path, 'LatLng'),
       });
-      throws(() => json(geo), /Unresolvable type import in `emitJSONType`/);
+      throws(() => json(geo), /Unresolvable type import in field type `geo`/);
     }
+  });
+
+  it('points an unresolvable import at the field type file', () => {
+    const geo = defineField({
+      columnType: 'json',
+      emitJSONType: (ctx) => ctx.importType('./_geo.ts', 'LatLng'),
+    });
+    const imports = createTypeImports('/site');
+    const args = { fieldType: geo, name: 'at', type: 'geo', file: '/app/fields/geo.ts' };
+    throws(
+      () => fieldJSONType({ ...args, options: {}, imports, mirror }),
+      (error: OhneError) => {
+        strictEqual(error.title, 'Unresolvable type import in field type `geo`');
+        deepStrictEqual(error.body, [
+          'Its `emitJSONType` imports `LatLng` from `./_geo.ts`, which a website cannot import.',
+          '',
+          'Inline the type, or import it from a package the website installs.',
+        ]);
+        strictEqual(error.path, '/app/fields/geo.ts');
+        return true;
+      },
+    );
   });
 
   it('degrades a `deserialize` type without `emitJSONType` to `unknown`', () => {

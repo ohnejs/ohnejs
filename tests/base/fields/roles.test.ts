@@ -114,7 +114,7 @@ describe('roles search', () => {
 
 describe('roles types', () => {
   const imports = createTypeImports('/app/.ohne/shared');
-  const args = { fieldType: rolesField, name: 'roles', options: {}, imports };
+  const args = { fieldType: rolesField, name: 'roles', type: 'roles', options: {}, imports };
 
   it('emits the registered role names inline as JSON', () => {
     strictEqual(

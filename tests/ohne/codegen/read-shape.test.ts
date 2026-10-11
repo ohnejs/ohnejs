@@ -20,6 +20,7 @@ import {
   emittableFieldTypes,
   readShapeType,
 } from '../../../src/ohne/codegen/read-shape.ts';
+import { defineField } from '../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { loadLayers, useLayers } from '../../../src/ohne/index.ts';
 import { createTypeImports } from '../../../src/utils/codegen/index.ts';
@@ -117,6 +118,24 @@ describe('readShapeType', () => {
     deepStrictEqual(paths, ['title:text']);
     strictEqual(members[0]?.type, 'unknown | null');
     ok(members[0]?.doc.includes('`unknown` here: field type `text` declares no `emitJSONType`.'));
+  });
+
+  it('hands `scalar` the file of a layer field type', () => {
+    const geo = { fieldType: defineField({ columnType: 'json' }), dir: '/app/fields' };
+    const files: (string | undefined)[] = [];
+    readShapeType(
+      owner,
+      { at: { type: 'geo', options: {} } as never, title: field('text') },
+      {
+        ...context(),
+        types: new Map([...context().types, ['geo', { ...geo, file: '/app/fields/geo.ts' }]]),
+        scalar: ({ file }) => {
+          files.push(file);
+          return { base: 'unknown', nullable: false };
+        },
+      },
+    );
+    deepStrictEqual(files, ['/app/fields/geo.ts', undefined]);
   });
 
   it('keeps only the type, nullability and translatability in `site` docs', () => {

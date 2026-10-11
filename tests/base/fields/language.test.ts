@@ -81,7 +81,13 @@ describe('language field', () => {
 
 describe('language types', () => {
   const imports = createTypeImports('/app/.ohne/shared');
-  const args = { fieldType: languageField, name: 'language', options: {}, imports };
+  const args = {
+    fieldType: languageField,
+    name: 'language',
+    type: 'language',
+    options: {},
+    imports,
+  };
 
   it('emits the registered languages inline as JSON', () => {
     strictEqual(fieldJSONType({ ...args, mirror: () => undefined }).base, "'de' | 'de-AT' | 'en'");

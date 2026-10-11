@@ -128,6 +128,11 @@ export interface ShapeScalarArgs extends FieldValueTypeArgs<Record<string, AnyOp
    * The name the field type is registered under.
    */
   type: string;
+
+  /**
+   * The file that defines the field type; absent for a built-in.
+   */
+  file?: string;
 }
 
 /**
@@ -469,6 +474,7 @@ function valueTypeOf(
     owner,
     path,
     type: instance.type,
+    file: registered.file,
   });
   const perLocale = fieldType.columnType !== false && instance.options.translatable === true;
   return { type: nullable || perLocale ? `${base} | null` : base, reason };
