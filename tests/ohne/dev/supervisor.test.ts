@@ -300,6 +300,18 @@ describe('dev', () => {
     await waitFor(async () => (await getBody(port, '/greet')) === 'missing');
   });
 
+  it('marks the API child with `OHNE_DEV`', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('ohne-dev', port);
+    writeFileSync(
+      join(app, 'api', 'mode.ts'),
+      "import { useEnv } from 'ohnejs'\nexport default () => String(useEnv().get('OHNE_DEV'))\n",
+    );
+
+    servers.push(await dev(app, { entry: BIN, dashboard: false }));
+    await waitFor(async () => (await getBody(port, '/mode')) === 'true');
+  });
+
   it('parks on a malformed `.env` and recovers on the next save', TIMEOUT, async () => {
     const port = await freePort();
     const app = writeProject('bad-dotenv', port);

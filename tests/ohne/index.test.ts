@@ -10,6 +10,8 @@ import type {
   ValidationError,
 } from '../../src/ohne/index.ts';
 
+import { collectFieldTypes, readShapeType } from '../../src/ohne/codegen/read-shape.ts';
+import { fieldJSONType } from '../../src/ohne/fields/value-type.ts';
 import * as ohne from '../../src/ohne/index.ts';
 import { busyError } from '../../src/ohne/query/write/busy.ts';
 import { referenceViolation, validationError } from '../../src/ohne/query/write/errors.ts';
@@ -35,5 +37,11 @@ describe('ohne', () => {
     const records: Equal<Parameters<Hooks['query:records']>[0], QueryRecord[]> = true;
     const synced: Equal<Parameters<Hooks['schema:synced']>[0], GuardReport> = true;
     strictEqual(filter && records && synced, true);
+  });
+
+  it('exports the walker a website types file builds on', () => {
+    strictEqual(ohne.readShapeType, readShapeType);
+    strictEqual(ohne.fieldJSONType, fieldJSONType);
+    strictEqual(ohne.collectFieldTypes, collectFieldTypes);
   });
 });

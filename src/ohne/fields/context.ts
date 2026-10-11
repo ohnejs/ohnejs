@@ -10,6 +10,7 @@ import type { AnyOptionDef, ResolvedOptions } from './option.ts';
  *
  * Carries the field's name and its resolved options - the type's own options plus the common ones.
  * `emitType` extends it with `importType` (`EmitTypeContext`).
+ * `emitJSONType` extends it the same way (`EmitJSONTypeContext`).
  */
 export interface FieldContext<TOptions extends Record<string, AnyOptionDef>> {
   /**
@@ -73,6 +74,30 @@ export interface EmitTypeContext<
    * ```
    */
   importGenerated(path: string, exportName: string): string;
+}
+
+/**
+ * The context passed to a field type's `emitJSONType`.
+ *
+ * Adds `importType` for the types a website can resolve.
+ */
+export interface EmitJSONTypeContext<
+  TOptions extends Record<string, AnyOptionDef>,
+> extends FieldContext<TOptions> {
+  /**
+   * Brings a named type into the website types file and returns its local name.
+   *
+   * A link or rich text type from `ohnejs/utils` is read from `@ohnejs/client` on the site.
+   * Any other package name is imported as is, so the website must install that package.
+   * A relative path and any other `ohnejs` module throw: the site has neither, so inline the type.
+   * Always use the returned name; it is aliased when another import already took the same name.
+   *
+   * @example
+   * ```ts
+   * emitJSONType: (ctx) => `${ctx.importType('ohnejs/utils', 'RichText')}<never>`
+   * ```
+   */
+  importType(path: string, exportName: string): string;
 }
 
 /**

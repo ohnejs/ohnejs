@@ -3,6 +3,7 @@ import type { LogicalType } from '../database/dialect.ts';
 import type { Message } from '../messages/known-messages.ts';
 import type {
   ColumnValue,
+  EmitJSONTypeContext,
   EmitTypeContext,
   FieldContext,
   FieldDefault,
@@ -86,7 +87,7 @@ export interface FieldType<
    *
    * Runs when the desired schema builds and at codegen time, never inside a request.
    * `ctx` carries the field's name and its resolved options.
-   * Mutually exclusive with `emitType`: the framework derives the value type from the hint.
+   * Mutually exclusive with `emitType` and `emitJSONType`: the framework derives the type from the hint.
    */
   schema?(ctx: FieldContext<TOptions>): StorageHint;
 
@@ -117,6 +118,29 @@ export interface FieldType<
    * ```
    */
   emitType?(ctx: EmitTypeContext<TOptions>): string | string[];
+
+  /**
+   * Emits the field's value type as a website receives it: the JSON form of what a read returns.
+   * Runs only when the website types generate, inside a booted app, never at `ohne prepare`.
+   * Return only the value type, as `emitType` does; the framework wraps `| null` the same way.
+   *
+   * Omitted, the website reuses `emitType` when its result is already JSON the site can resolve:
+   * - an inline type, like `'string[]'` or a union of choices
+   * - a link or rich text type imported from `ohnejs/utils`, which the site reads from `@ohnejs/client`
+   *
+   * Declare it when the type has `deserialize`, since only you know that value's JSON form.
+   * Declare it when `emitType` imports a relative path, a generated file, or another package.
+   * Without it such a field is `unknown` on the site, and generating the site types warns.
+   * Mutually exclusive with `schema`: a relation's JSON shape follows from its storage hint.
+   *
+   * @example
+   * ```ts
+   * emitJSONType: () => 'string'
+   * emitJSONType: () => '{ lat: number; lng: number }'
+   * emitJSONType: (ctx) => `${ctx.importType('ohnejs/utils', 'Link')}<never>`
+   * ```
+   */
+  emitJSONType?(ctx: EmitJSONTypeContext<TOptions>): string | string[];
 
   /**
    * A value every field of this type takes when a create leaves it out.
@@ -183,7 +207,8 @@ export interface FieldType<
 
   /**
    * Decodes a stored value back into the value a read returns, run just after the driver's codec.
-   * The generated record type reflects what this returns; a `null` value skips it.
+   * `emitType` describes the value this returns; `emitJSONType` describes its JSON form.
+   * A `null` value skips it.
    * May return a promise; the read path awaits it.
    *
    * @example

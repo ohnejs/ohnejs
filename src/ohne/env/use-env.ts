@@ -60,6 +60,7 @@ registry.define('FORCE_COLOR', {
 });
 registry.define('SKIP_CODEGEN', { default: false, parse: boolEnv, flag: 'boolean' });
 registry.define('DASHBOARD_RELOAD', { default: false, parse: boolEnv, flag: 'boolean' });
+registry.define('OHNE_DEV', { default: false, parse: boolEnv });
 registry.define('DATABASE', { default: undefined, parse: (raw) => raw, flag: 'value' });
 registry.define('DB', { default: undefined, parse: (raw) => raw, flag: 'value' });
 registry.define('FORCE_SYNC', { default: false, parse: boolEnv, flag: 'boolean' });

@@ -14,6 +14,7 @@ export type ServeBackend = 'api' | 'dashboard';
  * A spawned `ohne serve <backend>` child the dev supervisor controls.
  *
  * The child is the real production server with an IPC channel; the `api` backend also gets `SKIP_CODEGEN`.
+ * The supervisor's `env` gives both backends `OHNE_DEV`, so a boot file can tell it runs under `ohne dev`.
  * The supervisor awaits `ready`, then `stop`s it to reload or shut it down.
  */
 export interface ServeChild {
@@ -115,6 +116,7 @@ const DEBUGGER = /^--inspect(?:-brk|-wait)?(?:=|$)/;
  * Spawns `ohne serve <backend>` as a supervised child and returns handles to its lifecycle.
  *
  * The child runs the real CLI entry with an IPC channel; the `api` backend also gets `SKIP_CODEGEN=1`.
+ * The supervisor passes `OHNE_DEV=1` in `env` for both backends.
  * The supervisor owns codegen; the child only serves.
  * `ready` settles the boot outcome; `stop` drains or kills it.
  * A child that neither readies nor exits within `readyTimeout` is killed and counts as a boot failure.

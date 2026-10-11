@@ -1,10 +1,7 @@
-import { fileURLToPath } from 'node:url';
-
 import type { CollectedBlock } from '../blocks/collect-blocks.ts';
 import type { CollectedCollection } from '../collections/collect-collections.ts';
 import type { ScannedMigration } from '../database/migrations/scan-layer-migrations.ts';
 import type { CollectedFieldType } from '../fields/collect-fields.ts';
-import type { FieldType } from '../fields/define-field.ts';
 import type { FieldInstance } from '../fields/field.ts';
 import type {
   BlocksHint,
@@ -12,7 +9,6 @@ import type {
   ForeignKeyHint,
   JunctionHint,
 } from '../fields/storage-hint.ts';
-import type { Message } from '../messages/known-messages.ts';
 import type { MessageMeta } from '../messages/messages.ts';
 
 import {
@@ -21,41 +17,29 @@ import {
   createCodeGenerator,
   createTypeImports,
   importSpecifier,
-  indent,
   jsdocBlock,
   literalString,
   propertyKey,
-  type TypeImports,
 } from '../../utils/codegen/index.ts';
 import {
-  dirname,
   formatMessage,
   hasKey,
   isArray,
-  isBoolean,
   isNull,
-  isNumber,
   isObject,
   isString,
   isUndefined,
   joinPath,
-  pluralize,
-  toSentenceCase,
 } from '../../utils/index.ts';
 import { collectBlocks } from '../blocks/collect-blocks.ts';
-import { resolveAllowedBlocks } from '../blocks/resolve-allowed-blocks.ts';
 import { collectCollections } from '../collections/collect-collections.ts';
 import { resolveLocales } from '../collections/resolve-locales.ts';
 import { collectMigrations } from '../database/migrations/collect-migrations.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { collectFields } from '../fields/collect-fields.ts';
-import { isExpandableDescription, resolveFieldOptions } from '../fields/field.ts';
+import { resolveFieldOptions } from '../fields/field.ts';
 import { forbidsEmpty } from '../fields/forbids-empty.ts';
-import {
-  type FieldStorageKind,
-  resolveFieldStorage,
-  type ResolvedFieldStorage,
-} from '../fields/resolve-field.ts';
+import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
 import { fieldBaseType } from '../fields/value-type.ts';
 import { DEFAULTS } from '../layers/config.ts';
@@ -63,6 +47,21 @@ import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { collectMessages } from '../messages/collect-messages.ts';
 import { BANNER, codegenDir } from './codegen-dir.ts';
+import {
+  allowedBlocksOf,
+  blockArm,
+  blocksListType,
+  documentedShape,
+  type EmittableFieldType,
+  emittableFieldTypes,
+  fieldDocOf,
+  ITEM_UUID_DOC,
+  type MessageResolver,
+  readShapeType,
+  resolveEmissionStorage,
+  type ShapeContext,
+  type ShapeOwner,
+} from './read-shape.ts';
 
 /**
  * Options for `generateDatabase`.
@@ -79,42 +78,9 @@ export interface GenerateDatabaseOptions {
 }
 
 /**
- * One emittable field type: its definition plus the directory `importType` paths resolve against.
+ * Everything one field's value type and documentation resolve against, its doc headlines included.
  */
-interface EmittableFieldType {
-  fieldType: FieldType;
-  dir: string;
-}
-
-/**
- * The definition a field under emission belongs to, as the error messages name it.
- */
-interface EmissionOwner {
-  subject: string;
-  file: string;
-}
-
-/**
- * Everything one field's value type and documentation resolve against.
- */
-interface EmissionContext {
-  types: Map<string, EmittableFieldType>;
-  blocks: readonly CollectedBlock[];
-  imports: TypeImports;
-  resolveText: MessageResolver;
-}
-
-/**
- * Renders a field's `label` or `description` to concrete text for a static doc comment.
- * A plain string passes through; a message key or `{ key, params }` object renders in the default language.
- * Returns `undefined` when the message resolves to nothing, so the headline can fall back.
- */
-type MessageResolver = (message: Message | undefined) => string | undefined;
-
-/**
- * The directory of the built-in field types, used when a built-in's `importType` resolves a path.
- */
-const BUILTIN_DIR = fileURLToPath(new URL('../fields/builtin/', import.meta.url));
+type EmissionContext = ShapeContext & { resolveText: MessageResolver };
 
 /**
  * The `UUID` entry every collection and composite scope leads its query-field table with.
@@ -153,21 +119,6 @@ const UPDATED_AT_DOC =
  */
 const TRANSLATIONS_DOC =
   'The locales holding a translation of this record, in configured order.\nNo write accepts it.';
-
-/**
- * The doc a composite item's `UUID` carries in a read shape.
- */
-const ITEM_UUID_DOC =
-  "This item's unique identifier.\nAssigned when the item is created and never changes.";
-
-/**
- * The docs the structural members of a blocks-union arm carry, by member name.
- */
-const BLOCK_ARM_DOCS = {
-  block: 'The block type.',
-  UUID: "This block instance's unique identifier.",
-  fields: "The block's own fields.",
-} as const;
 
 /**
  * Generates the database types and registrations from every layer's schema directories.
@@ -271,7 +222,7 @@ async function writeShared(
   const imports = createTypeImports(dir);
   const context: EmissionContext = {
     types: emittableFieldTypes(fields, disabledFields),
-    blocks,
+    blocks: blocks.map((block) => block.name),
     imports,
     resolveText,
   };
@@ -285,7 +236,7 @@ async function writeShared(
       ...(translatable.has(collection.name)
         ? [{ name: '_translations', type: translations, doc: jsdocBlock(TRANSLATIONS_DOC) }]
         : []),
-      ...fieldShapesOf(
+      ...readShapeType(
         { subject: `Collection \`${collection.name}\``, file: collection.file },
         collection.collection.fields,
         context,
@@ -295,11 +246,13 @@ async function writeShared(
   }));
   const blockMembers = blocks.map((block) => ({
     name: block.name,
-    fields: fieldShapesOf(
+    fields: readShapeType(
       { subject: `Block \`${block.name}\``, file: block.file },
       block.block.fields,
-      context,
-      true,
+      {
+        ...context,
+        nested: true,
+      },
     ),
   }));
   const queryMembers = collections.map((collection) => ({
@@ -547,31 +500,6 @@ function translationsType(locales: readonly string[]): string {
 }
 
 /**
- * Resolves one definition's field map into named value types and docs, ready for interface emission.
- * `nested` marks a shape a `select` cannot address - a block's fields.
- * A `readable: false` field drops from such a shape entirely.
- * A top-level one stays, addressable by an explicit `select`.
- */
-function fieldShapesOf(
-  owner: EmissionOwner,
-  fields: Record<string, FieldInstance>,
-  context: EmissionContext,
-  nested = false,
-): { name: string; type: string; doc: string }[] {
-  return Object.entries(fields)
-    .filter(
-      ([name, instance]) =>
-        !nested ||
-        resolveEmissionStorage(owner, name, instance, context).options.readable !== false,
-    )
-    .map(([name, instance]) => ({
-      name,
-      type: valueTypeOf(owner, name, instance, context),
-      doc: fieldDocOf(owner, name, instance, context, false),
-    }));
-}
-
-/**
  * Emits one interface member: the name, then its field shape, `{}` when the definition holds none.
  * Each field carries its doc block above it when one is set.
  */
@@ -788,338 +716,10 @@ async function write(dir: string, code: CodeBuilder): Promise<string> {
 }
 
 /**
- * Maps every emittable field-type name to its definition: built-ins first, scanned types on top.
- * Disabled names drop the built-in they would otherwise resolve to.
- */
-function emittableFieldTypes(
-  fields: readonly CollectedFieldType[],
-  disabledFields: readonly string[],
-): Map<string, EmittableFieldType> {
-  const map = new Map<string, EmittableFieldType>();
-  for (const [name, meta] of Object.entries(useFields().all())) {
-    map.set(name, { fieldType: meta.fieldType, dir: BUILTIN_DIR });
-  }
-  for (const name of disabledFields) map.delete(name);
-  for (const collected of fields) {
-    map.set(collected.name, { fieldType: collected.fieldType, dir: dirname(collected.file) });
-  }
-  return map;
-}
-
-/**
- * Resolves a field-type name against the emittable set, throwing when the owner references an unknown one.
- */
-function registeredType(
-  owner: EmissionOwner,
-  type: string,
-  context: EmissionContext,
-): EmittableFieldType {
-  const registered = context.types.get(type);
-  if (isUndefined(registered)) {
-    throw ohneError({
-      title: `Unknown field type \`${type}\``,
-      body: [`${owner.subject} references field type \`${type}\`, which is not registered.`],
-      path: owner.file,
-    });
-  }
-  return registered;
-}
-
-/**
- * Emits one field's TypeScript value type, resolving its type name against the emittable set.
- * A child hint assembles its shape from its subfields here, where the emittable set is at hand.
- * A blocks hint assembles its union from the collected blocks on the same terms.
- * A translatable column-bearing field reads `null` where the queried locale holds no translation.
- * Its read shape therefore folds `| null` in whatever its own nullability says.
- */
-function valueTypeOf(
-  owner: EmissionOwner,
-  name: string,
-  instance: FieldInstance,
-  context: EmissionContext,
-): string {
-  const registered = registeredType(owner, instance.type, context);
-  const { fieldType } = registered;
-  if (fieldType.columnType === false && !isUndefined(fieldType.schema)) {
-    const options = resolveFieldOptions(fieldType, { ...instance.options });
-    const hint = fieldType.schema({ name, options });
-    if (hint.kind === 'child') return childValueType(owner, hint, context);
-    if (hint.kind === 'blocks') return blocksValueType(owner, name, hint, context);
-  }
-  const { base, nullable } = fieldBaseType({
-    fieldType,
-    name,
-    options: { ...instance.options },
-    fieldDir: registered.dir,
-    imports: context.imports,
-  });
-  const perLocale = fieldType.columnType !== false && instance.options.translatable === true;
-  return nullable || perLocale ? `${base} | null` : base;
-}
-
-/**
- * Assembles a documented record shape: `{`, each member's doc then its line, a blank line between members.
- * The shape closes with `closer`, so a caller can fold `| null` or `[]` onto the brace.
- * Each inner line carries its relative indentation; the emission site indents the whole block.
- */
-function documentedShape(
-  members: readonly { doc: string; line: string }[],
-  closer: string,
-): string {
-  const lines = ['{'];
-  members.forEach((member, i) => {
-    if (i > 0) lines.push('');
-    lines.push(indent(member.doc), indent(member.line));
-  });
-  lines.push(closer);
-  return lines.join('\n');
-}
-
-/**
- * Assembles a composite's inline record shape from its subfields, recursively.
- * The item `UUID` leads the shape, matching the read: every child row exposes its stable identity.
- * `one` cardinality reads back one row or none, so the shape is nullable; `many` is an array.
- * A `select` cannot address a subfield, so a `readable: false` one drops from the shape entirely.
- */
-function childValueType(owner: EmissionOwner, hint: ChildHint, context: EmissionContext): string {
-  const members = [
-    { doc: jsdocBlock(ITEM_UUID_DOC), line: 'UUID: string;' },
-    ...Object.entries(hint.subfields)
-      .filter(
-        ([name, instance]) =>
-          resolveEmissionStorage(owner, name, instance, context).options.readable !== false,
-      )
-      .map(([name, instance]) => ({
-        doc: fieldDocOf(owner, name, instance, context, true),
-        line: `${propertyKey(name)}: ${valueTypeOf(owner, name, instance, context)};`,
-      })),
-  ];
-  return documentedShape(members, hint.cardinality === 'one' ? '} | null' : '}[]');
-}
-
-/**
- * Resolves a blocks field's allowed type names through the shared resolver, sorted and validated.
- * An empty set or an unregistered name throws, naming the owning definition.
- */
-function allowedBlocksOf(
-  owner: EmissionOwner,
-  name: string,
-  hint: BlocksHint,
-  context: EmissionContext,
-): string[] {
-  const result = resolveAllowedBlocks(
-    hint.allow,
-    context.blocks.map((block) => block.name),
-  );
-  if (result.ok) return result.allowed;
-  if (result.reason === 'empty') {
-    throw ohneError({
-      title: `Field \`${name}\` has no block types to hold`,
-      body: [
-        `${owner.subject} declares a blocks field, but no block is registered.`,
-        'Define one under `dirs.blocks`, or drop the field.',
-      ],
-      path: owner.file,
-    });
-  }
-  throw ohneError({
-    title: `Unknown block \`${result.block}\``,
-    body: [`${owner.subject} allows block \`${result.block}\`, which is not registered.`],
-    path: owner.file,
-  });
-}
-
-/**
- * Wraps blocks item shapes into their list type: a lone item stays bare, a union gains parens.
- * A multi-line item keeps its shape: the arm's body indents one level past the `|`, its brace under it.
- */
-function blocksListType(items: string[]): string {
-  if (items.length === 1) return `${items[0] as string}[]`;
-  return ['(', ...items.map(unionArm), ')[]'].join('\n');
-}
-
-/**
- * One union arm: `| ` before the item, the item's own lines re-indented to sit past the bar.
- */
-function unionArm(item: string): string {
-  return `  | ${indent(item, { level: 2 }).slice(4)}`;
-}
-
-/**
- * Assembles a blocks field's value type: an array over the union of its allowed block shapes.
- * Each arm names its block and carries the instance `UUID`.
- * That block's `GeneratedBlocks` member rides as `fields`.
- * The shared resolver sorts and validates, so the desired schema and this shape never disagree.
- */
-function blocksValueType(
-  owner: EmissionOwner,
-  name: string,
-  hint: BlocksHint,
-  context: EmissionContext,
-): string {
-  const items = allowedBlocksOf(owner, name, hint, context).map((block) =>
-    blockArm(block, 'GeneratedBlocks', 'UUID: string;'),
-  );
-  return blocksListType(items);
-}
-
-/**
- * One documented blocks-union arm: the `block` tag, an optional `UUID` line, and the `fields` member.
- * `generated` is the sibling interface the `fields` type indexes into.
- * `uuidLine` is the `UUID` member's line, or `null` for a create arm, which carries none.
- */
-function blockArm(block: string, generated: string, uuidLine: string | null): string {
-  const members = [
-    { doc: jsdocBlock(BLOCK_ARM_DOCS.block), line: `block: ${literalString(block)};` },
-  ];
-  if (!isNull(uuidLine)) members.push({ doc: jsdocBlock(BLOCK_ARM_DOCS.UUID), line: uuidLine });
-  members.push({
-    doc: jsdocBlock(BLOCK_ARM_DOCS.fields),
-    line: `fields: ${generated}[${literalString(block)}];`,
-  });
-  return documentedShape(members, '}');
-}
-
-/**
- * Builds one field's documentation block: its headline, a rule, then a bullet list of resolved facts.
- * The headline is the field's `description`, else its `label`, else its name sentence-cased.
- * An expandable description contributes its `text`.
- * `nested` drops the translatability line, which only a top-level collection field can carry.
- */
-function fieldDocOf(
-  owner: EmissionOwner,
-  name: string,
-  instance: FieldInstance,
-  context: EmissionContext,
-  nested: boolean,
-): string {
-  const { fieldType } = registeredType(owner, instance.type, context);
-  const { options, kind } = resolveFieldStorage(name, instance, fieldType);
-  const { description } = instance.options;
-  const text = isExpandableDescription(description)
-    ? context.resolveText(description.text)
-    : context.resolveText(description);
-  const headline = withPeriod(
-    text ?? context.resolveText(instance.options.label) ?? toSentenceCase(name),
-  );
-  const bullets = fieldBullets(instance, fieldType, options, kind, nested);
-  return jsdocBlock([headline, '', '---', '', ...bullets].join('\n'));
-}
-
-/**
- * Ends a doc headline with a period, unless it already closes with sentence punctuation.
- * `Title` becomes `Title.`; `The page title.` and `Tagline!` are left as they are.
- */
-function withPeriod(headline: string): string {
-  return /[.!?]$/.test(headline) ? headline : `${headline}.`;
-}
-
-/**
- * The resolved-config bullets a field's doc lists.
- * Type, nullability, and index come first, then translatability for a top-level field.
- * The value behaviour the author set at the call site follows, then the field type's own options.
- */
-function fieldBullets(
-  instance: FieldInstance,
-  fieldType: FieldType,
-  options: ResolvedFieldStorage['options'],
-  kind: FieldStorageKind,
-  nested: boolean,
-): string[] {
-  const bullets = [`Type: ${inlineCode(instance.type)}`];
-  bullets.push(fieldNullable(kind, options, fieldType) ? 'Nullable' : 'Not nullable');
-  const index = indexBullet(kind, options, fieldType);
-  if (!isNull(index)) bullets.push(index);
-  if (!nested) bullets.push(options.translatable === true ? 'Translatable' : 'Not translatable');
-  bullets.push(hasKey(instance.options, 'default') ? 'Has a default value' : 'No default value');
-  bullets.push(countBullet(instance.options.sanitizers?.length ?? 0, 'sanitizer'));
-  bullets.push(countBullet(instance.options.validators?.length ?? 0, 'validator'));
-  bullets.push(hasKey(instance.options, 'when') ? 'Conditional' : 'No condition');
-  bullets.push(...typeSpecificBullets(fieldType, options));
-  return bullets.map((bullet) => `- ${bullet}`);
-}
-
-/**
- * Whether the field itself permits `null`: a lone child row or a nullable-or-forced column, never a list.
- * A translatable column also reads `null` per missing locale, which the translatability line already conveys.
- */
-function fieldNullable(
-  kind: FieldStorageKind,
-  options: ResolvedFieldStorage['options'],
-  fieldType: FieldType,
-): boolean {
-  if (kind === 'childOne') return true;
-  if (kind === 'childMany' || kind === 'junction' || kind === 'blocks') return false;
-  return options.nullable === true || fieldType.forceNullable === true;
-}
-
-/**
- * The index bullet of a column-bearing field: its unique scope, a plain index, or `No index`; else `null`.
- */
-function indexBullet(
-  kind: FieldStorageKind,
-  options: ResolvedFieldStorage['options'],
-  fieldType: FieldType,
-): string | null {
-  if (kind !== 'column' && kind !== 'foreignKey') return null;
-  if (options.uniquePerLocale === true) return 'Unique per locale';
-  if (options.uniquePerParent === true) return 'Unique per parent';
-  if (options.unique === true) return 'Unique';
-  if (options.index === true || fieldType.forceIndex === true) return 'Indexed';
-  return 'No index';
-}
-
-/**
- * A count bullet for how many of one thing a field carries: `No sanitizers`, `1 validator`, `2 validators`.
- */
-function countBullet(count: number, noun: string): string {
-  return count === 0 ? `No ${noun}s` : `${count} ${pluralize(count, noun)}`;
-}
-
-/**
- * The bullets for a field type's own declared options, each rendered from its resolved value.
- * An option absent after resolution is skipped, so only the options the field actually carries show.
- */
-function typeSpecificBullets(
-  fieldType: FieldType,
-  options: ResolvedFieldStorage['options'],
-): string[] {
-  const bullets: string[] = [];
-  for (const key of Object.keys(fieldType.options ?? {})) {
-    const value = options[key];
-    if (isUndefined(value)) continue;
-    bullets.push(`${inlineCode(key)} ${describeOptionValue(value)}`);
-  }
-  return bullets;
-}
-
-/**
- * Describes one resolved option value for a bullet: a scalar shows its value, a list or record its size.
- */
-function describeOptionValue(value: unknown): string {
-  if (isArray(value)) return `has ${value.length} ${pluralize(value.length, 'entry', 'entries')}`;
-  if (isString(value) || isNumber(value) || isBoolean(value)) {
-    return `is ${inlineCode(String(value))}`;
-  }
-  if (isObject(value)) {
-    const size = Object.keys(value).length;
-    return `has ${size} ${pluralize(size, 'entry', 'entries')}`;
-  }
-  return 'is set';
-}
-
-/**
- * Wraps a value in backticks, so the generated doc comment renders it as inline code.
- */
-function inlineCode(value: string): string {
-  return `\`${value}\``;
-}
-
-/**
  * Resolves one collection or composite field map into named `QueryFieldMeta` type literals.
  */
 function queryFieldsOf(
-  owner: EmissionOwner,
+  owner: ShapeOwner,
   fields: Record<string, FieldInstance>,
   context: EmissionContext,
 ): { name: string; type: string }[] {
@@ -1137,7 +737,7 @@ function queryFieldsOf(
  * The kind is read through the same `resolveFieldStorage` walk the runtime metadata uses.
  */
 function queryFieldType(
-  owner: EmissionOwner,
+  owner: ShapeOwner,
   name: string,
   instance: FieldInstance,
   context: EmissionContext,
@@ -1244,7 +844,7 @@ function conditionLiteral(value: unknown): string {
  * A `writable: false` field never appears in a write input, so it drops from the shape.
  */
 function insertShapesOf(
-  owner: EmissionOwner,
+  owner: ShapeOwner,
   fields: Record<string, FieldInstance>,
   context: EmissionContext,
   nested = false,
@@ -1259,29 +859,6 @@ function insertShapesOf(
       ...insertFieldType(owner, name, instance, context),
       doc: fieldDocOf(owner, name, instance, context, nested),
     }));
-}
-
-/**
- * Resolves one field's storage for emission, throwing when its type is not registered.
- */
-function resolveEmissionStorage(
-  owner: EmissionOwner,
-  name: string,
-  instance: FieldInstance,
-  context: EmissionContext,
-): { registered: EmittableFieldType } & Pick<ResolvedFieldStorage, 'hint' | 'kind' | 'options'> {
-  const registered = context.types.get(instance.type);
-  if (isUndefined(registered)) {
-    throw ohneError({
-      title: `Unknown field type \`${instance.type}\``,
-      body: [
-        `${owner.subject} references field type \`${instance.type}\`, which is not registered.`,
-      ],
-      path: owner.file,
-    });
-  }
-  const { hint, kind, options } = resolveFieldStorage(name, instance, registered.fieldType);
-  return { registered, hint, kind, options };
 }
 
 /**
@@ -1342,7 +919,7 @@ function columnDefaulted(
  * `fields` references the type's `GeneratedBlockInserts` member, so self-nesting terminates.
  */
 function insertFieldType(
-  owner: EmissionOwner,
+  owner: ShapeOwner,
   name: string,
   instance: FieldInstance,
   context: EmissionContext,
@@ -1377,7 +954,7 @@ function insertFieldType(
 /**
  * Emits a composite item's create-input object type from its subfields, each documented.
  */
-function insertObjectType(owner: EmissionOwner, hint: ChildHint, context: EmissionContext): string {
+function insertObjectType(owner: ShapeOwner, hint: ChildHint, context: EmissionContext): string {
   const members = insertShapesOf(owner, hint.subfields, context, true).map((field) => ({
     doc: field.doc,
     line: `${propertyKey(field.name)}${field.optional ? '?' : ''}: ${field.type};`,
@@ -1391,7 +968,7 @@ function insertObjectType(owner: EmissionOwner, hint: ChildHint, context: Emissi
  * A `writable: false` or `immutable` field never appears in an update input, so it drops from the shape.
  */
 function updateShapesOf(
-  owner: EmissionOwner,
+  owner: ShapeOwner,
   fields: Record<string, FieldInstance>,
   context: EmissionContext,
   nested = false,
@@ -1419,7 +996,7 @@ function updateShapesOf(
  * `fields` references the type's `GeneratedBlockUpdates` member, so self-nesting terminates.
  */
 function updateFieldType(
-  owner: EmissionOwner,
+  owner: ShapeOwner,
   name: string,
   instance: FieldInstance,
   context: EmissionContext,
@@ -1455,7 +1032,7 @@ function updateFieldType(
  * A repeater item leads with `UUID?: string`, so a matched item keeps its identity across the update.
  */
 function updateObjectType(
-  owner: EmissionOwner,
+  owner: ShapeOwner,
   hint: ChildHint,
   context: EmissionContext,
   identified: boolean,
@@ -1477,7 +1054,7 @@ function updateObjectType(
  */
 function owningRelationsOf(
   collection: CollectedCollection,
-  types: Map<string, EmittableFieldType>,
+  types: ReadonlyMap<string, EmittableFieldType>,
 ): { name: string; target: string }[] {
   const relations: { name: string; target: string }[] = [];
   for (const [name, instance] of Object.entries(collection.collection.fields)) {

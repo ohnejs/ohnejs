@@ -1,10 +1,10 @@
 import type { TypeImports } from '../../utils/codegen/type-imports.ts';
 import type { LogicalType } from '../database/dialect.ts';
-import type { EmitTypeContext } from './context.ts';
+import type { EmitJSONTypeContext, EmitTypeContext } from './context.ts';
 import type { FieldType } from './define-field.ts';
 import type { AnyOptionDef } from './option.ts';
 
-import { isArray } from '../../utils/index.ts';
+import { isArray, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { resolveFieldOptions } from './field.ts';
 
@@ -166,4 +166,160 @@ export function fieldValueType<TOptions extends Record<string, AnyOptionDef>>(
 ): string {
   const { base, nullable } = fieldBaseType(args);
   return nullable ? `${base} | null` : base;
+}
+
+/**
+ * Maps a type an `ohnejs` module exports to the module a website imports it from.
+ * Returns the website's module specifier, or `undefined` when the website has no such type.
+ */
+export type TypeMirror = (path: string, exportName: string) => string | undefined;
+
+/**
+ * Arguments to `fieldJSONType`.
+ */
+export interface FieldJSONTypeArgs<TOptions extends Record<string, AnyOptionDef>> {
+  /**
+   * The registered field type whose JSON type is being emitted.
+   */
+  fieldType: FieldType<TOptions>;
+
+  /**
+   * The field's key in its collection, exposed to the hooks as `ctx.name`.
+   */
+  name: string;
+
+  /**
+   * The instance options passed to `field(...)` - the type's own options plus the common ones.
+   */
+  options: Record<string, unknown>;
+
+  /**
+   * The import collector of the website types file; a resolvable `importType` records into it.
+   */
+  imports: TypeImports;
+
+  /**
+   * Maps an `ohnejs` type to the module the website reads it from.
+   */
+  mirror: TypeMirror;
+}
+
+/**
+ * One field's JSON type: its non-null base, whether it admits `null`, and why it fell back to `unknown`.
+ */
+export interface FieldJSONType extends FieldBaseType {
+  /**
+   * Why the base is `unknown` when the field type could not describe its JSON form, as one sentence.
+   */
+  reason?: string;
+}
+
+/**
+ * Emits one field's value type as a website receives it: the JSON form of what a read returns.
+ *
+ * The first tier that applies wins:
+ * - `emitJSONType` runs, its `importType` resolved through `mirror`.
+ * - A `deserialize` makes the type `unknown`, since only the field type knows that value's JSON form.
+ * - Without `emitType`, the type falls back from `columnType`, as the database types do.
+ * - `emitType` is reused when every type it imports has a `mirror`; anything else makes it `unknown`.
+ *
+ * A `deserialize` or an unmirrored `emitType` import adds a `reason`.
+ * An aborted `emitType` records no import.
+ * `nullable` folds a translatable column in, since such a field reads `null` where a locale has none.
+ *
+ * In `emitJSONType`, an import that `mirror` does not map passes through as a package name.
+ * A relative path or an `ohnejs` module throws: the website has neither.
+ *
+ * @example
+ * ```ts
+ * fieldJSONType({ fieldType: richText, name: 'body', options: { links: ['Pages'] }, imports, mirror })
+ * // -> { base: "RichText<'Pages'>", nullable: false }
+ *
+ * fieldJSONType({ fieldType: instant, name: 'at', options: { nullable: true }, imports, mirror })
+ * // -> { base: 'string', nullable: true }
+ * ```
+ */
+export function fieldJSONType<TOptions extends Record<string, AnyOptionDef>>(
+  args: FieldJSONTypeArgs<TOptions>,
+): FieldJSONType {
+  const { fieldType, name, options, imports, mirror } = args;
+  if (fieldType.columnType === false) {
+    return fieldBaseType({ fieldType, name, options, fieldDir: imports.dir, imports });
+  }
+  const resolved = resolveFieldOptions(fieldType, options);
+  const nullable = resolved.nullable || options.translatable === true;
+  const json = (emitted: string | string[]): FieldJSONType => ({
+    base: isArray(emitted) ? emitted.join('\n') : emitted,
+    nullable,
+  });
+  const unknown = (reason: string): FieldJSONType => ({ base: 'unknown', nullable, reason });
+
+  if (fieldType.emitJSONType) {
+    const ctx: EmitJSONTypeContext<TOptions> = {
+      name,
+      options: resolved,
+      importType: (path, exportName) => {
+        const mirrored = mirror(path, exportName);
+        if (isUndefined(mirrored) && (isLocalPath(path) || isOhnePath(path))) {
+          throw ohneError({
+            title: 'Unresolvable type import in `emitJSONType`',
+            body: [
+              `A website cannot import \`${exportName}\` from \`${path}\`.`,
+              '',
+              'Inline the type, or import it from a package the website installs.',
+            ],
+          });
+        }
+        return imports.reference({ fromDir: imports.dir, path: mirrored ?? path, exportName });
+      },
+    };
+    return json(fieldType.emitJSONType(ctx));
+  }
+  if (fieldType.deserialize) {
+    return unknown(
+      '`deserialize` changes the value a read returns, and its JSON form is not declared.',
+    );
+  }
+  if (!fieldType.emitType) return json(FALLBACK[fieldType.columnType]);
+
+  let blocked: string | undefined;
+  const probe: EmitTypeContext<TOptions> = {
+    name,
+    options: resolved,
+    importType: (path, exportName) => {
+      if (isUndefined(mirror(path, exportName))) blocked ??= `\`emitType\` imports \`${path}\``;
+      return exportName;
+    },
+    importGenerated: (path) => {
+      blocked ??= `\`emitType\` imports the generated \`${path}\``;
+      return 'unknown';
+    },
+  };
+  fieldType.emitType(probe);
+  if (!isUndefined(blocked)) return unknown(`${blocked}, which a website cannot resolve.`);
+  return json(
+    fieldType.emitType({
+      ...probe,
+      importType: (path, exportName) =>
+        imports.reference({
+          fromDir: imports.dir,
+          path: mirror(path, exportName) ?? path,
+          exportName,
+        }),
+    }),
+  );
+}
+
+/**
+ * Whether an import path names a file rather than a package: relative or absolute.
+ */
+function isLocalPath(path: string): boolean {
+  return path.startsWith('.') || path.startsWith('/');
+}
+
+/**
+ * Whether an import path names `ohnejs` or one of its subpath modules.
+ */
+function isOhnePath(path: string): boolean {
+  return path === 'ohnejs' || path.startsWith('ohnejs/');
 }

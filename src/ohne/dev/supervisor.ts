@@ -305,15 +305,16 @@ export async function dev(
   }
 
   /**
-   * Hands the API child the dashboard's origin as `DASHBOARD_URL`, or nothing when the dashboard is off.
+   * Marks the API child with `OHNE_DEV`.
+   * Hands it the dashboard's origin as `DASHBOARD_URL` too, when the dashboard runs.
    */
   function apiChildEnv(): Record<string, string> {
-    if (!wantDashboard) return {};
+    if (!wantDashboard) return { OHNE_DEV: '1' };
     const origin =
       useEnv().get('DASHBOARD_URL') ??
       useConfig().dashboard?.origin ??
       listenOrigin(useEnv().get('HOST') ?? useConfig().dashboard?.host, dashboardPort);
-    return { DASHBOARD_URL: origin };
+    return { OHNE_DEV: '1', DASHBOARD_URL: origin };
   }
 
   /**
@@ -334,6 +335,7 @@ export async function dev(
         env: {
           API_URL: env.get('API_URL') ?? config.dashboard?.apiURL ?? derivedURL,
           DASHBOARD_RELOAD: env.has('DASHBOARD_RELOAD') ? String(env.get('DASHBOARD_RELOAD')) : '1',
+          OHNE_DEV: '1',
         },
       });
       await dashboard.ready;

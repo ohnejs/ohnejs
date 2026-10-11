@@ -492,6 +492,7 @@ export function validateFieldTypeName(name: string, path?: string): void {
  *
  * - A column-less type (`columnType: false`) owns no column, so it cannot force `nullable` or an index.
  * - `emitType` and `schema` are mutually exclusive: the framework derives value types from the hint.
+ * - `emitJSONType` is a function, and exclusive with `schema` for the same reason.
  * - `jsonList` marks the stored value a JSON list, so it requires `columnType: 'json'`.
  * - `links` is a function that lists the record links in a `json` value.
  * - `sanitizers` and `validators` are lists of functions, run in order by the write pipeline.
@@ -561,6 +562,24 @@ export function validateFieldType<TOptions extends Record<string, AnyOptionDef>>
       body: [
         'The framework derives the value type of a `schema` field from its storage hint.',
         'Drop `emitType`.',
+      ],
+    });
+  }
+  if (!isUndefined(type.emitJSONType) && !isFunction(type.emitJSONType)) {
+    throw ohneError({
+      title: "A field type's `emitJSONType` must be a function",
+      body: [
+        '`emitJSONType` emits the JSON form of the value a read returns.',
+        'Set `emitJSONType` to a function.',
+      ],
+    });
+  }
+  if (!isUndefined(type.schema) && !isUndefined(type.emitJSONType)) {
+    throw ohneError({
+      title: 'A field type cannot declare both `schema` and `emitJSONType`',
+      body: [
+        "A `schema` field's JSON shape follows from its storage hint.",
+        'Drop `emitJSONType`.',
       ],
     });
   }

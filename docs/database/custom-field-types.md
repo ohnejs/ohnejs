@@ -151,6 +151,37 @@ A type that references another collection, like the uploads layer's
 
 The value type then follows from the layout, so such a type declares no `emitType`.
 
+## On your website
+
+A [website](../cms/website.md) that reads your pages through the CMS gets a types file made from
+your schema. There, a field of your type has the type `emitType` returns, as long as the website can
+resolve it: an inline type like `'string[]'`, or a link or rich text type from `ohnejs/utils`. Keep
+a small shape inline in `emitType`, and your server and your website share one type.
+
+`emitType` describes the value your code holds; `emitJSONType` describes how it reads as JSON, and
+you need it only when `deserialize` makes the two differ:
+
+```ts
+// fields/instant.ts
+import { defineField } from 'ohnejs';
+
+export default defineField({
+  columnType: 'text',
+  deserialize: (value) => new Date(value as string),
+  emitType: () => 'Date | string',
+  emitJSONType: () => 'string',
+});
+```
+
+Your code reads a `Date`, and the website receives the string that `Date` turns into as JSON.
+
+Declare `emitJSONType` too when `emitType` imports a type from your own files, since the website
+cannot import them. Return the shape inline, like `'{ lat: number; lng: number }'`. A field that
+the website cannot type reads `unknown` there, and generating the types warns about it.
+
+A layer's type that lacks `emitJSONType` is yours to complete: a type of the same name in your app
+[replaces it](#where-field-types-live), so spread the layer's type into it and add the hook.
+
 ## Defaults
 
 `defaultValue` is what a create stores in the field's column when its input leaves the field out:

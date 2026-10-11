@@ -219,6 +219,33 @@ describe('validateFieldType links', () => {
   });
 });
 
+describe('validateFieldType emitJSONType', () => {
+  it('rejects declaring both `schema` and `emitJSONType`', () => {
+    throwsTitled(
+      () =>
+        validateFieldType({
+          columnType: false,
+          schema: () => junction,
+          emitJSONType: () => 'string[]',
+        }),
+      'A field type cannot declare both `schema` and `emitJSONType`',
+    );
+  });
+
+  it('rejects an `emitJSONType` that is not a function', () => {
+    throwsTitled(
+      () => validateFieldType({ columnType: 'json', emitJSONType: 'string' as never }),
+      "A field type's `emitJSONType` must be a function",
+    );
+  });
+
+  it('accepts an `emitJSONType` beside `emitType`', () => {
+    doesNotThrow(() =>
+      validateFieldType({ columnType: 'json', emitType: () => 'X', emitJSONType: () => 'string' }),
+    );
+  });
+});
+
 describe('validateField search', () => {
   const hook = () => ({ startsWith: 'x' });
   const locked: FieldType = defineField({ columnType: 'text', search: false });

@@ -1,13 +1,14 @@
-import { deepStrictEqual, strictEqual, throws } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { EmitTypeContext } from '../../../src/ohne/fields/context.ts';
 import type { FieldType } from '../../../src/ohne/fields/define-field.ts';
 import type { AnyOptionDef } from '../../../src/ohne/fields/option.ts';
 
 import { defineField } from '../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { option } from '../../../src/ohne/fields/option.ts';
-import { fieldValueType } from '../../../src/ohne/fields/value-type.ts';
+import { fieldJSONType, fieldValueType } from '../../../src/ohne/fields/value-type.ts';
 import { createTypeImports } from '../../../src/utils/codegen/index.ts';
 
 const emit = <T extends Record<string, AnyOptionDef>>(
@@ -146,5 +147,139 @@ describe('fieldValueType', () => {
       schema: () => ({ kind: 'foreignKey', collection: 'Users' }),
     });
     strictEqual(emit(reference).type, 'string | null');
+  });
+});
+
+describe('fieldJSONType', () => {
+  const mirror = (path: string, exportName: string) =>
+    path === 'ohnejs/utils' && ['Link', 'RichText'].includes(exportName)
+      ? '@ohnejs/client'
+      : undefined;
+
+  const json = <T extends Record<string, AnyOptionDef>>(
+    fieldType: FieldType<T>,
+    options: Record<string, unknown> = {},
+  ) => {
+    const imports = createTypeImports('/site');
+    return { ...fieldJSONType({ fieldType, name: 'field', options, imports, mirror }), imports };
+  };
+
+  it('runs `emitJSONType` before every other tier', () => {
+    const instant = defineField({
+      columnType: 'text',
+      deserialize: (value) => new Date(value as string),
+      emitType: () => 'Date | string',
+      emitJSONType: () => 'string',
+    });
+    const { base, reason } = json(instant);
+    strictEqual(base, 'string');
+    strictEqual(reason, undefined);
+  });
+
+  it('joins a multiline `emitJSONType`', () => {
+    const point = defineField({
+      columnType: 'json',
+      emitJSONType: () => ['{', '  x: number;', '}'],
+    });
+    strictEqual(json(point).base, '{\n  x: number;\n}');
+  });
+
+  it('mirrors an `ohnejs/utils` import in `emitJSONType`', () => {
+    const link = defineField({
+      columnType: 'json',
+      emitJSONType: (ctx) => `${ctx.importType('ohnejs/utils', 'Link')}<never>`,
+    });
+    const { base, imports } = json(link);
+    strictEqual(base, 'Link<never>');
+    deepStrictEqual(imports.statements(), ["import type { Link } from '@ohnejs/client';"]);
+  });
+
+  it('passes another package through in `emitJSONType`', () => {
+    const money = defineField({
+      columnType: 'json',
+      emitJSONType: (ctx) => ctx.importType('dinero.js', 'Dinero'),
+    });
+    deepStrictEqual(json(money).imports.statements(), ["import type { Dinero } from 'dinero.js';"]);
+  });
+
+  it('throws on a relative or an unmirrored `ohnejs` import in `emitJSONType`', () => {
+    for (const path of ['./_geo.ts', 'ohnejs/dashboard', 'ohnejs']) {
+      const geo = defineField({
+        columnType: 'json',
+        emitJSONType: (ctx) => ctx.importType(path, 'LatLng'),
+      });
+      throws(() => json(geo), /Unresolvable type import in `emitJSONType`/);
+    }
+  });
+
+  it('degrades a `deserialize` type without `emitJSONType` to `unknown`', () => {
+    const instant = defineField({
+      columnType: 'text',
+      deserialize: (value) => new Date(value as string),
+      emitType: () => 'Date',
+    });
+    const { base, reason } = json(instant);
+    strictEqual(base, 'unknown');
+    ok(reason?.includes('`deserialize`'));
+  });
+
+  it('falls back from the column without `emitType`', () => {
+    strictEqual(json(defineField({ columnType: 'integer' })).base, 'number');
+    const raw = json(defineField({ columnType: 'json' }));
+    strictEqual(raw.base, 'unknown');
+    strictEqual(raw.reason, undefined);
+  });
+
+  it('reuses an inline `emitType`', () => {
+    const labels = defineField({ columnType: 'json', emitType: () => 'string[]' });
+    strictEqual(json(labels).base, 'string[]');
+  });
+
+  it('reuses a mirrored `emitType` with one import', () => {
+    const body = defineField({
+      columnType: 'json',
+      emitType: (ctx) => `${ctx.importType('ohnejs/utils', 'RichText')}<'Pages'>`,
+    });
+    const { base, imports } = json(body);
+    strictEqual(base, "RichText<'Pages'>");
+    deepStrictEqual(imports.statements(), ["import type { RichText } from '@ohnejs/client';"]);
+  });
+
+  it('degrades a relative, generated, or foreign `emitType` import, naming it', () => {
+    const cases = [
+      {
+        emitType: (ctx: EmitTypeContext<{}>) => ctx.importType('./_geo.ts', 'LatLng'),
+        named: './_geo.ts',
+      },
+      { emitType: (ctx: EmitTypeContext<{}>) => ctx.importType('zod', 'infer'), named: 'zod' },
+      {
+        emitType: (ctx: EmitTypeContext<{}>) =>
+          ctx.importGenerated('roles.ts', 'GeneratedRoleName'),
+        named: 'roles.ts',
+      },
+    ];
+    for (const { emitType, named } of cases) {
+      const { base, reason } = json(defineField({ columnType: 'json', emitType }));
+      strictEqual(base, 'unknown');
+      ok(reason?.includes(`\`${named}\``));
+    }
+  });
+
+  it('records no import when `emitType` aborts after a mirrored one', () => {
+    const mixed = defineField({
+      columnType: 'json',
+      emitType: (ctx) =>
+        `{ body: ${ctx.importType('ohnejs/utils', 'RichText')}; at: ${ctx.importType('./_geo.ts', 'LatLng')} }`,
+    });
+    const { base, imports } = json(mixed);
+    strictEqual(base, 'unknown');
+    deepStrictEqual(imports.statements(), []);
+  });
+
+  it('folds `nullable`, `forceNullable`, and a translatable column', () => {
+    strictEqual(json(defineField({ columnType: 'text' })).nullable, false);
+    strictEqual(json(defineField({ columnType: 'text' }), { nullable: true }).nullable, true);
+    strictEqual(json(defineField({ columnType: 'text', forceNullable: true })).nullable, true);
+    strictEqual(json(defineField({ columnType: 'text' }), { translatable: true }).nullable, true);
   });
 });

@@ -20,6 +20,19 @@ export * from './codegen/generate-roles.ts';
 export * from './codegen/generate-routes.ts';
 export * from './codegen/generate-skills.ts';
 export * from './codegen/prune-codegen.ts';
+export {
+  collectFieldTypes,
+  type EmittableFieldType,
+  type MessageResolver,
+  readShapeType,
+  type ReadShapeOptions,
+  type ShapeBlocksArgs,
+  type ShapeContext,
+  type ShapeMember,
+  type ShapeOwner,
+  type ShapeRelationArgs,
+  type ShapeScalarArgs,
+} from './codegen/read-shape.ts';
 export * from './codegen/scan-layer-augmentations.ts';
 export * from './commands/collect-commands.ts';
 export * from './commands/import-command.ts';
@@ -90,6 +103,14 @@ export * from './fields/relation-options.ts';
 export * from './fields/scan-layer-fields.ts';
 export * from './fields/storage-hint.ts';
 export * from './fields/use-fields.ts';
+export {
+  type FieldBaseType,
+  fieldJSONType,
+  type FieldJSONType,
+  type FieldJSONTypeArgs,
+  type FieldValueTypeArgs,
+  type TypeMirror,
+} from './fields/value-type.ts';
 export * from './flows/collect-flows.ts';
 export * from './flows/define-flow.ts';
 export * from './flows/known-ai-models.ts';
