@@ -1,4 +1,6 @@
+import { isUndefined } from '../is/is-undefined.ts';
 import { getOrSet } from '../map/get-or-set.ts';
+import { intlData, type IntlRelativeUnit } from './intl-data.ts';
 import { intlLanguage } from './intl-language.ts';
 
 const SECOND = 1000;
@@ -13,12 +15,7 @@ const MONTH = YEAR / 12;
  * A span measured in `size` whose rounded count stays within `limit` renders in `unit`.
  * It renders as `fixed` when set, else as the count itself.
  */
-type Rung = readonly [
-  size: number,
-  limit: number,
-  unit: Intl.RelativeTimeFormatUnit,
-  fixed?: number,
-];
+type Rung = readonly [size: number, limit: number, unit: IntlRelativeUnit, fixed?: number];
 
 const LADDER: readonly Rung[] = [
   [SECOND, 44, 'second', 0],
@@ -51,6 +48,7 @@ const formats = new Map<string, Intl.RelativeTimeFormat>();
  *
  * Words come from `Intl.RelativeTimeFormat` with `numeric: 'auto'`, so one day back reads "yesterday".
  * One formatter is kept per language.
+ * A language the engine lacks words the span from its registered `IntlData`; see `registerIntlData`.
  *
  * @example
  * ```ts
@@ -62,14 +60,30 @@ const formats = new Map<string, Intl.RelativeTimeFormat>();
  * ```
  */
 export function formatRelativeTime(timestamp: number, now: number, language: string): string {
-  const format = formatFor(language);
   const span = Math.abs(timestamp - now);
   const sign = timestamp < now ? -1 : 1;
   for (const [size, limit, unit, fixed] of LADDER) {
     const count = Math.round(span / size);
-    if (count <= limit) return format.format(sign * (fixed ?? count), unit);
+    if (count <= limit) return word(sign * (fixed ?? count), unit, language);
   }
-  return format.format(sign * Math.round(span / YEAR), 'year');
+  return word(sign * Math.round(span / YEAR), 'year', language);
+}
+
+/**
+ * Words a signed count of `unit`, from the engine or, for a language it lacks, the registered data.
+ */
+function word(value: number, unit: IntlRelativeUnit, language: string): string {
+  const words = isUndefined(intlLanguage(language))
+    ? intlData(language)?.relative[unit]
+    : undefined;
+  if (isUndefined(words)) return formatFor(language).format(value, unit);
+  const phrase = words.auto[String(value)];
+  if (!isUndefined(phrase)) return phrase;
+  const count = Math.abs(value);
+  const templates = value < 0 || Object.is(value, -0) ? words.past : words.future;
+  const template =
+    templates[new Intl.PluralRules(language).select(count)] ?? templates.other ?? '#';
+  return template.replace('#', String(count));
 }
 
 /**

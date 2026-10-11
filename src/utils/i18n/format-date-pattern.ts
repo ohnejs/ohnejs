@@ -1,5 +1,7 @@
 import { isString } from '../is/is-string.ts';
+import { isUndefined } from '../is/is-undefined.ts';
 import { getOrSet } from '../map/get-or-set.ts';
+import { type IntlData, intlData, type IntlPreset } from './intl-data.ts';
 import { intlLanguage } from './intl-language.ts';
 
 /**
@@ -33,6 +35,7 @@ interface WallClock {
 interface Context extends DatePatternOptions {
   date: Date;
   wall: WallClock;
+  inPreset?: boolean;
 }
 
 type Renderer = (context: Context) => string;
@@ -135,17 +138,44 @@ function formatterFor(key: IntlKey, { language, timeZone }: Context): Intl.DateT
 
 /**
  * One named part of the instant, like the month name, in the context's language.
+ * A language the engine lacks reads it from its registered `IntlData` when there is one.
  */
 function partOf(key: IntlKey, type: Intl.DateTimeFormatPartTypes, context: Context): string {
+  const data = fallbackData(context.language);
+  const named = isUndefined(data) ? undefined : namedPart(key, context, data);
+  if (!isUndefined(named)) return named;
   const parts = formatterFor(key, context).formatToParts(context.date);
   return parts.find((part) => part.type === type)?.value ?? '';
 }
 
 /**
- * A preset like `LL`, rendered whole in the language's own layout.
+ * A name from registered `IntlData`; inside a preset a month takes the form a full date uses.
  */
-function preset(key: IntlKey, context: Context): string {
-  return formatterFor(key, context).format(context.date);
+function namedPart(key: IntlKey, { wall, inPreset }: Context, data: IntlData): string | undefined {
+  const month = wall.month - 1;
+  if (key === 'MMM') return (inPreset ? data.months.formatShort : data.months.short)[month];
+  if (key === 'MMMM') return (inPreset ? data.months.formatLong : data.months.long)[month];
+  if (key === 'ddd') return data.weekdays.short[wall.weekday];
+  if (key === 'dddd') return data.weekdays.long[wall.weekday];
+  if (key === 'A') return data.dayPeriods[wall.hour < 12 ? 0 : 1];
+  return undefined;
+}
+
+/**
+ * A preset like `LL`, rendered whole in the language's own layout.
+ * A language the engine lacks renders the token pattern its registered `IntlData` carries.
+ */
+function preset(key: IntlKey & IntlPreset, context: Context): string {
+  const data = fallbackData(context.language);
+  if (isUndefined(data)) return formatterFor(key, context).format(context.date);
+  return render(data.presets[key], { ...context, inPreset: true });
+}
+
+/**
+ * The registered `IntlData` of a language the engine has no data for, `undefined` otherwise.
+ */
+function fallbackData(language: string): IntlData | undefined {
+  return isUndefined(intlLanguage(language)) ? intlData(language) : undefined;
 }
 
 /**
@@ -264,6 +294,7 @@ function tokenize(pattern: string): Segment[] {
  * Date: `YYYY` `YY` `M` `MM` `MMM` `MMMM` `D` `DD` `Do` `d` `dd` `ddd` `dddd` `Q` `w` `ww` `wo` `W` `WW`.
  * Time: `H` `HH` `h` `hh` `k` `kk` `m` `mm` `s` `ss` `SSS` `A` `a` `Z` `ZZ` `z` `zzz`.
  * Presets `L` `l` `LL` `ll` `LT` `LTS` render the language's own date or time layout.
+ * A language the engine lacks renders from its registered `IntlData`; see `registerIntlData`.
  * `W` is the ISO week; `w` starts the week on the language's first day.
  * An unknown `timeZone` throws a `RangeError`, as `Intl.DateTimeFormat` does.
  *
@@ -284,7 +315,13 @@ export function formatDatePattern(
   options: DatePatternOptions,
 ): string {
   const date = new Date(timestamp);
-  const context: Context = { ...options, date, wall: readWall(date, options.timeZone) };
+  return render(pattern, { ...options, date, wall: readWall(date, options.timeZone) });
+}
+
+/**
+ * Renders a token pattern in `context`, tokenizing it once.
+ */
+function render(pattern: string, context: Context): string {
   return getOrSet(patterns, pattern, () => tokenize(pattern))
     .map((segment) => (isString(segment) ? segment : segment(context)))
     .join('');

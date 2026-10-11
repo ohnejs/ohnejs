@@ -88,6 +88,7 @@ export * from './i18n/format-locale-code.ts';
 export * from './i18n/format-message-ast.ts';
 export * from './i18n/format-message.ts';
 export * from './i18n/format-relative-time.ts';
+export * from './i18n/intl-data.ts';
 export * from './i18n/intl-language.ts';
 export * from './i18n/is-message.ts';
 export * from './i18n/language-fallbacks.ts';

@@ -19,8 +19,10 @@ import { isDate } from '../is/is-date.ts';
 import { isNull } from '../is/is-null.ts';
 import { isNullish } from '../is/is-nullish.ts';
 import { isNumber } from '../is/is-number.ts';
+import { isUndefined } from '../is/is-undefined.ts';
 import { hasKey } from '../object/has-key.ts';
 import { dateOptionsFromSkeleton } from './date-options-from-skeleton.ts';
+import { intlData } from './intl-data.ts';
 import { intlLanguage } from './intl-language.ts';
 import { MessageFormatError } from './message-errors.ts';
 import { numberOptionsFromSkeleton } from './number-options-from-skeleton.ts';
@@ -229,7 +231,7 @@ function renderSelect(node: MessageSelectNode, ctx: Context): string {
 function renderPound(ctx: Context): string {
   if (!ctx.pound) return '#';
   const adjusted = ctx.pound.value - ctx.pound.offset;
-  return new Intl.NumberFormat(intlLanguage(ctx.language)).format(adjusted);
+  return numberFormat(null, ctx.language).format(adjusted);
 }
 
 /**
@@ -306,20 +308,37 @@ function notify(ctx: Context, message: string): void {
 
 /**
  * Builds the number formatter for no style, `integer`, `percent`, or a `::` skeleton; other styles throw.
+ * A language the engine lacks formats in English, its separators swapped for the registered `IntlData`'s.
  */
-function numberFormat(style: string | null, language: string): Intl.NumberFormat {
+function numberFormat(style: string | null, language: string): Pick<Intl.NumberFormat, 'format'> {
   const tag = intlLanguage(language);
-  if (isNull(style)) return new Intl.NumberFormat(tag);
-  if (style === 'integer') return new Intl.NumberFormat(tag, { maximumFractionDigits: 0 });
-  if (style === 'percent') return new Intl.NumberFormat(tag, { style: 'percent' });
+  const separators = isUndefined(tag) ? intlData(language)?.number : undefined;
+  const format = new Intl.NumberFormat(isUndefined(separators) ? tag : 'en', numberOptions(style));
+  if (isUndefined(separators)) return format;
+  return {
+    format: (value: number | bigint) =>
+      format
+        .formatToParts(value)
+        .map(({ type, value: text }) =>
+          type === 'group' ? separators.group : type === 'decimal' ? separators.decimal : text,
+        )
+        .join(''),
+  };
+}
+
+/**
+ * The `Intl.NumberFormat` options for no style, `integer`, `percent`, or a `::` skeleton; others throw.
+ */
+function numberOptions(style: string | null): Intl.NumberFormatOptions {
+  if (isNull(style)) return {};
+  if (style === 'integer') return { maximumFractionDigits: 0 };
+  if (style === 'percent') return { style: 'percent' };
   if (style === 'currency') {
     throw new MessageFormatError(
       'bare `currency` style requires a code; use `::currency/XXX` skeleton instead',
     );
   }
-  if (style.startsWith('::')) {
-    return new Intl.NumberFormat(tag, numberOptionsFromSkeleton(style.slice(2)));
-  }
+  if (style.startsWith('::')) return numberOptionsFromSkeleton(style.slice(2));
   throw new MessageFormatError(`unknown number style \`${style}\``);
 }
 
