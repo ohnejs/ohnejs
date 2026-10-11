@@ -14,6 +14,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import type { OhneError } from '../../../src/ohne/index.ts';
+
 import { BANNER } from '../../../src/ohne/codegen/codegen-dir.ts';
 import {
   generateLayerCodegen,
@@ -21,7 +23,9 @@ import {
   useCollections,
   useLayers,
   useRoles,
+  writeCodegenPath,
 } from '../../../src/ohne/index.ts';
+import { relativePath } from '../../../src/utils/index.ts';
 
 const ohne = new URL('../../../src/ohne/index.ts', import.meta.url).href;
 const base = new URL('../../../src/base/fields/', import.meta.url).href;
@@ -195,10 +199,11 @@ describe('generateLayerCodegen', { skip: process.platform === 'win32' }, () => {
     writeLayer(app, 'inside', [pathEntry("'.ohne/mine.ts'", "''")]);
     await loadLayers(app);
 
-    await rejects(
-      generateLayerCodegen(app, { paths: true }),
-      /Codegen path `.ohne\/mine.ts` is inside the codegen directory/,
-    );
+    await rejects(generateLayerCodegen(app, { paths: true }), (error: OhneError) => {
+      strictEqual(error.title, 'Codegen path `.ohne/mine.ts` is inside the codegen directory');
+      deepStrictEqual(error.body?.at(-1), 'Pick a path outside `.ohne/`.');
+      return true;
+    });
   });
 
   it('fills the registries from the stack while code runs, then restores them', async () => {
@@ -246,7 +251,102 @@ describe('generateLayerCodegen', { skip: process.platform === 'win32' }, () => {
     );
   });
 
+  it('throws a block naming the file, the layer, and the cause when a write fails', async () => {
+    const app = join(root, 'unwritable');
+    writeLayer(app, 'unwritable', [pathEntry("'taken/types.ts'", "''")]);
+    writeFileSync(join(app, 'taken'), '');
+    await loadLayers(app);
+
+    await rejects(generateLayerCodegen(app, { paths: true }), (error: OhneError) => {
+      strictEqual(
+        error.title,
+        `Cannot write codegen file \`${relativePath(process.cwd(), join(app, 'taken', 'types.ts'))}\``,
+      );
+      deepStrictEqual(error.body, [
+        '`unwritable` generates it, but a file sits where one of its parent directories belongs.',
+        'Move that file aside, or pick another path.',
+      ]);
+      strictEqual(error.path, join(app, 'taken', 'types.ts'));
+      return true;
+    });
+  });
+
+  it('names a directory in the way of a path entry', async () => {
+    const app = join(root, 'directory');
+    writeLayer(app, 'directory', [pathEntry("'out'", "''")]);
+    mkdirSync(join(app, 'out'));
+    await loadLayers(app);
+
+    await rejects(generateLayerCodegen(app, { paths: true }), (error: OhneError) => {
+      deepStrictEqual(error.body, [
+        '`directory` generates it, but a directory sits at that path.',
+        'Point the path at a file.',
+      ]);
+      return true;
+    });
+  });
+
+  it('throws when a path entry returns an empty path', async () => {
+    const app = join(root, 'empty');
+    writeLayer(app, 'empty', [pathEntry("''", "''")]);
+    await loadLayers(app);
+
+    await rejects(generateLayerCodegen(app, { paths: true }), /Codegen path is empty/);
+  });
+
   it('returns an empty list when no package.json is found', async () => {
     deepStrictEqual(await generateLayerCodegen(join(root, 'nowhere')), []);
+  });
+});
+
+describe('writeCodegenPath', { skip: process.platform === 'win32' }, () => {
+  let app: string;
+
+  before(() => {
+    app = realpathSync(mkdtempSync(join(tmpdir(), 'ohne-write-codegen-path-')));
+    writeFileSync(join(app, 'package.json'), '{}');
+  });
+
+  after(() => {
+    rmSync(app, { recursive: true, force: true });
+  });
+
+  it('writes against the app root and reports whether the file changed', async () => {
+    const from = join(app, 'nested');
+    mkdirSync(from);
+    const path = join(app, 'web', 'types.ts');
+    const options = { layer: 'cms', from };
+    deepStrictEqual(await writeCodegenPath('web/types.ts', 'x', options), { path, written: true });
+    deepStrictEqual(await writeCodegenPath('web/types.ts', 'x', options), { path, written: false });
+    strictEqual(readFileSync(path, 'utf8'), 'x');
+  });
+
+  it('refuses a path inside the codegen directory, naming the layer', async () => {
+    await rejects(
+      writeCodegenPath('.ohne/x.ts', '', { layer: 'cms', from: app }),
+      (error: OhneError) => {
+        strictEqual(error.path, join(app, '.ohne', 'x.ts'));
+        strictEqual(error.body?.[0]?.startsWith('`cms` generates it'), true);
+        return true;
+      },
+    );
+  });
+
+  it('refuses an empty path', async () => {
+    await rejects(writeCodegenPath('', '', { layer: 'cms', from: app }), /Codegen path is empty/);
+  });
+
+  it('wraps a failed write in a block', async () => {
+    mkdirSync(join(app, 'dir'));
+    await rejects(
+      writeCodegenPath('dir', '', { layer: 'cms', from: app }),
+      /Cannot write codegen file/,
+    );
+  });
+
+  it('throws when no package.json is found', async () => {
+    const from = mkdtempSync(join(tmpdir(), 'ohne-no-app-'));
+    await rejects(writeCodegenPath('x.ts', '', { layer: 'cms', from }), /No app found/);
+    rmSync(from, { recursive: true, force: true });
   });
 });

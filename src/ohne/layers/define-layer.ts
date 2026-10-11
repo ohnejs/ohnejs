@@ -57,7 +57,7 @@ export interface BucketCodegen {
 export interface PathCodegen {
   /**
    * Returns the file's path, relative to the app root, usually read from config.
-   * `undefined` skips the entry, so an app that sets no path gets no file.
+   * `undefined` skips the entry, so an app that sets no path gets no file; an empty path throws.
    * No two entries in the stack may claim the same path, and none may land in the codegen directory.
    */
   path(): string | undefined;

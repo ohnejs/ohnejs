@@ -1,5 +1,6 @@
 import type { BucketCodegen, LayerCodegen, LayerCodegenContext } from '../layers/define-layer.ts';
 
+import { codeSpan } from '../../utils/ansi/index.ts';
 import { createCodeGenerator } from '../../utils/codegen/index.ts';
 import { writeFileIfChanged } from '../../utils/fs/index.ts';
 import {
@@ -15,6 +16,25 @@ import { ohneError } from '../error/ohne-error.ts';
 import { useLayers } from '../layers/use-layers.ts';
 import { appRoot, BANNER, codegenDir } from './codegen-dir.ts';
 import { withStackRegistries } from './with-stack-registries.ts';
+
+const PARENT_IS_FILE = {
+  cause: 'a file sits where one of its parent directories belongs.',
+  fix: 'Move that file aside, or pick another path.',
+};
+
+const NO_PERMISSION = {
+  cause: 'you have no permission to write there.',
+  fix: 'Make its directory writable, or pick another path.',
+};
+
+const WRITE_FAILURES: Record<string, { cause: string; fix: string }> = {
+  EISDIR: { cause: 'a directory sits at that path.', fix: 'Point the path at a file.' },
+  EACCES: NO_PERMISSION,
+  EPERM: NO_PERMISSION,
+  EROFS: { cause: 'its file system is read-only.', fix: 'Pick a path on a writable disk.' },
+  EEXIST: PARENT_IS_FILE,
+  ENOTDIR: PARENT_IS_FILE,
+};
 
 const PLAIN_TS_NAME = /^[\w-]+(?:\.[\w-]+)*\.ts$/;
 
@@ -69,8 +89,9 @@ export interface GenerateLayerCodegenOptions {
  *
  * A path entry lands at its `path`, resolved against the app root, as `code` returns it.
  * Path entries are written only when `options.paths` is on.
- * An entry whose `path` returns `undefined` is skipped.
+ * An entry whose `path` returns `undefined` is skipped; an empty path throws.
  * A path two entries claim throws, and so does one inside the codegen directory, which never prunes it.
+ * A failed write throws a block naming the file, the layer, and the cause.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Each file is rewritten only when its contents change.
@@ -102,19 +123,9 @@ export async function generateLayerCodegen(
       if (!paths) continue;
       const out = entry.path();
       if (isUndefined(out)) continue;
-      const path = resolvePath(out, root);
-      if (isPathInside(path, dir)) {
-        throw ohneError({
-          title: `Codegen path \`${out}\` is inside the codegen directory`,
-          body: [
-            `\`${name}\` declares it, but a path file carries no banner, so a stale one would never be pruned there.`,
-            'Declare a `bucket` and `file` for it, or pick a path outside the directory.',
-          ],
-          path,
-        });
-      }
+      const path = resolveCodegenPath(out, name, root, dir);
       claim(owners, path, name, `\`${relativePath(process.cwd(), path)}\``, out);
-      jobs.push({ path, write: (code) => writeFileIfChanged(path, code), entry });
+      jobs.push({ path, write: (code) => writeCodegenFile(path, code, name), entry });
     }
   }
   if (jobs.length === 0) return [];
@@ -130,6 +141,117 @@ export async function generateLayerCodegen(
       ),
     { fresh },
   );
+}
+
+/**
+ * Options for `writeCodegenPath`.
+ */
+export interface WriteCodegenPathOptions {
+  /**
+   * The layer that generates the file, named in every error.
+   */
+  layer: string;
+
+  /**
+   * Where to look up the app, whose root the path resolves against.
+   * Omitted means the stack's closest layer, the app itself, or `process.cwd()` before a stack loads.
+   */
+  from?: string;
+}
+
+/**
+ * What `writeCodegenPath` did.
+ */
+export interface WriteCodegenPathResult {
+  /**
+   * The absolute path of the file.
+   */
+  path: string;
+
+  /**
+   * Whether the file changed; `false` when it already held `code`.
+   */
+  written: boolean;
+}
+
+/**
+ * Writes `code` to `out` in the project, exactly as a layer codegen path entry does.
+ * Reach for it in a command that writes such a file on demand, so it fails the same way the entry does.
+ *
+ * `out` resolves against the app root, the nearest `package.json` above `options.from`.
+ * So a command run with `--cwd` writes into that app, not the shell's directory.
+ * An empty path throws, and so does one inside the codegen directory, which never prunes it.
+ * A failed write throws a block naming the file, `options.layer`, and the cause.
+ * The file is rewritten only when its contents change.
+ * Throws when no `package.json` is found.
+ */
+export async function writeCodegenPath(
+  out: string,
+  code: string,
+  options: WriteCodegenPathOptions,
+): Promise<WriteCodegenPathResult> {
+  const { layer, from = useLayers().layers().at(-1)?.path ?? process.cwd() } = options;
+  const root = await appRoot(from);
+  const dir = await codegenDir(from);
+  if (isNull(root) || isNull(dir)) {
+    throw ohneError({
+      title: `No app found for codegen path ${codeSpan(out)}`,
+      body: [
+        'A codegen path resolves against your app root, the directory of its `package.json`.',
+        'Run the command inside your app.',
+      ],
+    });
+  }
+  const path = resolveCodegenPath(out, layer, root, dir);
+  return { path, written: await writeCodegenFile(path, code, layer) };
+}
+
+/**
+ * Resolves a path entry's `out` against `root`, throwing when it is empty or inside the codegen `dir`.
+ */
+function resolveCodegenPath(out: string, layer: string, root: string, dir: string): string {
+  if (out === '') {
+    throw ohneError({
+      title: 'Codegen path is empty',
+      body: [
+        `\`${layer}\` generates a file, but its path is empty, which names your app directory.`,
+        'Set it to a file path, or leave it unset to skip the file.',
+      ],
+    });
+  }
+  const path = resolvePath(out, root);
+  if (isPathInside(path, dir)) {
+    throw ohneError({
+      title: `Codegen path ${codeSpan(out)} is inside the codegen directory`,
+      body: [
+        `\`${layer}\` generates it, but a file there carries no banner, so a stale one would never be pruned.`,
+        `Pick a path outside \`${relativePath(root, dir)}/\`.`,
+      ],
+      path,
+    });
+  }
+  return path;
+}
+
+/**
+ * Writes `code` to `path` when it changed, turning a filesystem failure into a block naming `layer`.
+ */
+async function writeCodegenFile(path: string, code: string, layer: string): Promise<boolean> {
+  try {
+    return await writeFileIfChanged(path, code);
+  } catch (error) {
+    const errno = (error as NodeJS.ErrnoException).code;
+    if (isUndefined(errno)) throw error;
+    const { cause, fix } = WRITE_FAILURES[errno] ?? {
+      cause: `the write failed with \`${errno}\`.`,
+      fix: 'Fix the cause, or pick another path.',
+    };
+    throw ohneError({
+      title: `Cannot write codegen file ${codeSpan(relativePath(process.cwd(), path))}`,
+      body: [`\`${layer}\` generates it, but ${cause}`, fix],
+      path,
+    });
+  }
 }
 
 /**

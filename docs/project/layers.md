@@ -372,7 +372,7 @@ export default defineLayer({
 An app that sets `blog.typesFile: '../web/blog.ts'` gets the file next to its website.
 
 - `path` is relative to the app. When it returns `undefined`, nothing is written, so an app that
-  sets no path gets no file.
+  sets no path gets no file. An empty path is an error.
 - The file holds exactly what `code` returns, with no banner. ohne never deletes it.
 - `ohne prepare` and `ohne dev` write it. Nothing else does, so `ohne serve` writes nothing
   outside `.ohne/`.
@@ -381,3 +381,26 @@ An app that sets `blog.typesFile: '../web/blog.ts'` gets the file next to its we
 
 A failed write is a codegen error like any other. If the folder cannot be written, `ohne prepare`
 fails, and `ohne dev` prints the error and waits for your next change.
+
+To write the same file on demand, say from a [command](./commands.md) your layer ships, call
+`writeCodegenPath`. It resolves the path against your app and fails exactly as the entry does:
+
+```ts
+// commands/blog-types.ts
+import { useCollections, useConfig, usePrinter, writeCodegenPath } from 'ohnejs';
+import { defineCommand } from 'ohnejs/utils/cli';
+import { literalUnion } from 'ohnejs/utils/codegen';
+
+export default defineCommand({
+  meta: {
+    name: 'blog-types',
+    description: 'Write the blog types.',
+  },
+  async run() {
+    const code = `export type Collection = ${literalUnion(useCollections().keys())};\n`;
+    const out = useConfig().blog?.typesFile ?? 'blog.ts';
+    const { written } = await writeCodegenPath(out, code, { layer: 'blog' });
+    usePrinter().success(written ? 'Wrote the blog types' : 'The blog types are current');
+  },
+});
+```
