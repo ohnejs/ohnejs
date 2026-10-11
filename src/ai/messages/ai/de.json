@@ -163,7 +163,6 @@
       "newRecord": "Neuer Datensatz",
       "notYours": "Nicht von dir bearbeitbar",
       "noRows": "Nichts passt",
-      "loading": "Datensätze werden geladen",
       "loadFailed": "Die betroffenen Datensätze konnten nicht geladen werden, daher kann diese Änderung nicht freigegeben werden",
       "approveSelected": "Ausgewählte freigeben",
       "approveAll": "Alle freigeben",

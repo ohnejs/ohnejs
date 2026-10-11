@@ -10,7 +10,6 @@ import {
   loadVerdicts,
   seedLabel,
   table,
-  tableColumn,
   textArea,
   translateMessage,
   when,
@@ -20,6 +19,7 @@ import {
   groupBy,
   isArray,
   isNull,
+  isNullish,
   isPlainObject,
   isString,
   isUndefined,
@@ -139,11 +139,6 @@ css`
     font-weight: 400;
   }
 
-  .o-approval-rows {
-    max-height: 20rem;
-    overflow: auto;
-  }
-
   .o-approval-foreign {
     opacity: 0.5;
   }
@@ -209,9 +204,9 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
       index,
       table: transformTable(proposal, { turn, batch: current.id, index, pinned: current.pinned }),
     }));
-  const rows = ref<ApprovalRow[] | null>(null);
+  const rows = ref<ApprovalRow[] | undefined>(undefined);
   const failed = ref<ReadonlySet<number>>(new Set());
-  const selected = ref<Record<string, boolean>>({});
+  const selected = ref<ReadonlySet<string>>(new Set());
   const note = ref('');
   const armed = ref<Armed>(null);
   void loadRows(writes).then((loaded) => {
@@ -219,14 +214,8 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
     rows.value = loaded.rows;
   });
 
-  const rowOf = (id: number | string): ApprovalRow | undefined =>
-    (rows.value ?? []).find((row) => row.id === id);
   const mine = (): ApprovalRow[] => (rows.value ?? []).filter((row) => row.mine);
-  const chosen = (): ApprovalRow[] => mine().filter((row) => selected.value[row.id] === true);
-  const selectAllState = (): boolean | 'indeterminate' => {
-    const count = chosen().length;
-    return count === 0 ? false : count === mine().length ? true : 'indeterminate';
-  };
+  const chosen = (): ApprovalRow[] => mine().filter((row) => selected.value.has(row.id));
   const mineCount = (): number =>
     transforms.reduce((sum, { table }) => sum + table.mine(), mine().length);
   const chosenCount = (): number =>
@@ -258,41 +247,38 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
       ? t('ai.dashboard.batch.confirm')
       : t(which === 'all' ? 'ai.dashboard.batch.approveAll' : 'ai.dashboard.batch.approveSelected');
 
-  const columns = {
-    record: tableColumn<string>({ label: () => t('ai.dashboard.batch.record'), width: '30%' }),
-    action: tableColumn<string>({ label: () => t('ai.dashboard.batch.action'), width: '6em' }),
-    changes: tableColumn<Change[]>({
-      label: () => t('ai.dashboard.batch.changes'),
-      minWidth: '8em',
-    }),
-  };
-
-  const grid = table({
-    columns,
-    data: () => rows.value ?? [],
-    selectable: () => true,
-    rowSelectable: (row) => rowOf(row.id)?.mine === true,
-    selected,
-    selectAllState,
-    onSelectAll: (value) => {
-      selected.value = Object.fromEntries(mine().map((row) => [row.id, value]));
+  const foreign = (row: ApprovalRow): string => (row.mine ? '' : ' o-approval-foreign');
+  const grid = table(() => rows.value, {
+    key: (row) => row.id,
+    columns: {
+      record: {
+        label: () => t('ai.dashboard.batch.record'),
+        width: '30%',
+        render: (row) => h('div', { class: `ohne-truncate${foreign(row)}` }, recordName(row, t)),
+      },
+      action: {
+        label: () => t('ai.dashboard.batch.action'),
+        width: '6em',
+        render: (row) =>
+          h('div', { class: foreign(row).trim() }, t(`ai.dashboard.batch.verb.${row.verb}`)),
+      },
+      changes: {
+        label: () => t('ai.dashboard.batch.changes'),
+        minWidth: '8em',
+        render: (row) => {
+          if (!row.mine) return h('div', { class: 'ohne-muted' }, t('ai.dashboard.batch.notYours'));
+          return h(
+            'div',
+            null,
+            row.changes.length === 0 ? dimMark('-') : row.changes.map(changeLine),
+          );
+        },
+      },
     },
-    labels: () => ({ noData: t('ai.dashboard.batch.noRows') }),
-    cell: ({ row, key }) => {
-      const entry = rowOf(row.id);
-      if (isUndefined(entry)) return null;
-      const foreign = entry.mine ? '' : ' o-approval-foreign';
-      if (key === 'record')
-        return h('div', { class: `ohne-truncate${foreign}` }, recordName(entry, t));
-      if (key === 'action')
-        return h('div', { class: foreign }, t(`ai.dashboard.batch.verb.${entry.verb}`));
-      if (!entry.mine) return h('div', { class: 'ohne-muted' }, t('ai.dashboard.batch.notYours'));
-      return h(
-        'div',
-        null,
-        entry.changes.length === 0 ? dimMark('-') : entry.changes.map(changeLine),
-      );
-    },
+    selection: { selected, selectable: (row) => row.mine },
+    empty: () => t('ai.dashboard.batch.noRows'),
+    fixed: true,
+    maxHeight: '20rem',
     size: -1,
   });
 
@@ -318,13 +304,8 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
           }),
         ),
         when(
-          () => !isNull(rows.value),
-          () =>
-            when(
-              () => (rows.value ?? []).length > 0 || failed.value.size === 0,
-              () => h('div', { class: 'o-approval-rows' }, grid.root),
-            ),
-          () => h('div', { class: 'ohne-muted' }, () => t('ai.dashboard.batch.loading')),
+          () => (rows.value ?? []).length > 0 || failed.value.size === 0,
+          () => grid,
         ),
       ],
     ),
@@ -372,7 +353,7 @@ export function proposedChanges(proposal: Proposal): Child {
 function headerLine(
   proposal: Proposal,
   indexes: readonly number[],
-  rows: { value: ApprovalRow[] | null },
+  rows: { value: ApprovalRow[] | undefined },
   failed: () => boolean,
   t: AITranslate,
 ): Child {
@@ -429,10 +410,7 @@ async function loadRows(
     const collection = collectionOfRoute(proposal.route) ?? null;
     const locale = localeOf(proposal);
     const base = { proposal: index, verb, collection, changes: [] as Change[] };
-    if (
-      collection === null ||
-      (isUndefined(proposal.where) && isUndefined(proposal.params?.uuid))
-    ) {
+    if (isNull(collection) || (isUndefined(proposal.where) && isUndefined(proposal.params?.uuid))) {
       rows.push({
         ...base,
         id: `${index}`,
@@ -502,7 +480,7 @@ async function fillChanges(
     }
   }
   for (const row of rows) {
-    const record = row.UUID === null ? undefined : values.get(row.UUID);
+    const record = isNull(row.UUID) ? undefined : values.get(row.UUID);
     row.changes = keys.map((key) => ({
       label: fieldLabel(collection, key),
       current: record?.[key],
@@ -517,7 +495,7 @@ async function fillChanges(
  */
 function proposed(proposal: Proposal, collection: DashboardCollection | null): Change[] {
   return Object.entries(proposal.body ?? {}).map(([key, value]) => ({
-    label: collection === null ? key : fieldLabel(collection, key),
+    label: isNull(collection) ? key : fieldLabel(collection, key),
     current: undefined,
     known: false,
     proposed: value,
@@ -543,8 +521,8 @@ function changeLine(change: Change): HTMLElement {
  * The name a row shows: the record's label, or what a create or an app request is.
  */
 function recordName(row: ApprovalRow, t: AITranslate): Child {
-  if (row.collection === null) return dimMark('-');
-  if (row.UUID === null) return dimMark(t('ai.dashboard.batch.newRecord'));
+  if (isNull(row.collection)) return dimMark('-');
+  if (isNull(row.UUID)) return dimMark(t('ai.dashboard.batch.newRecord'));
   return recordLink(row.collection, row.UUID, { newTab: true });
 }
 
@@ -552,7 +530,7 @@ function recordName(row: ApprovalRow, t: AITranslate): Child {
  * A value as the table shows it: text as is, an empty one as a dash, anything else as JSON.
  */
 function formatValue(value: unknown): Child {
-  if (isUndefined(value) || value === null || value === '') return dimMark('-');
+  if (isNullish(value) || value === '') return dimMark('-');
   if (isString(value)) return value;
   return isPlainObject(value) || isArray(value) ? JSON.stringify(value) : String(value);
 }

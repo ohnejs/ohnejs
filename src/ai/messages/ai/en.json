@@ -163,7 +163,6 @@
       "newRecord": "New record",
       "notYours": "Not yours to edit",
       "noRows": "Nothing matches",
-      "loading": "Loading the records",
       "loadFailed": "Could not load the records this change reaches, so it cannot be approved",
       "approveSelected": "Approve selected",
       "approveAll": "Approve all",

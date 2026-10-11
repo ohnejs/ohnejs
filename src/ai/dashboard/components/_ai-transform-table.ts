@@ -13,7 +13,6 @@ import {
   seedLabel,
   select,
   table,
-  tableColumn,
   textArea,
   translateMessage,
   when,
@@ -132,7 +131,7 @@ type Standing = 'streaming' | 'done' | { failed: string };
  */
 interface TransformState {
   rows: Ref<TransformRow[]>;
-  selected: Ref<Record<string, boolean>>;
+  selected: Ref<ReadonlySet<string>>;
   skipped: Ref<Record<string, number>>;
   matched: Ref<number>;
   reached: Ref<number>;
@@ -207,11 +206,6 @@ css`
     min-width: 0;
   }
 
-  .o-transform-rows {
-    max-height: 24rem;
-    overflow: auto;
-  }
-
   .o-transform-cell {
     display: flex;
     flex-direction: column;
@@ -256,48 +250,38 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
     );
   };
   const mine = (): TransformRow[] => rows.value.filter((row) => !isEmpty(changed(row)));
-  const chosen = (): TransformRow[] => mine().filter((row) => selected.value[row.id] === true);
-  const selectAllState = (): boolean | 'indeterminate' => {
-    const count = chosen().length;
-    return count === 0 ? false : count === mine().length ? true : 'indeterminate';
-  };
+  const chosen = (): TransformRow[] => mine().filter((row) => selected.value.has(row.id));
 
-  const columns = {
-    record: tableColumn<string>({ label: () => t('ai.dashboard.batch.record'), width: '10rem' }),
-    ...Object.fromEntries(
-      fields.map((name) => [
-        name,
-        tableColumn<string>({ label: () => fieldLabel(collection, name) }),
-      ]),
-    ),
-  };
-  const grid = table({
-    columns,
-    data: () => rows.value,
-    selectable: () => true,
-    rowSelectable: (row) => !isEmpty(changed(rowOf(row.id) as TransformRow)),
-    selected,
-    selectAllState,
-    onSelectAll: (value) => {
-      selected.value = Object.fromEntries(mine().map((row) => [row.id, value]));
+  const grid = table(() => rows.value, {
+    key: (row) => row.id,
+    columns: {
+      record: {
+        label: () => t('ai.dashboard.batch.record'),
+        width: '10rem',
+        render: (row) => recordCell(row, collection, changed, t),
+      },
+      ...Object.fromEntries(
+        fields.map((name) => [
+          name,
+          {
+            label: () => fieldLabel(collection, name),
+            render: (row: TransformRow) =>
+              h(
+                'div',
+                { class: 'o-transform-cell' },
+                h('div', { class: 'o-transform-current' }, formatValue(row.source[name])),
+                textArea(row.edits[name], { size: -1, rows: 1 }),
+              ),
+          },
+        ]),
+      ),
     },
-    labels: () => ({ noData: t('ai.dashboard.transform.nothing') }),
-    cell: ({ row, key }) => {
-      const entry = rowOf(row.id);
-      if (isUndefined(entry)) return null;
-      if (key === 'record') return recordCell(entry, collection, changed, t);
-      const name = String(key);
-      return h(
-        'div',
-        { class: 'o-transform-cell' },
-        h('div', { class: 'o-transform-current' }, formatValue(entry.source[name])),
-        textArea(entry.edits[name], { size: -1, rows: 1 }),
-      );
-    },
+    selection: { selected, selectable: (row) => !isEmpty(changed(row)) },
+    empty: () => t('ai.dashboard.transform.nothing'),
+    fixed: true,
+    maxHeight: '24rem',
     size: -1,
   });
-  const rowOf = (id: number | string): TransformRow | undefined =>
-    rows.value.find((row) => row.id === id);
 
   const header = (): string => {
     const count = reached.value;
@@ -324,7 +308,7 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
     h('div', { class: 'o-transform-line' }, () => standingLine(state, t)),
     when(
       () => rows.value.length > 0,
-      () => h('div', { class: 'o-transform-rows' }, grid.root),
+      () => grid,
     ),
     when(
       () => Object.keys(skipped.value).length > 0,
@@ -389,7 +373,7 @@ function stateOf(
   if (isUndefined(state)) {
     state = {
       rows: ref([]),
-      selected: ref({}),
+      selected: ref(new Set()),
       skipped: ref({}),
       matched: ref(0),
       reached: ref(0),
@@ -449,7 +433,7 @@ async function run(
   const controller = new AbortController();
   state.controller = controller;
   rows.value = [];
-  selected.value = {};
+  selected.value = new Set();
   skipped.value = {};
   matched.value = 0;
   reached.value = 0;
@@ -515,7 +499,7 @@ function apply(
       });
       for (const row of added) {
         if (!isNull(collection)) seedFrom(row, collection, state.locale);
-        if (differs(row)) state.selected.value = { ...state.selected.value, [row.id]: true };
+        if (differs(row)) state.selected.value = new Set(state.selected.value).add(row.id);
       }
       state.rows.value = [...state.rows.value, ...added];
       return;
@@ -627,7 +611,7 @@ function standingLine(state: TransformState, t: AITranslate): Child {
   const text =
     reason === 'noModel' ? t('ai.dashboard.transform.noModel') : t(`ai.dashboard.reason.${reason}`);
   return alert(text, {
-    variant: 'destructive',
+    tone: 'destructive',
     title: t('ai.dashboard.transform.failed'),
     size: -1,
   });

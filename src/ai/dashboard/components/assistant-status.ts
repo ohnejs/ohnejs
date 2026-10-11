@@ -1,6 +1,6 @@
 import { openPalette, paletteView } from 'app/components/palette-state.ts';
-import { attachTooltip, bubble, button, type Child, icon, when } from 'ohnejs/dashboard';
-import { effect, isNull, onCleanup } from 'ohnejs/utils';
+import { bubble, button, type Child, when } from 'ohnejs/dashboard';
+import { effect, isNull } from 'ohnejs/utils';
 
 import { useAIT } from './_ai-messages.ts';
 import { currentTurn, sending } from './turn-store.ts';
@@ -15,7 +15,16 @@ export function assistantStatus(): Child {
   return when(busy, () => {
     const t = useAIT();
     const waiting = (): boolean => currentTurn()?.status === 'waiting';
-    const trigger = button(icon('sparkles'), {
+    const label = (): string => {
+      const progress = sending.value;
+      if (!isNull(progress)) {
+        return t('ai.dashboard.sending', { sent: progress.sent, total: progress.total });
+      }
+      return t(waiting() ? 'ai.dashboard.approval' : 'ai.dashboard.working');
+    };
+    const trigger = button(label, {
+      icon: 'sparkles',
+      iconOnly: true,
       variant: 'outline',
       bubble: when(
         () => !isNull(sending.value),
@@ -26,19 +35,10 @@ export function assistantStatus(): Child {
         paletteView.value = 'turn';
       },
     });
-    const label = (): string => {
-      const progress = sending.value;
-      if (!isNull(progress)) {
-        return t('ai.dashboard.sending', { sent: progress.sent, total: progress.total });
-      }
-      return t(waiting() ? 'ai.dashboard.approval' : 'ai.dashboard.working');
-    };
     effect(() => {
-      trigger.setAttribute('aria-label', label());
       trigger.classList.toggle('ohne-button-primary', waiting());
       trigger.classList.toggle('ohne-button-outline', !waiting());
     });
-    onCleanup(attachTooltip(trigger, label));
     return trigger;
   });
 }
