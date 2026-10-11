@@ -413,6 +413,7 @@ describe('dev', () => {
       writeFileSync(posts, "export default { fields: { title: { type: 'text', options: {} } } }\n");
 
       servers.push(await dev(app, { entry: BIN, dashboard: false }));
+      await waitFor(async () => (await get(port, '/health')) === 200);
       const fields = join(app, 'fields.txt');
       strictEqual(readFileSync(fields, 'utf8'), 'title');
 
