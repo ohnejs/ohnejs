@@ -215,6 +215,7 @@ export * from './reactive/effect-scope.ts';
 export * from './reactive/effect.ts';
 export * from './reactive/next-tick.ts';
 export * from './reactive/ref.ts';
+export * from './reactive/to-value.ts';
 export * from './reactive/untracked.ts';
 export * from './registry/create-layer-registry.ts';
 export * from './registry/create-registry.ts';
