@@ -12,9 +12,11 @@ import { registerDatabase, registerDialect } from '../../../src/ohne/database/us
 import { searchHook } from '../../../src/ohne/fields/field-search.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
+import { fieldBaseType, fieldJSONType } from '../../../src/ohne/fields/value-type.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
+import { createTypeImports } from '../../../src/utils/codegen/index.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -107,5 +109,31 @@ describe('roles search', () => {
   it('gives `null` for a prefix or an unknown name', () => {
     strictEqual(search('edit'), null);
     strictEqual(search('admin'), null);
+  });
+});
+
+describe('roles types', () => {
+  const imports = createTypeImports('/app/.ohne/shared');
+  const args = { fieldType: rolesField, name: 'roles', options: {}, imports };
+
+  it('emits the registered role names inline as JSON', () => {
+    strictEqual(
+      fieldJSONType({ ...args, mirror: () => undefined }).base,
+      "('editor' | 'viewer')[]",
+    );
+  });
+
+  it('emits `string[]` as JSON when no role is registered', () => {
+    const roles = useRoles().all();
+    useRoles().clear();
+    try {
+      strictEqual(fieldJSONType({ ...args, mirror: () => undefined }).base, 'string[]');
+    } finally {
+      for (const [name, role] of Object.entries(roles)) useRoles().register(name, role);
+    }
+  });
+
+  it('keeps the generated role-name union on the server', () => {
+    strictEqual(fieldBaseType({ ...args, fieldDir: '/app/fields' }).base, 'GeneratedRoleName[]');
   });
 });

@@ -1,5 +1,6 @@
 import { defineField, type UncheckedMessage, useMessages } from 'ohnejs';
 import { canonicalizeLanguage } from 'ohnejs/utils';
+import { literalUnion } from 'ohnejs/utils/codegen';
 
 /**
  * The `language` field type: a dashboard language, stored as its canonical BCP-47 tag.
@@ -8,12 +9,17 @@ import { canonicalizeLanguage } from 'ohnejs/utils';
  * The validator accepts a tag only when a message catalog is registered under it.
  * Any other tag rejects with `auth.unknownLanguage`, naming the tag it checked.
  * The generated value type is `GeneratedLanguage`, the union of the catalog languages.
+ * A website reads the registered languages inline, or `string` when none is registered.
  * Search is off until a field sets `search: true`; then a value containing the token matches.
  */
 export default defineField({
   columnType: 'text',
   search: { default: false },
   emitType: (ctx) => ctx.importGenerated('messages.ts', 'GeneratedLanguage'),
+  emitJSONType: () => {
+    const languages = useMessages().keys().sort();
+    return languages.length === 0 ? 'string' : literalUnion(languages);
+  },
   sanitizers: [(value) => canonicalizeLanguage(value) ?? value],
   validators: [(value) => (useMessages().has(value) ? undefined : unknownLanguageMessage(value))],
 });

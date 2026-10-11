@@ -1,5 +1,6 @@
 import { defineField, type UncheckedMessage, useRoles } from 'ohnejs';
 import { foldCase, isArray, isString, isUndefined, uniqueArray } from 'ohnejs/utils';
+import { literalUnion } from 'ohnejs/utils/codegen';
 
 /**
  * The `roles` field type: a list of role names, stored as a JSON list.
@@ -7,6 +8,7 @@ import { foldCase, isArray, isString, isUndefined, uniqueArray } from 'ohnejs/ut
  * Each entry must name a registered role; an unknown name rejects with `auth.unknownRole`.
  * Duplicate entries collapse on write, keeping the first occurrence.
  * The generated value type is `GeneratedRoleName[]`, so an assignment autocompletes and typechecks.
+ * A website reads the registered role names inline, or `string[]` when none is registered.
  * The `includes` operators probe the list, so a query can filter users by role.
  * Search is off until a field sets `search: true`; then a role name, in any case, finds its holders.
  */
@@ -15,6 +17,10 @@ export default defineField({
   jsonList: true,
   defaultValue: () => [],
   emitType: (ctx) => `${ctx.importGenerated('roles.ts', 'GeneratedRoleName')}[]`,
+  emitJSONType: () => {
+    const names = useRoles().keys().sort();
+    return names.length === 0 ? 'string[]' : `(${literalUnion(names)})[]`;
+  },
   sanitizers: [(value) => (isArray<string[]>(value) ? uniqueArray(value) : value)],
   validators: [
     (value) => {

@@ -176,6 +176,12 @@ export async function writeReach(
  * `readReach` is the read itself, middleware included, and memoized; this is the question asked first.
  * An `HTTPError` the resolver throws reaches nothing, as the read itself would refuse the caller.
  * Any other throw propagates, so a misconfigured scope is a `500`, never an open door.
+ *
+ * @example
+ * ```ts
+ * const scope = await readScope('Authors')
+ * if (scope === false) return []
+ * ```
  */
 export async function readScope(collection: string): Promise<QueryScope | false> {
   const endpoint = await reachedEndpoint(collection, 'read');
