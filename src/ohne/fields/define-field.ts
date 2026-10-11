@@ -121,7 +121,7 @@ export interface FieldType<
 
   /**
    * Emits the field's value type as a website receives it: the JSON form of what a read returns.
-   * Runs only when the website types generate, inside a booted app, never at `ohne prepare`.
+   * Runs wherever the website types generate, layer codegen included, with the stack's registries filled.
    * Return only the value type, as `emitType` does; the framework wraps `| null` the same way.
    *
    * Omitted, the website reuses `emitType` when its result is already JSON the site can resolve:

@@ -10,7 +10,7 @@ import { BASE_STRATEGIES } from './config.ts';
  */
 export interface LayerExtras {
   /**
-   * Files the layer generates into the app's codegen directory.
+   * Files the layer generates for the app.
    * `generateLayerCodegen` writes them once the stack has loaded.
    */
   codegen?: LayerCodegen[];

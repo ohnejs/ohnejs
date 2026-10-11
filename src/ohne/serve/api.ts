@@ -44,6 +44,7 @@ declare module 'ohnejs' {
  * Boots the API backend for the project rooted at `from` and starts serving it.
  *
  * Resolves and registers the layer stack, runs every layer's boot files, then regenerates types.
+ * Codegen writes only the codegen directory, never a layer's project-path entries.
  * Codegen is skipped when the `SKIP_CODEGEN` env is truthy.
  * A skipped codegen still warns when another ohne version generated the files.
  *

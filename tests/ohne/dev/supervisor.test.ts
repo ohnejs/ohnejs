@@ -300,18 +300,6 @@ describe('dev', () => {
     await waitFor(async () => (await getBody(port, '/greet')) === 'missing');
   });
 
-  it('marks the API child with `OHNE_DEV`', TIMEOUT, async () => {
-    const port = await freePort();
-    const app = writeProject('ohne-dev', port);
-    writeFileSync(
-      join(app, 'api', 'mode.ts'),
-      "import { useEnv } from 'ohnejs'\nexport default () => String(useEnv().get('OHNE_DEV'))\n",
-    );
-
-    servers.push(await dev(app, { entry: BIN, dashboard: false }));
-    await waitFor(async () => (await getBody(port, '/mode')) === 'true');
-  });
-
   it('parks on a malformed `.env` and recovers on the next save', TIMEOUT, async () => {
     const port = await freePort();
     const app = writeProject('bad-dotenv', port);
@@ -406,6 +394,72 @@ describe('dev', () => {
     writeFileSync(join(app, 'messages', 'en.json'), JSON.stringify({ greeting: 'Hello' }));
     await waitFor(async () => (await getBody(port, '/lang')) === 'Hello');
   });
+
+  it(
+    'reruns layer codegen after a collection edit, reading the edited schema',
+    TIMEOUT,
+    async () => {
+      const port = await freePort();
+      const app = writeProject('layer-codegen', port);
+      writeRoute(app, 'health.ts');
+      writeFileSync(
+        join(app, 'ohne.layer.ts'),
+        "import { useCollections } from 'ohnejs'\n" +
+          'export default { codegen: [{ path: () => "fields.txt", code: () =>\n' +
+          '  Object.keys(useCollections().get("Posts")?.collection.fields ?? {}).join(",") }] }\n',
+      );
+      const posts = join(app, 'collections', 'Posts.ts');
+      mkdirSync(join(app, 'collections'), { recursive: true });
+      writeFileSync(posts, "export default { fields: { title: { type: 'text', options: {} } } }\n");
+
+      servers.push(await dev(app, { entry: BIN, dashboard: false }));
+      const fields = join(app, 'fields.txt');
+      strictEqual(readFileSync(fields, 'utf8'), 'title');
+
+      writeFileSync(
+        posts,
+        "export default { fields: { title: { type: 'text', options: {} }, body: { type: 'text', options: {} } } }\n",
+      );
+      await waitFor(async () => readFileSync(fields, 'utf8') === 'title,body');
+    },
+  );
+
+  it(
+    'reloads the API once when layer codegen rewrites a source file in the app',
+    TIMEOUT,
+    async () => {
+      const port = await freePort();
+      const app = writeProject('layer-codegen-echo', port);
+      writeRoute(app, 'health.ts');
+      writeFileSync(
+        join(app, 'ohne.layer.ts'),
+        "import { useCollections } from 'ohnejs'\n" +
+          'export default { codegen: [{ path: () => "web/fields.ts", code: () =>\n' +
+          '  `export default ${JSON.stringify(Object.keys(useCollections().get("Posts")?.collection.fields ?? {}))}\\n` }] }\n',
+      );
+      const posts = join(app, 'collections', 'Posts.ts');
+      mkdirSync(join(app, 'collections'), { recursive: true });
+      writeFileSync(posts, "export default { fields: { title: { type: 'text', options: {} } } }\n");
+
+      const lines: string[] = [];
+      useEnv().set('SILENT', false);
+      usePrinter().configure({ stream: { write: (line) => lines.push(line) } });
+      servers.push(await dev(app, { entry: BIN, dashboard: false }));
+      await waitFor(async () => (await get(port, '/health')) === 200);
+      const mark = lines.join('').length;
+      const since = () => lines.join('').slice(mark);
+
+      writeFileSync(
+        posts,
+        "export default { fields: { title: { type: 'text', options: {} }, body: { type: 'text', options: {} } } }\n",
+      );
+      const fields = join(app, 'web', 'fields.ts');
+      await waitFor(async () => readFileSync(fields, 'utf8').includes('body'));
+      await waitFor(async () => since().includes('Waiting for changes'));
+      await delay(1_500);
+      strictEqual(since().split('Reloading API').length - 1, 1);
+    },
+  );
 
   it('serves the dashboard alongside the API and injects the bound API URL', TIMEOUT, async () => {
     const dashPort = await freePort();

@@ -35,7 +35,7 @@ export interface LayerWatch {
  * A workspace or linked layer resolves to its source directory outside `node_modules`, so it stays watched.
  *
  * Inside each watched directory, `watchTree` prunes `node_modules`, dot-prefixed names, and the codegen dir.
- * A generated file write therefore never reports a change.
+ * A write to the codegen dir therefore never reports a change.
  *
  * The registry must already be populated, since the supervisor runs `loadLayers` first.
  * Call `resync` after a config change re-resolves the stack, and `close` to tear every watch down.

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { readLayerConfig } from '../../../src/ohne/index.ts';
+import { type BucketCodegen, readLayerConfig } from '../../../src/ohne/index.ts';
 
 describe('readLayerConfig', () => {
   let root: string;
@@ -60,7 +60,10 @@ describe('readLayerConfig', () => {
   it('reads codegen entries from ohne.layer.ts', async () => {
     const config = await readLayerConfig(join(root, 'generator'));
     deepStrictEqual(
-      config?.codegen.map(({ bucket, file }) => ({ bucket, file })),
+      (config?.codegen as BucketCodegen[] | undefined)?.map(({ bucket, file }) => ({
+        bucket,
+        file,
+      })),
       [{ bucket: 'node', file: 'x.ts' }],
     );
   });

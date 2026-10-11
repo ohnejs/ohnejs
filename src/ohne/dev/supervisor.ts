@@ -23,6 +23,7 @@ import { resolveDevPorts } from './resolve-ports.ts';
 import { createConfigTarget } from './targets/config.ts';
 import { createDatabaseTarget } from './targets/database.ts';
 import { createFlowsTarget } from './targets/flows.ts';
+import { createLayerCodegenTarget } from './targets/layer-codegen.ts';
 import { createMessagesTarget } from './targets/messages.ts';
 import { createMiddlewareTarget } from './targets/middleware.ts';
 import { createRegistryTarget } from './targets/registry.ts';
@@ -85,6 +86,7 @@ export interface DevOptions {
  * The initial build writes the full set and prunes stale files from the codegen dir.
  * A change re-runs its codegen; an API source, message, or `.env` change also drains and respawns the child.
  * An `ohne.config.ts` change refreshes the registry first, as a barrier, so every table is rebuilt.
+ * Each layer's `codegen` entries rerun after any of that, so they follow a schema or config edit.
  *
  * Codegen failures and child crashes never tear the supervisor down.
  * It prints, waits for the next change, then revives once a respawn reaches `'ready'`.
@@ -117,6 +119,7 @@ export async function dev(
   const roles = createRolesTarget(from);
   const skills = createSkillsTarget(from);
   const flows = createFlowsTarget(from);
+  const layerCodegen = createLayerCodegenTarget(from);
   const config = createConfigTarget(from, [
     registry,
     routes,
@@ -222,8 +225,11 @@ export async function dev(
    * The API respawns first, so a browser reload or a dashboard restart never meets a restarting API.
    * A missing dashboard starts again on any change.
    * A browser reload with no API child to serve it waits for the change that brings one back.
+   * A file layer codegen generates, and no other target reads, is its echo, so it is dropped.
    */
   async function runCycle(batch: Set<string>): Promise<void> {
+    for (const path of batch) if (isEcho(path)) batch.delete(path);
+    if (batch.size === 0 && revive.size === 0) return;
     const revivesAPI = revive.delete('api');
     revive.clear();
     const configChanged = [...batch].some((path) => config.affectedBy(path));
@@ -264,22 +270,33 @@ export async function dev(
   /**
    * Runs every target and prunes stale files for `null`, else only the targets a path in `batch` affects.
    * A config change runs the config target alone, which rebuilds the rest, then resyncs the layer watch.
+   * Layer codegen follows whenever another target ran, alone, since it swaps the registries they read.
    */
   async function regen(batch: Set<string> | null): Promise<void> {
     if (isNull(batch)) {
       const written = (await Promise.all(targets.map((target) => target.regen()))).flat();
+      written.push(...(await layerCodegen.regen()));
       await pruneCodegen(from, written);
       return;
     }
     const paths = [...batch];
     if (paths.some((path) => config.affectedBy(path))) {
       await config.regen();
+      await layerCodegen.regen();
       if (!closed) layerWatch.resync();
       return;
     }
-    for (const target of targets) {
-      if (paths.some((path) => target.affectedBy(path))) await target.regen();
-    }
+    const affected = targets.filter((target) => paths.some((path) => target.affectedBy(path)));
+    if (affected.length === 0) return;
+    for (const target of affected) await target.regen();
+    await layerCodegen.regen();
+  }
+
+  /**
+   * Whether a change is the echo of a layer codegen write, in a file no other target reads.
+   */
+  function isEcho(path: string): boolean {
+    return layerCodegen.owns(path) && ![config, ...targets].some((t) => t.affectedBy(path));
   }
 
   /**
@@ -305,16 +322,15 @@ export async function dev(
   }
 
   /**
-   * Marks the API child with `OHNE_DEV`.
-   * Hands it the dashboard's origin as `DASHBOARD_URL` too, when the dashboard runs.
+   * Hands the API child the dashboard's origin as `DASHBOARD_URL`, or nothing when the dashboard is off.
    */
   function apiChildEnv(): Record<string, string> {
-    if (!wantDashboard) return { OHNE_DEV: '1' };
+    if (!wantDashboard) return {};
     const origin =
       useEnv().get('DASHBOARD_URL') ??
       useConfig().dashboard?.origin ??
       listenOrigin(useEnv().get('HOST') ?? useConfig().dashboard?.host, dashboardPort);
-    return { OHNE_DEV: '1', DASHBOARD_URL: origin };
+    return { DASHBOARD_URL: origin };
   }
 
   /**
@@ -335,7 +351,6 @@ export async function dev(
         env: {
           API_URL: env.get('API_URL') ?? config.dashboard?.apiURL ?? derivedURL,
           DASHBOARD_RELOAD: env.has('DASHBOARD_RELOAD') ? String(env.get('DASHBOARD_RELOAD')) : '1',
-          OHNE_DEV: '1',
         },
       });
       await dashboard.ready;

@@ -29,7 +29,6 @@ If a value is invalid, ohne refuses to boot and names the variable: `PORT=abc` f
 | `FORCE_COLOR`      | -             | Forces colors on or off, over terminal detection.                                                                   |
 | `SKIP_CODEGEN`     | `false`       | Skips codegen at [startup](./cli.md#ohne-serve), for when a parent process already ran it.                          |
 | `DASHBOARD_RELOAD` | `false`       | Serves the dashboard's live-reload stream. [`ohne dev`](./cli.md#ohne-dev) turns it on for you.                     |
-| `OHNE_DEV`         | `false`       | `true` in the servers [`ohne dev`](./cli.md#ohne-dev) starts, for development-only work in a boot file.             |
 | `API_URL`          | -             | Base URL the dashboard's browser client calls, over `dashboard.apiURL`.                                             |
 | `DASHBOARD_URL`    | -             | Dashboard origin the API's [CORS](../api/middleware.md#cors) allows, over `dashboard.origin`.                       |
 

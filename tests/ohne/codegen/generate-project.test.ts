@@ -107,6 +107,26 @@ describe('generateProject', () => {
     for (const file of second) strictEqual(existsSync(file), true);
   });
 
+  it('writes a layer path entry after the generators only when paths is on', async () => {
+    const app = makeApp('paths');
+    writeFileSync(
+      join(app, 'ohne.layer.ts'),
+      `import { defineLayer } from '${ohne}';\n\n` +
+        'export default defineLayer({\n' +
+        "  codegen: [{ path: () => 'out.ts', code: () => 'export {};\\n' }],\n" +
+        '});\n',
+    );
+    await loadLayers(app);
+
+    const serving = await generateProject(app);
+    strictEqual(serving.includes(join(app, 'out.ts')), false);
+    strictEqual(existsSync(join(app, 'out.ts')), false);
+
+    const written = await generateProject(app, { paths: true });
+    strictEqual(written.at(-1), join(app, 'out.ts'));
+    strictEqual(existsSync(join(app, 'out.ts')), true);
+  });
+
   it('returns an empty list and writes nothing when no package.json is found', async () => {
     const nowhere = join(root, 'nowhere');
 

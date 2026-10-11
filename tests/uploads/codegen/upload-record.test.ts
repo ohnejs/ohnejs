@@ -13,7 +13,7 @@ describe('uploadRecordCodegen', () => {
 
   it('types an Uploads read as its generated record plus the decorations', async () => {
     strictEqual(
-      await uploadRecordCodegen.code(),
+      await uploadRecordCodegen.code({ fresh: false }),
       [
         "import type { ImageVariantName, UploadDecorations } from 'ohnejs/uploads';",
         '',

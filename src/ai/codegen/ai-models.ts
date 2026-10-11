@@ -1,4 +1,4 @@
-import type { LayerCodegen } from 'ohnejs';
+import type { BucketCodegen } from 'ohnejs';
 
 import { createCodeBuilder, propertyKey } from 'ohnejs/utils/codegen';
 
@@ -10,7 +10,7 @@ import { useAIConfig } from '../config.ts';
  * `AIModelName` then narrows to the union, so a flow node's `model: 'smrt'` fails to typecheck.
  * The entry runs against the loaded stack, so the app's own `ohne.config.ts` models are typed.
  */
-export const aiModelsCodegen: LayerCodegen = {
+export const aiModelsCodegen: BucketCodegen = {
   bucket: 'node',
   file: 'ai-models.ts',
   code() {

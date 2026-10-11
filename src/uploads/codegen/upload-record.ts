@@ -1,4 +1,4 @@
-import type { LayerCodegen } from 'ohnejs';
+import type { BucketCodegen } from 'ohnejs';
 
 import { createCodeBuilder } from 'ohnejs/utils/codegen';
 
@@ -7,7 +7,7 @@ import { createCodeBuilder } from 'ohnejs/utils/codegen';
  * Emits `node/upload-record.ts`, merging `UploadDecorations` into the app's generated `Uploads` record.
  * A typed read, populated media fields included, then carries `path`, `url`, and `variants`.
  */
-export const uploadRecordCodegen: LayerCodegen = {
+export const uploadRecordCodegen: BucketCodegen = {
   bucket: 'node',
   file: 'upload-record.ts',
   code() {

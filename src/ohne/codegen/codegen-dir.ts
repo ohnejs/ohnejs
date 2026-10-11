@@ -44,14 +44,22 @@ export function bannerVersion(content: string): string | null {
  * Returns `null` when no `package.json` is found.
  */
 export async function codegenDir(from: string): Promise<string | null> {
-  const manifestPath = await findUp('package.json', from);
-  if (isNull(manifestPath)) return null;
+  const appDir = await appRoot(from);
+  if (isNull(appDir)) return null;
 
-  const appDir = dirname(manifestPath);
   const own = useLayers()
     .layers()
     .find((layer) => layer.path === appDir)?.input.dirs?.codegen;
   return joinPath(appDir, own ?? DIR_DEFAULTS.codegen);
+}
+
+/**
+ * Resolves the app root: the directory of the nearest `package.json` above `from`.
+ * Returns `null` when no `package.json` is found.
+ */
+export async function appRoot(from: string): Promise<string | null> {
+  const manifestPath = await findUp('package.json', from);
+  return isNull(manifestPath) ? null : dirname(manifestPath);
 }
 
 /**

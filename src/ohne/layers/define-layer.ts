@@ -6,11 +6,28 @@ export type { LayerStrategies } from '../../utils/index.ts';
 export type { CodegenBucket } from '../codegen/codegen-dir.ts';
 
 /**
+ * A file a layer generates for the consuming app.
+ * `BucketCodegen` writes into the app's codegen directory; `PathCodegen` writes to a path in the project.
+ */
+export type LayerCodegen = BucketCodegen | PathCodegen;
+
+/**
+ * What a layer codegen entry's `code` receives.
+ */
+export interface LayerCodegenContext {
+  /**
+   * Whether a long-lived process is rerunning the entry after an edit.
+   * Pass it as `fresh` to any collector that imports the app's definitions, so it reads the edited ones.
+   */
+  fresh: boolean;
+}
+
+/**
  * A file a layer generates into the consuming app's codegen directory.
  * `code` runs once the layer stack has loaded, so it can read the merged config through `useConfig`.
  * The file gets the ohne banner and is pruned like every other generated file.
  */
-export interface LayerCodegen {
+export interface BucketCodegen {
   /**
    * The bucket the file lands in, which decides the TypeScript program that includes it.
    * `'node'` for `ohnejs` augmentations, `'browser'` for `ohnejs/dashboard` ones, `'shared'` for pure types.
@@ -26,15 +43,37 @@ export interface LayerCodegen {
 
   /**
    * Returns the file's content, without the banner.
+   * The role, message, collection, block, and field-type registries hold the stack's own while it runs.
    */
-  code(): string | Promise<string>;
+  code(context: LayerCodegenContext): string | Promise<string>;
+}
+
+/**
+ * A file a layer generates at a path in the project, such as a types file another app imports.
+ * Only `ohne prepare` and `ohne dev` write it.
+ * Nothing else does, so `ohne serve` never writes outside its codegen directory.
+ * The file is written as `code` returns it, without the banner, and is never pruned.
+ */
+export interface PathCodegen {
+  /**
+   * Returns the file's path, relative to the app root, usually read from config.
+   * `undefined` skips the entry, so an app that sets no path gets no file.
+   * No two entries in the stack may claim the same path, and none may land in the codegen directory.
+   */
+  path(): string | undefined;
+
+  /**
+   * Returns the file's content.
+   * The role, message, collection, block, and field-type registries hold the stack's own while it runs.
+   */
+  code(context: LayerCodegenContext): string | Promise<string>;
 }
 
 /**
  * What a layer contributes beyond its content.
  * `defaults` and `strategies` target the keys the layer declares.
  * Its own values still live in `ohne.config.ts`.
- * `codegen` lists the files it generates into the consuming app's codegen directory.
+ * `codegen` lists the files it generates for the consuming app.
  */
 export interface LayerDefinition {
   /**
@@ -70,8 +109,9 @@ export interface LayerDefinition {
   strategies?: LayerStrategies;
 
   /**
-   * Files this layer generates into the consuming app's codegen directory.
-   * Each entry's `code` runs once the stack has loaded, so it can read the merged config.
+   * Files this layer generates for the consuming app, into its codegen directory or at a project path.
+   * Each entry's `code` runs after the rest of codegen, so it can read the merged config and the registries.
+   * `ohne dev` reruns every entry after each change that regenerates other files.
    * Use it to type what only the resolved config knows, like the names an app configures.
    *
    * @default

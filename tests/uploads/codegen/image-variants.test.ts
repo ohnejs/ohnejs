@@ -24,7 +24,7 @@ describe('imageVariantsCodegen', () => {
       },
     });
     strictEqual(
-      await imageVariantsCodegen.code(),
+      await imageVariantsCodegen.code({ fresh: false }),
       [
         "import type {} from 'ohnejs/uploads';",
         '',

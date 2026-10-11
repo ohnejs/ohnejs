@@ -273,6 +273,15 @@ export function queryMetadata(collection: string): CollectionQueryMeta {
 }
 
 /**
+ * Drops every memoized collection and block metadata, so the next read builds it from the registries.
+ * Codegen calls it around a registry swap, which the memo would otherwise outlive.
+ */
+export function clearQueryMetadata(): void {
+  cache.clear();
+  blockCache.clear();
+}
+
+/**
  * Builds and caches every collection's and every registered block's query metadata.
  * Each declared `when` validates in the process.
  *

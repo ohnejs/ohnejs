@@ -344,6 +344,7 @@ export function readShapeType(
  * Collects every field type a schema may name, each with the directory its type imports resolve against.
  * Built-ins come first, the stacked layers' own types on top, and `disable.fields` drops its names.
  * Layers come from the registered stack, so `loadLayers` must have run first.
+ * With `fresh`, each layer type is re-imported past the module cache, so an edit is read again.
  *
  * @example
  * ```ts
@@ -351,9 +352,12 @@ export function readShapeType(
  * types.get('text') // -> { fieldType, dir }
  * ```
  */
-export async function collectFieldTypes(): Promise<Map<string, EmittableFieldType>> {
+export async function collectFieldTypes(
+  options: { fresh?: boolean } = {},
+): Promise<Map<string, EmittableFieldType>> {
   const disable = useConfig().disable.fields;
-  return emittableFieldTypes(await collectFields(stackedLayers(), { disable }), disable);
+  const fields = await collectFields(stackedLayers(), { disable, fresh: options.fresh });
+  return emittableFieldTypes(fields, disable);
 }
 
 /**

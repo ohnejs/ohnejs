@@ -125,16 +125,6 @@ export interface Env {
   DASHBOARD_RELOAD: boolean;
 
   /**
-   * `true` in a server `ohne dev` started, so a boot file can do development-only work.
-   * Writing a file another app imports is one such job.
-   * `ohne dev` sets it; a server you start yourself leaves it `false`.
-   *
-   * @default
-   * false
-   */
-  OHNE_DEV: boolean;
-
-  /**
    * Connection URL for the main database, taking precedence over `Config.database.url`.
    * `DB` is an alias; setting both throws, since ohne cannot tell which you meant.
    *

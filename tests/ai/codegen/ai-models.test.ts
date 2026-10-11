@@ -30,7 +30,7 @@ describe('aiModelsCodegen', () => {
       },
     });
     strictEqual(
-      await aiModelsCodegen.code(),
+      await aiModelsCodegen.code({ fresh: false }),
       [
         "import type {} from 'ohnejs';",
         '',
@@ -47,7 +47,7 @@ describe('aiModelsCodegen', () => {
 
   it('leaves the interface empty without models', async () => {
     strictEqual(
-      await aiModelsCodegen.code(),
+      await aiModelsCodegen.code({ fresh: false }),
       [
         "import type {} from 'ohnejs';",
         '',

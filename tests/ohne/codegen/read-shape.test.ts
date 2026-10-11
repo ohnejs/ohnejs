@@ -1,5 +1,13 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -159,5 +167,20 @@ describe('collectFieldTypes', () => {
     ok(types.has('text'));
     strictEqual(types.get('text')?.file, undefined);
     strictEqual(types.has('time'), false);
+  });
+
+  it('reads an edited layer type again only when fresh', async () => {
+    const pin = join(app, 'fields', 'pin.ts');
+    writeFileSync(pin, "export default { columnType: 'text' };\n");
+    await loadLayers(app);
+    strictEqual((await collectFieldTypes()).get('pin')?.fieldType.columnType, 'text');
+
+    writeFileSync(pin, "export default { columnType: 'json' };\n");
+    utimesSync(pin, new Date(), new Date(Date.now() + 1_000));
+    strictEqual((await collectFieldTypes()).get('pin')?.fieldType.columnType, 'text');
+    strictEqual(
+      (await collectFieldTypes({ fresh: true })).get('pin')?.fieldType.columnType,
+      'json',
+    );
   });
 });

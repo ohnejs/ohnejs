@@ -14,7 +14,22 @@ import { generateSkills } from './generate-skills.ts';
 import { pruneCodegen } from './prune-codegen.ts';
 
 /**
+ * Options for `generateProject`.
+ */
+export interface GenerateProjectOptions {
+  /**
+   * Whether to write the layer codegen entries that target a project path.
+   * `ohne prepare` and `ohne dev` turn it on; a booting process writes only its codegen directory.
+   *
+   * @default
+   * false
+   */
+  paths?: boolean;
+}
+
+/**
  * Runs every codegen for the project, then prunes the files an earlier run left behind.
+ * Layer codegen runs last and alone, since it swaps the registries the other generators read.
  * Layers come from the registered stack, so `loadLayers` must have run first.
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Returns the absolute paths written, empty when no `package.json` is found.
@@ -26,7 +41,10 @@ import { pruneCodegen } from './prune-codegen.ts';
  * written.includes('/srv/app/.ohne/node/routes.ts') // -> true
  * ```
  */
-export async function generateProject(from: string = process.cwd()): Promise<string[]> {
+export async function generateProject(
+  from: string = process.cwd(),
+  options: GenerateProjectOptions = {},
+): Promise<string[]> {
   const written = (
     await Promise.all([
       generateLayerName(from),
@@ -40,11 +58,11 @@ export async function generateProject(from: string = process.cwd()): Promise<str
       generateRoles(from),
       generateSkills(from),
       generateFlows(from),
-      generateLayerCodegen(from),
     ])
   )
     .flat()
     .filter(isString);
+  written.push(...(await generateLayerCodegen(from, { paths: options.paths })));
   await pruneCodegen(from, written);
   return written;
 }

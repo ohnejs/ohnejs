@@ -15,6 +15,7 @@ import { loadProjectEnv } from '../../project/load-project-env.ts';
 /**
  * The `ohne prepare` command.
  * Runs every codegen for the project at `--cwd`, writing the generated types into its codegen dir.
+ * A layer codegen entry that targets a project path is written there too.
  * The project `.env` is read first, so a config that reads the environment sees it.
  * Files an earlier run left behind are pruned, so the dir holds exactly the current output.
  *
@@ -45,7 +46,7 @@ export const prepareCommand = defineCommand({
     await loadProjectEnv(cwd);
     const { result: written, ms } = await measure(async () => {
       await loadLayers(cwd);
-      return generateProject(cwd);
+      return generateProject(cwd, { paths: true });
     });
 
     print.successBlock({

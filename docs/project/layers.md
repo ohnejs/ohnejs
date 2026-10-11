@@ -335,3 +335,49 @@ configured.
 The file is written to `.ohne/node/blog-categories.ts` by default, with the
 [ohne banner](./cli.md#ohne-prepare) on its first line. It is rewritten only when its content
 changes, and deleted once the layer stops declaring it.
+
+Layer files are generated last, after the rest of your types. While `code` runs, `useRoles`,
+`useMessages`, `useCollections`, and `useBlocks` hold what your layers define, so an entry can read
+your schema too. `ohne dev` runs every entry again after each change that regenerates other types,
+such as an edited collection, so the file stays current.
+
+## Generating a file in your project
+
+An entry can also write to a path outside `.ohne/`, such as a types file that another app in your
+monorepo imports. Give it a `path` function instead of `bucket` and `file`:
+
+```ts
+// ohne.layer.ts
+import { defineLayer, useCollections, useConfig } from 'ohnejs';
+import { literalUnion } from 'ohnejs/utils/codegen';
+
+declare module 'ohnejs' {
+  interface Config {
+    blog?: {
+      typesFile?: string;
+    };
+  }
+}
+
+export default defineLayer({
+  codegen: [
+    {
+      path: () => useConfig().blog?.typesFile,
+      code: () => `export type Collection = ${literalUnion(useCollections().keys())};\n`,
+    },
+  ],
+});
+```
+
+An app that sets `blog.typesFile: '../web/blog.ts'` gets the file next to its website.
+
+- `path` is relative to the app. When it returns `undefined`, nothing is written, so an app that
+  sets no path gets no file.
+- The file holds exactly what `code` returns, with no banner. ohne never deletes it.
+- `ohne prepare` and `ohne dev` write it. Nothing else does, so `ohne serve` writes nothing
+  outside `.ohne/`.
+- Two entries cannot write the same path, and a path inside `.ohne/` is refused, since ohne could
+  never clean it up there.
+
+A failed write is a codegen error like any other. If the folder cannot be written, `ohne prepare`
+fails, and `ohne dev` prints the error and waits for your next change.

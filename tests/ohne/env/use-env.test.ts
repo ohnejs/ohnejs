@@ -10,7 +10,6 @@ const KEYS = [
   'FORCE_COLOR',
   'SKIP_CODEGEN',
   'DASHBOARD_RELOAD',
-  'OHNE_DEV',
 ] as const;
 
 describe('useEnv', () => {
@@ -48,10 +47,6 @@ describe('useEnv', () => {
 
     it('DASHBOARD_RELOAD defaults to `false`', () => {
       strictEqual(useEnv().get('DASHBOARD_RELOAD'), false);
-    });
-
-    it('OHNE_DEV defaults to `false`', () => {
-      strictEqual(useEnv().get('OHNE_DEV'), false);
     });
   });
 

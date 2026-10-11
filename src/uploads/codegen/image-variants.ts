@@ -1,4 +1,4 @@
-import type { LayerCodegen } from 'ohnejs';
+import type { BucketCodegen } from 'ohnejs';
 
 import { createCodeBuilder, propertyKey } from 'ohnejs/utils/codegen';
 
@@ -10,7 +10,7 @@ import { useUploadsConfig } from '../config.ts';
  * `ImageVariantName` then narrows to the union, so a typo in `imageURL(upload, 'hero')` fails to typecheck.
  * The entry runs against the loaded stack, so the app's own `ohne.config.ts` variants are typed too.
  */
-export const imageVariantsCodegen: LayerCodegen = {
+export const imageVariantsCodegen: BucketCodegen = {
   bucket: 'node',
   file: 'image-variants.ts',
   code() {
