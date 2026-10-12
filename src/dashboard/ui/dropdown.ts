@@ -100,8 +100,8 @@ export interface DropdownOptions {
 
   /**
    * Adjusts the size of the component, from -2 (very small) to 2 (very large).
-   * Omitted, the panel takes the `--ohne-size` of its `reference`.
-   * So a panel mounted on the body still matches its trigger.
+   * Omitted, the panel takes the `--ohne-size` around its `reference`, even when mounted on the body.
+   * The trigger's own size is left out, so a compact icon button still opens a readable menu.
    */
   size?: number;
 
@@ -455,9 +455,10 @@ export function dropdown(
 }
 
 /**
- * The `--ohne-size` in effect at `reference`, or `undefined` without one.
+ * The `--ohne-size` in effect around `reference`, or `undefined` without one.
  */
 function referenceSize(reference: HTMLElement | undefined): string | undefined {
-  const size = reference ? getComputedStyle(reference).getPropertyValue('--ohne-size').trim() : '';
+  const context = reference?.parentElement;
+  const size = context ? getComputedStyle(context).getPropertyValue('--ohne-size').trim() : '';
   return isEmpty(size) ? undefined : size;
 }

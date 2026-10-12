@@ -11,6 +11,7 @@ css`
     flex-shrink: 0;
     border-radius: 9999px;
     color: hsl(var(--ohne-muted-foreground));
+    font-size: 1.125em;
     cursor: help;
     opacity: 0.7;
   }
@@ -39,6 +40,8 @@ export function helpIcon(help: Text): HTMLElement {
     { class: 'ohne-help', tabindex: 0, role: 'note', 'aria-label': () => resolveText(help) },
     icon('info-circle-filled'),
   );
-  onCleanup(attachTooltip(element, () => resolveText(help), { maxWidth: 260, plain: true }));
+  onCleanup(
+    attachTooltip(element, () => resolveText(help), { maxWidth: 260, plain: true, offset: 14 }),
+  );
   return element;
 }

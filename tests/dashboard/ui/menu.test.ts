@@ -79,13 +79,18 @@ describe('menu', () => {
     fire(trigger, 'click');
   });
 
-  it('sizes its panel like the trigger, though it mounts on the body', () => {
+  it('sizes its panel like the text around a compact trigger, though it mounts on the body', () => {
     const computed = globalThis.getComputedStyle;
+    const context = new FakeElement('div');
     Object.assign(globalThis, {
-      getComputedStyle: () => ({ display: 'inline', getPropertyValue: () => ' -1' }),
+      getComputedStyle: (element: unknown) => ({
+        display: 'inline',
+        getPropertyValue: () => (element === context ? ' -1' : '-3'),
+      }),
     });
     try {
-      const trigger = fake(menu(button('Raid'), [{ label: 'Ulduar' }]));
+      const trigger = fake(menu(button('Raid', { size: -3 }), [{ label: 'Ulduar' }]));
+      context.appendChild(trigger);
       fire(trigger, 'click');
       flush();
       strictEqual(panel()?.getAttribute('style')?.includes('--ohne-size: -1;'), true);

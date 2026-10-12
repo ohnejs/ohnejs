@@ -193,7 +193,7 @@ css`
     top: -1px;
     right: -1px;
     left: -1px;
-    height: calc(100% + 2px);
+    height: calc(2em + 0.25rem + 2px);
     overflow: hidden;
     background-color: hsl(var(--ohne-background));
     border: 1px solid transparent;
@@ -204,7 +204,7 @@ css`
   }
 
   .ohne-select-expanded .ohne-select-choices {
-    height: calc(100% + 2px);
+    height: calc(2em + 0.25rem + 2px);
     visibility: visible;
     transition: var(--ohne-transition);
     transition-property: height, visibility, transform;
@@ -441,7 +441,8 @@ export function select<T extends Primitive>(
     choicesHeight.value = undefined;
     choicesTopOffset.value = 0;
     choicesBox.value = '';
-    if (choicesEl.matches(':popover-open')) choicesEl.hidePopover();
+    // A closed popover is `display: none`, which would leave the next open nothing to transition from.
+    choicesEl.removeAttribute('popover');
     event?.preventDefault();
   };
 

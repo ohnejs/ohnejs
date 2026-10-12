@@ -5,6 +5,10 @@ export class FakeNode {
   parentNode: FakeNode | null = null;
   childNodes: FakeNode[] = [];
 
+  get parentElement(): FakeElement | null {
+    return this.parentNode instanceof FakeElement ? this.parentNode : null;
+  }
+
   get nextSibling(): FakeNode | null {
     const siblings = this.parentNode?.childNodes ?? [];
     return siblings[siblings.indexOf(this) + 1] ?? null;

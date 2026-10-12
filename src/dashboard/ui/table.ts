@@ -282,8 +282,9 @@ css`
     display: inline-flex;
     gap: 0.375rem;
     align-items: center;
-    max-width: 100%;
-    padding: 0;
+    max-width: calc(100% + 0.75rem);
+    margin-inline: -0.375rem;
+    padding: 0 0.375rem;
     background: none;
     border: 0;
     border-radius: calc(var(--ohne-radius) - 0.125rem);
@@ -301,6 +302,11 @@ css`
 
   .ohne-table-sort:focus-visible {
     box-shadow: 0 0 0 0.125rem hsl(var(--ohne-ring));
+  }
+
+  /* Every header is sticky and opaque, so the next one would paint over a focus ring. */
+  .ohne-table-grid :where(th):has(> .ohne-table-head :focus-visible) {
+    z-index: 14;
   }
 
   .ohne-table-sort > svg {
@@ -332,8 +338,24 @@ css`
   }
 
   .ohne-table-openable:focus-visible {
-    outline: 0.125rem solid hsl(var(--ohne-ring));
-    outline-offset: -0.125rem;
+    outline: none;
+  }
+
+  /* On the cells, since a sticky cell's opaque background would paint over the row's outline. */
+  .ohne-table-openable:focus-visible > td {
+    box-shadow:
+      inset var(--ohne-table-ring-start, 0 0) hsl(var(--ohne-ring)),
+      inset var(--ohne-table-ring-end, 0 0) hsl(var(--ohne-ring)),
+      inset 0 0.125rem hsl(var(--ohne-ring)),
+      inset 0 -0.125rem hsl(var(--ohne-ring));
+  }
+
+  .ohne-table-openable:focus-visible > td:first-child {
+    --ohne-table-ring-start: 0.125rem 0;
+  }
+
+  .ohne-table-openable:focus-visible > td:last-child {
+    --ohne-table-ring-end: -0.125rem 0;
   }
 
   .ohne-table-clickable {
