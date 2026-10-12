@@ -1,6 +1,9 @@
 import type { Child, DashboardCollection } from 'ohnejs/dashboard';
 
+import { css, h } from 'ohnejs/dashboard';
 import { isUndefined } from 'ohnejs/utils';
+
+import type { RecordEditor } from './record-editor.ts';
 
 /**
  * Renders the page of one record, in place of the default record editor.
@@ -9,6 +12,18 @@ import { isUndefined } from 'ohnejs/utils';
 export type RecordView = (collection: DashboardCollection, uuid: string | undefined) => Child;
 
 const matchers: ((collection: DashboardCollection) => RecordView | undefined)[] = [];
+const notices: ((editor: RecordEditor) => Child)[] = [];
+
+css`
+  .o-record-notices {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .o-record-notices:has(> *) {
+    margin-bottom: 0.75rem;
+  }
+`;
 
 /**
  * Registers a record page for the collections `match` answers a view for.
@@ -31,4 +46,30 @@ export function recordViewOf(collection: DashboardCollection): RecordView | unde
     if (!isUndefined(view)) return view;
   }
   return undefined;
+}
+
+/**
+ * Registers a notice above a record's fields, for what the user should know about the record as it stands.
+ * `render` runs each time the editor renders its fields, in their scope, so a reactive read stays current.
+ * Answer `null` for a record the notice does not concern.
+ * The default record editor shows every notice; a registered view shows them through `recordNotices`.
+ *
+ * @example
+ * ```ts
+ * registerRecordNotice((editor) => () => (editor.saved().locked ? note('Locked by an admin') : null))
+ * ```
+ */
+export function registerRecordNotice(render: (editor: RecordEditor) => Child): void {
+  notices.push(render);
+}
+
+/**
+ * Every registered notice for `editor`, in registration order, spaced from the fields below when any shows.
+ */
+export function recordNotices(editor: RecordEditor): Child {
+  return h(
+    'div',
+    { class: 'o-record-notices' },
+    notices.map((render) => render(editor)),
+  );
 }

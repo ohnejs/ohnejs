@@ -59,6 +59,7 @@ import {
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History } from './history.ts';
+import { recordNotices } from './record-view.ts';
 import { translationsPopup } from './translations-popup.ts';
 
 /**
@@ -499,9 +500,12 @@ export function recordEditor(collection: DashboardCollection, uuid: string | und
       );
     }
     if (state.value !== 'ready') return null;
-    return h('fieldset', { class: 'o-record-editor-fields', disabled: () => busy.value }, () =>
-      form.value?.render(),
-    );
+    return [
+      recordNotices(editor),
+      h('fieldset', { class: 'o-record-editor-fields', disabled: () => busy.value }, () =>
+        form.value?.render(),
+      ),
+    ];
   });
 
   const containerEl = container([recordEditorHeader(editor), mainEl]);
