@@ -194,6 +194,7 @@ disclosure(() => h('p', null, 'Need before greed, always.'), {
 </picture>
 
 - The content builds on the first open and stays mounted, so its state survives closing.
+- `badge` sits right after the summary, as it does after a card title.
 - `open` binds a ref. Omitted, the disclosure starts closed.
 - Disclosures sharing a `group` form an accordion: opening one closes the others.
 
