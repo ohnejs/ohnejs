@@ -4,6 +4,7 @@ import type { FieldTypeName } from './known-fields.ts';
 import { createRegistry, type Registry } from '../../utils/index.ts';
 import { blocks } from './builtin/blocks.ts';
 import { boolean } from './builtin/boolean.ts';
+import { color } from './builtin/color.ts';
 import { dateTime } from './builtin/date-time.ts';
 import { date } from './builtin/date.ts';
 import { integer } from './builtin/integer.ts';
@@ -46,6 +47,7 @@ for (const [name, fieldType] of [
   ['multiSelect', multiSelect],
   ['date', date],
   ['time', time],
+  ['color', color],
   ['dateTime', dateTime],
   ['record', record],
   ['records', records],

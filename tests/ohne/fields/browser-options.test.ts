@@ -48,6 +48,7 @@ describe('browser field options', () => {
     assertDrift<'multiSelect'>(true);
     assertDrift<'date'>(true);
     assertDrift<'time'>(true);
+    assertDrift<'color'>(true);
     assertDrift<'dateTime'>(true);
     assertDrift<'link'>(true);
     assertDrift<'record'>(true);

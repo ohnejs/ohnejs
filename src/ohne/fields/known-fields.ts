@@ -1,5 +1,6 @@
 import type { blocks } from './builtin/blocks.ts';
 import type { boolean } from './builtin/boolean.ts';
+import type { color } from './builtin/color.ts';
 import type { dateTime } from './builtin/date-time.ts';
 import type { date } from './builtin/date.ts';
 import type { integer } from './builtin/integer.ts';
@@ -76,6 +77,11 @@ export interface KnownFields {
    * A time of day, stored as `HH:MM:SS` text.
    */
   time: typeof time;
+
+  /**
+   * A hex color, stored as lowercase `#rrggbb`, or `#rrggbbaa` when the field takes `alpha`.
+   */
+  color: typeof color;
 
   /**
    * An instant, stored as epoch milliseconds.
