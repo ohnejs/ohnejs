@@ -118,6 +118,56 @@ describe('withDefaults', () => {
     });
   });
 
+  describe("strategy 'assign-entries'", () => {
+    const strategies = { menu: 'assign-entries' } as const;
+
+    it('unions the entries, and each entry its fields', () => {
+      deepStrictEqual(
+        withDefaults(
+          { menu: { shop: { label: 'Store' }, sales: { to: '/sales' } } },
+          { menu: { shop: { label: 'Shop', order: 2 }, overview: { to: '/overview' } } },
+          { strategies },
+        ),
+        {
+          menu: {
+            shop: { label: 'Store', order: 2 },
+            sales: { to: '/sales' },
+            overview: { to: '/overview' },
+          },
+        },
+      );
+    });
+
+    it('replaces each field whole, never merging into it', () => {
+      deepStrictEqual(
+        withDefaults(
+          { menu: { shop: { label: { key: 'b' } } } },
+          { menu: { shop: { label: { key: 'a', params: { n: 1 } }, order: 2 } } },
+          { strategies },
+        ),
+        { menu: { shop: { label: { key: 'b' }, order: 2 } } },
+      );
+    });
+
+    it('keeps a `null` field over a deeper value, and fills an undefined one', () => {
+      deepStrictEqual(
+        withDefaults(
+          { menu: { shop: { parent: null, order: undefined } } },
+          { menu: { shop: { parent: 'general', order: 2 } } },
+          { strategies },
+        ),
+        { menu: { shop: { parent: null, order: 2 } } },
+      );
+    });
+
+    it('takes an entry that is not an object as given', () => {
+      deepStrictEqual(
+        withDefaults({ menu: { shop: 1 } }, { menu: { shop: { order: 2 } } }, { strategies }),
+        { menu: { shop: 1 } },
+      );
+    });
+  });
+
   describe("strategy 'assign'", () => {
     const strategies = { variants: 'assign' } as const;
 

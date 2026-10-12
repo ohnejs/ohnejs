@@ -12,6 +12,7 @@ import { isUndefined } from '../is/is-undefined.ts';
  * - `'defaults'` - recurse into objects (per key) and arrays (per index); longer side fills the rest.
  * - `'assign'` - objects merge one level: keys union, input wins per key, values are not recursed into.
  *   Non-objects behave like `'replace'`.
+ * - `'assign-entries'` - a map of objects: keys union, and each entry merges as `'assign'`.
  * - `'concat'` - arrays only: `[...input, ...defaults]`. No-op on non-arrays.
  * - `'concat-unique'` - same as `'concat'`, then deduped via `uniqueArray`.
  */
@@ -20,6 +21,7 @@ export type WithDefaultsStrategy =
   | 'own'
   | 'defaults'
   | 'assign'
+  | 'assign-entries'
   | 'concat'
   | 'concat-unique';
 
@@ -105,15 +107,15 @@ function apply(
 ): unknown {
   const strategy = strategies.get(path);
 
-  if (strategy === 'assign' && isPlainObject(input) && isPlainObject(defaults)) {
+  if (strategy === 'assign') return assign(input, defaults);
+
+  if (strategy === 'assign-entries' && isPlainObject(input) && isPlainObject(defaults)) {
     const result: Record<string, unknown> = {};
-    for (const key of unionKeys(input, defaults)) {
-      result[key] = isUndefined(input[key]) ? defaults[key] : input[key];
-    }
+    for (const key of unionKeys(input, defaults)) result[key] = assign(input[key], defaults[key]);
     return result;
   }
 
-  if (strategy === 'replace' || strategy === 'assign') {
+  if (strategy === 'replace' || strategy === 'assign-entries') {
     return isUndefined(input) ? defaults : input;
   }
 
@@ -148,6 +150,19 @@ function apply(
   }
 
   return input;
+}
+
+/**
+ * Merges two objects one level deep, `input` winning per key; anything else resolves like `'replace'`.
+ */
+function assign(input: unknown, defaults: unknown): unknown {
+  if (!isPlainObject(input) || !isPlainObject(defaults))
+    return isUndefined(input) ? defaults : input;
+  const result: Record<string, unknown> = {};
+  for (const key of unionKeys(input, defaults)) {
+    result[key] = isUndefined(input[key]) ? defaults[key] : input[key];
+  }
+  return result;
 }
 
 /**
