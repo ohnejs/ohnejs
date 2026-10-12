@@ -501,7 +501,7 @@ export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement 
             'button',
             {
               'aria-expanded': () => String(isExpanded()),
-              'aria-label': () => (isExpanded() ? collapseLabel : expandLabel),
+              'aria-label': () => toValue(isExpanded() ? collapseLabel : expandLabel),
               type: 'button',
               class: 'ohne-vertical-menu-item-toggle ohne-raw',
               onClick: toggle,
