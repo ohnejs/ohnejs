@@ -15,6 +15,7 @@ import {
   waitUntil,
 } from '../../../src/ohne/index.ts';
 import { sleep } from '../../../src/utils/index.ts';
+import { collectGarbage } from './_gc.ts';
 
 function makeRoute(pattern: string, handler: AnyHandler): Route {
   return { method: 'GET', pattern, file: `${pattern}.ts`, layer: 'test', handler };
@@ -188,5 +189,51 @@ describe('shutdownServer', () => {
 
     await shutdown;
     strictEqual(gate.state, 'closed');
+  });
+
+  it('cancels a handler parked only on its signal after a garbage collection', async () => {
+    const route = makeRoute('/vigil', async () => {
+      await new Promise((resolve) => useRequest().signal.addEventListener('abort', resolve));
+      return 'Uther';
+    });
+
+    const { server, gate } = createServer(createRouter([route]));
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const { port } = server.address() as AddressInfo;
+
+    const inflight = fetch(`http://127.0.0.1:${port}/vigil`).catch((error) => error);
+    await waitFor(() => gate.pending === 1);
+    await collectGarbage();
+
+    const winner = await Promise.race([
+      shutdownServer(server, gate, { shutdownTimeout: '50ms' }).then(() => 'shutdown'),
+      sleep(1000).then(() => 'timer'),
+    ]);
+    strictEqual(winner, 'shutdown');
+    strictEqual(gate.pending, 0);
+    ok((await inflight) instanceof Error);
+  });
+
+  it('cancels `waitUntil` work parked only on its signal after a garbage collection', async () => {
+    const route = makeRoute('/vigil', () => {
+      waitUntil(new Promise((resolve) => useRequest().signal.addEventListener('abort', resolve)));
+      return 'Arthas';
+    });
+
+    const { server, gate } = createServer(createRouter([route]));
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const { port } = server.address() as AddressInfo;
+
+    strictEqual(await (await fetch(`http://127.0.0.1:${port}/vigil`)).text(), 'Arthas');
+    await collectGarbage();
+
+    const winner = await Promise.race([
+      shutdownServer(server, gate, { shutdownTimeout: '50ms' }).then(() => 'shutdown'),
+      sleep(1000).then(() => 'timer'),
+    ]);
+    strictEqual(winner, 'shutdown');
+    strictEqual(gate.pending, 0);
   });
 });

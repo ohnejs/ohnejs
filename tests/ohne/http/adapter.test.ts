@@ -5,9 +5,7 @@ import { once } from 'node:events';
 import { createServer, request, type RequestListener } from 'node:http';
 import { text } from 'node:stream/consumers';
 import { describe, it } from 'node:test';
-import { setImmediate, setTimeout as sleep } from 'node:timers/promises';
-import { setFlagsFromString } from 'node:v8';
-import { runInNewContext } from 'node:vm';
+import { setImmediate } from 'node:timers/promises';
 
 import {
   clientIP,
@@ -19,9 +17,7 @@ import {
   useHooks,
 } from '../../../src/ohne/index.ts';
 import { createCIDRMatcher } from '../../../src/utils/net/index.ts';
-
-setFlagsFromString('--expose-gc');
-const collectGarbage = runInNewContext('gc') as () => void;
+import { collectGarbage } from './_gc.ts';
 
 async function withServer(
   handler: RequestListener,
@@ -158,17 +154,13 @@ describe('toRequest', () => {
     );
   });
 
-  it('keeps `signal` following its source once nothing else holds the request', async () => {
+  it('lets a dropped request collect while its source `signal` lives', async () => {
     await withServer(
       async (req, res) => {
         const controller = new AbortController();
-        const { signal } = toRequest(req, { signal: controller.signal });
-        for (let pass = 0; pass < 5; pass++) {
-          collectGarbage();
-          await sleep(10);
-        }
-        controller.abort();
-        await sendResponse(res, new Response(String(signal.aborted)));
+        const ref = new WeakRef(toRequest(req, { signal: controller.signal }));
+        await collectGarbage();
+        await sendResponse(res, new Response(String(ref.deref() === undefined)));
       },
       async (base) => {
         strictEqual(await (await fetch(base)).text(), 'true');

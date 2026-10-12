@@ -309,6 +309,7 @@ async function handle(
 
   let drain: (() => Promise<void>) | undefined;
   let event: Event | undefined;
+  let unhold: (() => void) | undefined;
   try {
     const url = toURL(req, trustProxy);
     if (allowedHosts && !allowedHosts(url.hostname)) {
@@ -343,6 +344,7 @@ async function handle(
     const maxBodySize = limit(overrides?.maxBodySize, limits.maxBodySize);
     abortOnDisconnect(res, controller);
     const request = toRequest(req, { url, maxBodySize, signal: controller.signal, onFirstRead });
+    unhold = holdRequest(controller.signal, request);
 
     if (match.type === 'matched' || match.type === 'options') {
       const route = match.type === 'matched' ? match.route : autoOptionsRoute(match.allow);
@@ -376,8 +378,22 @@ async function handle(
     } catch (error) {
       usePrinter().error(`\`request:complete\` rejected: ${errorMessage(error)}`);
     }
+    unhold?.();
     release();
   }
+}
+
+/**
+ * Keeps `request` reachable from `signal` until the returned fn runs.
+ * A Web `Request` follows its source signal only weakly, so a GC can collect one still in flight.
+ * Work parked on its `signal` then never sees the abort, and the request's ticket never releases.
+ * The hold ends with the ticket.
+ * Undici roots `signal` until the request collects, so a hold that outlives the ticket leaks both.
+ */
+function holdRequest(signal: AbortSignal, request: Request): () => void {
+  const hold = () => request;
+  signal.addEventListener('abort', hold);
+  return () => signal.removeEventListener('abort', hold);
 }
 
 /**

@@ -30,6 +30,7 @@ import {
   waitUntil,
 } from '../../../src/ohne/index.ts';
 import { isUndefined, sleep } from '../../../src/utils/index.ts';
+import { collectGarbage } from './_gc.ts';
 
 function makeRoute(method: HTTPMethod | null, pattern: string, handler: AnyHandler): Route {
   return { method, pattern, file: `${pattern}.ts`, layer: 'test', handler };
@@ -840,5 +841,38 @@ describe('request signal', () => {
       usePrinter().configure({ stream: { write() {} } });
     }
     deepStrictEqual(printed, []);
+  });
+
+  it('releases a request parked only on its signal once its client leaves after a garbage collection', async () => {
+    const route = makeRoute('GET', '/vigil', async () => {
+      await new Promise((resolve) => useRequest().signal.addEventListener('abort', resolve));
+      return 'Jaina';
+    });
+
+    await withServer([route], async (base, gate) => {
+      const client = new AbortController();
+      const inflight = fetch(`${base}/vigil`, { signal: client.signal }).catch((error) => error);
+      await waitFor(() => gate.pending === 1);
+      await collectGarbage();
+      client.abort();
+      await inflight;
+      await waitFor(() => gate.pending === 0);
+      strictEqual(gate.pending, 0);
+    });
+  });
+
+  it('lets a finished request collect once its ticket released', async () => {
+    let ref: WeakRef<Request> | undefined;
+    const route = makeRoute('GET', '/done', () => {
+      ref = new WeakRef(useRequest());
+      return 'ok';
+    });
+
+    await withServer([route], async (base, gate) => {
+      strictEqual(await (await fetch(`${base}/done`)).text(), 'ok');
+      await waitFor(() => gate.pending === 0);
+      await collectGarbage();
+      strictEqual(ref?.deref(), undefined);
+    });
   });
 });

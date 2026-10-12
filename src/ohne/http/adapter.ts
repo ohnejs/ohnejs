@@ -50,6 +50,7 @@ export interface ToRequestOptions {
    * The transport passes one that aborts when the client goes away before its response finished.
    * It also aborts it when a graceful shutdown stops waiting for the request.
    * Omitted, the request's `signal` never aborts.
+   * The request follows it only weakly, so hold the request while work waits on its `signal`.
    */
   signal?: AbortSignal;
 
@@ -128,8 +129,6 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
     duplex: 'half',
     signal: options.signal,
   });
-  // The request follows `signal` only weakly, so a collected request would miss the abort.
-  options.signal?.addEventListener('abort', () => request, { once: true });
   return request;
 }
 
