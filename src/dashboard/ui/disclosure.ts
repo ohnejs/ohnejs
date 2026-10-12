@@ -2,6 +2,7 @@ import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 import type { Text } from '../runtime/text.ts';
 
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
@@ -19,6 +20,11 @@ export interface DisclosureOptions {
    * The always visible row that opens and closes the content.
    */
   summary: Text | Child;
+
+  /**
+   * Content right after the summary, usually a `badge`.
+   */
+  badge?: Child;
 
   /**
    * Whether the content shows, read and written by the disclosure.
@@ -71,12 +77,17 @@ css`
   }
 
   .ohne-disclosure-label {
-    flex: 1;
     min-width: 0;
+  }
+
+  .ohne-disclosure-badge {
+    flex-shrink: 0;
+    display: flex;
   }
 
   .ohne-disclosure-chevron {
     flex-shrink: 0;
+    margin-left: auto;
     color: hsl(var(--ohne-muted-foreground));
     font-size: calc(1em + 0.125rem);
   }
@@ -129,6 +140,9 @@ export function disclosure(content: () => Child, options: DisclosureOptions): HT
       'summary',
       { class: 'ohne-disclosure-summary' },
       h('span', { class: 'ohne-disclosure-label' }, textChild(options.summary)),
+      isUndefined(options.badge)
+        ? null
+        : h('span', { class: 'ohne-disclosure-badge' }, options.badge),
       chevron(),
     ),
     h(

@@ -1,10 +1,9 @@
 import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { FakeElement } from '../_fake-dom.ts';
-
 import { flush } from '../../../src/utils/reactive/_scheduler.ts';
 import { ref } from '../../../src/utils/reactive/ref.ts';
+import { type FakeElement, hasClass } from '../_fake-dom.ts';
 import { fire } from './_events.ts';
 
 const { disclosure } = await import('../../../src/dashboard/ui/disclosure.ts');
@@ -46,5 +45,15 @@ describe('disclosure', () => {
     const root = disclosure(() => 'Bring flasks.', { summary: 'Raid rules', group: 'faq' });
     strictEqual(root.getAttribute('name'), 'faq');
     strictEqual(root.tagName, 'DETAILS');
+  });
+
+  it('sets a badge apart between the summary and the chevron', () => {
+    const root = disclosure(() => 'Thrall.', { summary: 'Who leads?', badge: 'Officers' });
+    const row = fake(root).childNodes[0]!.childNodes as FakeElement[];
+    const [label, badge] = row;
+    strictEqual(row.length, 3);
+    strictEqual(label!.textContent, 'Who leads?');
+    strictEqual(hasClass(badge!, 'ohne-disclosure-badge'), true);
+    strictEqual(badge!.textContent, 'Officers');
   });
 });
