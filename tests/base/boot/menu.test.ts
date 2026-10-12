@@ -86,7 +86,50 @@ describe('assertMenu', () => {
   });
 
   it('stops at a loop above a node, refusing it from the node inside it', () => {
-    const { title } = refusal({ leaf: { parent: 'a' }, a: { parent: 'b' }, b: { parent: 'a' } });
+    const { title } = refusal({
+      leaf: { parent: 'a', to: '/leaf', label: 'Leaf' },
+      a: { parent: 'b' },
+      b: { parent: 'a' },
+    });
     deepStrictEqual(title, 'Menu node `a` sits under itself');
+  });
+
+  it('refuses a loop through `collections`, where an unplaced collection sits', () => {
+    deepStrictEqual(
+      refusal({ collections: { label: 'Collections', parent: 'Posts' } }).title,
+      'Menu node `collections` sits under itself',
+    );
+  });
+
+  it('accepts the base layer nodes, a labeled group holding nothing included', () => {
+    doesNotThrow(() =>
+      check({
+        general: { order: 1 },
+        collections: { order: 2, label: 'Collections' },
+        utilities: { order: 4, label: 'Utilities' },
+        overview: { parent: 'general', to: '/overview', label: 'Overview' },
+      }),
+    );
+  });
+
+  it('refuses a node that holds nothing, suggesting the collection it misspells', () => {
+    deepStrictEqual(refusal({ shop: { label: 'Shop' }, Postss: { parent: 'shop' } }), {
+      title: 'Menu node `Postss` holds nothing',
+      body: [
+        'It is no collection, opens no page, and no node sits under it.',
+        '',
+        'Did you mean `Posts`?',
+      ],
+    });
+  });
+
+  it('refuses a patch for a node no layer declares', () => {
+    deepStrictEqual(refusal({ media: { hidden: true } }), {
+      title: 'Menu node `media` holds nothing',
+      body: [
+        'It is no collection, opens no page, and no node sits under it.',
+        'Give it a `to`, or drop it.',
+      ],
+    });
   });
 });

@@ -1,5 +1,12 @@
-import { applyHook, type DashboardMenuNode, useCollections, useConfig } from 'ohnejs';
-import { isEmpty, isNull, isUndefined, naturalCompare, toSentenceCase } from 'ohnejs/utils';
+import { applyHook, type DashboardMenuNode, useCollections, useConfig, useLayers } from 'ohnejs';
+import {
+  getOrSet,
+  isEmpty,
+  isNull,
+  isUndefined,
+  naturalCompare,
+  toSentenceCase,
+} from 'ohnejs/utils';
 
 import type { DashboardMenuItem } from '../api/dashboard.get.ts';
 import type { User } from '../auth/types.ts';
@@ -27,10 +34,12 @@ declare module 'ohnejs' {
 const DEFAULT_ORDER = 10;
 
 /**
- * One node the tree may hold: as declared, plus the collection it places, if any.
+ * One node the tree may hold: as declared, where it was first declared, and the collection it places, if any.
  */
 interface MenuEntry {
+  id: string;
   node: DashboardMenuNode;
+  rank: number;
   collection?: DashboardCollection;
 }
 
@@ -53,33 +62,37 @@ export function resolveDashboardMenu(
  * - A declared collection out of reach drops, and so does every node under it.
  * - A hidden node drops with its subtree, and so does one whose `can` the user lacks.
  * - A group drops while none of its nodes shows; a link stays.
- * - Siblings sort by `order`, then by id, so the tree is the same in every language.
+ * - Siblings sort by `order`, then by where they were first declared, then by id.
  */
 function resolveMenu(user: User, collections: DashboardCollection[]): DashboardMenuItem[] {
   const declared = useConfig().dashboard?.menu ?? {};
   const named = new Set([...useCollections().keys(), ...useConfig().disable.collections]);
+  const ranks = declarationRanks();
+  const rank = (id: string): number => ranks.get(id) ?? Infinity;
   const entries = new Map<string, MenuEntry>();
   for (const [id, node] of Object.entries(declared)) {
-    if (!isUndefined(node) && !named.has(id)) entries.set(id, { node });
+    if (!isUndefined(node) && !named.has(id)) entries.set(id, { id, node, rank: rank(id) });
   }
   for (const collection of collections) {
-    entries.set(collection.name, { node: declared[collection.name] ?? {}, collection });
+    const { name } = collection;
+    entries.set(name, { id: name, node: declared[name] ?? {}, rank: rank(name), collection });
   }
-  const children = new Map<string | null, string[]>();
-  for (const [id, { node, collection }] of entries) {
+  const children = new Map<string | null, MenuEntry[]>();
+  for (const entry of entries.values()) {
+    const { node, collection } = entry;
     const parent =
       isUndefined(node.parent) && !isUndefined(collection) && entries.has('collections')
         ? 'collections'
         : (node.parent ?? null);
-    children.set(parent, [...(children.get(parent) ?? []), id]);
+    getOrSet(children, parent, () => []).push(entry);
   }
   const build = (parent: string | null): DashboardMenuItem[] =>
     (children.get(parent) ?? [])
-      .sort((a, b) => order(entries.get(a)!) - order(entries.get(b)!) || naturalCompare(a, b))
-      .flatMap((id) => {
-        const { node, collection } = entries.get(id)!;
+      .sort((a, b) => order(a) - order(b) || a.rank - b.rank || naturalCompare(a.id, b.id))
+      .flatMap(({ id, node, collection }) => {
         if (node.hidden === true || (!isUndefined(node.can) && !userCan(user, node.can))) return [];
-        const to = node.to ?? (collection && `/collections/${collection.segment}`);
+        const to =
+          node.to ?? (isUndefined(collection) ? undefined : `/collections/${collection.segment}`);
         const nested = build(id);
         if (isUndefined(to) && isEmpty(nested)) return [];
         const label = node.label ?? collection?.label ?? (isNull(parent) ? '' : toSentenceCase(id));
@@ -98,4 +111,22 @@ function resolveMenu(user: User, collections: DashboardCollection[]): DashboardM
  */
 function order(entry: MenuEntry): number {
   return entry.node.order ?? DEFAULT_ORDER;
+}
+
+/**
+ * Each declared node id's position in declaration order.
+ * The deepest layer comes first, and within a layer its `ohne.layer.ts` before its `ohne.config.ts`.
+ * A closer layer's patch never moves a node, since its first declaration already ranked it.
+ */
+function declarationRanks(): Map<string, number> {
+  const ranks = new Map<string, number>();
+  for (const { defaults, input } of useLayers().layers()) {
+    for (const id of [
+      ...Object.keys(defaults.dashboard?.menu ?? {}),
+      ...Object.keys(input.dashboard?.menu ?? {}),
+    ]) {
+      if (!ranks.has(id)) ranks.set(id, ranks.size);
+    }
+  }
+  return ranks;
 }

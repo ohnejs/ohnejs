@@ -13,6 +13,13 @@ import { type Config, DEFAULTS } from '../../../src/ohne/layers/config.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
 
+declare module 'ohnejs' {
+  interface KnownMessages {
+    'menuTest.reports': { n: number };
+    'menuTest.stats': { m: number };
+  }
+}
+
 type Menu = NonNullable<NonNullable<Config['dashboard']>['menu']>;
 type Outline = (string | { [id: string]: Outline })[];
 
@@ -92,6 +99,19 @@ describe('resolveDashboardMenu', () => {
     deepStrictEqual(menu[0].children?.[0], { id: 'reports', label: 'Stats', to: '/reports' });
   });
 
+  it("replaces a deeper layer's message label whole, its params with it", async () => {
+    const menu = await resolve(
+      [
+        { reports: { to: '/reports', label: { key: 'menuTest.reports', params: { n: 1 } } } },
+        { reports: { label: { key: 'menuTest.stats', params: { m: 2 } } } },
+      ],
+      [],
+    );
+    deepStrictEqual(menu, [
+      { id: 'reports', label: { key: 'menuTest.stats', params: { m: 2 } }, to: '/reports' },
+    ]);
+  });
+
   it('moves a node to the root with `parent: null`, over an inherited parent', async () => {
     deepStrictEqual(outline(await resolve([base, { overview: { parent: null } }])), [
       'overview',
@@ -108,7 +128,7 @@ describe('resolveDashboardMenu', () => {
     deepStrictEqual(outline(await resolve([shop, { shop: { hidden: true } }])), ['Tags']);
     deepStrictEqual(
       outline(await resolve([shop, { shop: { hidden: true } }, { shop: { hidden: false } }])),
-      [{ shop: ['Posts', 'sales'] }, 'Tags'],
+      [{ shop: ['sales', 'Posts'] }, 'Tags'],
     );
   });
 
@@ -118,7 +138,7 @@ describe('resolveDashboardMenu', () => {
       audit: { to: '/audit', label: 'Audit', can: 'audit.read' },
       log: { parent: 'audit', to: '/audit/log', label: 'Log' },
     };
-    deepStrictEqual(outline(await resolve([menu])), ['Posts', 'reports', 'Tags']);
+    deepStrictEqual(outline(await resolve([menu])), ['reports', 'Posts', 'Tags']);
   });
 
   it('drops a group left with no node, and keeps a link without one', async () => {
@@ -146,14 +166,20 @@ describe('resolveDashboardMenu', () => {
     }
   });
 
-  it('breaks an order tie by id, naturally', async () => {
-    const menu: Menu = {
-      first: { order: 1, to: '/first', label: 'First' },
-      b10: { to: '/b10', label: 'B10' },
-      b9: { to: '/b9', label: 'B9' },
-      a: { to: '/a', label: 'A' },
-    };
-    deepStrictEqual(outline(await resolve([menu], [])), ['first', 'a', 'b9', 'b10']);
+  it('keeps equal orders in declaration order, deepest layer first, a patch never moving a node', async () => {
+    const menu = await resolve(
+      [
+        { first: { order: 1, to: '/first', label: 'First' }, zeta: { to: '/z', label: 'Z' } },
+        { alpha: { to: '/a', label: 'A' }, zeta: { label: 'Zeta' } },
+      ],
+      [],
+    );
+    deepStrictEqual(outline(menu), ['first', 'zeta', 'alpha']);
+  });
+
+  it('sorts a collection no layer places after the declared nodes, by name', async () => {
+    const menu: Menu = { zeta: { to: '/z', label: 'Z' }, Tags: { order: 10 } };
+    deepStrictEqual(outline(await resolve([menu])), ['zeta', 'Tags', 'Posts']);
   });
 
   it('labels an untitled group by its id below the root, and leaves a root one untitled', async () => {

@@ -221,7 +221,8 @@ The key, `reports`, is the node's id. The node says where it sits and what it sh
 - `label` - its text: a [message key](../i18n/messages.md#catalogs), a `{ key, params }` object,
   or plain text.
 - `icon` - a [Tabler icon](https://tabler.io/icons).
-- `order` - its place among its siblings, lowest first. It defaults to `10`, and ties sort by id.
+- `order` - its place among its siblings, lowest first. It defaults to `10`. Nodes with the same
+  `order` keep the order you declare them in.
 
 `ohnejs/base` declares the nodes you usually place yours under:
 
@@ -233,8 +234,9 @@ The key, `reports`, is the node's id. The node says where it sits and what it sh
 | `utilities`   | The **Utilities** section, shown once something sits in it.              |
 | `overview`    | The link to the overview page.                                           |
 
-The server refuses to start when a `parent` names no node, when a node ends up under itself, or
-when a link has no label.
+The server refuses to start when a `parent` names no node, when a node ends up under itself, when a
+link has no label, or when a node holds nothing at all. The last one is usually a misspelled id, so
+the error suggests the name you meant.
 
 ### Groups and collections
 
