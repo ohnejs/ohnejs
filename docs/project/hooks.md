@@ -75,10 +75,11 @@ which [the account page](../dashboard/account.md#extending-the-page) covers.
 | [`record:before-change`](#recordbefore-change)                      | filter | a create or update input, before coercion                        |
 | [`record:validate`](#recordvalidate)                                | filter | a create or update, after coercion, before the write             |
 | [`record:after-create`](#recordafter-create)                        | filter | a created record, re-read, before create returns                 |
+| [`record:before-update`](#recordbefore-update)                      | action | an update, before it writes its rows                             |
 | [`record:after-update`](#recordafter-update)                        | action | each record an update touched, re-read                           |
 | [`record:condition`](#recordcondition)                              | filter | an update or delete `WHERE`, before it matches rows              |
 | [`record:before-delete`](#recordbefore-delete)                      | action | a delete, before it removes its rows                             |
-| [`record:committed`](#recordcommitted)                              | action | a self-owned write committed, outside the transaction            |
+| [`record:committed`](#recordcommitted)                              | action | a write committed, outside the transaction                       |
 | [`query:filter`](#queryfilter)                                      | filter | a read's `QueryIR`, before it compiles to SQL                    |
 | [`query:records`](#queryrecords)                                    | filter | a row read's assembled records, before it returns                |
 | [`query:complete`](#querycomplete)                                  | action | a row read finished, with its timing                             |
@@ -306,6 +307,42 @@ hook('record:after-create', async (record, ctx) => {
 - Return a replacement record to reshape what the caller receives.
 - The `ctx` carries the `collection`, the open `tx`, and the effective `locale`.
 
+### `record:before-update`
+
+Runs once per update just before it writes, carrying the `UUID`s of the records it will change.
+Use it to read what a record held before the write, then act on the change in
+[`record:after-update`](#recordafter-update):
+
+```ts
+// boot/title-history.ts
+import { hook, query, type Transaction } from 'ohnejs';
+
+const before = new WeakMap<Transaction, Map<string, unknown>>();
+
+hook('record:before-update', async (ctx) => {
+  if (ctx.collection !== 'Posts') return;
+  const rows = await query('Posts')
+    .use(ctx.tx)
+    .where('UUID', (w) => w.in([...ctx.matched]))
+    .select('UUID', 'title')
+    .findMany();
+  before.set(ctx.tx, new Map(rows.map((row) => [row.UUID, row.title])));
+});
+
+hook('record:after-update', async (record, ctx) => {
+  const old = before.get(ctx.tx)?.get(record.UUID);
+  if (ctx.collection !== 'Posts' || old === record.title) return;
+  await query('TitleHistory').use(ctx.tx).create({ post: record.UUID, title: old });
+});
+```
+
+- It fires inside the transaction, after validation, and only when the update matched a record.
+- The `ctx` carries the `collection`, the scoped `condition`, the `matched` UUIDs, the open `tx`,
+  and the effective `locale`.
+- Keep it read-only. A uniqueness or reference check can still fail after it, and that failure
+  does not always undo what a callback wrote.
+- A [`deleteTranslation`](../database/translations.md#deleting-translations) never fires it.
+
 ### `record:after-update`
 
 Runs for each record an update touched, re-read in its final state. Use it to write something
@@ -384,9 +421,8 @@ hook('record:before-delete', async (ctx) => {
 
 ### `record:committed`
 
-Runs after a self-owned write commits. A write is self-owned when it opens its own transaction. Use
-it for external effects that must never run on a rollback. Clearing a cache, calling a webhook, or
-updating an external index is safe here:
+Runs after a write commits. Use it for external effects that must never run on a rollback. Clearing
+a cache, calling a webhook, or updating an external index is safe here:
 
 ```ts
 // boot/webhook.ts
@@ -402,8 +438,10 @@ hook('record:committed', async ({ collection, operation, uuids }) => {
 ```
 
 - It fires after the commit, outside the transaction.
-- A joined [`.use(tx)`](../database/engine.md#transactions) write skips it: the effect is left to
-  whoever owns the outer commit.
+- A [`.use(tx)`](../database/engine.md#transactions) write inside another write's hook, like a
+  revision row written in `record:after-update`, fires it once that write commits.
+- A `.use(tx)` write on a transaction you opened yourself never fires it, and neither does a write
+  that rolled back.
 - The payload carries the `collection`, the `operation`, and the affected `uuids`.
 - A `deleteTranslation` reports an `update` of the records that lost the locale.
 

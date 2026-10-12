@@ -65,6 +65,9 @@ export default defineCollection({
 });
 ```
 
+Adding a required field to a collection that already holds records takes a
+[fill migration](./migrations.md#filling), which gives those records their value.
+
 - `text` rejects the empty string by default. Pass `allowEmpty: true` to allow it. A value of only
   spaces passes, so add a [trimming sanitizer](./writing.md#sanitizers-and-validators) to reject it.
 - `boolean` has no default of its own, so `featured` above must be sent on every create. Pass
@@ -458,6 +461,8 @@ always exists. You never create or delete it yourself:
 
 - Every field must work without input. Give it `nullable: true` or a `default`, unless it is a
   relation, a composite, or a blocks field - those start empty on their own.
+- A `default` seeds the record when it is missing. A field you add later reaches the existing
+  record through a [fill migration](./migrations.md#filling).
 - [`api`](../api/collections.md#exposure) may open `read` and `update` only.
 - A top-level [`record`](#one-reference) field cannot use `onDelete: 'cascade'`, since deleting its
   target would delete the record. The same goes for an upload's

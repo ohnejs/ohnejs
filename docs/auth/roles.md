@@ -95,9 +95,8 @@ admin can then manage every account over HTTP: creating users, assigning roles. 
 `collection.Users.*` capabilities guard these operations.
 
 Adding a `roles` field to your own collection that already holds rows works like adding any new
-required field: add it with [`nullable: true`](../database/collections.md#column-fields), fill the
-existing rows, then remove the flag with a
-[switch migration](../database/migrations.md#switching-an-attribute).
+required field: add the field and a [fill migration](../database/migrations.md#filling) in the same
+change.
 
 ## Delegating user management
 

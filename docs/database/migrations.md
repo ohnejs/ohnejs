@@ -5,8 +5,8 @@ it. The sync's [destructive guard](./sync.md#the-destructive-guard) refuses such
 of them are moves, not losses. Once the migration carries the data, the guard has nothing left to
 refuse.
 
-A migration is not a script of SQL. It is one declarative operation: a move, a rename, a discard, or
-a switch. You describe the change, and the engine carries the rows.
+A migration is not a script of SQL. It is one declarative operation: a move, a rename, a discard, a
+fill, or a switch. You describe the change, and the engine carries the rows.
 
 ## A migration file
 
@@ -106,6 +106,50 @@ export default defineMigration({
 A block address discards a field inside the block. Removing a whole block type still needs
 [force](./sync.md#force).
 
+## Filling
+
+A fill gives every existing row a value for a field it has no value in yet. Reach for it when you
+add a required field to a collection that already holds records: the sync refuses the new column
+over those rows, and the fill is what gives them a value.
+
+```ts
+// collections/Site.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  singleton: true,
+  fields: {
+    title: field('text', { default: 'Home' }),
+    autoRedirect: field('boolean', { default: true }),
+  },
+});
+```
+
+```ts
+// migrations/2026-10-site-auto-redirect.ts
+import { defineMigration } from 'ohnejs';
+
+export default defineMigration({
+  from: null,
+  to: { collection: 'Site', field: 'autoRedirect' },
+  transform: () => true,
+});
+```
+
+`from: null` says that nothing feeds the field. The transform runs once per row that holds no
+value there, with `value` set to `null`:
+
+- Return a value to write it.
+- Return nothing to leave the row empty. A required field then refuses the sync, naming those rows.
+- Return `ctx.deleteRecord()` to delete the whole row.
+
+A row that already holds a value is never touched, so the same fill is correct whether the column
+is new, exists with gaps, or is already full. A translatable field fills once per record and
+locale, with `ctx.locale` set. Dot paths and block fields work as on a move's `to`.
+
+The field's `default` applies to new records only; the fill is where you decide what old records
+hold. Ship the fill in the same change as the field, and one boot does both.
+
 ## Switching an attribute
 
 A switch turns one schema attribute of one field on or off: `nullable`, `unique`,
@@ -193,8 +237,8 @@ recorded migration never runs again. The file stays in your repo as history, and
 identity: renaming a shipped file makes it a new migration.
 
 On a fresh database, old migrations skip themselves: their `from` is gone and their `to` already
-exists, in the live schema, your collections, or a later migration. The sync then builds the
-current schema directly.
+exists, in the live schema, your collections, or a later migration. A fill skips when its table
+does not exist yet: there are no rows to fill. The sync then builds the current schema directly.
 
 When `from` is missing and `to` exists nowhere, the migration refuses. It is stale or mistyped, and
 the error says which.

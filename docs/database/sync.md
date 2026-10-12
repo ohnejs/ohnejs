@@ -55,13 +55,16 @@ npm run serve:api -- --force-sync
 Force does not skip the checks. It performs the deletions they warned about, and reports everything
 it deleted in one block. Try a migration first. Force is for data you truly do not need.
 
-Some changes are refused even with force, because force cannot decide which rows to keep:
+Some changes are refused even with force, because force cannot decide which rows to keep or what
+they should hold:
 
 - a unique constraint over duplicate values,
 - `NOT NULL` over rows holding `NULL`,
-- a type change into `NOT NULL` on a column that holds values.
+- a type change into `NOT NULL` on a column that holds values,
+- a new required field on a table that holds rows.
 
-Fix the data first, or rewrite it with a migration.
+Fix the data first, or rewrite it with a migration. A new required field takes a
+[fill](./migrations.md#filling).
 
 ## Rolling back
 

@@ -33,6 +33,9 @@ Every saved change to a page, the site settings, or a redirect sends a `POST` wi
 - `uuids` - the changed records.
 - `at` - when the change was committed, in epoch milliseconds.
 
+A page whose slug changes also sends the `Redirects` events of the redirect [it leaves
+behind](./seo.md#when-a-page-moves).
+
 A failed delivery is logged, not retried.
 
 ## Checking the signature

@@ -11,6 +11,7 @@ The `Site` page in the dashboard holds settings for the whole website:
 - **Title template** - how each title reads. `{title} | {site}` turns `About` into `About | Acme`.
 - **Default description** and **Default share image** - for a page without its own.
 - **Hide the site from search engines** - for a staging site, or one not launched yet.
+- **Redirect moved pages** - on by default. See [When a page moves](#when-a-page-moves).
 
 ## A page's SEO
 
@@ -42,15 +43,39 @@ const head = ohne.renderHead(page);
 
 ## Redirects
 
-When a page moves, add a redirect in the dashboard's **Redirects** collection:
+A redirect sends a visitor from a path no page answers to somewhere else. Add one in the
+dashboard's **Redirects** collection:
 
 - **From** - the old path, like `/old-page`.
 - **To** - a path on the website, or a full URL.
 - **Status** - `301` by default. Use `302` or `307` for a temporary move.
 - **Keep the query** - carries `?query` parameters over to the target.
 
-`resolve` checks the redirects before any page. Your website handles the `redirect` kind once, as
-every recipe in [Frameworks](./frameworks.md) does, and never a single redirect by hand.
+`resolve` tries the pages first and the redirects after. Your website handles the `redirect` kind
+once, as every recipe in [Frameworks](./frameworks.md) does, and never a single redirect by hand.
+
+### When a page moves
+
+Change the slug of a published page, and the CMS leaves a `301` from its old path behind, so links
+to it keep working. Rename `/about` to `/team`, and `/about` now redirects to `/team`.
+
+- Only a live page leaves one. A draft or an expired page has no address worth keeping.
+- A slug shared by every locale leaves one per locale, like `/about` and `/de/about`.
+- Older redirects follow along. After `/a` becomes `/b` and then `/c`, both `/a` and `/b` lead
+  straight to `/c`.
+- Moving a page back is safe. The redirect from its old path goes, so the two paths never loop.
+
+Turn it off with **Redirect moved pages** in the site settings. A change that is not a slug change,
+like a new route pattern in your config, still needs its redirects added by hand.
+
+### A page wins over a redirect
+
+When a live page answers at a redirect's **From**, the page shows and the redirect waits. Once the
+page is unpublished or expires, the redirect works again.
+
+So you can schedule a new page at `/promo` while `/promo` still redirects to a sale. Until the page
+goes live, visitors land on the sale; after that, they see the page. The dashboard says which one
+wins: a page notes the redirect it replaces, and a redirect notes the page that holds its path.
 
 ## Sitemap and robots.txt
 
