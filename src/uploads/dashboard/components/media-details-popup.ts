@@ -511,6 +511,8 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     if (busy.value || !canEdit) return;
     const reading = form.value?.read();
     if (!isUndefined(reading?.errors)) {
+      unplaced.value = '';
+      form.value?.setErrors(reading.errors);
       form.value?.focusError();
       return;
     }
