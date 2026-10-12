@@ -1,6 +1,8 @@
 {
   "emptyValue": "Ova vrijednost ne smije biti prazna",
   "invalidChoice": "Ova vrijednost nije jedna od dostupnih opcija",
+  "invalidColor": "Ova vrijednost mora biti neprozirna heks boja poput `#ff8800`",
+  "invalidColorAlpha": "Ova vrijednost mora biti heks boja poput `#ff8800` ili `#ff880080`",
   "invalidDate": "Ova vrijednost mora biti kalendarski datum u obliku `YYYY-MM-DD`",
   "invalidLink": "Ovaj link mora biti web, e-mail ili telefonska adresa, `/putanja` ili `#fragment`",
   "invalidReference": "Referencirani zapis ne postoji",

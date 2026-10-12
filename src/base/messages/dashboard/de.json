@@ -41,6 +41,10 @@
   "close": "Schließen",
   "collapse": "Einklappen",
   "collections": "Sammlungen",
+  "color": {
+    "opacity": "Deckkraft",
+    "pick": "Farbe wählen"
+  },
   "columns": {
     "autoWidth": "Automatische Breite",
     "column": "Spalte",

@@ -41,6 +41,10 @@
   "close": "Close",
   "collapse": "Collapse",
   "collections": "Collections",
+  "color": {
+    "opacity": "Opacity",
+    "pick": "Pick a color"
+  },
   "columns": {
     "autoWidth": "Auto width",
     "column": "Column",

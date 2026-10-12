@@ -41,6 +41,10 @@
   "close": "Zatvori",
   "collapse": "Skupi",
   "collections": "Kolekcije",
+  "color": {
+    "opacity": "Neprozirnost",
+    "pick": "Odaberi boju"
+  },
   "columns": {
     "autoWidth": "Automatska širina",
     "column": "Kolona",

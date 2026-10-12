@@ -1,6 +1,8 @@
 {
   "emptyValue": "Dieser Wert darf nicht leer sein",
   "invalidChoice": "Dieser Wert gehört nicht zu den verfügbaren Auswahlmöglichkeiten",
+  "invalidColor": "Dieser Wert muss eine deckende Hex-Farbe wie `#ff8800` sein",
+  "invalidColorAlpha": "Dieser Wert muss eine Hex-Farbe wie `#ff8800` oder `#ff880080` sein",
   "invalidDate": "Dieser Wert muss ein Kalenderdatum im Format `YYYY-MM-DD` sein",
   "invalidLink": "Dieser Link muss eine Web-, E-Mail- oder Telefonadresse, ein `/Pfad` oder ein `#Fragment` sein",
   "invalidReference": "Der referenzierte Datensatz existiert nicht",

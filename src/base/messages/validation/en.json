@@ -1,6 +1,8 @@
 {
   "emptyValue": "This value must not be empty",
   "invalidChoice": "This value is not one of the available choices",
+  "invalidColor": "This value must be an opaque hex color like `#ff8800`",
+  "invalidColorAlpha": "This value must be a hex color like `#ff8800` or `#ff880080`",
   "invalidDate": "This value must be a calendar date in `YYYY-MM-DD` form",
   "invalidLink": "This link must be a web, email or phone address, a `/path` or a `#fragment`",
   "invalidReference": "The referenced record does not exist",
