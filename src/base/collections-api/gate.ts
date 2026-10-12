@@ -130,6 +130,14 @@ export async function gateCollection(
  * The target's named middleware run as its own read would run them; one that answers makes it unreachable.
  * A read gate seeds its own collection's reach, so a self-crossing read resolves its scope once.
  * The shipped read endpoints hand this to `parseWireQuery`, so a populate or `has` never widens a read.
+ * A route of your own that reads for the caller uses it too, so a read's guard holds wherever it reads.
+ * Valid only within a request.
+ *
+ * @example
+ * ```ts
+ * const reach = await readReach('Authors')
+ * if (reach === false) return []
+ * ```
  */
 export function readReach(collection: string): Promise<QueryScope | false> {
   const memo = requestReaches();

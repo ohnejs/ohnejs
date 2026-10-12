@@ -1,4 +1,4 @@
-export { readScope } from '../collections-api/gate.ts';
+export { readReach, readScope } from '../collections-api/gate.ts';
 export { sessionsDefinition } from '../collections/Sessions.ts';
 export { usersDefinition } from '../collections/Users.ts';
 export * from './account-layout.ts';
