@@ -1323,3 +1323,152 @@ describe('lowerMigration with block addresses', () => {
     );
   });
 });
+
+describe('lowerMigration with fills', () => {
+  const transform = (): boolean => true;
+  const companion = (users: TableSchema['columns']): TableSchema =>
+    table('Posts__translations', {
+      columns: [
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: '_localeCode', type: 'text', notNull: true },
+        ...users,
+      ],
+      primaryKey: ['_parentUUID', '_localeCode'],
+      companion: 'Posts',
+    });
+
+  it('lowers a logical `to` onto its desired home, the companion included', async () => {
+    const posts = table('Posts');
+    deepStrictEqual(
+      await lowerMigration(
+        state([posts], {
+          desired: [
+            table('Posts', { columns: [UUID, { name: 'flag', type: 'boolean', notNull: true }] }),
+          ],
+        }),
+        meta({ from: null, to: { collection: 'Posts', field: 'flag' }, transform }),
+      ),
+      { kind: 'fill', to: { table: 'Posts', column: 'flag', type: 'boolean' }, transform },
+    );
+    deepStrictEqual(
+      await lowerMigration(
+        state([posts], {
+          desired: [posts, companion([{ name: 'subtitle', type: 'text', notNull: true }])],
+        }),
+        meta({ from: null, to: { collection: 'Posts', field: 'subtitle' }, transform }),
+      ),
+      {
+        kind: 'fill',
+        to: { table: 'Posts__translations', column: 'subtitle', type: 'text' },
+        transform,
+      },
+    );
+  });
+
+  it('passes a physical `to` through, refusing one without its `type` or column', async () => {
+    deepStrictEqual(
+      await lowerMigration(
+        state([]),
+        meta({ from: null, to: { table: 'Posts', column: 'flag', type: 'boolean' }, transform }),
+      ),
+      { kind: 'fill', to: { table: 'Posts', column: 'flag', type: 'boolean' }, transform },
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({
+          from: null,
+          to: { table: 'Posts', column: 'flag' },
+          transform,
+        } as unknown as Migration),
+      ),
+      /addresses a column without its `type`/,
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({ from: null, to: { table: 'Posts' }, transform } as unknown as Migration),
+      ),
+      /fills without a column/,
+    );
+  });
+
+  it('refuses the fill shapes the grammar cannot mean', async () => {
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({ from: null, to: { collection: 'Posts', field: 'flag' } } as unknown as Migration),
+      ),
+      /fills without a transform/,
+    );
+    await rejects(
+      lowerMigration(state([]), meta({ from: null, to: null, transform } as unknown as Migration)),
+      /pairs nothing with nothing/,
+    );
+    await rejects(
+      lowerMigration(state([]), meta({ from: null, transform } as unknown as Migration)),
+      /has no `to`/,
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({ from: null, to: { collection: 'Posts' }, transform } as unknown as Migration),
+      ),
+      /fills without a field/,
+    );
+    await rejects(
+      lowerMigration(
+        state([]),
+        meta({
+          from: null,
+          to: { collection: 'Posts', field: 'flag', nullable: false },
+          transform,
+        } as unknown as Migration),
+      ),
+      /pairs a fill with a switch/,
+    );
+  });
+
+  it('refuses a composite field: a table holds no single value', async () => {
+    const posts = table('Posts');
+    const sections = table('Posts_sections', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { collection: 'Posts', path: ['sections'], kind: 'childMany' },
+    });
+    await rejects(
+      lowerMigration(
+        state([posts, sections]),
+        meta({ from: null, to: { collection: 'Posts', field: 'sections' }, transform }),
+      ),
+      /fills a composite/,
+    );
+    await rejects(
+      lowerMigration(
+        state([posts], { desired: [posts, sections] }),
+        meta({ from: null, to: { collection: 'Posts', field: 'sections' }, transform }),
+      ),
+      /fills a composite/,
+    );
+  });
+
+  it('refuses a field whose live and desired homes differ', async () => {
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: true }],
+    });
+    await rejects(
+      lowerMigration(
+        state([posts], {
+          desired: [table('Posts'), companion([{ name: 'title', type: 'text', notNull: true }])],
+        }),
+        meta({ from: null, to: { collection: 'Posts', field: 'title' }, transform }),
+      ),
+      /fills a field while it flips `translatable`/,
+    );
+  });
+
+  it('consumes nothing and touches the `to` readings alone', () => {
+    const fill = meta({ from: null, to: { collection: 'Posts', field: 'flag' }, transform });
+    deepStrictEqual(consumedByMigration(fill), []);
+    deepStrictEqual(touchedByMigration(fill), ['Posts', 'Posts_flag', 'Posts__translations']);
+  });
+});

@@ -136,6 +136,7 @@ interface Correlation {
  * Each migration mutates live structure itself.
  * A move materializes a missing `to`, carries values through the dialect codec, and drops `from`.
  * A rename renames; a discard drops.
+ * A fill adds a missing column nullable and writes its transform's value into every `NULL` cell.
  * A logical collection rename or discard runs as a compound, one member op per owned table.
  * `from` must match the live schema - a drifted type is a hard error, never a silent skip.
  * A `from` that is entirely absent skips and stamps, but only when `to` is already satisfied.
@@ -212,6 +213,8 @@ function runMigration(
       return runCompoundDiscard(engine, meta, lowered.tables);
     case 'switch':
       return runSwitch(engine, meta, lowered, later);
+    case 'fill':
+      return runFill(engine, meta, lowered, later);
   }
 }
 
@@ -517,6 +520,45 @@ async function runMove(
   const dropped = fresh.columns.find((item) => item.name === from.column);
   if (!isUndefined(dropped)) await dropColumn(engine, fresh, dropped);
   delete engine.claimed[from.table]?.columns[from.column];
+  return { name: meta.name, status: 'applied' };
+}
+
+/**
+ * Fills one column where rows hold nothing: the transform supplies a value for every `NULL` cell.
+ * A missing column lands nullable first; the sync's diff tightens it once the values are in.
+ * A missing column must be desired or consumed by a later migration, or the fill is stale and refuses.
+ * An absent table skips: it holds no rows to fill, and the diff creates it empty.
+ * A cell already holding a value is never touched, so the same fill is correct over any live state.
+ */
+async function runFill(
+  engine: Engine,
+  meta: MigrationMeta,
+  form: { to: ColumnAddress; transform: MigrationTransform },
+  later: readonly ConsumedAddress[],
+): Promise<MigrationStamp> {
+  const { to, transform } = form;
+  if (foreign(engine, to.table)) refuseForeign(meta, to.table);
+  const schema = present(engine, to.table) ? await describe(engine, to.table) : undefined;
+  const column = schema?.columns.find((item) => item.name === to.column);
+  if (isUndefined(column) && !(await columnSatisfied(engine, to, later))) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` fills a column the schema does not hold`,
+      body: [
+        `\`${to.table}.${to.column}\` is neither live nor in the desired schema, and no later migration carries it on.`,
+        'Add the field to the schema, or fix the address.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (isUndefined(schema)) return skipStamp(meta, `\`${to.table}\` holds no rows to fill`);
+  if (isUndefined(column)) {
+    await addColumn(engine, schema, { name: to.column, type: to.type, notNull: false });
+    setClaim(engine, to.table, to.column, to.type);
+  } else {
+    assertColumnMatches(engine, meta, to, column);
+    assertNotPrimaryKey(meta, schema, to);
+  }
+  await runValuePass(engine, meta, to.table, to.column, transform, true);
   return { name: meta.name, status: 'applied' };
 }
 
@@ -896,7 +938,7 @@ async function runSwitch(
     // Without a transform the automatic fan-out performs the flip; the migration asserted the states.
     return { name: meta.name, status: 'applied' };
   }
-  await runValuePass(engine, meta, lowered);
+  await runValuePass(engine, meta, lowered.table, lowered.column as string, lowered.transform);
   return { name: meta.name, status: 'applied' };
 }
 
@@ -1077,15 +1119,7 @@ async function runFanOutScalar(
     `VALUES (?, ?, ?)`;
   for (const row of rows) {
     const value = dialect.deserialize(sourceColumn.type, row[column] ?? null);
-    const out = await applySwitchTransform(
-      meta,
-      lowered.transform,
-      value,
-      source,
-      row,
-      ctx,
-      engine,
-    );
+    const out = await applyRowTransform(meta, lowered.transform, value, source, row, ctx, engine);
     if (out === DELETE_RECORD) {
       throw ohneError({
         title: `Migration \`${meta.name}\` deletes on a fan-out`,
@@ -1176,7 +1210,7 @@ async function runFanInScalar(
       ? locale === engine.defaultLocale
         ? value
         : undefined
-      : await applySwitchTransform(meta, lowered.transform, value, schema, row, ctx, engine);
+      : await applyRowTransform(meta, lowered.transform, value, schema, row, ctx, engine);
     if (out === DELETE_RECORD) {
       await db.run(erase, [parent, locale]);
       continue;
@@ -1262,7 +1296,7 @@ async function runFanInDerived(
       ? locale === engine.defaultLocale
         ? undefined
         : DELETE_RECORD
-      : await applySwitchTransform(meta, lowered.transform, undefined, schema, row, ctx, engine);
+      : await applyRowTransform(meta, lowered.transform, undefined, schema, row, ctx, engine);
     if (out === DELETE_RECORD) {
       doomed.push(row);
       continue;
@@ -1286,7 +1320,8 @@ async function runFanInDerived(
 }
 
 /**
- * Runs a `nullable` or unique switch's transform once per row, rewriting values in place.
+ * Runs a transform once per row of one column, rewriting values in place.
+ * A `nullable` or unique switch runs it over every row; a fill, under `onlyNull`, over the `NULL` cells.
  * The structural change stays with the diff, whose guard probes then pass over the massaged data.
  * `deleteRecord()` resolves a duplicate by dropping its row through the owned-row cascade.
  * Junction and record references aimed at a deleted row surface on the next sync's orphan probe.
@@ -1295,39 +1330,35 @@ async function runFanInDerived(
 async function runValuePass(
   engine: Engine,
   meta: MigrationMeta,
-  lowered: LoweredSwitch,
+  table: string,
+  column: string,
+  transform: MigrationTransform | undefined,
+  onlyNull = false,
 ): Promise<void> {
-  if (isUndefined(lowered.transform)) return;
+  if (isUndefined(transform)) return;
   const { db, dialect } = engine;
-  const column = lowered.column as string;
-  const schema = await describe(engine, lowered.table);
+  const schema = await describe(engine, table);
   const columnDef = schema.columns.find((item) => item.name === column) as ColumnSchema;
-  assertNotPrimaryKey(meta, schema, { table: lowered.table, column, type: columnDef.type });
+  assertNotPrimaryKey(meta, schema, { table, column, type: columnDef.type });
   if (isEmpty(schema.primaryKey)) {
     throw ohneError({
       title: `Migration \`${meta.name}\` cannot correlate rows`,
-      body: [`\`${lowered.table}\` has no primary key to correlate rows by.`],
+      body: [`\`${table}\` has no primary key to correlate rows by.`],
       path: meta.file,
     });
   }
   const localeKeyed = schema.columns.some((item) => item.name === '_localeCode');
   const where = schema.primaryKey.map((name) => `${dialect.quote(name)} = ?`).join(' AND ');
-  const update = `UPDATE ${dialect.quote(lowered.table)} SET ${dialect.quote(column)} = ? WHERE ${where}`;
+  const update = `UPDATE ${dialect.quote(table)} SET ${dialect.quote(column)} = ? WHERE ${where}`;
   const rows = await readRows(engine, schema);
   const doomed: Record<string, SQLValue>[] = [];
   for (const row of rows) {
+    const held = row[column] ?? null;
+    if (onlyNull && !isNull(held)) continue;
     const locale = localeKeyed ? String(row._localeCode) : undefined;
     const ctx = switchContext(engine, locale);
-    const value = dialect.deserialize(columnDef.type, row[column] ?? null);
-    const out = await applySwitchTransform(
-      meta,
-      lowered.transform,
-      value,
-      schema,
-      row,
-      ctx,
-      engine,
-    );
+    const value = dialect.deserialize(columnDef.type, held);
+    const out = await applyRowTransform(meta, transform, value, schema, row, ctx, engine);
     if (out === DELETE_RECORD) {
       doomed.push(row);
       continue;
@@ -1505,9 +1536,9 @@ function assertQueriesAwaited(meta: MigrationMeta, ctx: MigrationContext): void 
 }
 
 /**
- * Invokes a switch transform on one row, wrapping a throw into an error naming the migration.
+ * Invokes a transform on one row, wrapping a throw into an error naming the migration.
  */
-async function applySwitchTransform(
+async function applyRowTransform(
   meta: MigrationMeta,
   transform: MigrationTransform | undefined,
   value: unknown,

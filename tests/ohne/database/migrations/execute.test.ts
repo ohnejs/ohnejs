@@ -1612,3 +1612,486 @@ describe('executeMigrations materializes translatable child rows', () => {
     await db.close();
   });
 });
+
+describe('executeMigrations with fills', () => {
+  const flagged = table('Posts', {
+    columns: [UUID, { name: 'flag', type: 'boolean', notNull: true }],
+  });
+
+  it('adds a missing column nullable and fills every row', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['a', 'b']);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-flag', {
+          from: null,
+          to: { collection: 'Posts', field: 'flag' },
+          transform: () => true,
+        }),
+      ],
+      desired: [flagged],
+      claimed: classifySchema([posts]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-flag', status: 'applied' }]);
+    const live = await dialect.describeTable(db, 'Posts');
+    deepStrictEqual(
+      live.columns.find((column) => column.name === 'flag'),
+      { name: 'flag', type: 'integer', notNull: false },
+    );
+    const rows = await db.query<{ UUID: string; flag: number }>(
+      'SELECT "UUID", "flag" FROM "Posts" ORDER BY "UUID"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row.UUID, row.flag]),
+      [
+        ['a', 1],
+        ['b', 1],
+      ],
+    );
+    strictEqual(outcome.claimed['Posts']?.columns['flag'], 'boolean');
+    await db.close();
+  });
+
+  it('fills only the NULL cells of a live nullable column, set values untouched', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'note', type: 'text', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID", "note") VALUES (?, ?), (?, ?)', [
+      'a',
+      null,
+      'b',
+      'kept',
+    ]);
+    let calls = 0;
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-note', {
+          from: null,
+          to: { collection: 'Posts', field: 'note' },
+          transform: () => {
+            calls++;
+            return 'filled';
+          },
+        }),
+      ],
+      desired: [table('Posts', { columns: [UUID, { name: 'note', type: 'text', notNull: true }] })],
+      claimed: classifySchema([posts]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-note', status: 'applied' }]);
+    strictEqual(calls, 1);
+    const rows = await db.query<{ UUID: string; note: string }>(
+      'SELECT "UUID", "note" FROM "Posts" ORDER BY "UUID"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row.UUID, row.note]),
+      [
+        ['a', 'filled'],
+        ['b', 'kept'],
+      ],
+    );
+    await db.close();
+  });
+
+  it('hands the transform `null`, the deserialized row, and a queryable `ctx`', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'draft', type: 'boolean', notNull: true }],
+    });
+    const authors = table('Authors', {
+      columns: [UUID, { name: 'name', type: 'text', notNull: true }],
+    });
+    await materialize(db, [posts, authors]);
+    await db.run('INSERT INTO "Authors" ("UUID", "name") VALUES (?, ?)', ['u1', 'Ada']);
+    await db.run('INSERT INTO "Posts" ("UUID", "draft") VALUES (?, ?)', ['p1', 1]);
+    const seen: unknown[] = [];
+    await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-author', {
+          from: null,
+          to: { collection: 'Posts', field: 'authorName' },
+          transform: async (value, row, ctx) => {
+            seen.push(value, row);
+            const author = await ctx.queryOne<{ name: string }>(
+              'SELECT "name" FROM "Authors" WHERE "UUID" = ?',
+              ['u1'],
+            );
+            return `${author?.name} on ${row.draft === true ? 'a draft' : 'a post'}`;
+          },
+        }),
+      ],
+      desired: [
+        table('Posts', {
+          columns: [
+            UUID,
+            { name: 'draft', type: 'boolean', notNull: true },
+            { name: 'authorName', type: 'text', notNull: true },
+          ],
+        }),
+        authors,
+      ],
+      claimed: classifySchema([posts, authors]),
+      force: false,
+    });
+    deepStrictEqual(seen, [null, { UUID: 'p1', draft: true, authorName: null }]);
+    const rows = await db.query<{ authorName: string }>('SELECT "authorName" FROM "Posts"');
+    deepStrictEqual(
+      rows.map((row) => row.authorName),
+      ['Ada on a draft'],
+    );
+    await db.close();
+  });
+
+  it('leaves a row NULL when the transform returns nothing', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['a', 'b']);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-flag', {
+          from: null,
+          to: { collection: 'Posts', field: 'flag' },
+          transform: (_value, row) => (row.UUID === 'a' ? false : undefined),
+        }),
+      ],
+      desired: [flagged],
+      claimed: classifySchema([posts]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-flag', status: 'applied' }]);
+    const rows = await db.query<{ UUID: string; flag: number | null }>(
+      'SELECT "UUID", "flag" FROM "Posts" ORDER BY "UUID"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row.UUID, row.flag]),
+      [
+        ['a', 0],
+        ['b', null],
+      ],
+    );
+    await db.close();
+  });
+
+  it('deletes a row through the owned-row cascade on `deleteRecord`', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const sections = table('Posts_sections', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      derived: { collection: 'Posts', path: ['sections'], kind: 'childMany' },
+    });
+    await materialize(db, [posts, sections]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['a', 'b']);
+    await db.run('INSERT INTO "Posts_sections" ("UUID", "_parentUUID") VALUES (?, ?), (?, ?)', [
+      's1',
+      'a',
+      's2',
+      'b',
+    ]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-flag', {
+          from: null,
+          to: { collection: 'Posts', field: 'flag' },
+          transform: (_value, row, ctx) => (row.UUID === 'b' ? ctx.deleteRecord() : true),
+        }),
+      ],
+      desired: [flagged, sections],
+      claimed: classifySchema([posts, sections]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-flag', status: 'applied' }]);
+    deepStrictEqual(
+      (await db.query<{ UUID: string }>('SELECT "UUID" FROM "Posts"')).map((row) => row.UUID),
+      ['a'],
+    );
+    deepStrictEqual(
+      (await db.query<{ UUID: string }>('SELECT "UUID" FROM "Posts_sections"')).map(
+        (row) => row.UUID,
+      ),
+      ['s1'],
+    );
+    ok(outcome.deletions.some((line) => /row of `Posts_sections` deleted/.test(line)));
+    await db.close();
+  });
+
+  it('skips with a reason when the table is absent', async () => {
+    const db = await open();
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-flag', {
+          from: null,
+          to: { collection: 'Posts', field: 'flag' },
+          transform: () => true,
+        }),
+      ],
+      desired: [flagged],
+      claimed: {},
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [
+      { name: 'app/001-flag', status: 'skipped', reason: '`Posts` holds no rows to fill' },
+    ]);
+    await db.close();
+  });
+
+  it('refuses a foreign table', async () => {
+    const db = await open();
+    await materialize(db, [table('Posts')]);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-flag', {
+            from: null,
+            to: { collection: 'Posts', field: 'flag' },
+            transform: () => true,
+          }),
+        ],
+        desired: [flagged],
+        claimed: {},
+        force: false,
+      }),
+      /targets a foreign table/,
+    );
+    await db.close();
+  });
+
+  it('refuses a column the schema does not hold and no later migration carries on', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    await materialize(db, [posts]);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-flag', {
+            from: null,
+            to: { collection: 'Posts', field: 'flag' },
+            transform: () => true,
+          }),
+        ],
+        desired: [posts],
+        claimed: classifySchema([posts]),
+        force: false,
+      }),
+      /needs a `type` on its `to`/,
+    );
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-flag', {
+            from: null,
+            to: { collection: 'Posts', field: 'flag', type: 'boolean' },
+            transform: () => true,
+          }),
+        ],
+        desired: [posts],
+        claimed: classifySchema([posts]),
+        force: false,
+      }),
+      /fills a column the schema does not hold/,
+    );
+    deepStrictEqual(await columnNames(db, 'Posts'), ['UUID']);
+    await db.close();
+  });
+
+  it('fills a column a later move carries on', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-legacy', {
+          from: null,
+          to: { collection: 'Posts', field: 'legacy', type: 'text' },
+          transform: () => 'seeded',
+        }),
+        meta('app/002-note', {
+          from: { collection: 'Posts', field: 'legacy' },
+          to: { collection: 'Posts', field: 'note' },
+        }),
+      ],
+      desired: [table('Posts', { columns: [UUID, { name: 'note', type: 'text', notNull: true }] })],
+      claimed: classifySchema([posts]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [
+      { name: 'app/001-legacy', status: 'applied' },
+      { name: 'app/002-note', status: 'applied' },
+    ]);
+    deepStrictEqual(await columnNames(db, 'Posts'), ['UUID', 'note']);
+    deepStrictEqual(
+      (await db.query<{ note: string }>('SELECT "note" FROM "Posts"')).map((row) => row.note),
+      ['seeded'],
+    );
+    await db.close();
+  });
+
+  it('fills each companion row per locale, `ctx.locale` set', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const translations = (users: TableSchema['columns']) =>
+      table('Posts__translations', {
+        columns: [
+          { name: '_parentUUID', type: 'text', notNull: true },
+          { name: '_localeCode', type: 'text', notNull: true },
+          ...users,
+        ],
+        primaryKey: ['_parentUUID', '_localeCode'],
+        companion: 'Posts',
+      });
+    const companion = translations([{ name: 'title', type: 'text', notNull: true }]);
+    await materialize(db, [posts, companion]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['p1', 'p2']);
+    await db.run(
+      'INSERT INTO "Posts__translations" ("_parentUUID", "_localeCode", "title") ' +
+        'VALUES (?, ?, ?), (?, ?, ?)',
+      ['p1', 'en', 'Hello', 'p1', 'de', 'Hallo'],
+    );
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-subtitle', {
+          from: null,
+          to: { collection: 'Posts', field: 'subtitle' },
+          transform: (_value, row, ctx) => `${ctx.locale}: ${String(row.title)}`,
+        }),
+      ],
+      desired: [
+        posts,
+        translations([
+          { name: 'title', type: 'text', notNull: true },
+          { name: 'subtitle', type: 'text', notNull: true },
+        ]),
+      ],
+      claimed: classifySchema([posts, companion]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-subtitle', status: 'applied' }]);
+    const rows = await db.query<{ _localeCode: string; subtitle: string }>(
+      'SELECT "_localeCode", "subtitle" FROM "Posts__translations" ORDER BY "_localeCode"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row._localeCode, row.subtitle]),
+      [
+        ['de', 'de: Hallo'],
+        ['en', 'en: Hello'],
+      ],
+    );
+    deepStrictEqual(await columnNames(db, 'Posts'), ['UUID']);
+    await db.close();
+  });
+
+  it('fills a dot path on a child-one table, a parent without a child row getting none', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const sections = (users: TableSchema['columns']) =>
+      table('Posts_sections', {
+        columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }, ...users],
+        derived: { collection: 'Posts', path: ['sections'], kind: 'childOne' },
+      });
+    const live = sections([{ name: 'intro', type: 'text', notNull: false }]);
+    await materialize(db, [posts, live]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['p1', 'p2']);
+    await db.run('INSERT INTO "Posts_sections" ("UUID", "_parentUUID", "intro") VALUES (?, ?, ?)', [
+      's1',
+      'p1',
+      'hello',
+    ]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-kicker', {
+          from: null,
+          to: { collection: 'Posts', field: 'sections.kicker' },
+          transform: (_value, row) => `${String(row.intro)}!`,
+        }),
+      ],
+      desired: [
+        posts,
+        sections([
+          { name: 'intro', type: 'text', notNull: false },
+          { name: 'kicker', type: 'text', notNull: true },
+        ]),
+      ],
+      claimed: classifySchema([posts, live]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-kicker', status: 'applied' }]);
+    const rows = await db.query<{ _parentUUID: string; kicker: string }>(
+      'SELECT "_parentUUID", "kicker" FROM "Posts_sections"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row._parentUUID, row.kicker]),
+      [['p1', 'hello!']],
+    );
+    await db.close();
+  });
+
+  it('fills a block field on the per-type table', async () => {
+    const db = await open();
+    const hero = table('block_Hero', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+      block: 'Hero',
+    });
+    await materialize(db, [hero]);
+    await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'Hi']);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-align', {
+          from: null,
+          to: { block: 'Hero', field: 'align' },
+          transform: () => 'left',
+        }),
+      ],
+      desired: [
+        table('block_Hero', {
+          columns: [
+            UUID,
+            { name: 'title', type: 'text', notNull: false },
+            { name: 'align', type: 'text', notNull: true },
+          ],
+          block: 'Hero',
+        }),
+      ],
+      claimed: classifySchema([hero]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-align', status: 'applied' }]);
+    deepStrictEqual(
+      (await db.query<{ align: string }>('SELECT "align" FROM "block_Hero"')).map(
+        (row) => row.align,
+      ),
+      ['left'],
+    );
+    strictEqual(outcome.claimed['block_Hero']?.columns['align'], 'text');
+    await db.close();
+  });
+
+  it('refuses a live column whose native type differs from the desired one', async () => {
+    const db = await open();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'flag', type: 'text', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-flag', {
+            from: null,
+            to: { collection: 'Posts', field: 'flag' },
+            transform: () => true,
+          }),
+        ],
+        desired: [flagged],
+        claimed: classifySchema([posts]),
+        force: false,
+      }),
+      /does not match the live schema/,
+    );
+    await db.close();
+  });
+});

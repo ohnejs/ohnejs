@@ -69,6 +69,7 @@ interface Findings {
   collapses: CollapseFinding[];
   disallowed: DisallowedFinding[];
   blockers: string[];
+  unfilled: string[];
   orphans: DanglingFinding[];
 }
 
@@ -76,6 +77,7 @@ interface Findings {
  * The destructive guard: probes every diff and refuses what would silently lose data.
  * A populated table or column drop and a populated retype refuse unless `force` authorizes them.
  * A new unique over duplicates or `NOT NULL` over NULLs refuses regardless - force cannot pick winners.
+ * A new `NOT NULL` column over live rows refuses the same way, and its refusal points at a fill migration.
  * A repeater collapsing to one row per parent is the exception, since its winner is pinned.
  * Force keeps each parent's first row - lowest `_parentPosition`, `UUID` breaking ties - and drops the rest.
  * Rows dangling under a foreign key being added refuse too; under force they are purged here.
@@ -107,6 +109,7 @@ export async function guardDiffs(
     collapses: [],
     disallowed: [],
     blockers: [],
+    unfilled: [],
     orphans: [],
   };
   const creating = new Set(
@@ -135,11 +138,12 @@ export async function guardDiffs(
   ];
   if (
     findings.blockers.length > 0 ||
+    findings.unfilled.length > 0 ||
     ((migratable.length > 0 || blockGrade.length > 0) && !options.force)
   ) {
     throw ohneError({
       title: 'Destructive sync refused',
-      body: refusalBody(migratable, blockGrade, findings.blockers),
+      body: refusalBody(migratable, blockGrade, findings.blockers, findings.unfilled),
     });
   }
   if (!options.force) {
@@ -221,7 +225,7 @@ async function guardAlter(
   if (rows > 0) {
     for (const column of alter.addColumns) {
       if (!column.notNull) continue;
-      findings.blockers.push(
+      findings.unfilled.push(
         `- new column \`${table}.${column.name}\` is NOT NULL but \`${table}\` holds \`${rows}\` ${pluralize(rows, 'row')}`,
       );
     }
@@ -502,22 +506,35 @@ function probeUniverse(
 /**
  * Assembles the sectioned refusal body: destructions first, unforceable blockers after, then the fix.
  * Block-owned findings have no migration to write, so the migration hint appears only for the rest.
+ * A new `NOT NULL` column over live rows lists among the blockers and names the fill that resolves it.
  */
-function refusalBody(migratable: string[], blockGrade: string[], blockers: string[]): string[] {
+function refusalBody(
+  migratable: string[],
+  blockGrade: string[],
+  blockers: string[],
+  unfilled: string[],
+): string[] {
   const body: string[] = [];
   const destructive = [...migratable, ...blockGrade];
   if (destructive.length > 0) {
     body.push('Applying the desired schema would destroy:', '', ...destructive);
   }
-  if (blockers.length > 0) {
+  const unforceable = [...blockers, ...unfilled];
+  if (unforceable.length > 0) {
     if (body.length > 0) body.push('');
-    body.push('These cannot apply even under force:', '', ...blockers);
+    body.push('These cannot apply even under force:', '', ...unforceable);
   }
   body.push('');
-  if (blockers.length > 0) {
-    body.push(
-      'Fix the data behind these rows first, or rewrite it with a move migration; `force` cannot resolve them.',
-    );
+  if (unforceable.length > 0) {
+    if (unfilled.length > 0) {
+      body.push(
+        'Give the existing rows a value with a fill migration: `from: null`, `to` the field, `transform` the value.',
+      );
+    }
+    if (blockers.length > 0) {
+      body.push('Fix the data behind these rows first, or rewrite it with a move migration.');
+    }
+    body.push('`force` cannot resolve them.');
     return body;
   }
   if (migratable.length > 0) {

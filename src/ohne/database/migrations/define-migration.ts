@@ -237,7 +237,7 @@ export const DELETE_RECORD: unique symbol = Symbol('deleteRecord');
  * The context a transform runs in: read-only queries in the sync transaction, and the row in hand.
  * A transform can look values up mid-migration; everything it reads sees the migration so far.
  * `deleteRecord()` returns the sentinel that deletes the whole row; return it, never just call it.
- * Only a switch honors the sentinel: a move carries values, so it refuses a deletion.
+ * A switch and a fill honor the sentinel: a move carries values, so it refuses a deletion.
  */
 export interface MigrationContext extends Pick<Transaction, 'query' | 'queryOne'> {
   /**
@@ -285,6 +285,7 @@ export interface SwitchAttributes {
  * `row` is the full `from` row, deserialized by column.
  * On a move, each value carries over rewritten.
  * On a switch, `undefined` keeps the row untouched and `ctx.deleteRecord()` deletes it whole.
+ * On a fill, `value` is `null`: the row holds nothing there yet.
  * Turning `translatable` off promotes one locale's value per entity; turning it on reshapes each value.
  * May return a promise.
  */
@@ -354,6 +355,29 @@ export interface DiscardMigration {
 }
 
 /**
+ * Gives every existing row a value for a field it holds nothing in yet.
+ * The engine adds a missing column nullable, then writes `transform`'s value into each `NULL` cell.
+ * A cell already holding a value stays as it is, so a fill never overwrites data.
+ * The sync's diff tightens the column afterwards, so a required field lands in one deploy.
+ */
+export interface FillMigration {
+  /**
+   * Marks a fill: no column feeds it; `transform` supplies each value.
+   */
+  from: null;
+
+  /**
+   * The field or column to fill, as the desired schema declares it.
+   */
+  to: ColumnAddress | KnownFieldAddress | KnownBlockFieldAddress;
+
+  /**
+   * Called once per row whose `to` holds no value, with `value` `null`.
+   */
+  transform: MigrationTransform;
+}
+
+/**
  * At least one switch attribute set, so a switch is never mistaken for a move at the type level.
  * Distributes over the attributes: each member requires its own key and keeps the rest optional.
  */
@@ -392,9 +416,14 @@ export interface SwitchMigration {
 }
 
 /**
- * One declarative migration: a move, a rename, a discard, or a switch.
+ * One declarative migration: a move, a rename, a discard, a switch, or a fill.
  */
-export type Migration = MoveMigration | RenameMigration | DiscardMigration | SwitchMigration;
+export type Migration =
+  | MoveMigration
+  | RenameMigration
+  | DiscardMigration
+  | SwitchMigration
+  | FillMigration;
 
 /**
  * Defines a database migration.
@@ -405,6 +434,7 @@ export type Migration = MoveMigration | RenameMigration | DiscardMigration | Swi
  * `from` must match the live schema; a mismatch is a hard error naming the drift.
  * A `from` that is entirely absent is the already-migrated case.
  * It skips and stamps, but only when `to` is already satisfied.
+ * A fill has no `from` at all: it is written `from: null`, and `to` names the field to fill.
  *
  * Addresses are logical (`collection` and a `field` dot path) or physical (`table` and `column`).
  * The logical form is the one to reach for.
@@ -459,6 +489,18 @@ export type Migration = MoveMigration | RenameMigration | DiscardMigration | Swi
  *     if (ctx.locale === 'en') return value
  *     return ctx.deleteRecord()
  *   },
+ * })
+ * ```
+ *
+ * @example
+ * ```ts
+ * // migrations/2026-11-auto-redirect.ts - give the existing records a value for a new required field
+ * import { defineMigration } from 'ohnejs'
+ *
+ * export default defineMigration({
+ *   from: null,
+ *   to: { collection: 'Site', field: 'autoRedirect' },
+ *   transform: () => true,
  * })
  * ```
  */

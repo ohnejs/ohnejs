@@ -12,7 +12,7 @@ import type {
 } from './define-migration.ts';
 import type { MigrationMeta } from './use-migrations.ts';
 
-import { isNull, isObject, isUndefined, last } from '../../../utils/index.ts';
+import { isFunction, isNull, isObject, isUndefined, last } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
 import {
   companionTableName,
@@ -168,7 +168,7 @@ export interface LoweredSwitch {
 }
 
 /**
- * A migration lowered to physical form: one of the single ops, a compound's member list, or a switch.
+ * A migration lowered to physical form: a single op, a compound's member list, a switch, or a fill.
  * A block-level rename carries `blockType`: the `_blockType` value every live wrapper rewrites.
  */
 export type LoweredMigration =
@@ -189,6 +189,7 @@ export type LoweredMigration =
       blockType?: { from: string; to: string };
     }
   | { kind: 'compoundDiscard'; tables: readonly string[] }
+  | { kind: 'fill'; to: ColumnAddress; transform: MigrationTransform }
   | LoweredSwitch;
 
 /**
@@ -309,6 +310,13 @@ function readingsOf(meta: MigrationMeta, address: AnyAddress): ConsumedAddress[]
 }
 
 /**
+ * Whether the migration is a fill: `from: null`, so nothing feeds `to` but its transform.
+ */
+function isFill(meta: MigrationMeta): boolean {
+  return isNull((meta.migration as { from?: unknown }).from);
+}
+
+/**
  * The migration's `from` address, shape-checked: a missing or non-object `from` refuses by name.
  */
 function fromAddress(meta: MigrationMeta): AnyAddress {
@@ -332,7 +340,9 @@ function toAddress(meta: MigrationMeta): AnyAddress | null {
   if (isObject(to)) return to as unknown as AnyAddress;
   throw ohneError({
     title: `Migration \`${meta.name}\` has no \`to\``,
-    body: ['A move or rename sets `to` to the new address; a discard sets `to: null` on purpose.'],
+    body: [
+      'A move, rename, or fill sets `to` to the new address; a discard sets `to: null` on purpose.',
+    ],
     path: meta.file,
   });
 }
@@ -340,8 +350,10 @@ function toAddress(meta: MigrationMeta): AnyAddress | null {
 /**
  * The tables a migration's `from` consumes, for `to`-satisfaction of the migrations before it.
  * Pure over the address: physical names never need the live schema, so chains skip end to end.
+ * A fill reads nothing, so it consumes nothing.
  */
 export function consumedByMigration(meta: MigrationMeta): ConsumedAddress[] {
+  if (isFill(meta)) return [];
   return readingsOf(meta, fromAddress(meta));
 }
 
@@ -349,8 +361,13 @@ export function consumedByMigration(meta: MigrationMeta): ConsumedAddress[] {
  * The physical tables a migration may touch, for the sync's constraint bracket.
  * Pure over the addresses; an ambiguous logical address contributes both of its readings.
  * A switch flips in place, so its `from` readings already cover everything it touches.
+ * A fill writes `to` alone, so only its readings count.
  */
 export function touchedByMigration(meta: MigrationMeta): string[] {
+  if (isFill(meta)) {
+    const to = toAddress(meta);
+    return isNull(to) ? [] : readingsOf(meta, to).map((consumed) => consumed.table);
+  }
   const from = fromAddress(meta);
   const tables = readingsOf(meta, from).map((consumed) => consumed.table);
   if (switchKeysOf(from).length > 0) return tables;
@@ -382,12 +399,14 @@ function switchKeysOf(address: object): SwitchAttribute[] {
  * A pre-ownership snapshot bootstraps a rename's family from the `to` tree.
  * Table-grain discards refuse there, since nothing records what they cover.
  * A switch key on `from` marks a switch, which lowers first, before any address pairing.
+ * A `null` `from` marks a fill, which lowers its `to` alone, before even that.
  */
 export async function lowerMigration(
   state: ResolveState,
   meta: MigrationMeta,
 ): Promise<LoweredMigration> {
   const { migration } = meta;
+  if (isFill(meta)) return lowerFill(state, meta);
   const from = fromAddress(meta);
   const rawTo = (migration as { to?: unknown }).to;
   if (switchKeysOf(from).length > 0 || attributesOnly(rawTo)) {
@@ -1298,6 +1317,111 @@ async function lowerDiscard(
   return {
     kind: 'discardColumn',
     from: { table: column.table, column: column.column, type: 'text' },
+  };
+}
+
+/**
+ * Lowers a fill: `to` resolves to the one column it writes, on the table the desired schema homes it on.
+ *
+ * `to` lowers exactly as a move's `to` does: the desired home first, then the live one, then the main path.
+ * A physical `to` passes through pinned; a logical one takes its type from the desired schema.
+ * The run only skips while the home table is absent, so the type stays a placeholder there.
+ * A field whose only reading is a derived table holds no single value, so it refuses toward its subfields.
+ * A column live on one home while the desired schema wants another refuses too.
+ * The automatic fan-out would move the column after the fill and write over the filled values.
+ */
+async function lowerFill(state: ResolveState, meta: MigrationMeta): Promise<LoweredMigration> {
+  const to = toAddress(meta);
+  if (isNull(to)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` pairs nothing with nothing`,
+      body: [
+        'A fill writes `from: null` and names the field it fills on `to`; a discard names what it drops on `from`.',
+        'Set `to` to the field to fill, or `from` to the field to discard.',
+      ],
+      path: meta.file,
+    });
+  }
+  const transform = (meta.migration as { transform?: unknown }).transform;
+  if (!isFunction<MigrationTransform>(transform)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` fills without a transform`,
+      body: [
+        'A fill reads no column, so `transform` is the only source of the values it writes.',
+        'Add a `transform` returning the value each row takes.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (switchKeysOf(to).length > 0) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` pairs a fill with a switch`,
+      body: [
+        'A fill writes values; a switch flips an attribute, asserted on `from`.',
+        'Drop the attribute from `to`, or make the migration a switch.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (!isLogicalAddress(to)) {
+    const physical = to as PhysicalAddress;
+    assertPurelyPhysical(meta, physical);
+    if (!('column' in physical)) {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` fills without a column`,
+        body: ['A fill writes one column, and the address names none.', 'Name the `column`.'],
+        path: meta.file,
+      });
+    }
+    return { kind: 'fill', to: physical, transform };
+  }
+  assertPurelyLogical(meta, to as LogicalAddress);
+  const logical = to as LogicalAddress;
+  const owner = logicalOwner(meta, logical);
+  const root = derivedRootName(owner);
+  if (isUndefined(logical.field)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` fills without a field`,
+      body: [
+        `A fill writes one field's column, and a ${ownerNoun(owner)} has none of its own.`,
+        'Name the `field`.',
+      ],
+      path: meta.file,
+    });
+  }
+  const segments = fieldSegments(meta, logical.field);
+  const desiredHome = desiredColumnHome(state, owner, segments);
+  const liveHome = await liveColumnHome(state, owner, segments);
+  const tableRead = tableReading(owner, segments);
+  if (
+    isUndefined(desiredHome) &&
+    isUndefined(liveHome) &&
+    (state.names.has(tableRead) || state.desired.some((table) => table.name === tableRead))
+  ) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` fills a composite`,
+      body: [
+        `\`${root}.${logical.field}\` is the table \`${tableRead}\`, not a column: it holds subfields, never one value.`,
+        'Fill its subfields by dot path, one migration each.',
+      ],
+      path: meta.file,
+    });
+  }
+  if (!isUndefined(desiredHome) && !isUndefined(liveHome) && desiredHome.table !== liveHome.table) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` fills a field while it flips \`translatable\``,
+      body: [
+        `\`${root}.${logical.field}\` is live on \`${liveHome.table}\` and desired on \`${desiredHome.table}\`; the flip moves the column after the fill, writing over it.`,
+        'Flip the field in one deploy, and fill it in the next.',
+      ],
+      path: meta.file,
+    });
+  }
+  const home = desiredHome?.table ?? liveHome?.table ?? columnReading(owner, segments).table;
+  return {
+    kind: 'fill',
+    to: await lowerColumn(state, meta, logical, owner, segments, 'to', state.names.has(home)),
+    transform,
   };
 }
 
