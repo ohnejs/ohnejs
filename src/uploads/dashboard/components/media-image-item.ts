@@ -57,12 +57,6 @@ export interface MediaFileTileOptions {
 
 const NOT_DISABLED: MediaItemDisabled = { value: false };
 
-const CHECKER_LIGHT =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA5SURBVHgB7dGxEQAgDELRxDHYfzVYIzoChYXnQf3vNTTJKWMAnKxWXV7AgC+APWdOKMnJckrAP8ENTFgK0Z64q28AAAAASUVORK5CYII=';
-
-const CHECKER_DARK =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA/SURBVHgB7dOhEQAgDAPAwGFrmAEGYP+dMB0AVoio6PUSnXuTS1v7PBBxv0wNHcERKDADONgHmE2qp1EElgQ/ufgHd9nZw0oAAAAASUVORK5CYII=';
-
 css`
   .o-media-image-item {
     aspect-ratio: 1;
@@ -78,7 +72,6 @@ css`
     justify-content: center;
     align-items: center;
     overflow: hidden;
-    background-image: url('${CHECKER_LIGHT}');
     background-color: hsl(var(--ohne-background));
     border: 1px solid hsl(var(--ohne-border));
     border-radius: var(--ohne-radius);
@@ -94,10 +87,6 @@ css`
       0 0 #0000;
     outline: 0.125rem solid transparent;
     outline-offset: 0.125rem;
-  }
-
-  .dark .o-media-image-item-button {
-    background-image: url('${CHECKER_DARK}');
   }
 
   .o-media-image-item-disabled .o-media-image-item-button {
@@ -327,7 +316,7 @@ export function mediaImageItem(
         href: () => detailsHref(record(), !isUndefined(options.onPick)),
         target: options.onPick ? '_blank' : undefined,
         class: () =>
-          'o-media-image-item-button ohne-raw' +
+          'o-media-image-item-button ohne-checkerboard ohne-raw' +
           (disabled().value ? ' o-media-image-item-button-disabled' : ''),
         onClick: (event: MouseEvent) => fileTileClick(record, options, event),
       },

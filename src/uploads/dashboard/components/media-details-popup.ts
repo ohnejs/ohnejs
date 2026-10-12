@@ -139,12 +139,6 @@ const COPIED_FOR = 2000;
 
 const COMPACT_FOOTER_WIDTH = 480;
 
-const CHECKER_LIGHT =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA5SURBVHgB7dGxEQAgDELRxDHYfzVYIzoChYXnQf3vNTTJKWMAnKxWXV7AgC+APWdOKMnJckrAP8ENTFgK0Z64q28AAAAASUVORK5CYII=';
-
-const CHECKER_DARK =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA/SURBVHgB7dOhEQAgDAPAwGFrmAEGYP+dMB0AVoio6PUSnXuTS1v7PBBxv0wNHcERKDADONgHmE2qp1EElgQ/ufgHd9nZw0oAAAAASUVORK5CYII=';
-
 css`
   .o-media-details-fieldset {
     border: 0;
@@ -184,14 +178,9 @@ css`
     display: flex;
     justify-content: center;
     align-items: center;
-    background-image: url('${CHECKER_LIGHT}');
     background-color: hsl(var(--ohne-background));
     transition: var(--ohne-transition);
     transition-property: box-shadow;
-  }
-
-  .dark .o-media-details-preview-image {
-    background-image: url('${CHECKER_DARK}');
   }
 
   .o-media-details-image-frame {
@@ -669,12 +658,19 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
           canEdit
             ? h(
                 'div',
-                { class: 'o-media-details-preview-image o-media-details-focal-surface' },
+                {
+                  class:
+                    'o-media-details-preview-image o-media-details-focal-surface ohne-checkerboard',
+                },
                 imageFrame(),
               )
             : h(
                 'a',
-                { href: url, target: '_blank', class: 'o-media-details-preview-image' },
+                {
+                  href: url,
+                  target: '_blank',
+                  class: 'o-media-details-preview-image ohne-checkerboard',
+                },
                 imageFrame(),
               ),
         )
@@ -896,7 +892,8 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
         {
           href: variantURL,
           target: '_blank',
-          class: 'o-media-details-variant-preview o-media-details-preview-image ohne-raw',
+          class:
+            'o-media-details-variant-preview o-media-details-preview-image ohne-checkerboard ohne-raw',
         },
         when(
           () => failed.value,
