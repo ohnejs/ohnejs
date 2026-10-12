@@ -36,6 +36,7 @@ In `record`, each [block](../database/blocks.md) reads as `{ block, UUID, fields
 - A related record shows exactly what its collection's read access shows the visitor. To hide a
   field from the site, narrow that access with [`select`](../api/collections.md#the-scope) or mark
   the field [`readable: false`](../database/collections.md#write-only-and-locked-fields).
+- The types follow that access: a narrowed collection is typed with its selected fields alone.
 - A translatable value, an upload's `description` included, reads `null` in a locale without a
   translation. The CMS never substitutes another language, so fall back on the site, as in
   `upload.description ?? ''`.
@@ -119,9 +120,13 @@ The path is relative to your project. `ohne serve` never writes it.
 
 In CI, `ohne prepare` or `ohne cms types` writes the same file.
 
-`/cms/types.ts` is public, like the pages it describes: it shows only what an anonymous visitor can
-read. When your pages are not public, [override](../api/routes.md#routes-across-layers)
-`GET /cms/types.ts` in your app and call `requireUser()` there.
+`/cms/types.ts` is public, like the pages it describes: it shows only what a visitor without a
+session can read. Each collection's read access is asked as that visitor, so a collection that
+refuses them is left out and a [`select`](../api/collections.md#the-scope) narrows its fields. Such
+an access answers without a request, as `publishedScope` does: read the visitor with `useUser`,
+never `useEvent`. When your pages are not public,
+[override](../api/routes.md#routes-across-layers) `GET /cms/types.ts` in your app and call
+`requireUser()` there.
 
 ## Rich text and links
 
