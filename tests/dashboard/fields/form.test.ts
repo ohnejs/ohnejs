@@ -162,6 +162,21 @@ describe('form', () => {
     });
   });
 
+  it('shows the messages of a failed `read` and `readPatch` on their rows', () => {
+    scoped(() => {
+      const raid = form({ fields });
+      raid.read();
+      flush();
+      strictEqual(raid.element.textContent.includes('validation.required'), true);
+      type(inputs(raid.element)[0] as FakeElement, 'Thrall of the Horde');
+      deepStrictEqual(structuredClone(raid.readPatch()), {
+        errors: { leader: 'validation.maxLength' },
+      });
+      flush();
+      strictEqual(raid.element.textContent.includes('validation.maxLength'), true);
+    });
+  });
+
   it('places server messages and returns the first it cannot place', () => {
     scoped(() => {
       const raid = form({ fields });

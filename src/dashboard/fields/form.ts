@@ -211,7 +211,9 @@ export function fieldInput<K extends FieldTypeName, O>(
       path: '',
       language: () => useDashboardLanguage().value,
       onInput() {
-        const value = (inner.read().value as Readonly<Record<string, unknown>> | undefined)?.[name];
+        const reading = inner.read();
+        inner.setErrors(reading.errors ?? {});
+        const value = (reading.value as Readonly<Record<string, unknown>> | undefined)?.[name];
         if (isUndefined(value)) return;
         written = value;
         model.value = value as FieldValue<K, O>;
@@ -339,6 +341,7 @@ export function form<const F extends FieldSpecs>(options: FormOptions<F>): Form<
     current: FieldForm,
     errors: Readonly<Record<string, string>>,
   ): { errors: Readonly<Record<string, string>> } => {
+    current.setErrors(errors);
     current.focusError();
     return { errors };
   };

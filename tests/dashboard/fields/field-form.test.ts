@@ -3,12 +3,15 @@ import { describe, it } from 'node:test';
 
 import type { DashboardField } from '../../../src/dashboard/runtime/meta-types.ts';
 
+import { computed } from '../../../src/utils/reactive/computed.ts';
 import { effectScope } from '../../../src/utils/reactive/effect-scope.ts';
 import { inputOf, type } from './_controls.ts';
 
 const { createFieldForm } = await import('../../../src/dashboard/fields/field-form.ts');
 const { h } = await import('../../../src/dashboard/render/h.ts');
 await import('../../../src/dashboard/fields/builtin/text.ts');
+await import('../../../src/dashboard/fields/builtin/repeater.ts');
+await import('../../../src/dashboard/fields/builtin/object.ts');
 
 /**
  * A plain `text` column described as the server describes it.
@@ -31,10 +34,30 @@ function textField(name: string, overrides: Partial<DashboardField> = {}): Dashb
   };
 }
 
+/**
+ * A composite field the server describes, holding one required `text` subfield.
+ */
+function compositeField(
+  name: string,
+  type: 'repeater' | 'object',
+  subfield: string,
+): DashboardField {
+  return {
+    ...textField(name, { required: false }),
+    type,
+    kind: type === 'repeater' ? 'childMany' : 'childOne',
+    logicalType: undefined,
+    subfields: [textField(subfield)],
+  };
+}
+
+const roster = compositeField('roster', 'repeater', 'name');
+const meta = compositeField('meta', 'object', 'title');
+
 const language = (): string => 'en';
 
 describe('createFieldForm', () => {
-  it('reads an empty required field on create as `validation.required` and shows it', () => {
+  it('reads an empty required field on create as `validation.required` without showing it', () => {
     effectScope().run(() => {
       const form = createFieldForm([textField('raid')], undefined, {
         mode: 'create',
@@ -42,8 +65,73 @@ describe('createFieldForm', () => {
         language,
       });
       deepStrictEqual(structuredClone(form.read()), { errors: { raid: 'validation.required' } });
+      strictEqual(form.controlOf('raid')?.error(), '');
+      strictEqual(form.errored(), false);
+      strictEqual(form.focusError(), false);
+    });
+  });
+
+  it('shows a failed read through `setErrors`', () => {
+    effectScope().run(() => {
+      const form = createFieldForm([textField('raid')], undefined, {
+        mode: 'create',
+        path: '',
+        language,
+      });
+      strictEqual(form.setErrors(form.read().errors ?? {}), '');
       strictEqual(form.controlOf('raid')?.error(), 'validation.required');
       strictEqual(form.errored(), true);
+      strictEqual(form.focusError(), true);
+    });
+  });
+
+  it('reads a changed value that fails its check quietly, and shows it through `setErrors`', () => {
+    effectScope().run(() => {
+      const form = createFieldForm(
+        [textField('raid', { options: { max: 4 } })],
+        { raid: 'Ony' },
+        { mode: 'edit', path: '', language },
+      );
+      const element = h('div', null, form.render());
+      type(inputOf(element), 'Naxxramas');
+      const reading = form.read();
+      deepStrictEqual(structuredClone(reading), { errors: { raid: 'validation.maxLength' } });
+      deepStrictEqual(structuredClone(form.readPatch()), structuredClone(reading));
+      strictEqual(form.controlOf('raid')?.error(), '');
+      strictEqual(form.setErrors(reading.errors ?? {}), '');
+      strictEqual(form.controlOf('raid')?.error(), 'validation.maxLength');
+    });
+  });
+
+  it('reads an empty required field in a nested item quietly, and routes it back through `setErrors`', () => {
+    effectScope().run(() => {
+      const form = createFieldForm(
+        [roster, meta],
+        { roster: [{}], meta: {} },
+        { mode: 'edit', path: '', language },
+      );
+      const reading = form.read();
+      deepStrictEqual(structuredClone(reading), {
+        errors: { 'roster[0].name': 'validation.required', 'meta.title': 'validation.required' },
+      });
+      strictEqual(form.errored(), false);
+      strictEqual(form.setErrors(reading.errors ?? {}), '');
+      strictEqual(form.controlOf('roster')?.errored?.(), true);
+      strictEqual(form.controlOf('meta')?.errored?.(), true);
+      strictEqual(form.setErrors({}), '');
+      strictEqual(form.errored(), false);
+    });
+  });
+
+  it('snapshots a nested item quietly inside a `computed`, as an undo history does on every change', () => {
+    effectScope().run(() => {
+      const form = createFieldForm(
+        [roster],
+        { roster: [{}] },
+        { mode: 'edit', path: '', language },
+      );
+      deepStrictEqual(computed(() => form.snapshot()).value, {});
+      strictEqual(form.errored(), false);
     });
   });
 

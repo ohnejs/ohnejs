@@ -152,6 +152,7 @@ export interface FieldControl {
 
   /**
    * Parses the current state into its wire value, or into the messages that block the write.
+   * It shows nothing: the hosting form routes the messages back through `setErrors`.
    */
   read(): ControlReading;
 

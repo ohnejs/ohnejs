@@ -122,6 +122,7 @@ export interface FieldFormOptions {
  * Writable fields without one carry their stored value through unchanged.
  * A whole-item write therefore never blanks them.
  * The form is itself control-shaped, so composites nest it for their items.
+ * Reading never shows a message: `setErrors` is the one way a message reaches a row.
  *
  * A field whose `when` gate fails hides and drops out of reads, dirt, and focus.
  * A computed default never reaches the browser, so a gate reading one sees `undefined` until it is set.
@@ -140,27 +141,28 @@ export interface FieldForm {
 
   /**
    * Reads the whole value: every control's current value beside the carried fields.
-   * Any control that fails to parse blocks the read with its messages instead, shown on their rows.
+   * Any control that fails to parse blocks the read with its messages instead.
    * So does a required field left without a value, with `validation.required`, as the server would.
    * A top-level edit form skips that check, since an update leaves an omitted field as it is.
+   * Nothing shows, so a live consumer may read on every change; a save passes the messages to `setErrors`.
    */
   read(): ControlReading;
 
   /**
    * Reads only the dirty fields, for a partial `PATCH`; carried fields never appear.
-   * Failures block it and show exactly as they do for `read`.
+   * Failures block it exactly as they do for `read`, and show nothing either.
    */
   readPatch(): ControlReading;
 
   /**
    * Reads the whole value as far as it parses: a control that fails to parse keeps its `fallback` value.
    * An undo history passes its current state, so one field mid-edit never stalls the rest.
-   * Nothing is checked or shown, so a copy of an item mid-edit reads quietly too.
+   * Required fields go unchecked, so a copy of an item mid-edit reads whole too.
    */
   snapshot(fallback?: Readonly<Record<string, unknown>>): Record<string, unknown>;
 
   /**
-   * Routes server messages onto the form's controls, keyed relative to the form.
+   * Routes messages onto the form's controls, keyed relative to the form: a failed `read`'s, or the server's.
    * Each call replaces the previous routing, so `{}` clears every routed message.
    * Returns the first message that matched no control, or `''` when every message placed.
    */
@@ -339,7 +341,7 @@ export function createFieldForm(
     (field) => rowByName.has(field.name) || lockedByName.has(field.name) || statics.includes(field),
   );
 
-  // A checked gather is a real read: required rows are enforced and every failure shows on its row.
+  // A checked gather is a real read: required rows are enforced, as the server would.
   const gather = (
     selected: readonly ControlRow[],
     withCarry: boolean,
@@ -365,7 +367,6 @@ export function createFieldForm(
           : undefined;
       const failed = isUndefined(failure) ? reading.errors : { '': translateMessage(failure) };
       if (!isUndefined(failed)) {
-        if (checked) row.control.setErrors(failed);
         for (const [key, message] of Object.entries(failed)) {
           errors[joinPath(row.field.name, key)] = message;
         }

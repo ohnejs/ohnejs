@@ -162,7 +162,7 @@ export const linkType: FieldType<LinkFieldOptions> = {
     return {
       element: h('div', { class: 'ohne-row' }, target, tools),
       read() {
-        const problem = address?.check() ?? '';
+        const problem = address?.problem() ?? '';
         if (problem !== '') return { errors: { '': problem } };
         if (!touched.value && isUndefined(base)) return {};
         if (isNull(current.value) && !field.nullable) return {};
@@ -212,14 +212,14 @@ function collectionsOf(field: DashboardField): string[] {
 interface AddressInput {
   element: HTMLElement;
   input: HTMLInputElement;
-  check(): string;
+  problem(): string;
   sync(): void;
 }
 
 /**
  * The text input of a `link` field that allows only addresses.
  * Its text reads through `typedHref`, so `example.com` becomes `https://example.com`.
- * Text that reads as no safe address leaves the link as it was, and `check` and blur report it in `invalid`.
+ * Text that reads as no safe address leaves the link as it was: `problem` names it, blur shows it.
  */
 function addressInput(
   current: Ref<Link | null>,
@@ -240,10 +240,7 @@ function addressInput(
     if (isUndefined(url) || !isSafeHref(url)) return undefined;
     return linkOf({ url }, { newTab: untracked(() => current.value?.newTab) });
   };
-  const check = (): string => {
-    invalid.value = isUndefined(read()) ? t('dashboard.link.unsafeURL') : '';
-    return invalid.value;
-  };
+  const problem = (): string => (isUndefined(read()) ? t('dashboard.link.unsafeURL') : '');
   const element = textInput(raw, {
     disabled: () => disabled,
     placeholder: () => t('dashboard.link.urlPlaceholder'),
@@ -254,11 +251,13 @@ function addressInput(
     const next = read();
     change(isUndefined(next) ? untracked(() => current.value) : next);
   });
-  input.addEventListener('blur', check);
+  input.addEventListener('blur', () => {
+    invalid.value = problem();
+  });
   return {
     element,
     input,
-    check,
+    problem,
     sync() {
       raw.value = urlOf();
       invalid.value = '';
