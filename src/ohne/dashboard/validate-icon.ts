@@ -7,13 +7,15 @@ import { iconNames, isIconName } from './icon-shapes.ts';
  * The type already narrows this for a TypeScript caller, and the check catches a plain-JS one.
  * A row that would silently render no icon becomes a named failure at boot.
  * `option` names the declaring key, like `dashboard.icon`; `scope` places it, like `` in block `Hero` ``.
+ * Pass `path` when the icon comes from a file, so the error lands on it.
  */
-export function validateIcon(icon: unknown, option: string, scope: string): void {
+export function validateIcon(icon: unknown, option: string, scope: string, path?: string): void {
   if (isUndefined(icon)) return;
   if (!isString(icon)) {
     throw ohneError({
       title: `Invalid \`${option}\` declaration`,
       body: [`The \`${option}\` option${scope} must be an icon name.`],
+      path,
     });
   }
   if (isIconName(icon)) return;
@@ -26,5 +28,6 @@ export function validateIcon(icon: unknown, option: string, scope: string): void
         ? 'Every icon is a Tabler original; browse the names at `https://tabler.io/icons`.'
         : `Did you mean \`${near}\`?`,
     ],
+    path,
   });
 }

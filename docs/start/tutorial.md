@@ -184,7 +184,7 @@ the raw `Response`.
 [`each`](../dashboard/rendering.md#lists) renders a keyed list. Function children
 like `() => post().title` are reactive: when `posts.value` changes, only the changed nodes update.
 
-The page works by URL right away, but the sidebar lists only what the config names. Add a row in
+The page works by URL right away, but the sidebar does not know about it. Add a link in
 `ohne.config.ts`:
 
 ```ts
@@ -194,27 +194,17 @@ import { defineConfig } from 'ohnejs';
 export default defineConfig({
   layers: ['ohnejs/base'],
   dashboard: {
-    menu: [
-      {
-        items: [
-          { to: '/overview', label: 'dashboard.overview.title', icon: 'layout-dashboard' },
-          { to: '/posts', label: 'Posts', icon: 'article' },
-        ],
-      },
-    ],
+    menu: {
+      posts: { parent: 'general', to: '/posts', label: 'Posts', icon: 'article' },
+    },
   },
 });
 ```
 
-A declared `menu` replaces the default one:
-
-- The first row brings back the overview, labeled with the layer's own message key.
-- The second row is yours. `to` is the page's path, `label` shows as written, and `icon` names a
-  [Tabler icon](https://tabler.io/icons).
-
-Collections you leave out of the menu still appear, in their own group at the end. Here, that is
-`Sessions` and `Users`. [The sidebar](../dashboard/pages.md#the-sidebar) covers groups, headings,
-and translated labels.
+`posts` is the link's id. `parent: 'general'` puts it in the first section, below the overview. `to`
+is the page's path, `label` shows as written, and `icon` names a
+[Tabler icon](https://tabler.io/icons). [The sidebar](../dashboard/pages.md#the-sidebar) covers
+sections, nesting, and moving what a layer declares.
 
 One last file. Browser code type-checks against DOM types, not Node's, so the root `tsconfig.json`
 excludes `dashboard/`. Give the dashboard its own
@@ -327,14 +317,9 @@ import { defineConfig } from 'ohnejs';
 export default defineConfig({
   layers: ['ohnejs/base'],
   dashboard: {
-    menu: [
-      {
-        items: [
-          { to: '/overview', label: 'dashboard.overview.title', icon: 'layout-dashboard' },
-          { to: '/posts', label: 'Posts', icon: 'article' },
-        ],
-      },
-    ],
+    menu: {
+      posts: { parent: 'general', to: '/posts', label: 'Posts', icon: 'article' },
+    },
   },
 });
 ```

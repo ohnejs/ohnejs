@@ -1,7 +1,7 @@
 import {
   type Child,
   css,
-  type DashboardMenuGroup,
+  type DashboardMenuItem,
   dashboardMeta,
   each,
   h,
@@ -14,7 +14,9 @@ import {
   type VerticalMenuItemModel,
   when,
 } from 'ohnejs/dashboard';
-import { isEmpty, isUndefined, withTrailingSlash } from 'ohnejs/utils';
+import { flattenTree, isEmpty, isUndefined, ref, type Ref, withTrailingSlash } from 'ohnejs/utils';
+
+import { type MenuSection, menuSections } from './menu-sections.ts';
 
 css`
   .o-menu-wrapper > * + * {
@@ -24,35 +26,44 @@ css`
 
 /**
  * The sidebar menu column.
- * Each discovery menu group renders one `verticalMenu`, the group label as its uppercase title.
- * An empty label renders the list without one, and each group row contributes one link.
- * The row whose target sits closest above the route is active, so record pages highlight their collection.
- * A row's icon renders before its label.
- * The discovery data carries no submenus, so the menu stays flat.
+ * Each menu section renders one `verticalMenu`, its label as the uppercase title.
+ * A nested group renders as a row that expands to show its nodes.
+ * Every section shares one expanded state, keyed by node id, so a section reshaped per user keeps it.
+ * The link whose target sits closest above the route is active, and its groups expand to show it.
+ * A node's icon renders before its label.
  */
 export function sidebar(): HTMLElement {
   const t = useT();
+  const expandedState = ref<Record<string, boolean>>({});
   return h(
     'div',
     { class: 'o-menu-wrapper' },
     each(
-      () => dashboardMeta()?.menu ?? [],
-      (_, index) => index,
-      (group) => menuSection(group, t),
+      () => menuSections(dashboardMeta()?.menu ?? []),
+      (section) => section.key,
+      (section) => menuSection(section, expandedState, t),
     ),
   );
 }
 
 /**
- * One menu group, rendered only while it holds a row.
+ * One menu section, rendered only while it holds a node.
  */
-function menuSection(group: () => DashboardMenuGroup, t: Translate): Child {
+function menuSection(
+  section: () => MenuSection,
+  expandedState: Ref<Record<string, boolean>>,
+  t: Translate,
+): Child {
   return when(
-    () => !isEmpty(group().items),
+    () => !isEmpty(section().items),
     () =>
       verticalMenu({
-        title: group().label === '' ? undefined : () => translateMessage(group().label),
-        items: () => itemsOf(group()),
+        title: section().label === '' ? undefined : () => translateMessage(section().label),
+        items: () => {
+          const active = activeTarget(dashboardMeta()?.menu ?? [], useRoute()?.path ?? '/');
+          return section().items.map((node) => menuModel(node, active));
+        },
+        expandedState,
         ariaCollapseLabel: () => t('dashboard.menu.collapse'),
         ariaExpandLabel: () => t('dashboard.menu.expand'),
       }),
@@ -60,38 +71,34 @@ function menuSection(group: () => DashboardMenuGroup, t: Translate): Child {
 }
 
 /**
- * The group's rows as menu models, the one row whose target holds the route most closely active.
+ * One node as a menu model, its children as its submenu, the node targeting `active` lit.
  */
-function itemsOf(group: DashboardMenuGroup): VerticalMenuItemModel[] {
-  const active = activeTarget(dashboardMeta()?.menu ?? [], useRoute()?.path ?? '/');
-  return group.items.map((entry) => {
-    const item: VerticalMenuItemModel = {
-      to: entry.to,
-      label: translateMessage(entry.label),
-      active: entry.to === active,
-    };
-    if (!isUndefined(entry.icon)) item.icon = icon(entry.icon);
-    return item;
-  });
+function menuModel(node: DashboardMenuItem, active: string | undefined): VerticalMenuItemModel {
+  const model: VerticalMenuItemModel = { id: node.id, label: translateMessage(node.label) };
+  if (!isUndefined(node.to)) {
+    model.to = node.to;
+    model.active = node.to === active;
+  }
+  if (!isUndefined(node.icon)) model.icon = icon(node.icon);
+  if (!isUndefined(node.children)) {
+    model.submenu = node.children.map((child) => menuModel(child, active));
+  }
+  return model;
 }
 
 /**
- * The target across every menu group that sits closest above `path`: an exact match, else the longest prefix.
+ * The target across the whole menu that sits closest above `path`: an exact match, else the longest prefix.
  * `/kit/charts` lights `/kit/charts` over `/kit`, and a record page lights its collection.
  */
-export function activeTarget(
-  menu: readonly DashboardMenuGroup[],
-  path: string,
-): string | undefined {
+export function activeTarget(menu: readonly DashboardMenuItem[], path: string): string | undefined {
   const here = withTrailingSlash(path);
   let best: string | undefined;
-  for (const group of menu) {
-    for (const { to } of group.items) {
-      const target = withTrailingSlash(to);
-      // Every path sits under the root, so a row targeting it matches exactly instead.
-      const holds = target === '/' ? here === '/' : here.startsWith(target);
-      if (holds && to.length > (best?.length ?? -1)) best = to;
-    }
+  for (const { to } of flattenTree(menu)) {
+    if (isUndefined(to)) continue;
+    const target = withTrailingSlash(to);
+    // Every path sits under the root, so a link targeting it matches exactly instead.
+    const holds = target === '/' ? here === '/' : here.startsWith(target);
+    if (holds && to.length > (best?.length ?? -1)) best = to;
   }
   return best;
 }

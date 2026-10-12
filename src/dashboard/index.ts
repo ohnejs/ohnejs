@@ -139,7 +139,6 @@ export type {
   DashboardBlock,
   DashboardCollection,
   DashboardField,
-  DashboardMenuGroup,
   DashboardMenuItem,
   DashboardMeta,
   DashboardOperation,

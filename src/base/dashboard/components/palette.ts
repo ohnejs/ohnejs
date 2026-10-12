@@ -26,6 +26,7 @@ import {
   debounce,
   groupBy,
   effect,
+  flattenTree,
   isComposing,
   isEmpty,
   isNull,
@@ -38,6 +39,7 @@ import {
   untracked,
 } from 'ohnejs/utils';
 
+import { menuSections } from './menu-sections.ts';
 import { type PaletteTab, paletteSlots } from './palette-slots.ts';
 import {
   closePalette,
@@ -515,9 +517,11 @@ function paletteMeta(meta: DashboardMeta | undefined): PaletteMeta {
       ...collection,
       fields: paletteFields(collection.fields),
     })),
-    menu: meta.menu.map((group) => ({
-      label: translateMessage(group.label),
-      items: group.items.map((item) => ({ to: item.to, label: translateMessage(item.label) })),
+    menu: menuSections(meta.menu).map((section) => ({
+      label: translateMessage(section.label),
+      items: flattenTree(section.items).flatMap(({ to, label }) =>
+        isUndefined(to) ? [] : [{ to, label: translateMessage(label) }],
+      ),
     })),
     blocks: meta.blocks.map((block) => ({
       name: block.name,

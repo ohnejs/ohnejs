@@ -1,10 +1,10 @@
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { type BucketCodegen, readLayerConfig } from '../../../src/ohne/index.ts';
+import { type BucketCodegen, isOhneError, readLayerConfig } from '../../../src/ohne/index.ts';
 
 describe('readLayerConfig', () => {
   let root: string;
@@ -33,6 +33,21 @@ describe('readLayerConfig', () => {
     );
 
     mkdirSync(join(root, 'plain'), { recursive: true });
+
+    const appMenu = join(root, 'app-menu');
+    mkdirSync(appMenu, { recursive: true });
+    writeFileSync(
+      join(appMenu, 'ohne.config.ts'),
+      "export default { dashboard: { menu: { reports: { to: 'reports' } } } }\n",
+    );
+
+    const layerMenu = join(root, 'layer-menu');
+    mkdirSync(layerMenu, { recursive: true });
+    writeFileSync(join(layerMenu, 'ohne.config.ts'), 'export default {}\n');
+    writeFileSync(
+      join(layerMenu, 'ohne.layer.ts'),
+      'export default { defaults: { dashboard: { menu: { reports: { order: NaN } } } } }\n',
+    );
   });
 
   after(() => {
@@ -83,5 +98,19 @@ describe('readLayerConfig', () => {
     writeFileSync(file, "export default { dirs: { api: 'two' } }\n");
     deepStrictEqual((await readLayerConfig(dir))?.input, { dirs: { api: 'one' } });
     deepStrictEqual((await readLayerConfig(dir, { fresh: true }))?.input, { dirs: { api: 'two' } });
+  });
+
+  it('refuses a malformed menu node, on the file that declares it', async () => {
+    for (const [dir, file] of [
+      ['app-menu', 'ohne.config.ts'],
+      ['layer-menu', 'ohne.layer.ts'],
+    ]) {
+      await rejects(readLayerConfig(join(root, dir)), (error: unknown) => {
+        ok(isOhneError(error));
+        strictEqual(error.title, 'Invalid menu node `reports`');
+        strictEqual(error.path, join(root, dir, file));
+        return true;
+      });
+    }
   });
 });

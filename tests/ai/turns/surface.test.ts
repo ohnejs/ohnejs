@@ -15,6 +15,7 @@ import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
 import { useSkills } from '../../../src/ohne/skills/use-skills.ts';
+import { flattenTree } from '../../../src/utils/index.ts';
 import { call, route, signIn, withAI } from '../_fixture.ts';
 
 interface Rendered {
@@ -375,42 +376,39 @@ describe('renderSurface', () => {
     });
   });
 
-  it('lists the sidebar rows and the account page under `# Your pages`', async () => {
+  it('lists the sidebar links and the account page under `# Your pages`', async () => {
     await withAI(undefined, async () => {
       const { text, pages } = await surfaceFor(officer.token);
       deepStrictEqual(pages, [
         '/overview',
-        '/collections/items',
-        '/collections/guilds',
         '/collections/characters',
+        '/collections/guilds',
+        '/collections/items',
         '/account',
       ]);
-      match(text, /\n# Your pages\n- \/overview: .+\n- \/collections\/items: Items\n/);
+      match(text, /\n# Your pages\n- \/overview: .+\n- \/collections\/characters: Characters\n/);
       ok(text.indexOf('# Your routes') < text.indexOf('# Your pages'));
     });
   });
 
-  it('drops a link off this origin, a closed page, and the rows of a denied collection', async () => {
+  it('drops a link off this origin, a closed page, and the links of a denied collection', async () => {
     const menu = {
-      items: [
-        'Guilds',
-        'Items',
-        { to: 'https://docs.example.com', label: 'Docs' },
-        { to: '//evil.example.com', label: 'Evil' },
-        { to: '/logout?next=/', label: 'Sign out' },
-        { to: '/collections/guilds/archive', label: 'Archive' },
-        { to: '/reports?range=week', label: 'Weekly' },
-        { to: '/collections/items', label: 'Items again' },
-      ],
+      docs: { to: 'https://docs.example.com', label: 'Docs' },
+      evil: { to: '//evil.example.com', label: 'Evil' },
+      signOut: { to: '/logout?next=/', label: 'Sign out' },
+      archive: { to: '/collections/guilds/archive', label: 'Archive' },
+      weekly: { to: '/reports?range=week', label: 'Weekly' },
+      itemsAgain: { to: '/collections/items', label: 'Items again' },
     };
     const ai = { deny: { collections: [...AI_DEFAULTS.deny.collections, 'Guilds'] } };
-    useLayers().add({ path: '/pages-test/app', input: { ai, dashboard: { menu: [menu] } } });
+    useLayers().add({ path: '/pages-test/app', input: { ai, dashboard: { menu } } });
     try {
       const { text, pages } = await surfaceFor(officer.token);
       deepStrictEqual(pages, [
+        '/overview',
+        '/collections/characters',
         '/collections/items',
         '/reports?range=week',
-        '/collections/characters',
         '/account',
       ]);
       ok(text.includes('- /collections/items: Items\n'));
@@ -425,7 +423,7 @@ describe('renderSurface', () => {
     guilds.dashboard = { ...dashboard, recordPath: '/guilds?details=[uuid]' };
     hook('dashboard:menu', (menu) => [
       ...menu,
-      { label: '', items: [{ to: '/guilds', label: 'Guild hall' }] },
+      { id: 'guildHall', label: 'Guild hall', to: '/guilds' },
     ]);
     const ai = { deny: { collections: [...AI_DEFAULTS.deny.collections, 'Guilds'] } };
     try {
@@ -441,16 +439,13 @@ describe('renderSurface', () => {
     }
   });
 
-  it('lists a row the `dashboard:menu` hook adds or rewrites', async () => {
-    hook('dashboard:menu', (menu) => [
-      ...menu.map((group) => ({
-        ...group,
-        items: group.items.map((item) =>
-          item.to === '/collections/items' ? { ...item, to: '/media' } : item,
-        ),
-      })),
-      { label: '', items: [{ to: '/audit', label: 'Audit' }] },
-    ]);
+  it('lists a link the `dashboard:menu` hook adds or rewrites, however deep', async () => {
+    hook('dashboard:menu', (menu) => {
+      for (const node of flattenTree(menu)) {
+        if (node.to === '/collections/items') node.to = '/media';
+      }
+      menu.push({ id: 'audit', label: 'Audit', to: '/audit' });
+    });
     try {
       await withAI(undefined, async () => {
         const { text, pages } = await surfaceFor(officer.token);

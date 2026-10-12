@@ -201,8 +201,11 @@
   "menu": {
     "collapse": "Einklappen",
     "collapseAll": "Alle einklappen",
+    "collections": "Sammlungen",
     "expand": "Ausklappen",
-    "expandAll": "Alle ausklappen"
+    "expandAll": "Alle ausklappen",
+    "management": "Verwaltung",
+    "utilities": "Werkzeuge"
   },
   "new": "Neu",
   "no": "Nein",

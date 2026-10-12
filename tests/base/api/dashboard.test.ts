@@ -6,7 +6,7 @@ import type { AnyHandler, Route } from '../../../src/ohne/routes/route.ts';
 
 import dashboardGet, {
   type DashboardBlock,
-  type DashboardMenuGroup,
+  type DashboardMenuItem,
   type DashboardMeta,
 } from '../../../src/base/api/dashboard.get.ts';
 import { hashSessionToken } from '../../../src/base/auth/_token.ts';
@@ -29,6 +29,7 @@ import { useFields } from '../../../src/ohne/fields/use-fields.ts';
 import { hook } from '../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { dispatch } from '../../../src/ohne/http/dispatch.ts';
+import { DEFAULTS } from '../../../src/ohne/layers/config.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
@@ -49,24 +50,25 @@ usePrinter().configure({ stream: { write: () => true } });
 
 useLayers().add({
   path: '/dashboard-test',
+  defaults: DEFAULTS,
   input: {
     auth: { password: { cost: 1024 } },
     collections: { locales: ['en', 'de'], defaultLocale: 'en' },
     dashboard: {
-      menu: [
-        {
-          label: 'Content',
-          items: [
-            'DashNotes',
-            { to: '/reports', label: 'dash.menu.reports', icon: 'chart-bar' },
-            'DashClosed',
-          ],
+      menu: {
+        content: { order: 1, label: 'Content' },
+        DashNotes: { parent: 'content', order: 1 },
+        reports: {
+          parent: 'content',
+          order: 2,
+          to: '/reports',
+          label: 'dash.menu.reports',
+          icon: 'chart-bar',
         },
-        {
-          label: { key: 'dashMenu.tools', params: { n: 2 } },
-          items: [{ to: '/tools', label: 'Tools' }],
-        },
-      ],
+        DashClosed: { parent: 'content', order: 3 },
+        tools: { order: 2, label: { key: 'dashMenu.tools', params: { n: 2 } } },
+        toolbox: { parent: 'tools', to: '/tools', label: 'Tools' },
+      },
     },
   },
 });
@@ -367,11 +369,10 @@ function names(body: DashboardMeta): string[] {
   return body.collections.map((collection) => collection.name);
 }
 
-function menuPaths(body: DashboardMeta): { label: DashboardMenuGroup['label']; items: string[] }[] {
-  return body.menu.map((group) => ({
-    label: group.label,
-    items: group.items.map((item) => item.to),
-  }));
+type Outline = (string | { [id: string]: Outline })[];
+
+function outline(menu: DashboardMenuItem[]): Outline {
+  return menu.map((node) => (node.children ? { [node.id]: outline(node.children) } : node.id));
 }
 
 function collection(body: DashboardMeta, name: string): DashboardCollection {
@@ -509,10 +510,7 @@ describe('routes', () => {
     try {
       const { body } = await call(admin);
       deepStrictEqual(names(body), []);
-      deepStrictEqual(menuPaths(body), [
-        { label: 'Content', items: ['/reports'] },
-        { label: { key: 'dashMenu.tools', params: { n: 2 } }, items: ['/tools'] },
-      ]);
+      deepStrictEqual(outline(body.menu), [{ content: ['reports'] }, { tools: ['toolbox'] }]);
     } finally {
       await serve();
     }
@@ -751,105 +749,70 @@ describe('layout', () => {
 });
 
 describe('menu', () => {
-  it('folds the configured groups over the accessible collections, the rest trailing', async () => {
-    deepStrictEqual(menuPaths((await call(user)).body), [
-      { label: 'Content', items: ['/collections/dash-notes', '/reports'] },
-      { label: { key: 'dashMenu.tools', params: { n: 2 } }, items: ['/tools'] },
-      {
-        label: '',
-        items: [
-          '/collections/sessions',
-          '/collections/dash-owners',
-          '/collections/dash-public',
-          '/collections/dash-people',
-          '/collections/dash-articles',
-          '/collections/dash-labels',
-          '/collections/dash-pages',
-          '/collections/dash-metrics',
-          '/collections/dash-kinds',
-          '/collections/dash-settings',
-        ],
-      },
+  it('nests the declared nodes, the unplaced collections at the root by id', async () => {
+    deepStrictEqual(outline((await call(user)).body.menu), [
+      { content: ['DashNotes', 'reports'] },
+      { tools: ['toolbox'] },
+      'DashArticles',
+      'DashKinds',
+      'DashLabels',
+      'DashMetrics',
+      'DashOwners',
+      'DashPages',
+      'DashPeople',
+      'DashPublic',
+      'DashSettings',
+      'Sessions',
     ]);
   });
 
-  it('scopes the groups per user', async () => {
-    deepStrictEqual(menuPaths((await call(admin)).body), [
-      { label: 'Content', items: ['/collections/dash-notes', '/reports'] },
-      { label: { key: 'dashMenu.tools', params: { n: 2 } }, items: ['/tools'] },
-      {
-        label: '',
-        items: [
-          '/collections/users',
-          '/collections/sessions',
-          '/collections/dash-owners',
-          '/collections/dash-public',
-          '/collections/dash-people',
-          '/collections/dash-denied',
-          '/collections/dash-articles',
-          '/collections/dash-labels',
-          '/collections/dash-pages',
-          '/collections/dash-metrics',
-          '/collections/dash-kinds',
-          '/collections/dash-settings',
-        ],
-      },
+  it('scopes the nodes per user', async () => {
+    deepStrictEqual(outline((await call(admin)).body.menu), [
+      { content: ['DashNotes', 'reports'] },
+      { tools: ['toolbox'] },
+      'DashArticles',
+      'DashDenied',
+      'DashKinds',
+      'DashLabels',
+      'DashMetrics',
+      'DashOwners',
+      'DashPages',
+      'DashPeople',
+      'DashPublic',
+      'DashSettings',
+      'Sessions',
+      'Users',
     ]);
   });
 
-  it('resolves a collection row to its list route, sentence-cased label, and declared icon', async () => {
+  it('resolves a collection node to its list route, sentence-cased label, and declared icon', async () => {
     const { menu } = (await call(admin)).body;
-    deepStrictEqual(menu[0]?.items[0], { to: '/collections/dash-notes', label: 'Dash notes' });
-    deepStrictEqual(menu[2]?.items[0], {
-      to: '/collections/users',
+    deepStrictEqual(menu[0]?.children?.[0], {
+      id: 'DashNotes',
+      label: 'Dash notes',
+      to: '/collections/dash-notes',
+    });
+    deepStrictEqual(menu.at(-1), {
+      id: 'Users',
       label: 'Users',
+      to: '/collections/users',
       icon: 'users',
     });
   });
 
-  it('ships a declared link as authored, its label the declared message', async () => {
+  it('ships a declared node as authored, its label the declared message', async () => {
     const { menu } = (await call(user)).body;
-    deepStrictEqual(menu[0]?.items[1], {
-      to: '/reports',
+    deepStrictEqual(menu[0]?.children?.[1], {
+      id: 'reports',
       label: 'dash.menu.reports',
+      to: '/reports',
       icon: 'chart-bar',
     });
     deepStrictEqual(menu[1], {
+      id: 'tools',
       label: { key: 'dashMenu.tools', params: { n: 2 } },
-      items: [{ to: '/tools', label: 'Tools' }],
+      children: [{ id: 'toolbox', label: 'Tools', to: '/tools' }],
     });
-  });
-
-  it('leads with the overview row when no menu is declared, the collections trailing', async () => {
-    useLayers().add({ path: '/dashboard-test-no-menu', input: { dashboard: {} } });
-    try {
-      const { body } = await call(user);
-      deepStrictEqual(body.menu[0], {
-        label: '',
-        items: [{ to: '/overview', label: 'dashboard.overview.title', icon: 'layout-dashboard' }],
-      });
-      deepStrictEqual(menuPaths(body), [
-        { label: '', items: ['/overview'] },
-        {
-          label: '',
-          items: [
-            '/collections/sessions',
-            '/collections/dash-notes',
-            '/collections/dash-owners',
-            '/collections/dash-public',
-            '/collections/dash-people',
-            '/collections/dash-articles',
-            '/collections/dash-labels',
-            '/collections/dash-pages',
-            '/collections/dash-metrics',
-            '/collections/dash-kinds',
-            '/collections/dash-settings',
-          ],
-        },
-      ]);
-    } finally {
-      useLayers().remove('/dashboard-test-no-menu');
-    }
   });
 });
 
@@ -858,14 +821,11 @@ describe('the dashboard:menu hook', () => {
     let seen: string[] = [];
     hook('dashboard:menu', (menu, context) => {
       seen = context.collections.map((entry) => entry.name);
-      return [...menu, { label: context.user.email, items: [{ to: '/audit', label: 'Audit' }] }];
+      return [...menu, { id: 'audit', label: context.user.email, to: '/audit' }];
     });
     try {
       const { menu } = (await call(user)).body;
-      deepStrictEqual(menu.at(-1), {
-        label: 'user@example.com',
-        items: [{ to: '/audit', label: 'Audit' }],
-      });
+      deepStrictEqual(menu.at(-1), { id: 'audit', label: 'user@example.com', to: '/audit' });
       deepStrictEqual(seen, names((await call(user)).body));
     } finally {
       useHooks().delete('dashboard:menu');

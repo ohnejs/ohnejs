@@ -1,15 +1,11 @@
-import {
-  applyHook,
-  type DashboardMenuEntry,
-  type DashboardMenuLink,
-  type Message,
-  useConfig,
-} from 'ohnejs';
-import { isEmpty, isString, isUndefined } from 'ohnejs/utils';
+import { applyHook, type DashboardMenuNode, useCollections, useConfig } from 'ohnejs';
+import { isEmpty, isUndefined, naturalCompare, toSentenceCase } from 'ohnejs/utils';
 
-import type { DashboardMenuGroup, DashboardMenuItem } from '../api/dashboard.get.ts';
+import type { DashboardMenuItem } from '../api/dashboard.get.ts';
 import type { User } from '../auth/types.ts';
 import type { DashboardCollection } from '../collections-api/describe.ts';
+
+import { userCan } from '../auth/capabilities.ts';
 
 declare module 'ohnejs' {
   interface Hooks {
@@ -17,84 +13,90 @@ declare module 'ohnejs' {
      * Filters the sidebar menu after `dashboard.menu` resolves, before `GET /dashboard` answers.
      * Fires once per discovery read, inside the request context.
      * The assistant fires it too, to list the pages it may open.
-     * The groups arrive resolved: every row carries a `to`, a `label` message, and any icon.
-     * Give a new row's label as a message; the dashboard translates it where it renders.
-     * Append a group, reorder the rows, or drop a link the `context.user` should not see.
-     * Collection rows are already scoped to what the user may reach; a declared link is not.
-     * Return a replacement `DashboardMenuGroup[]`, or mutate the array in place and return nothing.
+     * The tree arrives resolved and pruned for `context.user`, built fresh for this call.
+     * Give a new node's label as a message; the dashboard translates it where it renders.
+     * Return a replacement tree, or mutate it in place and return nothing.
      */
     'dashboard:menu': (
-      menu: DashboardMenuGroup[],
+      menu: DashboardMenuItem[],
       context: { user: User; collections: readonly DashboardCollection[] },
-    ) => void | DashboardMenuGroup[] | Promise<void | DashboardMenuGroup[]>;
+    ) => void | DashboardMenuItem[] | Promise<void | DashboardMenuItem[]>;
   }
 }
 
-const DEFAULT_MENU: { label?: Message; items: DashboardMenuEntry[] }[] = [
-  { items: [{ to: '/overview', label: 'dashboard.overview.title', icon: 'layout-dashboard' }] },
-];
+const DEFAULT_ORDER = 10;
 
 /**
- * The sidebar `user` sees: `dashboard.menu` folded over `collections`, then the `dashboard:menu` hook.
+ * One node the tree may hold: as declared, plus the collection it places, if any.
+ */
+interface MenuEntry {
+  node: DashboardMenuNode;
+  collection?: DashboardCollection;
+}
+
+/**
+ * The sidebar `user` sees: `dashboard.menu` resolved over `collections`, then the `dashboard:menu` hook.
  * Valid only within a request.
  */
 export function resolveDashboardMenu(
   user: User,
   collections: DashboardCollection[],
-): Promise<DashboardMenuGroup[]> {
-  return applyHook('dashboard:menu', resolveMenu(collections), { user, collections });
+): Promise<DashboardMenuItem[]> {
+  return applyHook('dashboard:menu', resolveMenu(user, collections), { user, collections });
 }
 
 /**
- * Folds the configured `dashboard.menu` over the accessible collections.
- * Configured groups keep their order and drop inaccessible names; the rest trail unlabeled.
- * A named collection is spent on first use, so a later group cannot repeat it.
- * A declared link resolves as authored: the dashboard knows no capability for a page.
- * `DEFAULT_MENU` stands in for an omitted `dashboard.menu`.
+ * Builds the tree from the merged `dashboard.menu` and the collections `user` may reach.
+ * It is built fresh on every call, since the hook may mutate what it receives.
+ *
+ * - Each reachable collection is a node keyed by its name, under `collections` unless it names a `parent`.
+ * - A declared collection out of reach drops, and so does every node under it.
+ * - A hidden node drops with its subtree, and so does one whose `can` the user lacks.
+ * - A group drops while none of its nodes shows; a link stays.
+ * - Siblings sort by `order`, then by id, so the tree is the same in every language.
  */
-function resolveMenu(collections: DashboardCollection[]): DashboardMenuGroup[] {
-  const unplaced = new Map(collections.map((collection) => [collection.name, collection]));
-  const groups: DashboardMenuGroup[] = [];
-  for (const group of useConfig().dashboard?.menu ?? DEFAULT_MENU) {
-    const items: DashboardMenuItem[] = [];
-    for (const entry of group.items) {
-      if (!isString(entry)) {
-        items.push(linkItem(entry));
-        continue;
-      }
-      const collection = unplaced.get(entry);
-      if (isUndefined(collection)) continue;
-      unplaced.delete(entry);
-      items.push(collectionItem(collection));
-    }
-    if (isEmpty(items)) continue;
-    const heading: DashboardMenuGroup = { label: '', items };
-    if (!isUndefined(group.label)) heading.label = group.label;
-    groups.push(heading);
+function resolveMenu(user: User, collections: DashboardCollection[]): DashboardMenuItem[] {
+  const declared = useConfig().dashboard?.menu ?? {};
+  const named = new Set([...useCollections().keys(), ...useConfig().disable.collections]);
+  const entries = new Map<string, MenuEntry>();
+  for (const [id, node] of Object.entries(declared)) {
+    if (!isUndefined(node) && !named.has(id)) entries.set(id, { node });
   }
-  if (unplaced.size > 0) {
-    groups.push({ label: '', items: [...unplaced.values()].map(collectionItem) });
+  for (const collection of collections) {
+    entries.set(collection.name, { node: declared[collection.name] ?? {}, collection });
   }
-  return groups;
+  const children = new Map<string | null, string[]>();
+  for (const [id, { node, collection }] of entries) {
+    const parent =
+      isUndefined(node.parent) && !isUndefined(collection) && entries.has('collections')
+        ? 'collections'
+        : (node.parent ?? null);
+    children.set(parent, [...(children.get(parent) ?? []), id]);
+  }
+  const build = (parent: string | null): DashboardMenuItem[] =>
+    (children.get(parent) ?? [])
+      .sort((a, b) => order(entries.get(a)!) - order(entries.get(b)!) || naturalCompare(a, b))
+      .flatMap((id) => {
+        const { node, collection } = entries.get(id)!;
+        if (node.hidden === true || (!isUndefined(node.can) && !userCan(user, node.can))) return [];
+        const to = node.to ?? (collection && `/collections/${collection.segment}`);
+        const nested = build(id);
+        if (isUndefined(to) && isEmpty(nested)) return [];
+        const label =
+          node.label ?? collection?.label ?? (parent === null ? '' : toSentenceCase(id));
+        const item: DashboardMenuItem = { id, label };
+        if (!isUndefined(to)) item.to = to;
+        const icon = node.icon ?? collection?.icon;
+        if (!isUndefined(icon)) item.icon = icon;
+        if (!isEmpty(nested)) item.children = nested;
+        return [item];
+      });
+  return build(null);
 }
 
 /**
- * One collection's row: its list route, its label, and its declared icon.
+ * A node's position among its siblings.
  */
-function collectionItem(collection: DashboardCollection): DashboardMenuItem {
-  const item: DashboardMenuItem = {
-    to: `/collections/${collection.segment}`,
-    label: collection.label,
-  };
-  if (!isUndefined(collection.icon)) item.icon = collection.icon;
-  return item;
-}
-
-/**
- * One declared link's row, its label as declared.
- */
-function linkItem(link: DashboardMenuLink): DashboardMenuItem {
-  const item: DashboardMenuItem = { to: link.to, label: link.label };
-  if (!isUndefined(link.icon)) item.icon = link.icon;
-  return item;
+function order(entry: MenuEntry): number {
+  return entry.node.order ?? DEFAULT_ORDER;
 }

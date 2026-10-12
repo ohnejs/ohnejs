@@ -539,33 +539,33 @@ hook('schema:synced', async (report) => {
 ### `dashboard:menu`
 
 Filters the [sidebar menu](../dashboard/pages.md#the-sidebar) after
-[`dashboard.menu`](./config.md#the-dashboard) resolves, just before `GET /dashboard`
-answers. The groups arrive resolved, so a layer can append a group without knowing the config.
+[`dashboard.menu`](./config.md#the-dashboard) resolves, just before `GET /dashboard` answers. The
+tree arrives resolved for the viewer: hidden nodes, nodes whose `can` they lack, and collections
+they cannot reach are already gone.
 
-Collection rows are already scoped to
-[what the user may reach](../auth/roles.md#the-collections-api-guard). A declared link is not,
-because the dashboard has no [capability](../auth/roles.md#capabilities) for a page. This hook is
-where you scope one:
+Reach for it when a node's visibility needs more than one capability:
 
 ```ts
 // boot/menu.ts
 import { hook } from 'ohnejs';
+import { userCan } from 'ohnejs/auth';
 
 hook('dashboard:menu', (menu, { user }) => {
-  if (user.roles.includes('admin')) {
-    menu.push({ label: 'Ops', items: [{ to: '/audit', label: 'Audit log', icon: 'history' }] });
+  if (userCan(user, 'audit.read') && userCan(user, 'collection.Users.read')) {
+    menu.push({ id: 'audit', label: 'Audit log', to: '/audit', icon: 'history' });
   }
 });
 ```
 
 - It fires once per discovery read, inside the request context.
 - The [assistant](../ai/assistant.md) runs it too, to learn which pages it may open.
-- Every row already carries a `to`, a `label`, and any icon. A label is a
-  [message](../i18n/messages.md): a key, a `{ key, params }` object, or plain text. The dashboard
-  translates it where it renders, so a row you add may carry a key as well.
-- The threaded value is a `DashboardMenuGroup[]`.
+- The threaded value is a `DashboardMenuItem[]`: the root nodes, each with an `id`, a `label`, and
+  any `to`, `icon`, and `children`. A node without `to` is a group.
+- A label is a [message](../i18n/messages.md): a key, a `{ key, params }` object, or plain text. The
+  dashboard translates it where it renders, so a node you add may carry a key as well.
+- The tree is built fresh for every call. Mutate it in place, or return a replacement.
 - The `context` also carries `collections`: the collections the user can access, as the same read
-  describes them. You can build a group from the registered collections instead of naming each one.
+  describes them.
 
 ### `dashboard:meta`
 

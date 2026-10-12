@@ -4,6 +4,7 @@ import type { LayerCodegen, LayerDefinition } from '../layers/define-layer.ts';
 
 import { exists, importDefault } from '../../utils/fs/index.ts';
 import { joinPath } from '../../utils/index.ts';
+import { validateMenu } from '../dashboard/validate-menu.ts';
 import { validateConfigDirs } from '../layers/validate-config-dirs.ts';
 import { validateFrameAncestors } from '../layers/validate-frame-ancestors.ts';
 
@@ -76,11 +77,13 @@ export async function readLayerConfig(
   if (input.dirs) validateConfigDirs(input.dirs, configFile);
   const frameAncestors = input.dashboard?.frameAncestors;
   if (frameAncestors) validateFrameAncestors(frameAncestors, configFile);
+  validateMenu(input.dashboard?.menu, configFile);
 
   const layerFile = joinPath(dir, 'ohne.layer.ts');
   const layer = (await exists(layerFile))
     ? await importDefault<LayerDefinition>(layerFile, { fresh })
     : null;
+  validateMenu(layer?.defaults?.dashboard?.menu, layerFile);
 
   return {
     input,

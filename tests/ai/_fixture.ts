@@ -16,6 +16,7 @@ import localeField from '../../src/base/fields/locale.ts';
 import passwordField from '../../src/base/fields/password.ts';
 import rolesField from '../../src/base/fields/roles.ts';
 import timezoneField from '../../src/base/fields/timezone.ts';
+import baseLayer from '../../src/base/ohne.layer.ts';
 import { useCollections } from '../../src/ohne/collections/use-collections.ts';
 import { SQLiteDialect } from '../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../src/ohne/database/schema/desired.ts';
@@ -41,10 +42,11 @@ for (const [path, strategy] of Object.entries(aiLayer.strategies ?? {})) {
   useLayers().setStrategy(path, strategy);
 }
 
+useLayers().add({ path: '/ai-test/base', defaults: { ...DEFAULTS, ...baseLayer.defaults } });
+
 // A tiny scrypt cost keeps the password field's hashing fast.
 useLayers().add({
   path: '/ai-test',
-  defaults: DEFAULTS,
   input: {
     collections: { locales: ['en', 'de'], defaultLocale: 'en' },
     auth: { password: { cost: 1024 } },

@@ -231,7 +231,7 @@ export default defineConfig({
 | `apiURL`         | -       | Absolute base URL of the API the browser calls, including any `api.basePath`. Unset, it is derived from `api`.                                                                        |
 | `origin`         | -       | Absolute origin the browser reaches the dashboard at. The API's [CORS](../api/middleware.md#cors) accepts credentialed requests from it. Unset, it is derived from `host` and `port`. |
 | `frameAncestors` | -       | Origins of the pages allowed to show the dashboard in an iframe. Unset, no page may frame it.                                                                                         |
-| `menu`           | -       | The [sidebar groups](../dashboard/pages.md#the-sidebar), in order. Unset, the sidebar starts with the overview row, then lists every accessible collection in one unlabeled group.    |
+| `menu`           | -       | The [sidebar nodes](../dashboard/pages.md#the-sidebar), keyed by id. Every layer patches them by id, so you can move, relabel, or hide what a layer declares.                         |
 
 The defaults fit local development, where the browser reaches both servers directly. In production,
 give `apiURL` and `origin` the public URLs instead.
@@ -348,7 +348,7 @@ Some keys resolve differently:
 - **Own** - never inherited. A layer's value applies to that layer alone. An own key you leave unset
   takes the framework default, even if a layer sets it. These are `dirs`, `printer`, `api.port`,
   `api.host`, `dashboard.port`, `dashboard.host`, `dashboard.apiURL`, `dashboard.origin`,
-  `dashboard.frameAncestors`, `dashboard.menu`, `database.dialect`, `database.url`, and
+  `dashboard.frameAncestors`, `database.dialect`, `database.url`, and
   `database.sync.force`.
 
 A base layer and your project both set `api`:
@@ -370,6 +370,5 @@ listens on the default `9001`.
 Own keys are a trust boundary. A dependency layer cannot move your ports, point you at its
 database, silence your printer, or force a destructive sync.
 
-The same boundary covers `dashboard.menu`: a layer that ships dashboard pages cannot add sidebar
-rows. List them yourself, or have the layer append them through the
-[`dashboard:menu`](./hooks.md#dashboardmenu) hook.
+`dashboard.menu` is not an own key. It merges node by node, so a layer that ships
+dashboard pages can add its links, and you keep the last word on each one.

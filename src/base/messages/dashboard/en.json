@@ -201,8 +201,11 @@
   "menu": {
     "collapse": "Collapse",
     "collapseAll": "Collapse all",
+    "collections": "Collections",
     "expand": "Expand",
-    "expandAll": "Expand all"
+    "expandAll": "Expand all",
+    "management": "Management",
+    "utilities": "Utilities"
   },
   "new": "New",
   "no": "No",

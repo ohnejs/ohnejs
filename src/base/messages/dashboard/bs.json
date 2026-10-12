@@ -201,8 +201,11 @@
   "menu": {
     "collapse": "Skupi",
     "collapseAll": "Skupi sve",
+    "collections": "Kolekcije",
     "expand": "Proširi",
-    "expandAll": "Proširi sve"
+    "expandAll": "Proširi sve",
+    "management": "Upravljanje",
+    "utilities": "Alati"
   },
   "new": "Novo",
   "no": "Ne",

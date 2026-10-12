@@ -29,9 +29,25 @@ The layer ships the Media page at `/media`, with folders, drag and drop uploads,
 [uploads from a URL](./from-a-url.md), a details popup for alt text and the focal point, and
 a picker that the [media fields](./fields.md) open.
 
-The sidebar row replaces the `Uploads` collection's own row, so a viewer who is allowed to read
-`Uploads` sees Media instead of the table. To place it yourself, list `'Uploads'` in
-[`dashboard.menu`](../dashboard/pages.md#the-sidebar) where you want the row.
+The layer adds a `media` link to the sidebar's first section, shown to a viewer who may read
+`Uploads`. It hides the `Uploads`, `UploadsJournal`, and `UploadsSessions` tables there. To move
+the link or bring a table back, patch its node in
+[`dashboard.menu`](../dashboard/pages.md#changing-what-a-layer-declares):
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', 'ohnejs/uploads'],
+  dashboard: {
+    menu: {
+      media: { parent: 'collections', order: 1 },
+      Uploads: { hidden: false },
+    },
+  },
+});
+```
 
 ## The collection
 

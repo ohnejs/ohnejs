@@ -15,6 +15,7 @@ import { userCan } from 'ohnejs/auth';
 import {
   capitalize,
   compileRoute,
+  flattenTree,
   isArray,
   isBoolean,
   isEmpty,
@@ -355,7 +356,7 @@ async function reachableCollections(
 }
 
 /**
- * The pages the person may open, by path: their sidebar rows, then their account page when they have one.
+ * The pages the person may open, by path: their sidebar links, then their account page when they have one.
  * A row off this origin, a closed page, or one under a denied collection is left out.
  * A denied collection owns its `/collections/<segment>` pages and the page its `recordPath` opens.
  * A repeated path keeps its first label.
@@ -375,13 +376,12 @@ async function offeredPages(
     ])
     .filter((prefix) => prefix !== '' && prefix !== '/');
   const pages = new Map<string, string>();
-  for (const { items } of await resolveDashboardMenu(user, described)) {
-    for (const { to, label } of items) {
-      const path = to.split(/[?#]/, 1)[0];
-      if (pages.has(to) || !isLocalPath(to) || CLOSED_PAGES.has(path)) continue;
-      if (closed.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) continue;
-      pages.set(to, resolveMessage(label));
-    }
+  for (const { to, label } of flattenTree(await resolveDashboardMenu(user, described))) {
+    if (isUndefined(to)) continue;
+    const path = to.split(/[?#]/, 1)[0];
+    if (pages.has(to) || !isLocalPath(to) || CLOSED_PAGES.has(path)) continue;
+    if (closed.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) continue;
+    pages.set(to, resolveMessage(label));
   }
   if (!pages.has('/account') && (await hasAccountPage(user))) {
     pages.set('/account', translate('dashboard.account.title'));

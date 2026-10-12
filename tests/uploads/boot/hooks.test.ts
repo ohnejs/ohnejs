@@ -1,8 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { DashboardMenuGroup, DashboardMeta } from '../../../src/base/api/dashboard.get.ts';
-import type { User } from '../../../src/base/auth/types.ts';
+import type { DashboardMeta } from '../../../src/base/api/dashboard.get.ts';
 
 import '../../../src/uploads/boot/hooks.ts';
 import { toUser } from '../../../src/base/auth/to-user.ts';
@@ -17,7 +16,6 @@ import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { scanLayerMessages } from '../../../src/ohne/messages/scan-layer-messages.ts';
 import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
-import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
 import { joinPath, parseBytes, parseDuration } from '../../../src/utils/index.ts';
 import { storage } from '../_fixture.ts';
 
@@ -35,19 +33,8 @@ useCollections().register('BootPosts', {
 await syncDatabase(useDatabase(), useDialect(), {
   desired: buildDesiredSchema(useCollections(), useFields() as never),
 });
-useRoles().register('boot-viewer', {
-  name: 'boot-viewer',
-  role: { capabilities: ['collection.Users.read'] },
-});
 
 const admin = toUser({ UUID: 'u-admin', email: 'admin@example.com', roles: ['uploads-admin'] });
-const viewer = toUser({ UUID: 'u-viewer', email: 'viewer@example.com', roles: ['boot-viewer'] });
-
-const usersRow = { to: '/collections/users', label: 'Users' };
-const uploadsRow = { to: '/collections/uploads', label: 'Uploads', icon: 'library-photo' as const };
-const journalRow = { to: '/collections/uploads-journal', label: 'Uploads journal' };
-const sessionsRow = { to: '/collections/uploads-sessions', label: 'Uploads sessions' };
-const mediaRow = { to: '/media', label: 'uploads.menu.media', icon: 'library-photo' };
 
 const folder = await queryUntyped('Uploads').createOrThrow({
   kind: 'folder',
@@ -67,10 +54,6 @@ const SESSION_ROUTES = [
   'PATCH /uploads/sessions/[uuid]',
   'POST /uploads/sessions/[uuid]/complete',
 ];
-
-function menuFor(user: User, ...groups: DashboardMenuGroup[]): Promise<DashboardMenuGroup[]> {
-  return applyHook('dashboard:menu', groups, { user, collections: [] });
-}
 
 /**
  * The discovery payload the `dashboard:meta` hook leaves for an app serving `routes`.
@@ -105,51 +88,6 @@ describe('the read hooks', () => {
     const cover = read?.cover as Record<string, unknown>;
     strictEqual(cover.path, 'photos/sunset.jpg');
     strictEqual(cover.url, '/uploads/photos/sunset.jpg');
-  });
-});
-
-describe('the dashboard:menu hook', () => {
-  it('rewrites the Uploads row into the media row where it stands', async () => {
-    const menu = await menuFor(admin, { label: 'Content', items: [usersRow, uploadsRow] });
-    deepStrictEqual(menu, [{ label: 'Content', items: [usersRow, mediaRow] }]);
-  });
-
-  it('appends the media row for a viewer who may read Uploads but has no row', async () => {
-    const menu = await menuFor(admin, { label: '', items: [usersRow] });
-    deepStrictEqual(menu, [
-      { label: '', items: [usersRow] },
-      { label: '', items: [mediaRow] },
-    ]);
-  });
-
-  it('leaves the menu alone for a viewer without the capability', async () => {
-    const menu = await menuFor(viewer, { label: '', items: [usersRow] });
-    deepStrictEqual(menu, [{ label: '', items: [usersRow] }]);
-  });
-
-  it('drops the journal and sessions rows, and the group they leave empty', async () => {
-    const menu = await menuFor(
-      admin,
-      { label: 'System', items: [journalRow, sessionsRow] },
-      { label: '', items: [usersRow, sessionsRow, uploadsRow] },
-    );
-    deepStrictEqual(menu, [{ label: '', items: [usersRow, mediaRow] }]);
-  });
-
-  it('keeps a declared /media link and appends nothing beside it', async () => {
-    const library = { to: '/media', label: 'Library', icon: 'photo' as const };
-    const menu = await menuFor(
-      admin,
-      { label: 'Content', items: [library] },
-      { label: '', items: [uploadsRow] },
-    );
-    deepStrictEqual(menu, [
-      { label: 'Content', items: [library] },
-      { label: '', items: [mediaRow] },
-    ]);
-    deepStrictEqual(await menuFor(admin, { label: '', items: [library] }), [
-      { label: '', items: [library] },
-    ]);
   });
 });
 

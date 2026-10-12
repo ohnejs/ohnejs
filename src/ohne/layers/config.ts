@@ -8,13 +8,12 @@ import type {
 import type { KnownBlocks } from '../blocks/known-blocks.ts';
 import type { KnownCollections } from '../collections/known-collections.ts';
 import type { LocaleCode } from '../collections/known-locales.ts';
-import type { DashboardMenuEntry } from '../dashboard/menu.ts';
+import type { DashboardMenuID, DashboardMenuNode } from '../dashboard/menu.ts';
 import type { DatabaseName } from '../database/known-databases.ts';
 import type { DialectName } from '../database/known-dialects.ts';
 import type { FieldTypeName } from '../fields/known-fields.ts';
 import type { KnownFlows } from '../flows/known-flows.ts';
 import type { KnownLanguage } from '../messages/known-languages.ts';
-import type { Message } from '../messages/known-messages.ts';
 import type { QueryGuards } from '../query/wire/guards.ts';
 import type { KnownRoles } from '../roles/known-roles.ts';
 import type { KnownRoutes } from '../routes/known-routes.ts';
@@ -676,47 +675,23 @@ export interface Config {
     frameAncestors?: string[];
 
     /**
-     * Menu groups for the dashboard sidebar, in order.
-     * Each group holds collection names and page links; a group left with no row drops.
-     * A collection the viewer cannot reach drops from its group.
-     * Accessible collections in no group land in a trailing unlabeled group.
-     * Omitted, the menu leads with the overview row, then lists every accessible collection unlabeled.
-     * Declared, the menu shows the overview row only if you list a link to `/overview`.
+     * The dashboard sidebar, as nodes keyed by id.
+     * Every layer patches the nodes by id, field by field, so a closer layer reshapes a deeper one's.
+     * A collection is a node keyed by its name, placed under `collections` unless it names a `parent`.
+     * The base layer declares `overview` and the groups `general`, `collections`, `management`, `utilities`.
+     * A viewer sees a collection only when they may reach it, and a node with `can` only when they hold it.
      *
      * @example
      * ```ts
-     * [
-     *   { label: 'menu.content', items: ['Pages', 'Posts'] },
-     *   {
-     *     label: 'Shop',
-     *     items: ['Orders', { to: '/sales', label: 'Sales', icon: 'coin' }],
-     *   },
-     *   { items: ['Users'] },
-     * ]
+     * {
+     *   shop: { order: 2, label: 'Shop' },
+     *   sales: { parent: 'shop', to: '/sales', label: 'Sales', icon: 'coin' },
+     *   Orders: { parent: 'shop' },
+     *   overview: { hidden: true },
+     * }
      * ```
      */
-    menu?: {
-      /**
-       * The group's heading, shown above its rows.
-       * Pass a message key to translate it per the viewer's language.
-       * A `{ key, params }` object supplies a parameterized message; a plain string is shown as-is.
-       * Omitted renders the group without a heading.
-       *
-       * @example
-       * ```ts
-       * 'menu.content'                         // a message key, translated
-       * { key: 'menu.shop', params: { n: 2 } } // a parameterized message
-       * ```
-       */
-      label?: Message;
-
-      /**
-       * The rows the group holds, in order.
-       * A collection name renders that collection's list link; a link object opens any dashboard page.
-       * A singleton's row opens its record instead of a list.
-       */
-      items: DashboardMenuEntry[];
-    }[];
+    menu?: Partial<Record<DashboardMenuID, DashboardMenuNode>>;
   };
 
   /**
@@ -934,7 +909,8 @@ export const DEFAULT_DATABASE_URL = '.data/ohne.db';
  * - `dirs` stays each layer's own: it never inherits across the merge, matching how it is read.
  * - Every `disable` list accumulates across layers and dedupes, so every layer can add components to drop.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
- * - The listed `api` and `dashboard` keys stay each layer's own: an app owns its servers and sidebar.
+ * - The listed `api` and `dashboard` keys stay each layer's own: an app owns its servers.
+ * - `dashboard.menu` is unlisted on purpose: the per-key merge lets every layer patch its nodes by id.
  * - `api.rateLimitStore` and `api.rateLimitDatabase` stay each layer's own: an app owns where it counts.
  * - `database.dialect` and `database.url` stay each layer's own: an app owns its connection, like `api`'s.
  * - `database.sync.force` stays each layer's own: a dependency cannot force a destructive sync on an app.
@@ -960,7 +936,6 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'dashboard.apiURL': 'own',
   'dashboard.origin': 'own',
   'dashboard.frameAncestors': 'own',
-  'dashboard.menu': 'own',
   'database.dialect': 'own',
   'database.url': 'own',
   'database.sync.force': 'own',

@@ -196,9 +196,9 @@ useUnsavedChanges(() => draft.value !== '');
 
 ## The sidebar
 
-Without a menu, the sidebar starts with the overview row, then lists every collection the viewer
-can reach in one group without a label. You can open a page by URL as soon as its file exists. To
-give it a row, declare [`dashboard.menu`](../project/config.md#the-dashboard):
+The sidebar starts with the overview page, then lists every collection the viewer can reach under
+**Collections**. A page opens by URL as soon as its file exists. To give it a link, add a node to
+[`dashboard.menu`](../project/config.md#the-dashboard):
 
 ```ts
 // ohne.config.ts
@@ -207,42 +207,112 @@ import { defineConfig } from 'ohnejs';
 export default defineConfig({
   layers: ['ohnejs/base'],
   dashboard: {
-    menu: [
-      {
-        label: 'Content',
-        items: ['Pages', 'Posts', { to: '/reports', label: 'Reports', icon: 'chart-bar' }],
-      },
-      { label: 'People', items: ['Users'] },
-    ],
+    menu: {
+      reports: { parent: 'general', to: '/reports', label: 'Reports', icon: 'chart-bar' },
+    },
   },
 });
 ```
 
-A group's `items` hold its rows, in the order you write them:
+The key, `reports`, is the node's id. The node says where it sits and what it shows:
 
-- A **string** names a [collection](../database/collections.md) and renders its list link. The
-  label and [icon](../database/collections.md#the-collection-in-the-dashboard) come from the
-  collection itself, and the row is left out for a viewer who cannot reach it. A collection listed
-  twice renders only where it first appears. A
-  [singleton](../database/collections.md#singletons)'s row opens its record instead.
-- An **object** links to any dashboard path: `to`, a `label`, and an optional
-  [Tabler icon](https://tabler.io/icons). Nothing filters it, since the dashboard has no
-  [capability](../auth/roles.md#capabilities) for a page. To show one only to some viewers, use the
-  [`dashboard:menu`](../project/hooks.md#dashboardmenu) hook.
+- `parent` - the id of the node it sits under. Omit it to place the node at the root.
+- `to` - the dashboard path it opens.
+- `label` - its text: a [message key](../i18n/messages.md#catalogs), a `{ key, params }` object,
+  or plain text.
+- `icon` - a [Tabler icon](https://tabler.io/icons).
+- `order` - its place among its siblings, lowest first. It defaults to `10`, and ties sort by id.
 
-The group's own `label` is its heading. Omit it for a list without one. Both labels take a
-[message key](../i18n/messages.md#catalogs), so a heading and a link translate per viewer:
+`ohnejs/base` declares the nodes you usually place yours under:
+
+| Id            | What it is                                                               |
+| ------------- | ------------------------------------------------------------------------ |
+| `general`     | The first section, without a heading. It holds `overview`.               |
+| `collections` | The **Collections** section, where every collection lands unless placed. |
+| `management`  | The **Management** section. It holds `Users`.                            |
+| `utilities`   | The **Utilities** section, shown once something sits in it.              |
+| `overview`    | The link to the overview page.                                           |
+
+The server refuses to start when a `parent` names no node, when a node ends up under itself, or
+when a link has no label.
+
+### Groups and collections
+
+A node without `to` is a group. At the root, a group is a section with its label as the heading.
+Below the root, it is a row that expands to show what it holds. A group with nothing to show is
+left out.
+
+A collection is a node too, keyed by its name. Its label and
+[icon](../database/collections.md#the-collection-in-the-dashboard) come from the collection, so
+moving it takes only a `parent`:
 
 ```ts
-{ label: 'menu.content', items: [{ to: '/reports', label: 'menu.reports' }] }
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  dashboard: {
+    menu: {
+      shop: { order: 2, label: 'Shop' },
+      Orders: { parent: 'shop' },
+      Products: { parent: 'shop' },
+      sales: { parent: 'shop', to: '/sales', label: 'Sales', icon: 'coin' },
+    },
+  },
+});
 ```
 
-A declared menu replaces the default:
+A [singleton](../database/collections.md#singletons)'s link opens its record instead of a list.
 
-- The overview row is gone unless you link `/overview` yourself.
-- Collections the viewer can reach but you did not list still appear at the end, in a final group
-  without a label.
-- A group that ends up with no row is not shown.
+### Changing what a layer declares
+
+Every layer's menu merges node by node. To change a node, name its id and set only what should
+differ. The rest stays as the layer declared it:
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  dashboard: {
+    menu: {
+      overview: { label: 'Home' },
+      Users: { parent: 'collections' },
+      management: { hidden: true },
+    },
+  },
+});
+```
+
+- `hidden: true` hides a node and everything under it. A layer closer to your app can set
+  `hidden: false` to bring it back.
+- `parent: null` moves a node to the root, even when a layer gave it a parent.
+- A `to` or an `icon` a layer set cannot be removed. Hide the node and declare your own instead.
+
+### Who sees what
+
+A viewer sees a collection only when they can reach it. For any other node, `can` names the
+[capability](../auth/roles.md#capabilities) a viewer needs to see it and everything under it:
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  dashboard: {
+    menu: {
+      reports: { parent: 'general', to: '/reports', label: 'Reports', can: 'reports.read' },
+    },
+  },
+});
+```
+
+The menu only hides links. Anyone can still open `/reports` by URL, so the routes the page calls
+must check access themselves. For a rule `can` cannot express, filter the menu in the
+[`dashboard:menu`](../project/hooks.md#dashboardmenu) hook.
 
 ## Boot files
 

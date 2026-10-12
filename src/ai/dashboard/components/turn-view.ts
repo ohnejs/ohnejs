@@ -28,6 +28,7 @@ import {
 import {
   batchedEffect,
   effect,
+  flattenTree,
   intersperse,
   isArray,
   isComposing,
@@ -518,13 +519,13 @@ function pageLine(turn: () => Turn, batch: () => TurnBatch, t: AITranslate): Chi
 }
 
 /**
- * How the person knows the page at `path`: its sidebar row, the record or collection it opens, else the path.
+ * How the person knows the page at `path`: its sidebar link, the record or collection it opens, else the path.
  * Reactive.
  */
 function pageLabel(path: string, t: AITranslate): string {
   const meta = dashboardMeta();
-  const row = meta?.menu.flatMap((group) => group.items).find((item) => item.to === path);
-  if (!isUndefined(row)) return translateMessage(row.label);
+  const link = flattenTree(meta?.menu ?? []).find((node) => node.to === path);
+  if (!isUndefined(link)) return translateMessage(link.label);
   const uuid = path.split(/[/?&=#]/).find(isUUID);
   for (const collection of meta?.collections ?? []) {
     if (path === `/collections/${collection.segment}`) return collection.label;

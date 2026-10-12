@@ -351,39 +351,37 @@ export interface DashboardRole {
 }
 
 /**
- * One sidebar menu row: a link the dashboard draws, already resolved for the signed-in user.
- * A collection row and a declared page link arrive in the same shape, so the sidebar renders one kind.
+ * One sidebar menu node, already resolved and pruned for the signed-in user.
+ * A node with a `to` is a link; one without is a group, and a group always holds a node.
+ * A root group is a sidebar section under its label; adjacent root links share one untitled section.
  */
 export interface DashboardMenuItem {
   /**
-   * The dashboard path the row opens; a collection row points at its list route.
+   * The node's id in `dashboard.menu`, or the collection name for a collection's link.
    */
-  to: string;
+  id: string;
 
   /**
-   * The row label, a message the dashboard translates where it renders, through `translateMessage`.
+   * The node's text, a message the dashboard translates where it renders, through `translateMessage`.
+   * `''` renders a root group without a heading.
    */
   label: MessageData;
 
   /**
-   * The Tabler icon shown before the label; absent when the row declares none.
+   * The dashboard path the link opens; a collection's link points at its list route.
+   * Absent on a group.
+   */
+  to?: string;
+
+  /**
+   * The Tabler icon shown before the label; absent when the node declares none.
    */
   icon?: IconName;
-}
-
-/**
- * One sidebar menu group: a heading and the rows it holds.
- */
-export interface DashboardMenuGroup {
-  /**
-   * The group heading, a message the dashboard translates; `''` renders the group without one.
-   */
-  label: MessageData;
 
   /**
-   * The rows the group holds, in order.
+   * The nodes under this one, in order; absent when it holds none.
    */
-  items: DashboardMenuItem[];
+  children?: DashboardMenuItem[];
 }
 
 /**
@@ -391,10 +389,10 @@ export interface DashboardMenuGroup {
  */
 export interface DashboardMeta {
   /**
-   * The sidebar menu groups, resolved from `dashboard.menu` and filtered by the `dashboard:menu` hook.
-   * Collection rows are scoped to what the user may reach; a declared link is not.
+   * The sidebar's root nodes, in order: `dashboard.menu` resolved, then the `dashboard:menu` hook.
+   * Only what the user may see arrives: a collection out of reach drops, and so does a node whose `can` they lack.
    */
-  menu: DashboardMenuGroup[];
+  menu: DashboardMenuItem[];
 
   /**
    * The collections the user may work with, in registry order.
