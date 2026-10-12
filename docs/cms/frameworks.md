@@ -35,9 +35,10 @@ const api = useRuntimeConfig().public.ohneAPI;
 const ohne = createOhne<CMS>({ api });
 const route = useRoute();
 const token = useState('ohne-preview', () => route.query['ohne-preview'] as string | undefined);
+const address = route.fullPath.replace(/#.*/, '');
 
-const { data: page } = await useAsyncData(`ohne:${route.path}`, () =>
-  ohne.resolve(route.path, { token: token.value }),
+const { data: page } = await useAsyncData(`ohne:${address}`, () =>
+  ohne.resolve(address, { token: token.value }),
 );
 if (page.value?.kind === 'redirect') {
   await navigateTo(page.value.to, { redirectCode: page.value.code, external: true });
@@ -91,6 +92,9 @@ useHead({
 `onData` swaps in each new page as the editor types, with no request. `useState` keeps the token
 across renders, since the client removes it from the address bar. When you add a block to the CMS,
 `satisfies` fails until `blocks` has a component for it.
+
+`address` is the path with its query, which a redirect may keep. The hash stays out, so the key is
+the same on the server and in the browser.
 
 A [rich text](./website.md#rich-text-and-links) field renders through one component, which routes
 clicks on links to your pages through `navigateTo`:
@@ -172,13 +176,17 @@ const ohne = createOhne<CMS>({ api, fetchInit: { cache: 'no-store' } });
 
 type Props = {
   params: Promise<{ slug?: string[] }>;
-  searchParams: Promise<{ 'ohne-preview'?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 async function load({ params, searchParams }: Props) {
   const { slug = [] } = await params;
-  const token = (await searchParams)['ohne-preview'];
-  const page = await ohne.resolve(`/${slug.join('/')}`, { token });
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    for (const each of [value].flat()) if (each !== undefined) query.append(key, each);
+  }
+  const token = query.get('ohne-preview') ?? undefined;
+  const page = await ohne.resolve(`/${slug.join('/')}${query.size ? `?${query}` : ''}`, { token });
   if (page.kind === 'redirect') {
     if (page.code === 301 || page.code === 308) permanentRedirect(page.to);
     redirect(page.to);
@@ -230,6 +238,9 @@ export default async function Page(props: Props) {
 The `switch` on `block.block` narrows `fields` to that block's. Narrow on `page.collection` the same
 way to render another collection.
 
+Next hands a page its query as an object, with a repeated key as an array, so `load` writes it back
+out for `resolve`, which a redirect may keep.
+
 A [rich text](./website.md#rich-text-and-links) field renders through one client component, which
 routes clicks on links to your pages through `router.push`:
 
@@ -266,7 +277,7 @@ export function Page() {
   const [page, setPage] = useState();
 
   useEffect(() => {
-    ohne.resolve(location.pathname, { token }).then((next) => {
+    ohne.resolve(location.pathname + location.search, { token }).then((next) => {
       if (next.kind === 'redirect') location.replace(next.to);
       else setPage(next);
     });
@@ -325,9 +336,8 @@ import { createOhne, escapeHTML, richTextToHTML } from '@ohnejs/client';
 const ohne = createOhne({ api: process.env.OHNE_API });
 
 createServer(async (request, response) => {
-  const path = new URL(request.url, 'http://site').pathname;
   const token = ohne.token(request.url);
-  const page = await ohne.resolve(path, { token });
+  const page = await ohne.resolve(request.url, { token });
 
   if (page.kind === 'redirect') {
     response.writeHead(page.code, { location: page.to }).end();

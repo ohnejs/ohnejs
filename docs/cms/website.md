@@ -176,7 +176,7 @@ import { connect, createOhne } from '@ohnejs/client';
 const api = 'https://api.example.com';
 const ohne = createOhne({ api });
 const token = ohne.token(location.href);
-const page = await ohne.resolve(location.pathname, { token });
+const page = await ohne.resolve(location.pathname + location.search, { token });
 
 render(page);
 if (token) connect({ api, onData: render });

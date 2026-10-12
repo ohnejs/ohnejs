@@ -49,15 +49,19 @@ dashboard's **Redirects** collection:
 - **From** - the old path, like `/old-page`.
 - **To** - a path on the website, or a full URL.
 - **Status** - `301` by default. Use `302` or `307` for a temporary move.
-- **Keep the query** - carries `?query` parameters over to the target.
+- **Keep the query** - on by default. Carries the visitor's `?query` parameters over to the target,
+  after any the target has of its own.
 
 `resolve` tries the pages first and the redirects after. Your website handles the `redirect` kind
 once, as every recipe in [Frameworks](./frameworks.md) does, and never a single redirect by hand.
 
+Pass `resolve` the path with its query, as `/old?ref=x`, so a redirect can keep it. A preview token
+follows a redirect within your site, and never one to another site.
+
 ### When a page moves
 
 Change the slug of a published page, and the CMS leaves a `301` from its old path behind, so links
-to it keep working. Rename `/about` to `/team`, and `/about` now redirects to `/team`.
+to it keep working. Rename `/about` to `/team`, and `/about?ref=x` now redirects to `/team?ref=x`.
 
 - Only a live page leaves one. A draft or an expired page has no address worth keeping.
 - A slug shared by every locale leaves one per locale, like `/about` and `/de/about`.
