@@ -93,6 +93,7 @@ export interface LayerDefinition {
    * - `'defaults'` - recurse into objects per key and arrays per index; the longer side fills the rest.
    * - `'assign'` - objects merge one level: keys union, the closer layer's value replaces per key.
    *   Values are never recursed into; non-objects behave like `'replace'`.
+   * - `'assign-entries'` - a map of objects: keys union, and each entry merges as `'assign'`.
    * - `'concat'` - arrays only: the closer layer's items first, then the lower layers'.
    * - `'concat-unique'` - same as `'concat'`, then duplicates are dropped.
    *

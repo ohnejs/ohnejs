@@ -39,7 +39,16 @@ describe('validateMenu', () => {
   });
 
   it('refuses a menu that is not an object, on its file', () => {
-    deepStrictEqual(refusal([{ items: [] }]).path, file);
+    deepStrictEqual(refusal('reports').path, file);
+  });
+
+  it('names the node map when it meets a list of groups', () => {
+    deepStrictEqual(refusal([{ label: 'Shop', items: ['Orders'] }]).body, [
+      '`dashboard.menu` maps each node id to its node, like `{ reports: { to: "/reports" } }`.',
+      '',
+      'A list of `{ label, items }` groups is not accepted.',
+      'Each group becomes a node, and each of its rows a node naming it as `parent`.',
+    ]);
   });
 
   it('refuses an unknown key, suggesting the nearest one', () => {

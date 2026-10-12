@@ -1,4 +1,5 @@
 import type { IconName } from '../../utils/icon/icon-name.ts';
+import type { LiteralUnion } from '../../utils/types/literal-union.ts';
 import type { CollectionName } from '../collections/known-collections.ts';
 import type { ConfigExtensions } from '../layers/config.ts';
 import type { Message } from '../messages/known-messages.ts';
@@ -8,13 +9,15 @@ import type { Capability } from '../roles/known-capabilities.ts';
  * The ids the stacked layers give their menu nodes, read from the generated config defaults.
  */
 type LayerMenuID = ConfigExtensions extends { defaults: { dashboard: { menu: infer M } } }
-  ? Extract<keyof M, string>
+  ? M extends Record<string, unknown>
+    ? Extract<keyof M, string>
+    : never
   : never;
 
 /**
  * The id of a dashboard menu node: a collection name, a node a layer declares, or your own.
  */
-export type DashboardMenuID = CollectionName | LayerMenuID | (string & {});
+export type DashboardMenuID = LiteralUnion<CollectionName | LayerMenuID>;
 
 /**
  * One node of the dashboard sidebar, declared under its id in `dashboard.menu`.
@@ -44,7 +47,8 @@ export interface DashboardMenuNode {
 
   /**
    * The node's position among its siblings, lowest first.
-   * Siblings of equal order sort by id.
+   * Siblings of equal order keep the order they were declared in, a deeper layer's first.
+   * A collection no layer places follows them, sorted by name.
    *
    * @default
    * 10

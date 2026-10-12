@@ -910,7 +910,7 @@ export const DEFAULT_DATABASE_URL = '.data/ohne.db';
  * - Every `disable` list accumulates across layers and dedupes, so every layer can add components to drop.
  * - `printer` stays each layer's own: a dependency cannot silence or debug an app that consumes it.
  * - The listed `api` and `dashboard` keys stay each layer's own: an app owns its servers.
- * - `dashboard.menu` is unlisted on purpose: the per-key merge lets every layer patch its nodes by id.
+ * - `dashboard.menu` merges node by node, each node field by field, so a closer layer patches a node by id.
  * - `api.rateLimitStore` and `api.rateLimitDatabase` stay each layer's own: an app owns where it counts.
  * - `database.dialect` and `database.url` stay each layer's own: an app owns its connection, like `api`'s.
  * - `database.sync.force` stays each layer's own: a dependency cannot force a destructive sync on an app.
@@ -936,6 +936,7 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'dashboard.apiURL': 'own',
   'dashboard.origin': 'own',
   'dashboard.frameAncestors': 'own',
+  'dashboard.menu': 'assign-entries',
   'database.dialect': 'own',
   'database.url': 'own',
   'database.sync.force': 'own',

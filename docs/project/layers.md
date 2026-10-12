@@ -269,14 +269,15 @@ when it adds config keys or generates files.
   path. Without a strategy, plain objects combine per key, and the closer layer replaces anything
   else.
 
-| Strategy          | How the key merges                                                                                                                 |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `'replace'`       | The closer value wins entirely. A layer that omits the key still inherits it.                                                      |
-| `'own'`           | Never inherited. Each layer's value applies to that layer alone.                                                                   |
-| `'defaults'`      | Recurses into objects per key and arrays per index. The longer side fills the rest.                                                |
-| `'assign'`        | Objects merge one level: keys union, and the closer value replaces per key without recursing. Non-objects behave like `'replace'`. |
-| `'concat'`        | Arrays only. The closer layer's items first, then the lower layers'.                                                               |
-| `'concat-unique'` | `'concat'`, then duplicates are dropped.                                                                                           |
+| Strategy           | How the key merges                                                                                                                 |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `'replace'`        | The closer value wins entirely. A layer that omits the key still inherits it.                                                      |
+| `'own'`            | Never inherited. Each layer's value applies to that layer alone.                                                                   |
+| `'defaults'`       | Recurses into objects per key and arrays per index. The longer side fills the rest.                                                |
+| `'assign'`         | Objects merge one level: keys union, and the closer value replaces per key without recursing. Non-objects behave like `'replace'`. |
+| `'assign-entries'` | A map of objects. Keys union, and each entry merges as `'assign'`.                                                                 |
+| `'concat'`         | Arrays only. The closer layer's items first, then the lower layers'.                                                               |
+| `'concat-unique'`  | `'concat'`, then duplicates are dropped.                                                                                           |
 
 Consumers get autocomplete for your keys automatically, exactly like the built-ins. Values the layer
 sets for itself still belong in its `ohne.config.ts`. `ohne.layer.ts` describes only what it owns.

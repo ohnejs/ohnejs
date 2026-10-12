@@ -17,7 +17,7 @@ import { BANNER, codegenBucket } from './codegen-dir.ts';
 
 /**
  * Emits each defaulted key as `true`, nesting into plain objects, so the type mirrors the defaults' shape.
- * It never nests into a `'replace'` path or an `'assign'` path's entries.
+ * It never nests into a `'replace'` path, nor into an entry of an `'assign'` or `'assign-entries'` path.
  */
 function writeDefaults(
   code: CodeBuilder,
@@ -27,7 +27,10 @@ function writeDefaults(
 ): void {
   for (const [name, value] of Object.entries(defaults)) {
     const path = parent === '' ? name : `${parent}.${name}`;
-    const whole = strategies[path] === 'replace' || strategies[parent] === 'assign';
+    const whole =
+      strategies[path] === 'replace' ||
+      strategies[parent] === 'assign' ||
+      strategies[parent] === 'assign-entries';
     if (isPlainObject(value) && !whole) {
       code.line(`${propertyKey(name)}: {`);
       code.indent(() => writeDefaults(code, value, strategies, path));
@@ -44,7 +47,7 @@ function writeDefaults(
  * A field set only by a runtime `input` stays optional; only a default makes it required.
  * A key marked `'own'` stays optional too, since no default ever reaches it.
  * A key marked `'replace'` is required but its fields are not, since a closer value replaces it whole.
- * So is each entry of a key marked `'assign'`.
+ * So is each entry of a key marked `'assign'` or `'assign-entries'`.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Output lands in the `node` bucket of the app's `dirs.codegen` (default `.ohne`).

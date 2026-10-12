@@ -108,6 +108,38 @@ describe('generateResolvedConfig', () => {
     }
   });
 
+  it('types each menu node whole, never its fields', async () => {
+    const app = makeApp('menu');
+
+    const layers = useLayers();
+    layers.add({
+      path: app,
+      defaults: { dashboard: { menu: { reports: { to: '/reports', label: 'Reports' } } } },
+    });
+    try {
+      const path = await generateResolvedConfig(app);
+      strictEqual(
+        readFileSync(path!, 'utf8'),
+        `${BANNER}\n` +
+          "import type {} from 'ohnejs';\n" +
+          '\n' +
+          "declare module 'ohnejs' {\n" +
+          '  interface ConfigExtensions {\n' +
+          '    defaults: {\n' +
+          '      dashboard: {\n' +
+          '        menu: {\n' +
+          '          reports: true;\n' +
+          '        };\n' +
+          '      };\n' +
+          '    };\n' +
+          '  }\n' +
+          '}\n',
+      );
+    } finally {
+      layers.remove(app);
+    }
+  });
+
   it('emits an empty interface when no layer ships defaults', async () => {
     const app = makeApp('empty');
 

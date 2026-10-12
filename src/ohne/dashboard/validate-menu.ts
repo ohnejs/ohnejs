@@ -1,5 +1,6 @@
 import {
   didYouMean,
+  isArray,
   isBoolean,
   isLocalPath,
   isMessage,
@@ -32,25 +33,33 @@ export function validateMenu(menu: unknown, file: string): void {
       title: 'Invalid `dashboard.menu`',
       body: [
         '`dashboard.menu` maps each node id to its node, like `{ reports: { to: "/reports" } }`.',
+        ...(isArray(menu)
+          ? [
+              '',
+              'A list of `{ label, items }` groups is not accepted.',
+              'Each group becomes a node, and each of its rows a node naming it as `parent`.',
+            ]
+          : []),
       ],
       path: file,
     });
   }
   for (const [id, node] of Object.entries(menu)) {
     if (isUndefined(node)) continue;
+    const invalid = (body: string[]) =>
+      ohneError({ title: `Invalid menu node \`${id}\``, body, path: file });
+    if (!isPlainObject(node))
+      throw invalid(['A menu node is an object, like `{ parent: "general" }`.']);
     const problem = nodeProblem(node);
-    if (!isUndefined(problem)) {
-      throw ohneError({ title: `Invalid menu node \`${id}\``, body: problem, path: file });
-    }
-    validateIcon((node as { icon?: unknown }).icon, 'icon', ` of menu node \`${id}\``, file);
+    if (!isUndefined(problem)) throw invalid(problem);
+    validateIcon(node.icon, 'icon', ` of menu node \`${id}\``, file);
   }
 }
 
 /**
  * What makes one declared menu node unusable, as error body rows, or `undefined` when its shape holds.
  */
-function nodeProblem(node: unknown): string[] | undefined {
-  if (!isPlainObject(node)) return ['A menu node is an object, like `{ parent: "general" }`.'];
+function nodeProblem(node: Record<string, unknown>): string[] | undefined {
   const unknown = Object.keys(node).find((key) => !NODE_KEYS.includes(key));
   if (!isUndefined(unknown)) {
     const near = didYouMean(unknown, NODE_KEYS);
