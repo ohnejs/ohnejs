@@ -169,7 +169,7 @@ export default defineConfig({
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "ohnejs": ">=0.0.1"
+    "ohnejs": ">=0.1.0 <0.2.0-0"
   }
 }
 ```
@@ -207,6 +207,22 @@ export default defineHandler(() => query('Posts').findMany());
 
 The config holds the layer's own values, like any project's. A few keys
 [stay with the layer](./config.md#own-vs-inherited-keys) and never reach a consumer.
+
+## Supported ohne versions
+
+The `ohnejs` range in `peerDependencies` names the ohne versions your layer runs on. Keep it to one
+line, since the next line may break it:
+
+```json
+{
+  "peerDependencies": { "ohnejs": ">=0.1.0 <0.2.0-0" }
+}
+```
+
+- A line is a minor before 1.0 and a major from then on. A lone `>=0.1.0` reads the same.
+- When the ohne an app runs falls outside the range, `ohne dev`, `ohne prepare`, and a boot that
+  runs codegen warn, naming the layer.
+- A range in any other shape, like `^0.1.0`, is left to the package manager.
 
 ## Several layers in one package
 
