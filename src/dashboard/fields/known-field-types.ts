@@ -141,6 +141,24 @@ export interface TextFieldOptions {
 }
 
 /**
+ * The options of a `color` field.
+ */
+export interface ColorFieldOptions {
+  /**
+   * Whether a translucent color is legal, written as `#rrggbbaa`.
+   *
+   * @default
+   * false
+   */
+  alpha?: boolean;
+
+  /**
+   * Colors the control offers to pick from, in any hex spelling.
+   */
+  swatches?: readonly string[];
+}
+
+/**
  * The options of a `number` or `integer` field.
  */
 export interface NumberFieldOptions {
@@ -468,6 +486,11 @@ export interface KnownFieldTypes {
    * A time of day as `HH:MM:SS`.
    */
   time: { options: DateFieldOptions; value: string };
+
+  /**
+   * A hex color as lowercase `#rrggbb`, or `#rrggbbaa` when the field takes `alpha`.
+   */
+  color: { options: ColorFieldOptions; value: string };
 
   /**
    * An instant as epoch milliseconds.

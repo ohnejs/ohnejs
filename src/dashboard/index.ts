@@ -32,6 +32,7 @@ export { field } from './fields/known-field-types.ts';
 export type {
   BooleanFieldOptions,
   ChoiceValue,
+  ColorFieldOptions,
   CommonFieldOptions,
   DateFieldOptions,
   DateTimeFieldOptions,
@@ -203,6 +204,8 @@ export { checkbox } from './ui/checkbox.ts';
 export type { CheckboxOptions } from './ui/checkbox.ts';
 export { chips } from './ui/chips.ts';
 export type { ChipsChoice, ChipsOptions } from './ui/chips.ts';
+export { colorInput } from './ui/color-input.ts';
+export type { ColorInputLabels, ColorInputOptions } from './ui/color-input.ts';
 export { colorMode, resolvedColorMode, setColorMode } from './ui/color-mode.ts';
 export type { ColorMode } from './ui/color-mode.ts';
 export { confirm } from './ui/confirm.ts';

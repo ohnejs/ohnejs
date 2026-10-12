@@ -1,5 +1,6 @@
 import './blocks.ts';
 import './boolean.ts';
+import './color.ts';
 import './date.ts';
 import './date-time.ts';
 import './integer.ts';

@@ -1,9 +1,16 @@
 import { css } from '../../render/css.ts';
 
+const CHECKERBOARD_LIGHT =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA5SURBVHgB7dGxEQAgDELRxDHYfzVYIzoChYXnQf3vNTTJKWMAnKxWXV7AgC+APWdOKMnJckrAP8ENTFgK0Z64q28AAAAASUVORK5CYII=';
+
+const CHECKERBOARD_DARK =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAA/SURBVHgB7dOhEQAgDAPAwGFrmAEGYP+dMB0AVoio6PUSnXuTS1v7PBBxv0wNHcERKDADONgHmE2qp1EElgQ/ufgHd9nZw0oAAAAASUVORK5CYII=';
+
 /**
  * The utility class vocabulary.
  * `ohne-clamp` reads its line count from `--ohne-clamp` (default 1).
  * `ohne-no-transition` on `<body>` suppresses every transition during a theme switch.
+ * `ohne-checkerboard` paints the transparency grid behind a translucent color or image, in either theme.
  */
 css`
   .ohne-primary {
@@ -136,5 +143,13 @@ css`
   .ohne-stroke-2,
   .ohne-stroke-2 [stroke] {
     stroke-width: 2 !important;
+  }
+
+  .ohne-checkerboard {
+    background-image: url('${CHECKERBOARD_LIGHT}');
+  }
+
+  .dark .ohne-checkerboard {
+    background-image: url('${CHECKERBOARD_DARK}');
   }
 `;
