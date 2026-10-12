@@ -511,6 +511,42 @@ describe('dev', () => {
     strictEqual(bound, false);
   });
 
+  it(
+    'warns once about an unmet `ohnejs` range, across an API respawn and a config change',
+    TIMEOUT,
+    async () => {
+      const dashPort = await freePort();
+      const app = writeProject('unmet-peer', 0);
+      const manifest = {
+        name: 'unmet-peer',
+        type: 'module',
+        peerDependencies: { ohnejs: '>=0.0.1 <0.0.2-0' },
+      };
+      writeFileSync(join(app, 'package.json'), JSON.stringify(manifest));
+      const config = pidConfig(`{ api: { port: 0 }, dashboard: { port: ${dashPort} } }`);
+      writeFileSync(join(app, 'ohne.config.ts'), config);
+      writeRoute(app, 'health.ts');
+      const cli = spawnDev(app);
+      clis.push(cli);
+      await waitFor(async () => /API ready[\s\S]*Waiting for changes/.test(cli.output()));
+      const warnings = (): number =>
+        cli.output().split('unmet-peer does not support ohne').length - 1;
+      strictEqual(warnings(), 1);
+
+      let mark = cli.output().length;
+      writeRoute(app, 'orgrimmar.get.ts');
+      await waitFor(async () =>
+        /API ready[\s\S]*Waiting for changes/.test(cli.output().slice(mark)),
+      );
+      mark = cli.output().length;
+      writeFileSync(join(app, 'ohne.config.ts'), `${config}\n`);
+      await waitFor(async () =>
+        /API ready[\s\S]*Waiting for changes/.test(cli.output().slice(mark)),
+      );
+      strictEqual(warnings(), 1);
+    },
+  );
+
   it('parks quietly when a ready dashboard crashes, and a change revives it', TIMEOUT, async () => {
     const { app, cli, dashPort } = await startDev('dashboard-crashed');
 

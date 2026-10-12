@@ -12,6 +12,7 @@ import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
+import { warnUnmetPeers } from '../project/warn-unmet-peers.ts';
 import {
   type ChildExit,
   type ServeBackend,
@@ -100,6 +101,7 @@ export interface DevOptions {
  * A dashboard that fails to start or exits prints its own error, and any next change starts it again.
  * A change in a dashboard directory tells its browsers to reload over the dev live-reload stream.
  * That reload follows any API respawn the same batch caused, so the reloaded page finds the API ready.
+ * It warns once, at start, about installed packages whose `ohnejs` peer range leaves out this version.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  */
@@ -110,6 +112,7 @@ export async function dev(
   const printer = usePrinter();
   await loadProjectEnv(from);
   await loadLayers(from);
+  await warnUnmetPeers(from);
 
   const registry = createRegistryTarget(from);
   const routes = createRoutesTarget(from);

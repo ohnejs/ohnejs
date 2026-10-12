@@ -25,7 +25,7 @@ import {
   useRoutes,
   version,
 } from '../../../src/ohne/index.ts';
-import { relativePath } from '../../../src/utils/index.ts';
+import { nextVersionLine, relativePath } from '../../../src/utils/index.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
 
@@ -56,6 +56,20 @@ describe('bootProject', () => {
   function link(app: string, name: string, target: string): void {
     mkdirSync(join(app, 'node_modules'), { recursive: true });
     symlinkSync(target, join(app, 'node_modules', name), 'dir');
+  }
+
+  /**
+   * Installs a layer `stale` under `app` whose `ohnejs` range starts at the next line.
+   */
+  function staleLayer(app: string): void {
+    const dir = `${app}-stale`;
+    const peerDependencies = { ohnejs: `>=${nextVersionLine(version)}` };
+    write(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'stale', type: 'module', peerDependencies }),
+    );
+    write(join(dir, 'ohne.config.ts'), 'export default {};\n');
+    link(app, 'stale', dir);
   }
 
   async function bootCapturing(app: string): Promise<string> {
@@ -181,6 +195,38 @@ describe('bootProject', () => {
 
     strictEqual(useRoutes().has('GET /ping'), true);
     deepStrictEqual(Object.keys(queryMetadata('Heroes').fields), ['UUID', '_updatedAt', 'name']);
+  });
+
+  it("warns before the boot files run when a package's `ohnejs` range leaves out this version", async () => {
+    const app = makeApp('unmet', ['stale']);
+    staleLayer(app);
+    mark(join(app, 'boot', 'index.ts'), 'booted');
+    await loadLayers(app);
+    const out: string[] = [];
+    usePrinter().configure({
+      stream: {
+        write: (chunk) => {
+          out.push(chunk);
+          scope.__ohneBootProject.push('warned');
+        },
+      },
+    });
+    try {
+      await bootProject(app);
+    } finally {
+      usePrinter().configure({ stream: process.stderr });
+    }
+    strictEqual(out.join('').includes(`stale does not support ohne ${version}`), true);
+    strictEqual(
+      scope.__ohneBootProject.indexOf('warned') < scope.__ohneBootProject.indexOf('booted'),
+      true,
+    );
+  });
+
+  it("stays quiet under `SKIP_CODEGEN` about a package's `ohnejs` range", async () => {
+    const app = makeApp('unmet-skip', ['stale']);
+    staleLayer(app);
+    strictEqual(await bootSkipping(app), '');
   });
 
   it('warns under `SKIP_CODEGEN` when another ohne version generated the files', async () => {

@@ -108,6 +108,7 @@ export interface Env {
 
   /**
    * When `true`, startup skips codegen, for when `ohne prepare` or a parent process already ran it.
+   * The check of each package's `ohnejs` range goes with it, since that run checked them.
    *
    * @default
    * false

@@ -1,11 +1,11 @@
-import { strictEqual } from 'node:assert';
+import { rejects, strictEqual } from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { ohne } from '../../../../src/ohne/cli/ohne.ts';
-import { useEnv } from '../../../../src/ohne/index.ts';
+import { useEnv, usePrinter, version } from '../../../../src/ohne/index.ts';
 import { runCommand } from '../../../../src/utils/cli/index.ts';
 
 describe('ohne prepare', () => {
@@ -52,6 +52,26 @@ describe('ohne prepare', () => {
     strictEqual(existsSync(join(dir, '.ohne', 'flat.ts')), false);
     strictEqual(existsSync(join(dir, '.ohne', 'node', 'stale.ts')), false);
     strictEqual(existsSync(join(dir, '.ohne', 'node', 'layer-name.ts')), true);
+  });
+
+  it("warns about the project's `ohnejs` range before codegen, even when codegen then fails", async () => {
+    const dir = makeDir('unmet', true);
+    const manifest = { name: 'unmet', peerDependencies: { ohnejs: '>=0.0.1 <0.0.2-0' } };
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest));
+    mkdirSync(join(dir, 'collections'));
+    writeFileSync(join(dir, 'collections', 'Broken.ts'), "throw new Error('broken');\n");
+    const out: string[] = [];
+    useEnv().set('SILENT', false);
+    useEnv().set('NO_COLOR', true);
+    usePrinter().configure({ stream: { write: (chunk) => out.push(chunk) } });
+    try {
+      await rejects(runCommand(ohne, ['prepare', '--cwd', dir]), /broken/);
+    } finally {
+      usePrinter().configure({ stream: process.stderr });
+      useEnv().set('SILENT', true);
+      useEnv().unset('NO_COLOR');
+    }
+    strictEqual(out.join('').includes(`unmet does not support ohne ${version}`), true);
   });
 
   it('refuses to run outside an ohne project', async () => {

@@ -1,7 +1,14 @@
 import { realpath } from 'node:fs/promises';
 
 import { findUp, readJSON, resolveModuleDir } from '../../utils/fs/index.ts';
-import { basename, dirname, isNull, joinPath, normalizePath } from '../../utils/index.ts';
+import {
+  basename,
+  dirname,
+  isNull,
+  isUndefined,
+  joinPath,
+  normalizePath,
+} from '../../utils/index.ts';
 import { isOhneProject } from './is-ohne-project.ts';
 
 interface Manifest {
@@ -37,6 +44,11 @@ export interface OhnePackage extends OhneLayer {
    * The app is always one, so its own content is never skipped.
    */
   layer: boolean;
+
+  /**
+   * The `ohnejs` range the package declares in its `peerDependencies`.
+   */
+  peer?: string;
 }
 
 /**
@@ -72,7 +84,12 @@ export async function resolveOhnePackages(from: string = process.cwd()): Promise
   visited.add(normalizePath(await realpath(appDir)));
 
   await walk(appDir, depNames(rootManifest, true));
-  packages.push({ name: rootManifest.name ?? basename(appDir), dir: appDir, layer: true });
+  packages.push({
+    name: rootManifest.name ?? basename(appDir),
+    dir: appDir,
+    layer: true,
+    ...peerOf(rootManifest),
+  });
   return packages;
 
   /**
@@ -88,7 +105,12 @@ export async function resolveOhnePackages(from: string = process.cwd()): Promise
       if (isNull(manifest)) continue;
 
       await walk(dir, depNames(manifest, false));
-      packages.push({ name: manifest.name ?? name, dir, layer: await isOhneProject(dir) });
+      packages.push({
+        name: manifest.name ?? name,
+        dir,
+        layer: await isOhneProject(dir),
+        ...peerOf(manifest),
+      });
     }
   }
 }
@@ -135,4 +157,12 @@ function depNames(manifest: Manifest, includeDev: boolean): string[] {
     includeDev ? manifest.devDependencies : undefined,
   ];
   return groups.flatMap((group) => (group ? Object.keys(group) : []));
+}
+
+/**
+ * The `peer` of a package, present only when its manifest declares an `ohnejs` peer.
+ */
+function peerOf(manifest: Manifest): { peer?: string } {
+  const peer = manifest.peerDependencies?.ohnejs;
+  return isUndefined(peer) ? {} : { peer };
 }

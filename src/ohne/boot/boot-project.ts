@@ -7,13 +7,15 @@ import { generateProject } from '../codegen/generate-project.ts';
 import { useEnv } from '../env/use-env.ts';
 import { version } from '../meta/version.ts';
 import { usePrinter } from '../printer/use-printer.ts';
+import { warnUnmetPeers } from '../project/warn-unmet-peers.ts';
 import { bootLayers } from './boot-layers.ts';
 
 /**
  * Boots the loaded project the way its API server does, up to the database.
  *
- * Runs every layer's boot files, then regenerates the types.
- * Codegen is skipped when the `SKIP_CODEGEN` env is truthy.
+ * First it warns about installed packages whose `ohnejs` peer range leaves out this version.
+ * Then it runs every layer's boot files, and regenerates the types.
+ * Both are skipped when the `SKIP_CODEGEN` env is truthy, since whoever ran codegen checked the install too.
  * A skipped codegen still warns when another ohne version generated the files.
  * Last, it imports the generated registrations.
  *
@@ -28,9 +30,9 @@ import { bootLayers } from './boot-layers.ts';
  * ```
  */
 export async function bootProject(from: string = process.cwd()): Promise<void> {
-  await bootLayers();
-
   const skipCodegen = useEnv().get('SKIP_CODEGEN');
+  if (!skipCodegen) await warnUnmetPeers(from);
+  await bootLayers();
   if (!skipCodegen) await generateProject(from);
 
   // The component tables live in the node bucket: importing runs the registrations.
