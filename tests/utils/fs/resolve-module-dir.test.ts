@@ -56,6 +56,23 @@ describe('resolveModuleDir', () => {
     },
   );
 
+  it('resolves a package to itself before an install of the same name above it', async () => {
+    const self = join(dir, 'app', 'node_modules', 'dep', 'self');
+    makePackage(join(dir, 'app', 'node_modules', 'own'), 'own');
+    mkdirSync(join(self, 'src'), { recursive: true });
+    writeFileSync(join(self, 'package.json'), JSON.stringify({ name: 'own', exports: {} }));
+    const found = await resolveModuleDir('own', join(self, 'src'));
+    strictEqual(found, normalizePath(self));
+  });
+
+  it('skips a self-reference without `exports`, as Node does', async () => {
+    const plain = join(dir, 'plain');
+    makePackage(join(plain, 'node_modules', 'plain'), 'plain');
+    makePackage(join(plain, 'inner'), 'plain');
+    const found = await resolveModuleDir('plain', join(plain, 'inner'));
+    strictEqual(found, normalizePath(realpathSync(join(plain, 'node_modules', 'plain'))));
+  });
+
   it('returns null for a package that is not installed', async () => {
     strictEqual(await resolveModuleDir('missing', join(dir, 'app')), null);
   });

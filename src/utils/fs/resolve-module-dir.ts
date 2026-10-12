@@ -6,14 +6,18 @@ import { joinPath } from '../path/join-path.ts';
 import { normalizePath } from '../path/normalize-path.ts';
 import { resolvePath } from '../path/resolve-path.ts';
 import { exists } from './exists.ts';
+import { findUp } from './find-up.ts';
+import { readJSON } from './read-json.ts';
 
 /**
  * Resolves the installed directory of the package `name`, as seen from `from`.
  *
  * Mirrors Node's `node_modules` lookup.
- * It probes `<dir>/node_modules/<name>` at `from`, then walks up, skipping `node_modules` segments.
+ * Like Node, it first tries a self-reference.
+ * The package around `from` resolves to itself when it is `name` and has `exports`, as `from` reaches it.
+ * Otherwise it probes `<dir>/node_modules/<name>` at `from`, then walks up, skipping `node_modules` segments.
  * This finds hoisted and workspace-level installs, not just a sibling `node_modules`.
- * The match is passed through `realpath`, so pnpm symlinks collapse to the real store location.
+ * A `node_modules` match is passed through `realpath`, so pnpm symlinks collapse to the real store location.
  *
  * Returns the absolute, normalized package directory, or `null` if the package is not installed.
  *
@@ -27,6 +31,13 @@ import { exists } from './exists.ts';
  * ```
  */
 export async function resolveModuleDir(name: string, from: string): Promise<string | null> {
+  const scope = await findUp('package.json', from);
+  if (scope) {
+    const manifest = await readJSON<{ name?: string; exports?: unknown }>(scope);
+    if (manifest?.name === name && manifest.exports !== undefined)
+      return normalizePath(dirname(scope));
+  }
+
   let dir = resolvePath(from);
   while (true) {
     if (basename(dir) !== 'node_modules') {
