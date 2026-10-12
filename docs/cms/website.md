@@ -37,6 +37,8 @@ In `record`, each [block](../database/blocks.md) reads as `{ block, UUID, fields
   field from the site, narrow that access with [`select`](../api/collections.md#the-scope) or mark
   the field [`readable: false`](../database/collections.md#write-only-and-locked-fields).
 - The types follow that access: a narrowed collection is typed with its selected fields alone.
+- A read's [`middleware`](../api/collections.md#exposure) guards the resolve too. The types cannot
+  run middleware without a request, so they leave such a collection out and warn you.
 - A translatable value, an upload's `description` included, reads `null` in a locale without a
   translation. The CMS never substitutes another language, so fall back on the site, as in
   `upload.description ?? ''`.
