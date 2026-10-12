@@ -4,12 +4,14 @@ import type { Dialect } from '../../database/dialect.ts';
 import { isUndefined } from '../../../utils/index.ts';
 import { useDatabase } from '../../database/use-database.ts';
 import { busyError } from './busy.ts';
+import { commitEffects, holdEffects, type RecordCommitted } from './committed.ts';
 import { withSavepoint } from './savepoint.ts';
 
 /**
  * Runs a write terminal in one transaction bracket, self-owned or joined, behind one classification funnel.
  *
  * A self-owned call opens an `immediate` write transaction; a joined call brackets `joinedTx` in a savepoint.
+ * Once a self-owned transaction commits, the commit effects its joined writes held fire, in write order.
  * `failed` tells the savepoint which soft outcomes to unwind.
  * A create or update returns `{ ok: false }`; a delete only ever throws, so its predicate is constant.
  * A busy database always surfaces as a retryable `busyError`, whatever the terminal.
@@ -23,15 +25,19 @@ export async function runWrite<T>(
   attempt: (tx: Transaction) => Promise<T>,
   classify: (error: unknown) => T | undefined,
 ): Promise<T> {
+  const held: RecordCommitted[] = [];
   const run = isUndefined(joinedTx)
-    ? () => useDatabase().transaction((tx) => attempt(tx), 'immediate')
+    ? () => useDatabase().transaction((tx) => holdEffects(tx, held, () => attempt(tx)), 'immediate')
     : () => withSavepoint(joinedTx, failed, () => attempt(joinedTx));
+  let outcome: T;
   try {
-    return await run();
+    outcome = await run();
   } catch (error) {
     if (dialect.isBusy(error)) throw busyError(error);
     const classified = classify(error);
     if (!isUndefined(classified)) return classified;
     throw error;
   }
+  for (const event of held) await commitEffects(event);
+  return outcome;
 }

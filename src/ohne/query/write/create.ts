@@ -116,12 +116,15 @@ export async function runCreate(
       return undefined;
     },
   );
-  if (outcome.ok && isUndefined(joinedTx)) {
-    await commitEffects({
-      collection: collection as CollectionName,
-      operation: 'create',
-      uuids: [outcome.record.UUID as string],
-    });
+  if (outcome.ok) {
+    await commitEffects(
+      {
+        collection: collection as CollectionName,
+        operation: 'create',
+        uuids: [outcome.record.UUID as string],
+      },
+      joinedTx,
+    );
   }
   return outcome;
 }

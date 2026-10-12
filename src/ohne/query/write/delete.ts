@@ -140,13 +140,10 @@ export async function runDelete(
       return undefined;
     },
   );
-  if (isUndefined(joinedTx)) {
-    await commitEffects({
-      collection: collection as CollectionName,
-      operation: 'delete',
-      uuids: outcome.uuids,
-    });
-  }
+  await commitEffects(
+    { collection: collection as CollectionName, operation: 'delete', uuids: outcome.uuids },
+    joinedTx,
+  );
   return { deleted: outcome.deleted };
 }
 
@@ -439,13 +436,10 @@ export async function runDeleteTranslation(
     (tx) => attemptDeleteTranslation(tx, meta, dialect, scoped, locale),
     () => undefined,
   );
-  if (isUndefined(joinedTx)) {
-    await commitEffects({
-      collection: collection as CollectionName,
-      operation: 'update',
-      uuids: outcome.uuids,
-    });
-  }
+  await commitEffects(
+    { collection: collection as CollectionName, operation: 'update', uuids: outcome.uuids },
+    joinedTx,
+  );
   return { deleted: outcome.deleted };
 }
 

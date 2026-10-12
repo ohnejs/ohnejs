@@ -730,6 +730,51 @@ describe('runUpdate hooks', () => {
     ok(seen.includes(b.UUID as string));
   });
 
+  it('fires `record:before-update` once with the matched rows still unwritten', async () => {
+    const a = await seedPost({ summary: 'bu-group', views: 7 });
+    const b = await seedPost({ summary: 'bu-group', views: 7 });
+    const calls: { matched: readonly string[]; locale: string; views: unknown[] }[] = [];
+    hook('record:before-update', async ({ matched, tx, locale }) => {
+      const rows = await queryUntyped('UPost')
+        .use(tx)
+        .where({ UUID: { in: matched } })
+        .findMany();
+      calls.push({ matched, locale, views: rows.map((row) => row.views) });
+    });
+    const result = await runUpdate(
+      'UPost',
+      { views: 8 },
+      { kind: 'compare', path: ['summary'], op: 'equalsTo', value: 'bu-group', negated: false },
+      'de',
+    );
+    ok(result.ok);
+    strictEqual(calls.length, 1);
+    deepStrictEqual([...(calls[0]?.matched ?? [])].sort(), [a.UUID, b.UUID].sort());
+    strictEqual(calls[0]?.locale, 'de');
+    deepStrictEqual(calls[0]?.views, [7, 7]);
+  });
+
+  it('fires `record:before-update` on an unscoped chain', async () => {
+    const a = await seedPost();
+    let fired = 0;
+    hook('record:before-update', () => {
+      fired++;
+    });
+    await queryUntyped('UPost').unscoped().where({ UUID: a.UUID }).updateOrThrow({ views: 2 });
+    strictEqual(fired, 1);
+  });
+
+  it('leaves `record:before-update` silent when nothing matches or validation fails', async () => {
+    const a = await seedPost();
+    let fired = 0;
+    hook('record:before-update', () => {
+      fired++;
+    });
+    ok((await runUpdate('UPost', { views: 2 }, uuidIs('none'), null)).ok);
+    ok(!(await runUpdate('UPost', { views: 'many' }, uuidIs(a.UUID as string), null)).ok);
+    strictEqual(fired, 0);
+  });
+
   it('narrows the matched set through `record:condition`', async () => {
     const a = await seedPost({ summary: 'cond-group', views: 10 });
     const b = await seedPost({ summary: 'cond-group', views: 10 });

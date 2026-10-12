@@ -83,8 +83,49 @@ export interface RecordConditionContext {
   operation: 'update' | 'delete';
 }
 
+/**
+ * The context the pre-update hook fires with, carrying the records an update is about to change.
+ */
+export interface RecordUpdateContext {
+  /**
+   * The collection being updated, by name.
+   */
+  collection: CollectionName;
+
+  /**
+   * The `WHERE` condition the update matched on, scoped by `record:condition` unless the chain is `unscoped()`.
+   */
+  condition: ConditionNode;
+
+  /**
+   * The `UUID`s of the records this update will change.
+   */
+  matched: readonly string[];
+
+  /**
+   * The open write transaction, so a callback reads the records as they stand before the write.
+   */
+  tx: Transaction;
+
+  /**
+   * The effective locale the update writes translatable values in.
+   */
+  locale: LocaleCode;
+}
+
 declare module 'ohnejs' {
   interface Hooks {
+    /**
+     * Runs once per update just before it writes, inside the transaction, carrying the matched `UUID`s.
+     * Use it to read what a record held before the write, then act on the change in `record:after-update`.
+     * It fires after validation, so a field error never reaches it, but a later precheck may still fail.
+     * Keep it read-only: a precheck failing after it does not always undo what a callback wrote.
+     * A `deleteTranslation` never fires it, nor does an update that matches no record.
+     * An action: its return is ignored, and the update proceeds once every callback settles.
+     * The `ctx` carries the `collection`, the `condition`, the `matched` UUIDs, the `tx`, and the `locale`.
+     */
+    'record:before-update': (ctx: RecordUpdateContext) => void | Promise<void>;
+
     /**
      * Runs once for each record an update matched, re-read in its final state, inside the transaction.
      * Use it for a per-record atomic effect - a search-index row, a revision - written on the same `tx`.
@@ -123,6 +164,15 @@ export async function scopeCondition(
     collection: collection as CollectionName,
     operation,
   });
+}
+
+/**
+ * Runs the `record:before-update` effects for the matched rows, skipping when nothing subscribes.
+ */
+async function beforeUpdate(ctx: RecordUpdateContext): Promise<void> {
+  const callbacks = useHooks().get('record:before-update');
+  if (isUndefined(callbacks) || isEmpty(callbacks)) return;
+  await applyHook('record:before-update', ctx);
 }
 
 /**
@@ -193,9 +243,10 @@ export async function runUpdate(
   );
   if (!outcome.ok) return outcome;
   const uuids = outcome.records.map((record) => record.UUID as string);
-  if (isUndefined(joinedTx)) {
-    await commitEffects({ collection: collection as CollectionName, operation: 'update', uuids });
-  }
+  await commitEffects(
+    { collection: collection as CollectionName, operation: 'update', uuids },
+    joinedTx,
+  );
   await narrowTranslations(meta, outcome.records, uuids, access, unscoped);
   return outcome;
 }
@@ -235,6 +286,13 @@ async function attemptUpdate(
 
   const matched = await matchedUUIDs(tx, dialect, meta, condition, code);
   if (isEmpty(matched)) return { ok: true, records: [] };
+  await beforeUpdate({
+    collection: meta.collection as CollectionName,
+    condition,
+    matched,
+    tx,
+    locale: code as LocaleCode,
+  });
 
   const gates = whenGates(meta.fields, processed.input, scope);
   if (isEmpty(gates) && !hasNestedGates(scope)) {

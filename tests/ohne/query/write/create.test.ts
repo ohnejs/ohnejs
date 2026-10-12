@@ -255,6 +255,44 @@ describe('runCreate hooks', () => {
     });
     strictEqual(events.length, 0);
   });
+
+  it('fires `record:committed` for a write joined in a hook once the outer write commits', async () => {
+    const events: string[] = [];
+    let pending = 0;
+    hook('record:committed', (event) => {
+      events.push(event.collection);
+    });
+    hook('record:after-create', async (record, { collection, tx }) => {
+      if (collection !== 'CPost' || record.title !== 'HookOuter') return;
+      ok((await runCreate('CUser', { name: 'Joined' }, null, tx)).ok);
+      pending = events.length;
+    });
+    const result = await runCreate('CPost', { ...base, title: 'HookOuter' }, null);
+    ok(result.ok);
+    strictEqual(pending, 0);
+    deepStrictEqual(events.sort(), ['CPost', 'CUser']);
+  });
+
+  it('drops `record:committed` for joined writes their savepoint unwound', async () => {
+    const events: string[] = [];
+    hook('record:committed', (event) => {
+      events.push(`${event.collection}:${event.uuids.length}`);
+    });
+    hook('record:after-create', async (record, { collection, tx }) => {
+      if (collection !== 'CPost') return;
+      if (record.title === 'HookKept') {
+        await runCreate('CPost', { ...base, title: 'HookUnwound' }, null, tx).catch(
+          () => undefined,
+        );
+      }
+      if (record.title === 'HookUnwound') {
+        ok((await runCreate('CUser', { name: 'Unwound' }, null, tx)).ok);
+        throw new Error('unwind');
+      }
+    });
+    ok((await runCreate('CPost', { ...base, title: 'HookKept' }, null)).ok);
+    deepStrictEqual(events, ['CPost:1']);
+  });
 });
 
 describe('runCreate links', () => {
