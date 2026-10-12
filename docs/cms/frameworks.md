@@ -68,7 +68,7 @@ useHead({
     page.value?.kind === 'page'
       ? [
           { rel: 'canonical', href: page.value.seo.canonical },
-          ...page.value.alternates.map((link) => ({ rel: 'alternate', ...link })),
+          ...page.value.alternates.map((link) => ({ rel: 'alternate' as const, ...link })),
         ]
       : [],
 });
@@ -115,7 +115,25 @@ onMounted(() => {
 </template>
 ```
 
-A block component renders its field with `<RichText :value="body" />`.
+Each block is a component that takes its fields as props. `Blocks['Hero']` types them:
+
+```vue
+<!-- app/components/Hero.vue -->
+<script setup lang="ts">
+import type { Blocks } from '~~/ohne';
+
+defineProps<Blocks['Hero']>();
+</script>
+
+<template>
+  <section>
+    <h2>{{ heading }}</h2>
+    <RichText :value="body" />
+  </section>
+</template>
+```
+
+`defineProps` cannot resolve `Block<'Hero'>['fields']`, so name the block in `Blocks` instead.
 
 ## Next
 

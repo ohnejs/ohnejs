@@ -59,8 +59,9 @@ if (page.kind === 'page' && page.collection === 'Posts') {
 
 Checking `collection` narrows `record` to that collection's fields.
 
-`CMS` describes everything your CMS resolves; `Page`, `Block`, `Related` and `Upload` name its
-parts. `Block<'Hero'>` is one `Hero` item, and `Block` alone is any block, narrowed by `block`:
+`CMS` describes everything your CMS resolves; `Page`, `Block`, `Blocks`, `Related` and `Upload`
+name its parts. `Block<'Hero'>` is one `Hero` item, and `Block` alone is any block, narrowed by
+`block`:
 
 ```ts
 import { escapeHTML, richTextToHTML } from '@ohnejs/client';
@@ -75,6 +76,9 @@ export function renderHero({ fields }: Block<'Hero'>) {
   return `<h1>${escapeHTML(fields.heading)}</h1>${image(fields.image)}${richTextToHTML(fields.body)}`;
 }
 ```
+
+`Blocks['Hero']` is the `fields` of one `Hero`. Reach for it when a component takes a block's
+fields as its props, as Vue's `defineProps` does: it cannot resolve `Block<'Hero'>['fields']`.
 
 A [custom field type](../database/custom-field-types.md#on-your-website) that the website cannot
 type reads `unknown`.
@@ -126,10 +130,10 @@ renders it, with every text and address escaped:
 
 ```ts
 import { richTextToHTML } from '@ohnejs/client';
-import type { Block } from './ohne.ts';
+import type { Blocks } from './ohne.ts';
 
-export function renderText({ fields }: Block<'Text'>) {
-  return richTextToHTML(fields.body);
+export function renderText(text: Blocks['Text']) {
+  return richTextToHTML(text.body);
 }
 ```
 
