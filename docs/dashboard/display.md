@@ -155,7 +155,7 @@ facts(() => hero.value?.facts, { columns: 2 })
 
 ## List
 
-`list` renders items as divided rows, made for a [flush card](./cards-and-tabs.md#flush):
+`list` renders items as divided rows. Alone in a card, the rows run to the card's edges:
 
 ```ts
 card(
@@ -164,7 +164,7 @@ card(
     (raid) => h('span', null, () => raid().name),
     { key: (raid) => raid.id, empty: 'No raids scheduled' },
   ),
-  { title: 'Raids', flush: true },
+  { title: 'Raids' },
 )
 ```
 
