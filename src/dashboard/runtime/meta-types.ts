@@ -390,7 +390,7 @@ export interface DashboardMenuItem {
 export interface DashboardMeta {
   /**
    * The sidebar's root nodes, in order: `dashboard.menu` resolved, then the `dashboard:menu` hook.
-   * Only what the user may see arrives: a collection out of reach drops, and so does a node whose `can` they lack.
+   * A collection out of reach drops, and so does a node whose `can` the user lacks.
    */
   menu: DashboardMenuItem[];
 

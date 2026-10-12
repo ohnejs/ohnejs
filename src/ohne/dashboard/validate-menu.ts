@@ -5,6 +5,7 @@ import {
   isMessage,
   isNull,
   isPlainObject,
+  isRealNumber,
   isString,
   isUndefined,
 } from '../../utils/index.ts';
@@ -60,7 +61,7 @@ function nodeProblem(node: unknown): string[] | undefined {
   if (!isUndefined(parent) && !isNull(parent) && !isString(parent)) {
     return ['`parent` is the id of another node, or `null` for the root.'];
   }
-  if (!isUndefined(order) && !Number.isFinite(order)) return ['`order` is a finite number.'];
+  if (!isUndefined(order) && !isRealNumber(order)) return ['`order` is a finite number.'];
   if (!isUndefined(label) && !isMessage(label)) {
     return ['`label` is a message: a string, or a `{ key, params }` object.'];
   }

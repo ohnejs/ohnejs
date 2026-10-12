@@ -1,5 +1,5 @@
 import { applyHook, type DashboardMenuNode, useCollections, useConfig } from 'ohnejs';
-import { isEmpty, isUndefined, naturalCompare, toSentenceCase } from 'ohnejs/utils';
+import { isEmpty, isNull, isUndefined, naturalCompare, toSentenceCase } from 'ohnejs/utils';
 
 import type { DashboardMenuItem } from '../api/dashboard.get.ts';
 import type { User } from '../auth/types.ts';
@@ -82,8 +82,7 @@ function resolveMenu(user: User, collections: DashboardCollection[]): DashboardM
         const to = node.to ?? (collection && `/collections/${collection.segment}`);
         const nested = build(id);
         if (isUndefined(to) && isEmpty(nested)) return [];
-        const label =
-          node.label ?? collection?.label ?? (parent === null ? '' : toSentenceCase(id));
+        const label = node.label ?? collection?.label ?? (isNull(parent) ? '' : toSentenceCase(id));
         const item: DashboardMenuItem = { id, label };
         if (!isUndefined(to)) item.to = to;
         const icon = node.icon ?? collection?.icon;
