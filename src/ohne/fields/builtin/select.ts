@@ -3,7 +3,7 @@ import type { Message } from '../../messages/known-messages.ts';
 
 import { literalUnion } from '../../../utils/codegen/index.ts';
 import { checkChoice, choiceValues, isEmpty } from '../../../utils/index.ts';
-import { matchingChoices } from '../choice.ts';
+import { choiceListProblem, matchingChoices } from '../choice.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { failureMessage } from '../validation-message.ts';
@@ -35,6 +35,7 @@ export const select = defineField({
      */
     display: option<'dropdown' | 'buttons'>({ default: 'dropdown' }),
   },
+  validateOptions: (ctx) => choiceListProblem(ctx.options.choices),
   emitType: (ctx) => literalUnion(choiceValues(ctx.options.choices)),
   validators: [(value, ctx) => failureMessage(checkChoice(value, ctx.options.choices))],
   search: (ctx) => {

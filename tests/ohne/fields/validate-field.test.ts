@@ -1,4 +1,4 @@
-import { doesNotThrow, throws } from 'node:assert';
+import { deepStrictEqual, doesNotThrow, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { FieldType } from '../../../src/ohne/fields/define-field.ts';
@@ -183,6 +183,81 @@ describe('validateField write flags', () => {
         }),
       'Field `field` cannot be immutable',
     );
+  });
+});
+
+describe('validateField validateOptions', () => {
+  const ranged: FieldType = defineField({
+    columnType: 'integer',
+    options: { min: option({ default: 0 }), max: option({ default: 10 }) },
+    validateOptions: ({ options }) =>
+      options.min > options.max ? ['`min` is above `max`.', 'Swap them.'] : undefined,
+  });
+
+  const bodyOf = (fn: () => void): unknown => {
+    try {
+      fn();
+    } catch (error) {
+      if (isOhneError(error)) return error.body;
+    }
+    return undefined;
+  };
+
+  it('accepts options the type finds sound', () => {
+    doesNotThrow(() => check({ min: 2, max: 5 }, ranged));
+    doesNotThrow(() => check({}, ranged));
+  });
+
+  it('rejects with the rows the type returns, located on its owner', () => {
+    throwsTitled(() => check({ min: 6, max: 5 }, ranged), 'Field `field` has invalid options');
+    deepStrictEqual(
+      bodyOf(() => check({ min: 6, max: 5 }, ranged)),
+      ['Field `field` in collection `Posts` is `x`.', '`min` is above `max`.', 'Swap them.'],
+    );
+  });
+
+  it('takes a single string as one row', () => {
+    const single: FieldType = defineField({ columnType: 'text', validateOptions: () => 'Nope.' });
+    deepStrictEqual(
+      bodyOf(() => check({}, single)),
+      ['Field `field` in collection `Posts` is `x`.', 'Nope.'],
+    );
+  });
+
+  it('receives the resolved options, defaults filled in', () => {
+    let seen: { size: number; nullable: boolean } | undefined;
+    const spy: FieldType = defineField({
+      columnType: 'text',
+      options: { size: option({ default: 3 }) },
+      validateOptions: ({ options }) => {
+        seen = options;
+        return undefined;
+      },
+    });
+    check({}, spy);
+    deepStrictEqual(seen && { size: seen.size, nullable: seen.nullable }, {
+      size: 3,
+      nullable: false,
+    });
+  });
+
+  it('runs for a subfield and a block field, each located on its owner', () => {
+    const run = (owner: 'collection' | 'block', nested: boolean) =>
+      bodyOf(() =>
+        validateField({
+          owner: { kind: owner, name: owner === 'block' ? 'Hero' : 'Posts' },
+          name: nested ? 'sections.count' : 'count',
+          nested,
+          instance: { type: 'x', options: { min: 6, max: 5 } } as unknown as FieldInstance,
+          fieldType: ranged,
+          hint: undefined,
+        }),
+      );
+    deepStrictEqual(
+      (run('collection', true) as string[])[0],
+      'Field `sections.count` in collection `Posts` is `x`.',
+    );
+    deepStrictEqual((run('block', false) as string[])[0], 'Field `count` in block `Hero` is `x`.');
   });
 });
 

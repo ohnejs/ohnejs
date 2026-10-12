@@ -222,7 +222,7 @@ An ordered list of distinct strings, stored as a JSON list. Duplicates are remov
 
 | Option            | Default | What it does                                                                                                                                                            |
 | ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `choices`         | -       | The values each entry must come from. Each is a string, or `{ value, label }`. Omitted, any strings are accepted.                                                       |
+| `choices`         | -       | The values each entry must come from, each value once. Each is a string, or `{ value, label }`. Omitted, any strings are accepted.                                      |
 | `default`         | `[]`    | The list a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                        |
 | `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
 | `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
@@ -438,7 +438,7 @@ list is rejected.
 
 | Option            | Default      | What it does                                                                                                                                                            |
 | ----------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `choices`         | required     | The values the field accepts. Each is a string, or `{ value, label }` with a label the dashboard shows.                                                                 |
+| `choices`         | required     | The values the field accepts, at least one, each value once. Each is a string, or `{ value, label }` with a label the dashboard shows.                                  |
 | `default`         | -            | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
 | `description`     | -            | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
 | `display`         | `'dropdown'` | The editor: `'dropdown'`, or `'buttons'` for a short list that reads at a glance. The stored value is the same either way.                                              |

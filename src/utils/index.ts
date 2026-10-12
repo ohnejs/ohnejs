@@ -1,4 +1,5 @@
 export * from './array/chunk.ts';
+export * from './array/duplicates.ts';
 export * from './array/first.ts';
 export * from './array/group-by.ts';
 export * from './array/intersection.ts';

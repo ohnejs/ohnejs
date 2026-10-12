@@ -129,3 +129,38 @@ describe('multiSelect search', () => {
     deepStrictEqual(search('urgent'), { includes: 'urgent' });
   });
 });
+
+describe('multiSelect validateOptions', () => {
+  type OptionsCtx = Parameters<NonNullable<typeof multiSelect.validateOptions>>[0];
+
+  const check = (options: Record<string, unknown>) =>
+    multiSelect.validateOptions!({ name: 'status', options } as unknown as OptionsCtx);
+
+  it('accepts distinct choices', () => {
+    strictEqual(check({ choices: ['draft', { value: 'live', label: 'Published' }] }), undefined);
+  });
+
+  it('rejects an empty choice list', () => {
+    deepStrictEqual(check({ choices: [] }), [
+      '`choices` is empty, so no value can be chosen.',
+      'List at least one choice.',
+    ]);
+  });
+
+  it('rejects a repeated value, plain or labeled, listing each once', () => {
+    deepStrictEqual(
+      check({ choices: ['draft', { value: 'draft', label: 'Draft' }, 'live', 'live', 'draft'] }),
+      [
+        '`choices` repeats a value, so its choices cannot be told apart once stored.',
+        'Drop the duplicates:',
+        '',
+        '- `draft`',
+        '- `live`',
+      ],
+    );
+  });
+
+  it('accepts no `choices` at all', () => {
+    strictEqual(check({}), undefined);
+  });
+});

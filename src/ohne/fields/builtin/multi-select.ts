@@ -12,7 +12,7 @@ import {
   isUndefined,
   uniqueArray,
 } from '../../../utils/index.ts';
-import { matchingChoices } from '../choice.ts';
+import { choiceListProblem, matchingChoices } from '../choice.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { failureMessage } from '../validation-message.ts';
@@ -50,6 +50,8 @@ export const multiSelect = defineField({
      */
     max: option<number>(),
   },
+  validateOptions: ({ options }) =>
+    isUndefined(options.choices) ? undefined : choiceListProblem(options.choices),
   emitType: (ctx) =>
     isUndefined(ctx.options.choices)
       ? 'string[]'

@@ -12,6 +12,7 @@ import {
   isNull,
   isPlainObject,
   isUndefined,
+  toArray,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { hasColumnMatcher, searchHook } from './field-search.ts';
@@ -129,6 +130,7 @@ export interface ValidateFieldArgs {
  * - `immutable` is top-level only: an update rewrites composite items and block instances whole.
  * - A search hook on a relation, composite, or blocks field would never run: search follows those itself.
  * - `search: true` needs a type that is not locked out, something to match, and a readable field.
+ * - The type's own `validateOptions` rejects options that make no sense for it.
  */
 export function validateField(args: ValidateFieldArgs): void {
   const { owner, name, nested, instance, fieldType, hint } = args;
@@ -380,6 +382,16 @@ export function validateField(args: ValidateFieldArgs): void {
     });
   }
   validateFieldSearch(where, name, instance.type, options, fieldType, hint);
+  const problem = fieldType.validateOptions?.({
+    name,
+    options: resolveFieldOptions(fieldType, options),
+  });
+  if (!isUndefined(problem)) {
+    throw ohneError({
+      title: `Field \`${name}\` has invalid options`,
+      body: [`${where} is \`${instance.type}\`.`, ...toArray(problem)],
+    });
+  }
   if (hasKey(options, 'default') && !isUndefined(options.default)) {
     const value = options.default;
     const valueShapeNullable =

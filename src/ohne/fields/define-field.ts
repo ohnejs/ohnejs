@@ -80,6 +80,20 @@ export interface FieldType<
   options?: TOptions;
 
   /**
+   * Checks one field's resolved options when the schema builds, so a nonsensical setup fails at boot.
+   * Returns the problem as error body rows, cause then fix, or `undefined` when the options hold.
+   * The rows are developer-facing English, never a message key: they render in the boot error.
+   * It sees the whole resolved options object, so a rule may relate one option to another.
+   *
+   * @example
+   * ```ts
+   * validateOptions: ({ options }) =>
+   *   options.min > options.max ? ['`min` is above `max`.', 'Swap them.'] : undefined
+   * ```
+   */
+  validateOptions?(ctx: FieldContext<TOptions>): string | readonly string[] | undefined;
+
+  /**
    * Returns the storage layout of a field that needs more than a plain column.
    *
    * - A `record` pairs `columnType: 'text'` with a `foreignKey` hint.

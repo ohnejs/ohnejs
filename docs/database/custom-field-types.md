@@ -86,6 +86,31 @@ option<'soft' | 'hard'>({ default: 'soft' })
 Option names are camelCase. None may reuse the name of an option that every field already takes,
 like `nullable`, `default`, or `label`.
 
+## Checking options
+
+Some options only make sense together. A `rating` with `min: 5` and `max: 1` type-checks, but no
+value could ever pass. `validateOptions` catches it at boot:
+
+```ts
+// fields/rating.ts
+import { defineField, option } from 'ohnejs';
+
+export default defineField({
+  columnType: 'integer',
+  options: {
+    min: option({ default: 1 }),
+    max: option({ default: 5 }),
+  },
+  validateOptions: ({ options }) =>
+    options.min > options.max ? ['`min` is above `max`.', 'Swap them.'] : undefined,
+});
+```
+
+Return `undefined` when the options are fine. Otherwise, return what is wrong and how to fix it, as
+a string or a list of lines. Boot stops and shows those lines with the field they belong to.
+
+Only you see these lines, never an editor, so write them as plain text rather than message keys.
+
 ## Storage
 
 `columnType` picks the column the value is stored in: `text`, `integer`, `real`, `boolean`, or

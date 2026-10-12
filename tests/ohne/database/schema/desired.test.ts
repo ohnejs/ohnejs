@@ -1641,4 +1641,40 @@ describe('buildDesiredSchema', () => {
       { name: truncateWithHash(`IX__${long}_content___parentUUID`), columns: ['_parentUUID'] },
     ]);
   });
+
+  it("runs a field type's `validateOptions` on a nested subfield and a block field", () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: {
+                sections: field('repeater', {
+                  fields: { status: field('select', { choices: [] }) },
+                }),
+              },
+            },
+          }),
+          useFields(),
+        ),
+      (error: unknown) =>
+        isOhneError(error) && error.title === 'Field `sections.status` has invalid options',
+    );
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: { fields: { content: field('blocks', { allow: ['Hero'] }) } },
+          }),
+          useFields(),
+          blocks({
+            name: 'Hero',
+            block: { fields: { tone: field('select', { choices: ['warm', 'warm'] }) } },
+          }),
+        ),
+      bodyMatching(/Field `tone` in block `Hero` is `select`\.\n`choices` repeats a value/),
+    );
+  });
 });
