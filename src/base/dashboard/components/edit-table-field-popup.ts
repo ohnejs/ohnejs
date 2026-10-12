@@ -220,11 +220,12 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
   const save = async (): Promise<void> => {
     if (write.busy() || disabled) return;
     const reading = form.value.read();
+    unplaced.value = '';
     if (!isUndefined(reading.errors)) {
+      form.value.setErrors(reading.errors);
       form.value.focusError();
       return;
     }
-    unplaced.value = '';
     await write.run({
       body: reading.value ?? {},
       query: collection.translatable ? { locale: activeContentLocale() } : undefined,

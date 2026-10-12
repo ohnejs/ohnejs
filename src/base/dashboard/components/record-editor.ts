@@ -372,6 +372,7 @@ export function useRecordEditor(
     if (isUndefined(live) || busy.value || !canWrite()) return;
     const reading = live.read();
     if (!isUndefined(reading.errors)) {
+      live.setErrors(reading.errors);
       live.focusError();
       return;
     }
