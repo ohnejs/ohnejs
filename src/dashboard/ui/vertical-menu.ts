@@ -22,6 +22,12 @@ import './tokens.ts';
  */
 export interface VerticalMenuItemModel {
   /**
+   * The key the item's expanded state is kept under, unique across the whole menu.
+   * Omitted, the item's hyphen-joined index path keys it, so a reorder remaps its state.
+   */
+  id?: string;
+
+  /**
    * The link target; the router intercepts same-origin navigation.
    *
    * Either provide a `to` or an `action` property, but not both.
@@ -90,7 +96,7 @@ export interface VerticalMenuOptions {
   items?: () => VerticalMenuItemModel[];
 
   /**
-   * The expanded state of the items, keyed by hyphen-joined index path (`'0'`, `'0-2'`, ...).
+   * The expanded state of the items, keyed by each item's `id`, else its hyphen-joined index path (`'0-2'`).
    * It is two-way: the items keep it updated, and a caller write is reflected immediately.
    * Omitted, the menu keeps the state internally.
    */
@@ -128,10 +134,18 @@ export interface VerticalMenuOptions {
  */
 export interface VerticalMenuItemOptions {
   /**
-   * The hyphen-joined index path identifying the item (`'0'`, `'0-2'`, `'0-2-1'`).
-   * It is the key into the expanded state.
+   * The key into the expanded state: the item's `id`, else its hyphen-joined index path (`'0-2'`).
    */
-  id: string;
+  key: string;
+
+  /**
+   * The keys of the items above this one, outermost first.
+   * Expanding the item expands each of them too.
+   *
+   * @default
+   * []
+   */
+  ancestors?: readonly string[];
 
   /**
    * The item model, read reactively.
@@ -326,7 +340,8 @@ let sequence = 0;
 /**
  * Sidebar navigation.
  * An optional uppercase title sits above a recursive list of expandable items.
- * The expanded state is keyed by each item's index path, so reordering `items` remaps it.
+ * The expanded state is keyed by each item's `id`, so it follows the item through a reorder.
+ * An item without one is keyed by its index path, and reordering `items` remaps its state.
  * An active leaf auto-expands all of its ancestors.
  *
  * @example
@@ -359,10 +374,10 @@ export function verticalMenu(options: VerticalMenuOptions = {}): HTMLElement {
       },
       each(
         () => options.items?.() ?? [],
-        (_, index) => index,
+        (item, index) => item.id ?? index,
         (item, index) =>
           verticalMenuItem({
-            id: String(index()),
+            key: untracked(item).id ?? String(index()),
             item,
             expandedState,
             ariaExpandLabel: options.ariaExpandLabel,
@@ -384,28 +399,24 @@ export function verticalMenu(options: VerticalMenuOptions = {}): HTMLElement {
  *
  * @example
  * ```ts
- * verticalMenuItem({ id: '0', item: () => ({ label: 'Pages', to: '/pages' }), expandedState })
+ * verticalMenuItem({ key: 'pages', item: () => ({ label: 'Pages', to: '/pages' }), expandedState })
  * ```
  */
 export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement {
-  const { id, item, expandedState } = options;
+  const { key, item, expandedState } = options;
+  const ancestors = options.ancestors ?? [];
   const expandLabel = options.ariaExpandLabel ?? 'Expand';
   const collapseLabel = options.ariaCollapseLabel ?? 'Collapse';
-  const isExpanded = (): boolean => expandedState.value[id] === true;
+  const isExpanded = (): boolean => expandedState.value[key] === true;
 
   const expand = (): void => {
     const state = { ...untracked(() => expandedState.value) };
-    let current = '';
-    for (const segment of id.split('-')) {
-      current += segment;
-      state[current] = true;
-      current += '-';
-    }
+    for (const open of [...ancestors, key]) state[open] = true;
     expandedState.value = state;
   };
 
   const collapse = (): void => {
-    expandedState.value = { ...untracked(() => expandedState.value), [id]: false };
+    expandedState.value = { ...untracked(() => expandedState.value), [key]: false };
   };
 
   let previousActive: boolean | undefined;
@@ -551,10 +562,11 @@ export function verticalMenuItem(options: VerticalMenuItemOptions): HTMLElement 
       },
       each(
         () => item().submenu ?? [],
-        (_, index) => index,
+        (sub, index) => sub.id ?? index,
         (sub, index) =>
           verticalMenuItem({
-            id: `${id}-${index()}`,
+            key: untracked(sub).id ?? `${key}-${index()}`,
+            ancestors: [...ancestors, key],
             item: sub,
             expandedState,
             ariaExpandLabel: options.ariaExpandLabel,
