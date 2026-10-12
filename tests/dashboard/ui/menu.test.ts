@@ -78,4 +78,21 @@ describe('menu', () => {
     strictEqual(panel() !== undefined, true);
     fire(trigger, 'click');
   });
+
+  it('sizes its panel like the trigger, though it mounts on the body', () => {
+    const computed = globalThis.getComputedStyle;
+    Object.assign(globalThis, {
+      getComputedStyle: () => ({ display: 'inline', getPropertyValue: () => ' -1' }),
+    });
+    try {
+      const trigger = fake(menu(button('Raid'), [{ label: 'Ulduar' }]));
+      fire(trigger, 'click');
+      flush();
+      strictEqual(panel()?.getAttribute('style')?.includes('--ohne-size: -1;'), true);
+      fire(trigger, 'click');
+      flush();
+    } finally {
+      Object.assign(globalThis, { getComputedStyle: computed });
+    }
+  });
 });

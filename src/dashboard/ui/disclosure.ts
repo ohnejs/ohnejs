@@ -45,7 +45,8 @@ css`
     display: flex;
     align-items: center;
     gap: 0.5em;
-    padding: 0.625em 0;
+    margin-inline: -0.5rem;
+    padding: 0.625em 0.5rem;
     cursor: pointer;
     border-radius: calc(var(--ohne-radius) - 0.125rem);
     outline: none;
@@ -61,7 +62,12 @@ css`
   }
 
   .ohne-disclosure-summary:focus-visible {
-    box-shadow: 0 0 0 0.125rem hsl(var(--ohne-ring));
+    box-shadow:
+      0 0 0 0.125rem hsl(var(--ohne-background)),
+      0 0 0 0.25rem hsl(var(--ohne-ring)),
+      0 0 #0000;
+    outline: 0.125rem solid transparent;
+    outline-offset: 0.125rem;
   }
 
   .ohne-disclosure-label {

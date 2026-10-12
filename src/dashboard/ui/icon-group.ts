@@ -120,6 +120,7 @@ css`
     flex-shrink: 0;
     display: inline-flex;
     gap: 0.125rem;
+    width: fit-content;
     max-width: 100%;
     height: calc(2em + 0.25rem);
     padding: 0.125rem;

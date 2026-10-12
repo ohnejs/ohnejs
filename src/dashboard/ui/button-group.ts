@@ -120,6 +120,7 @@ css`
   .ohne-button-group-item {
     flex: 1;
     display: flex;
+    justify-content: center;
     align-items: center;
     gap: 0.5em;
     min-width: min-content;

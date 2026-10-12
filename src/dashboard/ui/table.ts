@@ -138,7 +138,7 @@ let shiftTracked = false;
 
 css`
   .ohne-table {
-    --ohne-table-check: calc(1rem + var(--ohne-table-button) * 0.125rem + 1.125rem);
+    --ohne-table-check: calc(1rem + var(--ohne-table-button) * 0.125rem + 1.375rem);
     --ohne-table-kebab: calc(2 * (1rem + var(--ohne-table-button) * 0.125rem) + 1.75rem);
     --ohne-table-bg: hsl(var(--ohne-table-surface, var(--ohne-background)));
     --ohne-table-shadow: hsl(var(--ohne-foreground) / 0.14);
@@ -233,6 +233,7 @@ css`
   .ohne-table-grid :where(th, td).ohne-table-check {
     width: var(--ohne-table-check);
     min-width: var(--ohne-table-check);
+    padding-right: 0.25rem;
   }
 
   .ohne-table-grid :where(th, td).ohne-table-actions {

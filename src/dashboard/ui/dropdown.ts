@@ -1,6 +1,7 @@
 import type { Child } from '../render/insert.ts';
 import type { Placement } from './floater-place.ts';
 
+import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
@@ -99,7 +100,8 @@ export interface DropdownOptions {
 
   /**
    * Adjusts the size of the component, from -2 (very small) to 2 (very large).
-   * Omitted, the value is inherited as `--ohne-size` from the parent element.
+   * Omitted, the panel takes the `--ohne-size` of its `reference`.
+   * So a panel mounted on the body still matches its trigger.
    */
   size?: number;
 
@@ -240,6 +242,7 @@ export function dropdown(
   options: DropdownOptions = {},
 ): DropdownHandle {
   const handleControls = options.handleControls ?? true;
+  const size = options.size ?? referenceSize(options.reference);
   const alignment = options.placement ?? 'start';
   const allowedPlacements: Placement[] =
     alignment === 'end'
@@ -274,7 +277,7 @@ export function dropdown(
         (options.class ? ` ${options.class}` : ''),
       style:
         'position: fixed; left: 0; top: 0;' +
-        (isUndefined(options.size) ? '' : ` --ohne-size: ${options.size};`) +
+        (isUndefined(size) ? '' : ` --ohne-size: ${size};`) +
         (options.inheritColors
           ? ''
           : ' --ohne-background: var(--ohne-primary); --ohne-foreground: var(--ohne-primary-foreground);'),
@@ -449,4 +452,12 @@ export function dropdown(
   });
 
   return { root, update, calcItemSizes, scrollable: scroll };
+}
+
+/**
+ * The `--ohne-size` in effect at `reference`, or `undefined` without one.
+ */
+function referenceSize(reference: HTMLElement | undefined): string | undefined {
+  const size = reference ? getComputedStyle(reference).getPropertyValue('--ohne-size').trim() : '';
+  return isEmpty(size) ? undefined : size;
 }

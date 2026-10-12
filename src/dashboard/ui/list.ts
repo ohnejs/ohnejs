@@ -45,10 +45,18 @@ css`
   .ohne-list-row + .ohne-list-row {
     border-top-width: 1px;
   }
+
+  .ohne-card-body:has(
+    > .ohne-list-root:only-child > .ohne-list,
+    > .ohne-loaded:only-child > .ohne-loaded-content > .ohne-list-root:only-child > .ohne-list
+  ) {
+    padding: 0;
+  }
 `;
 
 /**
- * Items as divided rows, made to sit in a `card({ flush: true })`.
+ * Items as divided rows.
+ * Alone in a card, the rows run to its edges, since each row carries its own padding.
  * Items as `undefined` show placeholder rows while they load; no items show an empty state.
  * Rows reconcile by `key`, so `render` gets a live getter and runs once per item.
  *
@@ -60,7 +68,7 @@ css`
  *     (raid) => h('span', null, () => raid().name),
  *     { key: (raid) => raid.id, empty: 'No raids scheduled' },
  *   ),
- *   { title: 'Raids', flush: true },
+ *   { title: 'Raids' },
  * )
  * ```
  */

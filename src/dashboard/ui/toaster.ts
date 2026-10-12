@@ -628,8 +628,12 @@ css`
   }
 
   .ohne-toast [data-close-button] {
+    top: 50%;
+    right: calc(-1.5em - 0.5rem);
+    left: auto;
     width: 1.5em;
     height: 1.5em;
+    transform: translateY(-50%);
     background-color: hsl(var(--ohne-primary)) !important;
     border: none;
     color: hsl(var(--ohne-primary-foreground)) !important;
@@ -660,6 +664,14 @@ css`
   @media (max-width: 600px) {
     .ohne-toaster {
       --mobile-offset: 0.3125rem;
+    }
+
+    .ohne-toast:has([data-close-button]) {
+      padding-right: calc(1.5em + 1.5rem);
+    }
+
+    .ohne-toast [data-close-button] {
+      right: 0.75rem;
     }
   }
 `;

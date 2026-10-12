@@ -80,6 +80,8 @@ export interface PaginationOptions {
 css`
   .ohne-pagination-buttons {
     display: flex;
+    margin: -0.25rem;
+    padding: 0.25rem;
     overflow-x: auto;
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--ohne-foreground) / 0.25) transparent;

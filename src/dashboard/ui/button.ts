@@ -3,6 +3,7 @@ import type { IconName } from './icon.ts';
 import type { Step } from './layout.ts';
 
 import { isFunction } from '../../utils/is/is-function.ts';
+import { isNull } from '../../utils/is/is-null.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -248,10 +249,8 @@ css`
 
   .ohne-button-inner > svg:only-child {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    margin: 0;
-    transform: translate3d(-50%, -50%, 0);
+    inset: 0;
+    margin: auto;
   }
 
   .ohne-button-inner > span {
@@ -339,7 +338,12 @@ export function button(label: Text | Child, options: ButtonOptions = {}): HTMLEl
     isUndefined(text) || iconOnly === true
       ? null
       : h('span', { class: 'ohne-button-label' }, () => resolveText(text));
-  const content = iconOnly === true || !isUndefined(text) ? labelEl : (label as Child);
+  const content =
+    iconOnly === true || !isUndefined(text)
+      ? labelEl
+      : isFunction(label) && !isNull(leading)
+        ? h('span', { class: 'ohne-button-label' }, label)
+        : (label as Child);
   const name = ariaLabel ?? (isUndefined(iconOnly) ? undefined : text);
   const el = h(
     tag,

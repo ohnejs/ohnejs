@@ -20,6 +20,7 @@ import { lockScroll } from './_scroll-lock.ts';
 import { type Primitive } from './button-group.ts';
 import { nearestContainer } from './container.ts';
 import { icon } from './icon.ts';
+import { raiseToTopLayer } from './overlay.ts';
 import { listenClickOutside } from './overlay.ts';
 import { type ScrollableHandle, scrollable } from './scrollable.ts';
 import { listenTrigger } from './trigger.ts';
@@ -328,6 +329,7 @@ export function select<T extends Primitive>(
   const highlightedChoice = ref<SelectChoice<T> | undefined>(undefined);
   const choicesHeight = ref<number | undefined>(undefined);
   const choicesTopOffset = ref(0);
+  const choicesBox = ref('');
   const mousePaused = ref(false);
   const keywordHighlight = ref<[number, number]>([-1, -1]);
   const keywordPending = ref(false);
@@ -389,10 +391,8 @@ export function select<T extends Primitive>(
     );
     const { itemHeight } = calcItemSizes();
     const rootRect = combobox.getBoundingClientRect();
-    const container = pane;
-    const parentHeight = container ? container.offsetHeight : window.innerHeight;
-    const rootTop = container ? rootRect.top - container.getBoundingClientRect().top : rootRect.top;
-    const rootBottom = parentHeight - rootTop;
+    const parentHeight = window.innerHeight;
+    const rootBottom = parentHeight - rootRect.top;
 
     let height = 0;
     let overflows = false;
@@ -414,6 +414,10 @@ export function select<T extends Primitive>(
     }
     choicesHeight.value = panelHeight;
     choicesTopOffset.value = topOffset;
+    choicesBox.value =
+      `position: fixed; top: ${rootRect.top - 1}px; left: ${rootRect.left - 1}px; ` +
+      `width: ${rootRect.width + 2}px; `;
+    raiseToTopLayer(choicesEl);
 
     highlightedChoice.value = selectedChoice.value;
     scrollToHighlighted();
@@ -436,6 +440,8 @@ export function select<T extends Primitive>(
     unlockContainer = undefined;
     choicesHeight.value = undefined;
     choicesTopOffset.value = 0;
+    choicesBox.value = '';
+    if (choicesEl.matches(':popover-open')) choicesEl.hidePopover();
     event?.preventDefault();
   };
 
@@ -656,6 +662,19 @@ export function select<T extends Primitive>(
     topButtonVisible.value = scroll.isTopButtonVisible.value;
   });
 
+  const choicesEl = h(
+    'div',
+    {
+      class: 'ohne-select-choices',
+      style: () =>
+        choicesBox.value +
+        (choicesHeight.value ? `height: ${choicesHeight.value}px; ` : '') +
+        `transform: translate3d(0, ${choicesTopOffset.value}px, 0)`,
+      onClick: (event: MouseEvent) => event.stopPropagation(),
+    },
+    scrollableEl,
+  );
+
   const combobox = h(
     'div',
     {
@@ -721,17 +740,7 @@ export function select<T extends Primitive>(
       return null;
     },
     fieldIcon('selector'),
-    h(
-      'div',
-      {
-        class: 'ohne-select-choices',
-        style: () =>
-          (choicesHeight.value ? `height: ${choicesHeight.value}px; ` : '') +
-          `transform: translate3d(0, ${choicesTopOffset.value}px, 0)`,
-        onClick: (event: MouseEvent) => event.stopPropagation(),
-      },
-      scrollableEl,
-    ),
+    choicesEl,
   );
 
   if (options.id) {

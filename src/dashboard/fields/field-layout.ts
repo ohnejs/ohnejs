@@ -128,6 +128,14 @@ css`
     margin-top: calc(-1rem + 0.5em);
   }
 
+  .ohne-card-body
+    .ohne-fields-tabs-list:not([hidden])
+    + .ohne-fields-tabs-content
+    > .ohne-fields-stack
+    > .ohne-fields-card:first-child {
+    margin-top: calc(var(--ohne-padding-body, 0.75rem) - 1rem);
+  }
+
   .ohne-fields-tabs-list {
     flex-shrink: 0;
     position: relative;
