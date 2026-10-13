@@ -1,6 +1,12 @@
 import { defineField, option } from 'ohnejs';
 
-import { checkListSize, checkUploadList, imageOptions, listOptions } from './_constraints.ts';
+import {
+  checkListSize,
+  checkUploadList,
+  imageOptions,
+  listOptions,
+  uploadOptionsProblem,
+} from './_constraints.ts';
 
 /**
  * The `images` field type: an ordered list of references to uploaded images.
@@ -26,6 +32,7 @@ export default defineField({
      */
     onDelete: option<'cascade' | 'restrict'>(),
   },
+  validateOptions: ({ options }) => uploadOptionsProblem(options),
   schema: (ctx) => ({ kind: 'junction', collection: 'Uploads', onDelete: ctx.options.onDelete }),
   validators: [
     (value, ctx) => checkListSize(value, ctx.options),

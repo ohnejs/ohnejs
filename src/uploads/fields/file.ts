@@ -1,6 +1,6 @@
 import { defineField, option } from 'ohnejs';
 
-import { checkUpload, fileOptions } from './_constraints.ts';
+import { checkUpload, fileOptions, uploadOptionsProblem } from './_constraints.ts';
 
 /**
  * The `file` field type: a reference to one uploaded file.
@@ -28,6 +28,7 @@ export default defineField({
      */
     onDelete: option<'setNull' | 'cascade' | 'restrict'>(),
   },
+  validateOptions: ({ options }) => uploadOptionsProblem(options),
   schema: (ctx) => ({ kind: 'foreignKey', collection: 'Uploads', onDelete: ctx.options.onDelete }),
   validators: [(value, ctx) => checkUpload(value, ctx, false)],
 });

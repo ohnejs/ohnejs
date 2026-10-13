@@ -6,11 +6,13 @@ import type {
   UncheckedMessage,
 } from 'ohnejs';
 
-import { option, queryUntyped } from 'ohnejs';
+import { boundsProblem, option, queryUntyped } from 'ohnejs';
 import {
   formatBytes,
   isArray,
   isNull,
+  isRealNumber,
+  isString,
   isUndefined,
   mediaCategory,
   mediaTypeMatches,
@@ -311,4 +313,33 @@ export function checkListSize(
     return validationMessage('validation.maxItems', { max });
   }
   return undefined;
+}
+
+/**
+ * What makes an upload field's bounds unusable, as error body rows, or `undefined` when they hold.
+ * It checks the file size, the pixel width and height, and the list length, each pair with `boundsProblem`.
+ */
+export function uploadOptionsProblem(options: object): string[] | undefined {
+  return (
+    boundsProblem(options, {
+      names: ['minSize', 'maxSize'],
+      parse: bytes,
+      form: 'a byte count or a size like `5mb`',
+    }) ??
+    boundsProblem(options, { names: ['minWidth', 'maxWidth'] }) ??
+    boundsProblem(options, { names: ['minHeight', 'maxHeight'] }) ??
+    boundsProblem(options)
+  );
+}
+
+/**
+ * A size bound as bytes, or `undefined` when `parseBytes` cannot read it.
+ */
+function bytes(bound: unknown): number | undefined {
+  if (!isString(bound) && !isRealNumber(bound)) return undefined;
+  try {
+    return parseBytes(bound);
+  } catch {
+    return undefined;
+  }
 }

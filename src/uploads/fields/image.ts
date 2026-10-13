@@ -1,6 +1,6 @@
 import { defineField, option } from 'ohnejs';
 
-import { checkUpload, imageOptions } from './_constraints.ts';
+import { checkUpload, imageOptions, uploadOptionsProblem } from './_constraints.ts';
 
 /**
  * The `image` field type: a reference to one uploaded image.
@@ -28,6 +28,7 @@ export default defineField({
      */
     onDelete: option<'setNull' | 'cascade' | 'restrict'>(),
   },
+  validateOptions: ({ options }) => uploadOptionsProblem(options),
   schema: (ctx) => ({ kind: 'foreignKey', collection: 'Uploads', onDelete: ctx.options.onDelete }),
   validators: [(value, ctx) => checkUpload(value, ctx, true)],
 });
