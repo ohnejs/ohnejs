@@ -65,8 +65,8 @@ carries the password hash.
 }
 ```
 
-The email is stored trimmed and lowercased, so `Anduin@Example.com` and `anduin@example.com` are
-the same account.
+`email` is an [`email` field](../database/field-types.md#email), stored trimmed and lowercased, so
+`Anduin@Example.com` and `anduin@example.com` are the same account.
 
 - **`POST /auth/login`** - matches the email in either form. A wrong password and an unknown email
   both answer `401` with the same message, so a caller cannot find out which emails exist.

@@ -105,7 +105,7 @@ import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
-    email: field('text', { unique: true }),
+    email: field('email', { unique: true }),
     author: field('text', { index: true }),
   },
 });
@@ -122,7 +122,7 @@ import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
-    email: field('text'),
+    email: field('email'),
     tenant: field('text'),
   },
   compositeIndexes: [{ fields: ['email', 'tenant'], unique: true }],
@@ -450,8 +450,8 @@ export default defineCollection({
   api: { read: 'public', update: true },
   fields: {
     siteName: field('text', { translatable: true, default: 'My site' }),
-    contactEmail: field('text', { nullable: true }),
-    links: field('repeater', { fields: { url: field('text') } }),
+    contactEmail: field('email', { nullable: true }),
+    links: field('repeater', { fields: { url: field('url') } }),
   },
 });
 ```

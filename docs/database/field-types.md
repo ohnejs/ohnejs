@@ -180,6 +180,37 @@ An instant, stored as epoch milliseconds. A write takes that number only, so con
 | `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
 | `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
+### `email`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/email-dark.png">
+  <img alt="The email field in the dashboard" src="../images/field-types/email-light.png">
+</picture>
+
+An email address, stored trimmed and lowercased, so `Thrall@Orgrimmar.example` and
+`thrall@orgrimmar.example` are one value for `unique`. A `where` compares its value as you pass it,
+so normalize it first with `normalizeEmail` from `ohnejs/utils`.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`  | Lets [search](./collections.md#search) match any value that contains the typed word.                                                                                    |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
 ### `integer`
 
 <picture>
@@ -544,6 +575,37 @@ A time of day, stored as `HH:MM:SS` text. `HH:MM` input is stored with `:00` sec
 | `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
 | `search`          | `true`  | Lets [search](./collections.md#search) match the field. A time like `10:30` finds the times that start with it.                                                         |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `url`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/url-dark.png">
+  <img alt="The url field in the dashboard" src="../images/field-types/url-light.png">
+</picture>
+
+An absolute `https://` or `http://` address on a public domain, stored with its scheme and host
+lowercased and a default port dropped. For a `mailto:` or `tel:` address or a `/path`, use
+[`link`](#link).
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `true`  | Lets [search](./collections.md#search) match any value that contains the typed word.                                                                                    |
 | `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
 | `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
 | `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
