@@ -147,6 +147,10 @@ A row that already holds a value is never touched, so the same fill is correct w
 is new, exists with gaps, or is already full. A translatable field fills once per record and
 locale, with `ctx.locale` set. Dot paths and block fields work as on a move's `to`.
 
+A fill into a subfield of a required [`object`](./field-types.md#object), like `seo.title`, also
+gives each record that holds no object one. That is how you add a required object to a collection
+that already holds records.
+
 The field's `default` applies to new records only; the fill is where you decide what old records
 hold. Ship the fill in the same change as the field, and one boot does both.
 

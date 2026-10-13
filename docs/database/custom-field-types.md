@@ -111,6 +111,9 @@ a string or a list of lines. Boot stops and shows those lines with the field the
 
 Only you see these lines, never an editor, so write them as plain text rather than message keys.
 
+For a `min` and `max` pair, `boundsProblem(options)` from `ohnejs` writes those lines for you, as the
+built-in types do.
+
 ## Storage
 
 `columnType` picks the column the value is stored in: `text`, `integer`, `real`, `boolean`, or

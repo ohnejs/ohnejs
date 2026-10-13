@@ -344,7 +344,7 @@ A finite decimal, exactly like a JavaScript number. `NaN` and the infinities are
 </picture>
 
 One nested [group of fields](./collections.md#composite-fields), stored in its own table. A record
-holds one group or none.
+holds one group, or none when the field is `nullable`.
 
 | Option         | Default  | What it does                                                                                                                                                            |
 | -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -354,6 +354,7 @@ holds one group or none.
 | `immutable`    | `false`  | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
 | `label`        | -        | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
 | `layout`       | -        | How the editor [arranges the subfields](../dashboard/field-layouts.md). Omitted, they stack in order.                                                                   |
+| `nullable`     | `false`  | Lets the record hold no group, read as `null`.                                                                                                                          |
 | `readable`     | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
 | `sanitizers`   | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
 | `search`       | `true`   | `false` keeps [search](./collections.md#search) from looking inside the object.                                                                                         |
@@ -686,8 +687,8 @@ language that has a [message catalog](../i18n/messages.md#catalogs) is accepted.
   <img alt="The locale field in the dashboard" src="../images/field-types/locale-light.png">
 </picture>
 
-One of your [content locales](../project/config.md#content-locales), as its canonical tag like
-`de-AT`. The tag must arrive in that form: `de-at` is rejected.
+One of your [content locales](../project/config.md#content-locales), stored as its canonical tag,
+so `de-at` is stored as `de-AT`.
 
 | Option            | Default | What it does                                                                                                                                                            |
 | ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

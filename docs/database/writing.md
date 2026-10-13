@@ -91,8 +91,8 @@ await query('Posts').create({
 - A [`records`](./field-types.md#records), [`repeater`](./field-types.md#repeater), or
   [`blocks`](./field-types.md#blocks) list defaults to `[]`, so you may omit it, unless
   `allowEmpty: false` or a `min` of 1 or more forbids the empty list.
-- An [`object`](./field-types.md#object) defaults to no child row, and accepts `null` to say so
-  explicitly.
+- An [`object`](./field-types.md#object) is required like a scalar. A `nullable` one defaults to no
+  group, and accepts `null` to say so explicitly.
 - Unknown keys are rejected, not ignored. A misspelled field fails with an `unknownField` error at
   that key, so it never silently drops its value.
 - A value in the wrong primitive is converted when it reads as the right one, so form input works
@@ -244,7 +244,7 @@ await query('Posts').where('UUID', id).update({
 A `blocks` field takes envelopes and [replaces its list](./blocks.md#writing) the same way. An
 envelope is `{ block: 'Hero', fields: { ... } }`, plus the item's `UUID` on update.
 
-An `object` upserts its single child: pass a value to set it, or `null` to clear it.
+An `object` upserts its single child: pass a value to set it, or `null` to clear a `nullable` one.
 
 ```ts
 await query('Posts').where('UUID', id).update({ meta: null }); // clears the object

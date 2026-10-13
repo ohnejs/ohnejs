@@ -370,7 +370,8 @@ To read related records, [populate](./reading.md#populating-relations) them.
 
 A composite field stores a nested shape in its own table, not a reference to another collection.
 
-[`object`](./field-types.md#object) holds one nested group per row, or none:
+[`object`](./field-types.md#object) holds one nested group per row. Like a scalar, it is required
+unless you pass `nullable: true`:
 
 ```ts
 // collections/Pages.ts
@@ -460,7 +461,7 @@ export default defineCollection({
 always exists. You never create or delete it yourself:
 
 - Every field must work without input. Give it `nullable: true` or a `default`, unless it is a
-  relation, a composite, or a blocks field - those start empty on their own.
+  relation, a `repeater`, or a blocks field - those start empty on their own.
 - A `default` seeds the record when it is missing. A field you add later reaches the existing
   record through a [fill migration](./migrations.md#filling).
 - [`api`](../api/collections.md#exposure) may open `read` and `update` only.
