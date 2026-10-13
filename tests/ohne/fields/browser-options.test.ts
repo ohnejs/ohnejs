@@ -10,14 +10,18 @@ import type { Message } from '../../../src/ohne/messages/known-messages.ts';
 
 /**
  * The browser options as the wire carries them: every `Text` becomes the server's `Message`.
+ * An options type of `{}` stays itself, since a `Text` is assignable to it.
  */
-type Wire<T> = [Text] extends [T]
-  ? Message
-  : T extends readonly (infer E)[]
-    ? readonly Wire<E>[]
-    : T extends object
-      ? { [K in keyof T]: Wire<T[K]> }
-      : T;
+// oxlint-disable-next-line typescript/no-empty-object-type
+type Wire<T> = [T, {}, keyof T] extends [{}, T, never]
+  ? T
+  : [Text] extends [T]
+    ? Message
+    : T extends readonly (infer E)[]
+      ? readonly Wire<E>[]
+      : T extends object
+        ? { [K in keyof T]: Wire<T[K]> }
+        : T;
 
 /**
  * The browser options of `K` the server types alike.
@@ -49,6 +53,8 @@ describe('browser field options', () => {
     assertDrift<'date'>(true);
     assertDrift<'time'>(true);
     assertDrift<'color'>(true);
+    assertDrift<'email'>(true);
+    assertDrift<'url'>(true);
     assertDrift<'dateTime'>(true);
     assertDrift<'link'>(true);
     assertDrift<'record'>(true);

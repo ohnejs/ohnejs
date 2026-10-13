@@ -493,6 +493,16 @@ export interface KnownFieldTypes {
   color: { options: ColorFieldOptions; value: string };
 
   /**
+   * An email address, trimmed with its local part and domain lowercased.
+   */
+  email: { options: Record<never, never>; value: string };
+
+  /**
+   * An absolute `http:` or `https:` address with its scheme and host lowercased.
+   */
+  url: { options: Record<never, never>; value: string };
+
+  /**
    * An instant as epoch milliseconds.
    */
   dateTime: { options: DateTimeFieldOptions; value: number };
