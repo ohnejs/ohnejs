@@ -73,6 +73,14 @@ describe('validateLiteralDefaults', () => {
     );
   });
 
+  it('rejects an email default that is no address', async () => {
+    await rejectsTitled(
+      checkCollection('LDEmail', { contact: field('email', { default: 'thrall' }) }),
+      'Field `contact` defaults to a value it rejects',
+      /defaults to `'thrall'`\.\n.*validation\.invalidEmail\./,
+    );
+  });
+
   it('rejects a default that fails the base-type gate', async () => {
     await rejectsTitled(
       checkCollection('LDGate', { views: field('integer', { default: 'x' as never }) }),

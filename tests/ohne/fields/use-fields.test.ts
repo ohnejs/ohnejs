@@ -11,6 +11,7 @@ describe('useFields', () => {
       'color',
       'date',
       'dateTime',
+      'email',
       'integer',
       'link',
       'multiSelect',
@@ -23,6 +24,7 @@ describe('useFields', () => {
       'select',
       'text',
       'time',
+      'url',
     ]);
   });
 

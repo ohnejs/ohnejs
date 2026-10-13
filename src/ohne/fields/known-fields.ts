@@ -3,6 +3,7 @@ import type { boolean } from './builtin/boolean.ts';
 import type { color } from './builtin/color.ts';
 import type { dateTime } from './builtin/date-time.ts';
 import type { date } from './builtin/date.ts';
+import type { email } from './builtin/email.ts';
 import type { integer } from './builtin/integer.ts';
 import type { link } from './builtin/link.ts';
 import type { multiSelect } from './builtin/multi-select.ts';
@@ -15,6 +16,7 @@ import type { richText } from './builtin/rich-text.ts';
 import type { select } from './builtin/select.ts';
 import type { text } from './builtin/text.ts';
 import type { time } from './builtin/time.ts';
+import type { url } from './builtin/url.ts';
 
 /**
  * The registered field types, each name mapped to its definition.
@@ -82,6 +84,16 @@ export interface KnownFields {
    * A hex color, stored as lowercase `#rrggbb`, or `#rrggbbaa` when the field takes `alpha`.
    */
   color: typeof color;
+
+  /**
+   * An email address, stored trimmed with its local part and domain lowercased.
+   */
+  email: typeof email;
+
+  /**
+   * An absolute `http:` or `https:` address, stored with its scheme and host lowercased.
+   */
+  url: typeof url;
 
   /**
    * An instant, stored as epoch milliseconds.

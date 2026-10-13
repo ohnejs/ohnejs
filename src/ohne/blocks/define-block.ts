@@ -107,7 +107,7 @@ export interface BlockDefinition<
    * ```ts
    * {
    *   title: field('text'),
-   *   url: field('text', { nullable: true }),
+   *   url: field('url', { nullable: true }),
    * }
    * ```
    */

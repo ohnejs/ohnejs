@@ -7,6 +7,7 @@ import { boolean } from './builtin/boolean.ts';
 import { color } from './builtin/color.ts';
 import { dateTime } from './builtin/date-time.ts';
 import { date } from './builtin/date.ts';
+import { email } from './builtin/email.ts';
 import { integer } from './builtin/integer.ts';
 import { link } from './builtin/link.ts';
 import { multiSelect } from './builtin/multi-select.ts';
@@ -19,6 +20,7 @@ import { richText } from './builtin/rich-text.ts';
 import { select } from './builtin/select.ts';
 import { text } from './builtin/text.ts';
 import { time } from './builtin/time.ts';
+import { url } from './builtin/url.ts';
 
 /**
  * One registered field type: its name and its definition.
@@ -48,6 +50,8 @@ for (const [name, fieldType] of [
   ['date', date],
   ['time', time],
   ['color', color],
+  ['email', email],
+  ['url', url],
   ['dateTime', dateTime],
   ['record', record],
   ['records', records],
