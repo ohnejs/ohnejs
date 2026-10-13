@@ -448,4 +448,11 @@ export interface DashboardMeta {
    * How the account page arranges `accountFields`, resolved; empty when the page is hidden.
    */
   accountLayout: DashboardLayoutNode[];
+
+  /**
+   * The signed-in user's default table views, keyed by collection name.
+   * Each names the bookmark and its view, the query string without its `?`; `''` is the declared view.
+   * Empty when the app drops the route that sets a default.
+   */
+  defaultViews: Record<string, { bookmark: string; view: string }>;
 }
