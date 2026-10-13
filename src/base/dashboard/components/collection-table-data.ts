@@ -5,6 +5,7 @@ import {
   type DashboardCollection,
   type DashboardField,
   dashboardMeta,
+  dashboardMetaIdentity,
   dimMark,
   fieldTypeFor,
   formatDateTime,
@@ -16,7 +17,7 @@ import {
 } from 'ohnejs/dashboard';
 import { hasKey, isEmpty, isNumber, isString, onCleanup, shortUUID, untracked } from 'ohnejs/utils';
 
-import { sortableFieldsOf } from './collection-table-state.ts';
+import { sortableFieldsOf, type TableURLState } from './collection-table-state.ts';
 import { translationsCell } from './translations-cell.ts';
 
 /**
@@ -64,11 +65,9 @@ export const PER_PAGE = 50;
  */
 export const DEFAULT_ORDER: readonly string[] = ['-_updatedAt'];
 
-/**
- * The last table query string per collection segment, restored when the collection is revisited bare.
- * The list page owns the entries; the record picker only seeds its first view from them.
- */
-export const tableMemory = new Map<string, string>();
+const views = new Map<string, string>();
+const pickerViews = new Map<string, TableURLState>();
+let basis = dashboardMetaIdentity();
 
 /**
  * The fields a table surface resolves its columns from.
@@ -94,6 +93,42 @@ export function readableFields(collection: DashboardCollection): DashboardField[
  */
 export function sortableFields(collection: DashboardCollection): DashboardField[] {
   return sortableFieldsOf(collection.fields);
+}
+
+/**
+ * Remembers `search` as the segment's last table view, in `location.search` form.
+ * The list page owns these entries; the record picker only seeds its first view from them.
+ */
+export function rememberView(segment: string, search: string): void {
+  sync();
+  views.set(segment, search);
+}
+
+/**
+ * The query string a bare visit to the collection's table restores, in `location.search` form.
+ * It is `''` while the tab remembers none.
+ */
+export function rememberedView(collection: DashboardCollection): string {
+  sync();
+  return views.get(collection.segment) ?? '';
+}
+
+/**
+ * Remembers `state` as the record picker's view for the segment, reopened by its next picker.
+ * The memory holds `state` itself, so pass a copy the caller never mutates.
+ */
+export function rememberPickerView(segment: string, state: TableURLState): void {
+  sync();
+  pickerViews.set(segment, state);
+}
+
+/**
+ * The record picker's remembered view for the segment, `undefined` before any picker of it changed view.
+ * Copy it before mutating, since the memory keeps this very object.
+ */
+export function rememberedPickerView(segment: string): TableURLState | undefined {
+  sync();
+  return pickerViews.get(segment);
 }
 
 /**
@@ -163,4 +198,17 @@ export function displayFor(field: DashboardField, row: TableRecord): Child {
     value: () => row[field.name],
     language: () => useDashboardLanguage().value,
   });
+}
+
+/**
+ * Forgets every remembered view once the identity they were made under is gone.
+ * A view holds filter values, so the next user never lands on the last one's.
+ * An in-place refresh of the discovery data keeps them, since the same user still owns them.
+ */
+function sync(): void {
+  const current = dashboardMetaIdentity();
+  if (current === basis) return;
+  views.clear();
+  pickerViews.clear();
+  basis = current;
 }

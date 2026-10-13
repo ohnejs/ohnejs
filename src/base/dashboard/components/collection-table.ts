@@ -63,9 +63,10 @@ import {
   loadPage,
   PER_PAGE,
   readableFields,
+  rememberedView,
+  rememberView,
   seedLabels,
   sortableFields,
-  tableMemory,
   type TableRecord,
 } from './collection-table-data.ts';
 import {
@@ -161,7 +162,7 @@ export function collectionTable(collection: DashboardCollection): Child {
   const route = untracked(useRoute);
   const query = (): RouteContext['query'] => route?.query ?? {};
   effect(() => {
-    const remembered = tableMemory.get(collection.segment) ?? '';
+    const remembered = rememberedView(collection);
     if (isEmpty(query()) && remembered !== '' && lastNavigation() !== 'popstate') {
       navigate(location.pathname + remembered, { replace: true });
     }
@@ -181,7 +182,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
   const canTranslate =
     collection.translatable && (untracked(dashboardMeta)?.locales.length ?? 0) > 1;
 
-  tableMemory.set(segment, search);
+  rememberView(segment, search);
 
   const state = parseTableState(search, DEFAULT_ORDER);
   const whereDirty = !isUndefined(state.where);
@@ -196,7 +197,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
     };
     const query = serializeTableState(next, DEFAULT_ORDER, search);
     const target = query === '' ? '' : `?${query}`;
-    tableMemory.set(segment, target);
+    rememberView(segment, target);
     navigate(location.pathname + target, { replace });
   };
 

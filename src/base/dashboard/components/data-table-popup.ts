@@ -48,9 +48,11 @@ import {
   loadPage,
   PER_PAGE,
   readableFields,
+  rememberedPickerView,
+  rememberedView,
+  rememberPickerView,
   seedLabels,
   sortableFields,
-  tableMemory,
   type TableRecord,
 } from './collection-table-data.ts';
 import { admitsRow, pageUUIDs } from './collection-table-selection.ts';
@@ -105,8 +107,6 @@ export interface DataTablePopupOptions {
    */
   onClose(close: () => Promise<void>): void;
 }
-
-const pickerMemory = new Map<string, TableURLState>();
 
 css`
   .o-data-table-popup-title {
@@ -165,7 +165,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     }
     if (hasKey(patch, 'where')) state.where = patch.where;
     if (hasKey(patch, 'columns')) state.columns = patch.columns;
-    pickerMemory.set(segment, cloneState(state));
+    rememberPickerView(segment, cloneState(state));
     scrollTop = true;
     revision.value += 1;
     if (hasKey(patch, 'columns')) columnsRevision.value += 1;
@@ -597,9 +597,9 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
  * Always a private copy, so stacked pickers of one collection never mutate each other's state.
  */
 function pickerState(collection: DashboardCollection): TableURLState {
-  const remembered = pickerMemory.get(collection.segment);
+  const remembered = rememberedPickerView(collection.segment);
   if (!isUndefined(remembered)) return cloneState(remembered);
-  const state = parseTableState(tableMemory.get(collection.segment) ?? '', DEFAULT_ORDER);
+  const state = parseTableState(rememberedView(collection), DEFAULT_ORDER);
   state.page = 1;
   return state;
 }

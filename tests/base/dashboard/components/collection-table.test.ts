@@ -135,10 +135,10 @@ describe('collectionTable', () => {
     });
     const { collectionTable } =
       await import('../../../../src/base/dashboard/components/collection-table.ts');
-    const { tableMemory } =
+    const { rememberView } =
       await import('../../../../src/base/dashboard/components/collection-table-data.ts');
     edit = await import('../../../../src/base/dashboard/components/edit-table-field-popup.ts');
-    tableMemory.set('posts', '?page=3');
+    rememberView('posts', '?page=3');
     Object.assign(globalThis, {
       testPages: { posts: defineDashboardPage(() => collectionTable(POSTS)) },
     });
