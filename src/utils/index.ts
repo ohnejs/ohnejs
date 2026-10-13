@@ -125,6 +125,7 @@ export * from './is/is-cross-origin-write.ts';
 export * from './is/is-css-length.ts';
 export * from './is/is-date.ts';
 export * from './is/is-decimal-string.ts';
+export * from './is/is-domain-name.ts';
 export * from './is/is-email.ts';
 export * from './is/is-empty.ts';
 export * from './is/is-function.ts';
