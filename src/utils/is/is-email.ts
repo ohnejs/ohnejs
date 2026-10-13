@@ -1,40 +1,35 @@
+import { isDomainName } from './is-domain-name.ts';
 import { isString } from './is-string.ts';
 
+const ATOM = "[\\p{L}\\p{M}\\p{N}!#$%&'*+\\-/=?^_`{|}~]+";
+const LOCAL = new RegExp(`^${ATOM}(?:\\.${ATOM})*$`, 'u');
+const IGNORABLE = /\p{DI}/u;
+
 /**
- * Checks whether a value is a valid email address.
- * Practical RFC 5321 shape: one `@`, local <= 64, domain <= 255, total <= 254.
- * Rejects whitespace and ASCII control characters.
+ * Checks whether a value is an email address: a dot-atom local part, `@`, and a domain name.
+ * The local part is at most 64 characters of RFC 5322 `atext`, letters, marks and digits.
+ * An invisible character such as U+034F is refused anywhere.
+ * The domain must pass `isDomainName`, so IP hosts and `localhost` are refused.
+ * The whole address is at most 254 characters; quoted local parts are refused.
  *
  * @example
  * ```ts
- * isEmail('user@example.com') // -> true
- * isEmail('not-an-email')     // -> false
- * isEmail('a@b')              // -> false
+ * isEmail('user@example.com')  // -> true
+ * isEmail('jürgen@münchen.de') // -> true
+ * isEmail('not-an-email')      // -> false
+ * isEmail('a@b')               // -> false
+ * isEmail('a@x.y?subject=hi')  // -> false
  * ```
  */
 export function isEmail<T extends string = string>(value: unknown): value is T {
-  if (!isString(value)) return false;
-  const n = value.length;
-  if (n === 0 || n > 254) return false;
-
-  let atIndex = -1;
-  for (let i = 0; i < n; i++) {
-    const c = value.charCodeAt(i);
-    if (c === 0x40) {
-      if (atIndex !== -1) return false;
-      atIndex = i;
-    } else if (c <= 0x20 || c === 0x7f) {
-      return false;
-    }
-  }
-  if (atIndex < 1) return false;
-
-  const local = value.slice(0, atIndex);
-  const domain = value.slice(atIndex + 1);
-  if (local.length > 64 || domain.length === 0 || domain.length > 255) return false;
-  if (local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
-  if (!domain.includes('.')) return false;
-  if (domain.startsWith('.') || domain.endsWith('.') || domain.includes('..')) return false;
-
-  return true;
+  if (!isString(value) || value.length > 254) return false;
+  const at = value.lastIndexOf('@');
+  const local = value.slice(0, at);
+  return (
+    at > 0 &&
+    local.length <= 64 &&
+    LOCAL.test(local) &&
+    !IGNORABLE.test(local) &&
+    isDomainName(value.slice(at + 1))
+  );
 }
