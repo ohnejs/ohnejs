@@ -110,6 +110,7 @@ export type {
   ActionRequest,
   APIAction,
 } from './runtime/action.ts';
+export { readAPIError } from './runtime/api-error.ts';
 export type { APIError } from './runtime/api-error.ts';
 export { apiUpload } from './runtime/api-upload.ts';
 export type { UploadBody, UploadOptions } from './runtime/api-upload.ts';
@@ -128,7 +129,7 @@ export type { DateTimePreferences } from './runtime/date-time.ts';
 export type { APIRouteID, KnownAPIRoutes } from './runtime/known-api-routes.ts';
 export type { CollectionName, KnownCollections } from './runtime/known-collections.ts';
 export type { KnownRoles, RoleName } from './runtime/known-roles.ts';
-export { dashboardMeta, invalidateDashboardMeta } from './runtime/meta.ts';
+export { dashboardMeta, dashboardMetaIdentity, invalidateDashboardMeta } from './runtime/meta.ts';
 export { formatNumber } from './runtime/number.ts';
 export type { NumberFormatOptions } from './runtime/number.ts';
 export { useResource } from './runtime/resource.ts';
