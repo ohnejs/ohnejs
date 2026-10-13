@@ -176,6 +176,40 @@ A type that references another collection, like the uploads layer's
 
 The value type then follows from the layout, so such a type declares no `emitType`.
 
+## Composite types
+
+A type whose value is a fixed group of parts, like a date span, returns a child layout from
+`schema`. It stores exactly as an [`object`](./field-types.md#object) does, so its value, its
+filters, and its error paths work the same way:
+
+```ts
+// fields/span.ts
+import { defineField, field } from 'ohnejs';
+
+export default defineField({
+  columnType: false,
+  schema: () => ({
+    kind: 'child',
+    cardinality: 'one',
+    subfields: { start: field('date'), end: field('date') },
+    orderBy: 'start',
+  }),
+  validators: [
+    (value) => {
+      const span = value as { start: string; end: string } | null;
+      return span === null || span.start <= span.end ? undefined : 'Must end after it starts';
+    },
+  ],
+});
+```
+
+The validators receive the whole value. A field of this type filters through
+[`has`](./reading.md#filtering-relations), like any object.
+
+`orderBy` names the part a query sorts by when it orders by the field itself. A field
+`period: field('span')` then sorts by its `start` in `orderBy('period')`. Without it, the field
+cannot be ordered.
+
 ## On your website
 
 A [website](../cms/website.md) that reads your pages through the CMS gets a types file made from

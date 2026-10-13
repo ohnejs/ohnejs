@@ -109,6 +109,9 @@ starts with a bare `block` equality. It names the block type that the other cond
 ?order=[-views,title]
 ```
 
+A [composite with a sort part](../database/custom-field-types.md#composite-types) sorts by its own
+name, like `?order=[period]`.
+
 ## The row window
 
 `limit` and `offset` set the window directly:

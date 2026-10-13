@@ -601,6 +601,9 @@ A viewer can rearrange the columns in the dashboard. Their choice is stored in t
 the declared defaults until they restore them. To keep it with a sort order and a filter, they save
 it as a [bookmark](../dashboard/bookmarks.md).
 
+The filter offers each part of an `object` on its own, labelled like `SEO > Title`. A column of a
+[composite with a sort part](./custom-field-types.md#composite-types) sorts by that part.
+
 ## Search
 
 The [search palette](../dashboard/palette.md) finds records by the words you type. Each field type

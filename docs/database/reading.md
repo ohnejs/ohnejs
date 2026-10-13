@@ -201,6 +201,9 @@ await query('Posts').orderBy('publishedAt', 'desc').orderBy('title').findMany();
 Rows that are still equal are always sorted by `UUID` last, so a paginated read never reorders rows
 between pages.
 
+A field whose [type names a sort part](./custom-field-types.md#composite-types) sorts by that part.
+A record without the field sorts as a null value does: first ascending, last descending.
+
 ## Selecting fields
 
 By default a read returns every field. `select` narrows it to the ones you name, and the returned
