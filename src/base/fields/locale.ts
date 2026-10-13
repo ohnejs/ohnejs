@@ -1,4 +1,5 @@
 import { defineField, type UncheckedMessage } from 'ohnejs';
+import { canonicalizeLanguage } from 'ohnejs/utils';
 
 import { queryLocales } from '../../ohne/query/locale.ts';
 
@@ -6,13 +7,14 @@ import { queryLocales } from '../../ohne/query/locale.ts';
  * The `locale` field type: a content locale, one of the configured `collections.locales`.
  *
  * The validator reads the set from config at write time, so the type declares no choices of its own.
- * A tag outside the set rejects with `auth.unknownLocale`, naming the submitted value.
- * The set holds canonical tags, so the value must arrive canonical, like `de-AT`.
+ * The sanitizer canonicalizes the tag, so `de-at` stores as `de-AT`; a malformed tag stays as sent.
+ * A tag outside the set rejects with `auth.unknownLocale`, naming the tag it checked.
  * Search is off until a field sets `search: true`; then a value containing the token matches.
  */
 export default defineField({
   columnType: 'text',
   search: { default: false },
+  sanitizers: [(value) => canonicalizeLanguage(value) ?? value],
   validators: [
     (value) => (queryLocales().locales.includes(value) ? undefined : unknownLocaleMessage(value)),
   ],

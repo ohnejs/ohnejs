@@ -17,7 +17,7 @@ usePrinter().configure({ stream: { write: () => true } });
 
 useLayers().add({
   path: '/locale-test',
-  input: { collections: { locales: ['en', 'de'], defaultLocale: 'en' } },
+  input: { collections: { locales: ['en', 'de', 'de-AT'], defaultLocale: 'en' } },
 });
 
 useFields().register('locale', { name: 'locale', fieldType: localeField });
@@ -42,6 +42,23 @@ describe('locale field', () => {
       locale: 'de',
     });
     strictEqual(record.locale, 'de');
+  });
+
+  it('canonicalizes the tag before storing it', async () => {
+    const record = await queryUntyped('LocaleAccounts').createOrThrow({
+      name: 'Jaina',
+      locale: 'de-at',
+    });
+    strictEqual(record.locale, 'de-AT');
+  });
+
+  it('names the canonical tag of a locale outside `collections.locales`', async () => {
+    const result = await queryUntyped('LocaleAccounts').create({ name: 'Ghost', locale: 'fr-ca' });
+    ok(!result.ok);
+    deepStrictEqual(result.errors.locale, {
+      key: 'auth.unknownLocale',
+      params: { locale: 'fr-CA' },
+    });
   });
 
   it('rejects a locale outside `collections.locales`, naming it', async () => {
