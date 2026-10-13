@@ -181,6 +181,11 @@ export interface DashboardField<O = Record<string, unknown>> {
   subfields?: DashboardField[];
 
   /**
+   * The subfield a one-child composite sorts by, when its type names one.
+   */
+  orderBy?: string;
+
+  /**
    * How the form arranges the subfields, resolved; child kinds that declare a `layout` only.
    */
   layout?: DashboardLayoutNode[];

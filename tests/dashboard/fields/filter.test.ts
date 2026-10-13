@@ -91,6 +91,23 @@ describe('filterToWhere', () => {
       { or: [{ a: { equalsTo: 1 } }, { and: [{ b: { equalsTo: 2 } }, { c: { equalsTo: 3 } }] }] },
     );
   });
+
+  it('nests a dotted path in one `has` per composite, negation inside the innermost', () => {
+    const where = (field: string, operator: FilterOperator, value: string | number) =>
+      filterToWhere({ relation: 'and', items: [condition(field, operator, value)] });
+    deepStrictEqual(where('period.start', 'gte', '2026-01-01'), {
+      period: { has: { start: { atLeast: '2026-01-01' } } },
+    });
+    deepStrictEqual(where('seo.title', 'ne', 'x'), {
+      seo: { has: { not: { title: { equalsTo: 'x' } } } },
+    });
+    deepStrictEqual(where('seo.title', 'notContains', ''), {
+      seo: { has: { not: { title: { contains: ' ' } } } },
+    });
+    deepStrictEqual(where('a.b.c', 'eq', 1), {
+      a: { has: { b: { has: { c: { equalsTo: 1 } } } } },
+    });
+  });
 });
 
 describe('filterFromWhere', () => {
@@ -130,6 +147,22 @@ describe('filterFromWhere', () => {
     });
   });
 
+  it('round-trips dotted paths', () => {
+    const model: FilterModel = {
+      relation: 'and',
+      items: [
+        condition('period.start', 'gte', '2026-01-01'),
+        condition('period.end', 'lt', '2027-01-01'),
+        condition('seo.title', 'ne', 'x'),
+        condition('seo.tags', 'notIncludes', 'news'),
+        condition('a.b.c', 'eq', 1),
+      ],
+    };
+    const where = filterToWhere(model);
+    deepStrictEqual(strip(filterFromWhere(where)), strip(model));
+    deepStrictEqual(filterToWhere(filterFromWhere(where)), where);
+  });
+
   it('lifts a lone top-level or-group into the or relation', () => {
     const parsed = filterFromWhere({ or: [{ a: { equalsTo: 1 } }, { b: { equalsTo: 2 } }] });
     strictEqual(parsed.relation, 'or');
@@ -145,5 +178,17 @@ describe('filterFromWhere', () => {
       relation: 'and',
       items: [],
     });
+    deepStrictEqual(
+      strip(
+        filterFromWhere({
+          a: { has: true },
+          b: { has: { x: { equalsTo: 1 }, y: { equalsTo: 2 } } },
+          c: { has: { or: [{ x: { equalsTo: 1 } }] } },
+          d: { has: { x: { equalsTo: 1 } }, isNull: false },
+          not: { e: { has: { x: { equalsTo: 1 } } } },
+        }),
+      ),
+      { relation: 'and', items: [] },
+    );
   });
 });

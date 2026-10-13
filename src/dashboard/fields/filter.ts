@@ -3,6 +3,7 @@ import type { ConditionObject, ConditionValue } from '../../utils/index.ts';
 import {
   isArray,
   isBoolean,
+  isEmpty,
   isNumber,
   isPlainObject,
   isString,
@@ -43,7 +44,7 @@ export interface FilterCondition {
   key: string;
 
   /**
-   * The field name the rule compares.
+   * The field name the rule compares, or a dotted path through one-child composites, like `period.start`.
    */
   field: string;
 
@@ -173,6 +174,8 @@ export function filterKey(): string {
  *   An empty string value becomes `' '`, so an unfilled pattern never matches everything.
  * - `notContains` emits `{ not: { [field]: { contains: value } } }`.
  * - `includes` emits `{ [field]: { includes: value } }`; `notIncludes` the `not`-wrapped same.
+ * - A dotted `field` like `period.start` nests one `{ [composite]: { has: ... } }` per segment.
+ *   A negation stays inside the innermost `has`, so a record without the composite never matches.
  * - A member list emits `{ and: [...] }` / `{ or: [...] }` with one object per member.
  *   A single member emits its object alone, and an empty group is omitted entirely.
  * - An empty model serializes to `undefined`: the query carries no `where` at all.
@@ -234,10 +237,23 @@ function serializeItems(
 
 /**
  * One rule's condition object; negated operators wrap in `not`, and an empty pattern sends `' '`.
+ * A dotted path nests one `has` per composite, the `not` inside the innermost one.
  */
 function serializeCondition(condition: FilterCondition): ConditionObject {
-  const { field, operator } = condition;
-  let value = condition.value;
+  const path = condition.field.split('.');
+  let where = serializeLeaf(path.pop()!, condition.operator, condition.value);
+  for (const composite of path.reverse()) where = { [composite]: { has: where } };
+  return where;
+}
+
+/**
+ * The condition object comparing one field of the innermost scope.
+ */
+function serializeLeaf(
+  field: string,
+  operator: FilterOperator,
+  value: FilterValue,
+): ConditionObject {
   if (value === '' && PATTERN_OPERATORS.has(operator)) value = ' ';
   if (operator === 'ne') return { not: { [field]: { equalsTo: value } } };
   if (operator === 'notContains') return { not: { [field]: { contains: value } } };
@@ -273,11 +289,24 @@ function parseObject(where: ConditionObject): FilterNode[] {
       const negated = parseNegated(value);
       if (!isUndefined(negated)) items.push(negated);
     } else {
-      const condition = parseCompare(key, value);
+      const condition = parseHas(key, value) ?? parseCompare(key, value);
       if (!isUndefined(condition)) items.push(condition);
     }
   }
   return items;
+}
+
+/**
+ * The dotted rule a composite's `has` holds, or `undefined` unless its body is exactly one rule.
+ * Only a field's own key reaches here, so a negated `has` never turns into a `has` of a negation.
+ */
+function parseHas(field: string, value: ConditionValue): FilterCondition | undefined {
+  if (!isPlainObject(value)) return undefined;
+  const { has, ...rest } = value as ConditionObject;
+  if (!isEmpty(rest) || !isPlainObject(has)) return undefined;
+  const inner = parseObject(has as ConditionObject);
+  if (inner.length !== 1 || 'items' in inner[0]!) return undefined;
+  return { ...inner[0]!, field: `${field}.${inner[0]!.field}` };
 }
 
 /**
