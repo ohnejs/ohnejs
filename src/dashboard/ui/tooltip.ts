@@ -126,6 +126,7 @@ function renderContent(target: HTMLElement, text: string, plain = false): void {
  * Attaches a tooltip to an element; returns the dispose.
  *
  * Show and hide are instant, any click hides, and touch shows only while holding.
+ * Keyboard focus shows it too; focus from a click, or handed back by a closing dropdown, does not.
  * Every tooltip is raised to the top layer as it appears, so it covers the surface that opened it.
  * The content string speaks markdown-lite: `**bold**`, backticked code, and `<br>` breaks.
  * It renders as constructed text nodes, so caller content never reaches `innerHTML`.
@@ -241,10 +242,13 @@ export function attachTooltip(
     if (!usingTouch) show();
   };
   const onTouchStart = (): void => show();
+  const onFocus = (): void => {
+    if (el.matches(':focus-visible')) show();
+  };
 
   el.addEventListener('mouseenter', onMouseEnter);
   el.addEventListener('mouseleave', hide);
-  el.addEventListener('focus', onMouseEnter);
+  el.addEventListener('focus', onFocus);
   el.addEventListener('blur', hide);
   el.addEventListener('touchstart', onTouchStart, { passive: true });
   el.addEventListener('touchend', hide);
@@ -253,7 +257,7 @@ export function attachTooltip(
   return () => {
     el.removeEventListener('mouseenter', onMouseEnter);
     el.removeEventListener('mouseleave', hide);
-    el.removeEventListener('focus', onMouseEnter);
+    el.removeEventListener('focus', onFocus);
     el.removeEventListener('blur', hide);
     el.removeEventListener('touchstart', onTouchStart);
     el.removeEventListener('touchend', hide);
