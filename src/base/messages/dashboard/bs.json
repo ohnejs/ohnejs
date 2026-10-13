@@ -20,6 +20,62 @@
     "empty": "Nema dodanih blokova",
     "notPasted": "{count, plural, one {# blok nije moguće zalijepiti} few {# bloka nije moguće zalijepiti} other {# blokova nije moguće zalijepiti}}"
   },
+  "bookmarkDefaults": {
+    "user": {
+      "label": "Korisnik",
+      "description": "Osoba za koju vrijedi ovaj zadani prikaz."
+    },
+    "collection": {
+      "label": "Kolekcija",
+      "description": "Kolekcija za čiju tabelu vrijedi zadani prikaz."
+    },
+    "bookmark": {
+      "label": "Oznaka",
+      "description": "Oznaka čiji je prikaz zadani."
+    }
+  },
+  "bookmarks": {
+    "add": "Oznaka",
+    "applied": "Trenutno primijenjeno",
+    "confirmDelete": "Da li zaista želite obrisati oznaku `{name}`?",
+    "defaultSettings": "Zadane postavke",
+    "isDefault": "Trenutno zadano",
+    "myBookmarks": "Moje oznake",
+    "namePlaceholder": "npr. Nedavno ažurirano",
+    "newBookmark": "Nova oznaka",
+    "newName": "Novi naziv",
+    "predefined": "Unaprijed definirano",
+    "rename": "Preimenuj",
+    "renameBookmark": "Preimenuj oznaku",
+    "setDefault": "Postavi kao zadano",
+    "share": "Podijeli",
+    "sharedBookmarks": "Dijeljene oznake",
+    "sharedNote": "dijeljeno",
+    "stopSharing": "Prestani dijeliti",
+    "title": "Oznake",
+    "update": "Ažuriraj na trenutni prikaz",
+    "updated": "Ažurirano",
+    "name": {
+      "label": "Naziv",
+      "description": "Naziv pod kojim je oznaka navedena."
+    },
+    "collection": {
+      "label": "Kolekcija",
+      "description": "Kolekcija čijoj tabeli prikaz pripada."
+    },
+    "view": {
+      "label": "Prikaz",
+      "description": "Sortiranje, filter i kolone tabele, kao query string."
+    },
+    "user": {
+      "label": "Korisnik",
+      "description": "Osoba koja je sačuvala oznaku i jedina je može mijenjati."
+    },
+    "shared": {
+      "label": "Dijeljeno",
+      "description": "Da li oznaku vide svi koji mogu čitati kolekciju."
+    }
+  },
   "calendar": {
     "clear": "Očisti",
     "nextMonth": "Sljedeći mjesec",

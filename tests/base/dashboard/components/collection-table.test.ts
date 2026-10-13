@@ -4,15 +4,18 @@ import { before, describe, it } from 'node:test';
 import type {
   DashboardCollection,
   DashboardField,
+  DashboardMeta,
 } from '../../../../src/dashboard/runtime/meta-types.ts';
 import type { FakeBrowser } from '../../../dashboard/router/_browser.ts';
 
 import { h } from '../../../../src/dashboard/render/h.ts';
 import { defineDashboardPage } from '../../../../src/dashboard/router/define-dashboard-page.ts';
 import { navigate, startRouter } from '../../../../src/dashboard/router/router.ts';
+import { startSession } from '../../../../src/dashboard/runtime/_request.ts';
+import { dashboardMeta, invalidateDashboardMeta } from '../../../../src/dashboard/runtime/meta.ts';
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
-import { FakeElement, type FakeNode, findElement } from '../../../dashboard/_fake-dom.ts';
+import { FakeElement, type FakeNode, findElement, hasClass } from '../../../dashboard/_fake-dom.ts';
 import { pageModule, settle } from '../../../dashboard/router/_browser.ts';
 import { baseBrowser } from '../_browser.ts';
 
@@ -144,7 +147,10 @@ describe('collectionTable', () => {
       testPages: { posts: defineDashboardPage(() => collectionTable(POSTS)) },
     });
     await startRouter(
-      [{ pattern: '/collections/posts', url: pageModule('posts') }],
+      ['posts', 'notes', 'tags', 'drafts'].map((segment) => ({
+        pattern: `/collections/${segment}`,
+        url: pageModule(segment),
+      })),
       new FakeElement('div') as unknown as Element,
     );
     await idle();
@@ -518,5 +524,183 @@ describe('collectionTable refused views', () => {
     strictEqual(sent.length, 1);
     strictEqual(location.search, '?page=2');
     strictEqual(toasts().length, shown);
+  });
+});
+
+describe('collectionTable default views', () => {
+  const PAGE = { records: [], page: 1, lastPage: 1, perPage: 50, total: 0 };
+  const META: DashboardMeta = {
+    menu: [],
+    collections: [],
+    blocks: [],
+    roles: [],
+    capabilities: [],
+    routes: [],
+    locales: ['en'],
+    defaultLocale: 'en',
+    languages: ['en'],
+    accountFields: [],
+    accountLayout: [],
+    defaultViews: {
+      Notes: { bookmark: 'b-notes', view: 'order=[title]' },
+      Tags: { bookmark: 'b-tags', view: '' },
+      Drafts: { bookmark: 'b-drafts', view: 'order=[title]' },
+    },
+  };
+  const orders: unknown[] = [];
+
+  /**
+   * Runs the navigation `go` and returns the orders the table loaded while it settled.
+   */
+  const visit = async (go: () => unknown): Promise<unknown[]> => {
+    orders.length = 0;
+    await go();
+    await idle();
+    return [...orders];
+  };
+
+  before(async () => {
+    Object.assign(globalThis, {
+      fetch: async (url: string, init?: RequestInit) => {
+        if (url.endsWith('/dashboard')) return Response.json(META);
+        if (!url.endsWith('/query')) return new Response(null, { status: 404 });
+        orders.push((JSON.parse(String(init?.body)) as { order: unknown }).order);
+        return Response.json(PAGE);
+      },
+    });
+    const { collectionTable } =
+      await import('../../../../src/base/dashboard/components/collection-table.ts');
+    const page = (name: string) =>
+      defineDashboardPage(() =>
+        collectionTable({ ...POSTS, name, label: name, segment: name.toLowerCase() }),
+      );
+    Object.assign((globalThis as unknown as { testPages: object }).testPages, {
+      notes: page('Notes'),
+      tags: page('Tags'),
+      drafts: page('Drafts'),
+    });
+    startSession();
+    dashboardMeta();
+    await idle();
+  });
+
+  it('opens a bare first visit on the default view, loading only that view', async () => {
+    const loaded = await visit(() => navigate('/collections/notes'));
+    strictEqual(browser.replaces.at(-1), '/collections/notes?order=[title]');
+    deepStrictEqual(loaded, [['title']]);
+  });
+
+  it('stays bare when the default is the declared view, leaving no `?`', async () => {
+    const replaced = browser.replaces.length;
+    const loaded = await visit(() => navigate('/collections/tags'));
+    strictEqual(browser.replaces.length, replaced);
+    strictEqual(location.href, 'http://dashboard/collections/tags');
+    deepStrictEqual(loaded, [['-_updatedAt']]);
+  });
+
+  it('lands bare when back brings the bare URL, despite a default', async () => {
+    const loaded = await visit(() => browser.popstate('/collections/drafts'));
+    strictEqual(location.search, '');
+    deepStrictEqual(loaded, [['-_updatedAt']]);
+  });
+
+  it('keeps a remembered declared view over the default', async () => {
+    await navigate('/collections/notes');
+    await idle();
+    const loaded = await visit(() => navigate('/collections/drafts'));
+    strictEqual(location.search, '');
+    deepStrictEqual(loaded, [['-_updatedAt']]);
+  });
+});
+
+describe('collectionTable bookmarks', () => {
+  const PAGE = { records: [], page: 1, lastPage: 1, perPage: 50, total: 0 };
+  const META: Omit<DashboardMeta, 'routes'> = {
+    menu: [],
+    collections: [],
+    blocks: [],
+    roles: [],
+    capabilities: [],
+    locales: ['en'],
+    defaultLocale: 'en',
+    languages: ['en'],
+    accountFields: [],
+    accountLayout: [],
+    defaultViews: {},
+  };
+  const LIST = {
+    bookmarks: [
+      { UUID: 'b-titles', name: 'Titles', view: 'order=[title]', shared: false, mine: true },
+      { UUID: 'b-team', name: 'Team', view: 'order=[-title]', shared: true, mine: false },
+    ],
+    default: null,
+  };
+  let routes: string[] = [];
+  let scope: ReturnType<typeof effectScope> | undefined;
+  let collectionTable!: (collection: DashboardCollection) => unknown;
+
+  const findAll = (root: FakeNode, match: (element: FakeElement) => boolean): FakeElement[] =>
+    root.childNodes.flatMap((child) => [
+      ...(child instanceof FakeElement && match(child) ? [child] : []),
+      ...findAll(child, match),
+    ]);
+  const labelled = (root: FakeNode, label: string): FakeElement[] =>
+    findAll(root, (element) => element.getAttribute('aria-label') === label);
+  const body = (): FakeElement => document.body as unknown as FakeElement;
+
+  /**
+   * Serves `next` as the app's routes, then mounts the posts table and lets it settle.
+   */
+  const mount = async (next: string[]): Promise<FakeElement> => {
+    routes = next;
+    invalidateDashboardMeta();
+    dashboardMeta();
+    await idle();
+    scope?.dispose();
+    scope = effectScope();
+    const root = scope.run(() => h('div', null, collectionTable(POSTS) as Node))!;
+    await idle();
+    return root as unknown as FakeElement;
+  };
+
+  before(async () => {
+    Object.assign(globalThis, {
+      fetch: async (url: string) => {
+        const path = new URL(url).pathname;
+        if (path === '/dashboard') return Response.json({ ...META, routes });
+        if (path === '/dashboard/bookmarks/posts') return Response.json(LIST);
+        if (path.endsWith('/query')) return Response.json(PAGE);
+        return new Response(null, { status: 404 });
+      },
+    });
+    ({ collectionTable } =
+      await import('../../../../src/base/dashboard/components/collection-table.ts'));
+  });
+
+  it('shows no bookmarks button while the app does not serve the list route', async () => {
+    const root = await mount(['POST /dashboard/bookmarks/[collection]']);
+    strictEqual(labelled(root, 'dashboard.bookmarks.title').length, 0);
+    scope?.dispose();
+  });
+
+  it('opens on the current view, without page or foreign params, and applies a pick', async () => {
+    await navigate('/collections/posts?page=3&order=[title]&utm=x');
+    await idle();
+    const root = await mount(['GET /dashboard/bookmarks/[collection]']);
+    dispatch(labelled(root, 'dashboard.bookmarks.title')[0]!, 'click');
+    await idle();
+    const row = (name: string): FakeElement =>
+      findAll(
+        body(),
+        (element) => hasClass(element, 'ohne-card') && element.textContent.includes(name),
+      )[0]!;
+    strictEqual(labelled(row('Titles'), 'dashboard.bookmarks.applied').length, 1);
+    dispatch(labelled(row('Team'), 'dashboard.apply')[0]!, 'click');
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await idle();
+    strictEqual(decodeURIComponent(location.search), '?order=[-title]&utm=x');
+    scope?.dispose();
+    await navigate('/collections/posts');
+    await idle();
   });
 });

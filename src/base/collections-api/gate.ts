@@ -388,8 +388,9 @@ let segments: Map<string, CollectionMeta> | null = null;
 
 /**
  * The registered collection whose kebab-case name is `segment`, or `undefined`.
+ * Kebab case does not reverse reliably, so a route resolves its segment here, as the gate does.
  */
-function collectionBySegment(segment: string): CollectionMeta | undefined {
+export function collectionBySegment(segment: string): CollectionMeta | undefined {
   if (isNull(segments)) {
     segments = new Map();
     for (const meta of Object.values(useCollections().all())) {

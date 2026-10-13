@@ -41,6 +41,7 @@ import {
   deepEqual,
   effect,
   hasKey,
+  hasRoute,
   isEmpty,
   isNull,
   isString,
@@ -55,6 +56,7 @@ import {
   untracked,
 } from 'ohnejs/utils';
 
+import { bookmarksPopup } from './bookmarks-popup.ts';
 import { clearSelectionButton } from './clear-selection-button.ts';
 import {
   columnFields,
@@ -158,6 +160,7 @@ css`
  * A view part the query endpoint refuses is dropped with a toast, replacing the URL.
  * Every cell renders its field's display inside an editable cell whose popup patches only that field.
  * Sorting, the filter and sorting popups, and the pagination push new URL state.
+ * A bookmarks button opens the saved views while the app serves their list route.
  * Rows select with shift ranges into the batch delete.
  * A row's actions menu opens, edits, and deletes single records behind confirm dialogs.
  * Each page loads with its row verdicts, so a row offers only what the `access` scopes admit for it.
@@ -183,8 +186,9 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
   const segment = collection.segment;
   const canCreate = collection.operations.create?.allowed === true;
   const deleteScoped = collection.operations.delete?.scoped === true;
-  const canTranslate =
-    collection.translatable && (untracked(dashboardMeta)?.locales.length ?? 0) > 1;
+  const meta = untracked(dashboardMeta);
+  const canTranslate = collection.translatable && (meta?.locales.length ?? 0) > 1;
+  const canBookmark = hasRoute(meta?.routes ?? [], 'GET /dashboard/bookmarks/[collection]');
 
   rememberView(segment, search);
 
@@ -212,6 +216,10 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
   const defaultEntries = serializeTableColumns(resolveTableColumns(fields, declared));
   const currentEntries = serializeTableColumns(specs);
   const columnsDirty = !deepEqual(currentEntries, defaultEntries);
+  const view = serializeTableState(
+    { ...state, page: 1, columns: columnsDirty ? currentEntries : undefined },
+    DEFAULT_ORDER,
+  );
 
   const data = ref<TableRecord[] | undefined>(undefined);
   const verdicts = ref(NO_VERDICTS);
@@ -226,6 +234,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
   const filterOpen = ref(false);
   const columnsOpen = ref(false);
   const sortingOpen = ref(false);
+  const bookmarksOpen = ref(false);
   const translationsUUID = ref<string | null>(null);
   let generation = 0;
   let deleteBusy = false;
@@ -628,6 +637,17 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
   const clearButton = (): HTMLElement =>
     clearSelectionButton(() => selectedCount.value, deselectAll);
 
+  const bookmarksButton = canBookmark
+    ? button(() => t('dashboard.bookmarks.title'), {
+        icon: 'bookmark',
+        iconOnly: true,
+        variant: 'outline',
+        onClick: () => {
+          bookmarksOpen.value = true;
+        },
+      })
+    : null;
+
   const filterButton = button(() => t('dashboard.filter.title'), {
     icon: 'adjustments',
     iconOnly: true,
@@ -679,6 +699,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
           () => selected.value.size > 0,
           () => [deleteButton(), clearButton()],
         ),
+        bookmarksButton,
         filterButton,
         columnsButton,
         sortingButton,
@@ -756,6 +777,27 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
     },
   );
 
+  const bookmarksHost = when(
+    () => bookmarksOpen.value,
+    () => {
+      let pending: string | undefined;
+      bookmarksPopup({
+        collection,
+        view,
+        onApply: (next) => {
+          pending = next;
+        },
+        onClose: (close) =>
+          void close().then(() => {
+            bookmarksOpen.value = false;
+            if (!isUndefined(pending))
+              push({ ...parseTableState(pending, DEFAULT_ORDER), page: 1 });
+          }),
+      });
+      return null;
+    },
+  );
+
   const translationsHost = when(
     () => !isNull(translationsUUID.value),
     () => {
@@ -811,6 +853,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
     filterHost,
     columnsHost,
     sortingHost,
+    bookmarksHost,
     translationsHost,
   );
 }

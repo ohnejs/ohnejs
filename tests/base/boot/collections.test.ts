@@ -27,7 +27,7 @@ async function refusal(collections: string[]): Promise<{ title?: string; body?: 
 }
 
 /**
- * The block the boot file throws for a disabled `name`.
+ * The block the boot file throws for a disabled sign-in collection `name`.
  */
 function block(name: string): { title: string; body: string[] } {
   return {
@@ -36,6 +36,21 @@ function block(name: string): { title: string; body: string[] } {
       'You list it in `disable.collections`, but sign-in keeps its users and sessions there.',
       '',
       `Remove \`${name}\` from \`disable.collections\`.`,
+    ],
+  };
+}
+
+/**
+ * The block the boot file throws for a disabled bookmarks collection `name`.
+ */
+function bookmarksBlock(name: string): { title: string; body: string[] } {
+  return {
+    title: `The \`ohnejs/base\` layer needs \`${name}\``,
+    body: [
+      'You list it in `disable.collections`, but the dashboard keeps its table bookmarks there.',
+      '',
+      `Remove \`${name}\` from \`disable.collections\`.`,
+      'To turn bookmarks off, list `/dashboard/bookmarks/**` in `disable.routes` instead.',
     ],
   };
 }
@@ -51,10 +66,18 @@ describe('the collections boot file', () => {
     deepStrictEqual(await refusal(['Sessions', 'Users']), block('Users'));
   });
 
-  it('boots when the app disables other collections and the auth routes', async () => {
+  for (const name of ['DashboardBookmarks', 'DashboardBookmarkDefaults']) {
+    it(`stops the boot when \`${name}\` is disabled, pointing at the bookmark routes`, async () => {
+      deepStrictEqual(await refusal([name]), bookmarksBlock(name));
+    });
+  }
+
+  it('boots when the app disables other collections, the auth routes, and the bookmark routes', async () => {
     useLayers().add({
       path: LAYER,
-      input: { disable: { collections: ['Quests'], routes: ['/auth/**'] } },
+      input: {
+        disable: { collections: ['Quests'], routes: ['/auth/**', '/dashboard/bookmarks/**'] },
+      },
     });
     try {
       await import(`${BOOT}?others`);

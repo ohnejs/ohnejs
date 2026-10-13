@@ -5,6 +5,7 @@ import {
   defineHandler,
   type Message,
   queryMetadata,
+  queryUntyped,
   useBlocks,
   useCollections,
   useConfig,
@@ -13,6 +14,7 @@ import {
   useRoutes,
 } from 'ohnejs';
 import {
+  hasRoute,
   isEmpty,
   isUndefined,
   naturalCompare,
@@ -23,6 +25,7 @@ import {
 
 import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { User } from '../auth/types.ts';
+import type { BookmarkDefault } from '../bookmarks/types.ts';
 import type {
   DashboardCollection,
   DashboardField,
@@ -34,6 +37,7 @@ import { defaultLanguage } from '../../ohne/http/translate.ts';
 import { accountFields, accountLayout } from '../auth/account-layout.ts';
 import { userCapabilities } from '../auth/capabilities.ts';
 import { requireUser } from '../auth/require-user.ts';
+import { bookmarkTarget } from '../bookmarks/bookmark-target.ts';
 import { describeCollections, describeFields, resolveLayout } from '../collections-api/describe.ts';
 import { resolveDashboardMenu } from '../menu/resolve-menu.ts';
 
@@ -200,6 +204,13 @@ export interface DashboardMeta {
    * How the account page arranges `accountFields`, resolved; empty when the page is hidden.
    */
   accountLayout: DashboardLayoutNode[];
+
+  /**
+   * The signed-in user's default table views, keyed by collection name.
+   * A default shows only while its bookmark is the user's own or shared, and its collection stays readable.
+   * Empty when the app drops `PUT /dashboard/bookmarks/[collection]/default`, so no default outlives it.
+   */
+  defaultViews: Record<string, BookmarkDefault>;
 }
 
 declare module 'ohnejs' {
@@ -228,6 +239,7 @@ declare module 'ohnejs' {
  * `languages` lists the catalog languages the dashboard language setting offers, the default first.
  * `accountFields` describes the `Users` fields the account page edits, as `auth:account-layout` places them.
  * A declared layout arrives resolved on its collection, block, or composite field, and on `accountLayout`.
+ * `defaultViews` holds the user's default table view per collection, the one a bare table URL opens on.
  * No signed-in user is a `401`.
  */
 export default defineHandler(async (): Promise<DashboardMeta> => {
@@ -236,6 +248,7 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
   const { locales, defaultLocale } = resolveLocales(useConfig().collections);
   const menu = await resolveDashboardMenu(user, collections);
   const account = await describeAccount(user);
+  const routes = useRoutes().keys();
   const meta: DashboardMeta = {
     menu,
     collections,
@@ -245,11 +258,12 @@ export default defineHandler(async (): Promise<DashboardMeta> => {
     ]),
     roles: describeRoles(),
     capabilities: userCapabilities(user),
-    routes: useRoutes().keys(),
+    routes,
     locales,
     defaultLocale,
     languages: catalogLanguages(),
     ...account,
+    defaultViews: await describeDefaultViews(user, routes),
   };
   await applyHook('dashboard:meta', meta, { user });
   return meta;
@@ -278,6 +292,34 @@ async function describeAccount(
     users.collection.fields,
   );
   return { accountFields: fields, accountLayout: resolveLayout(layout, fields) ?? [] };
+}
+
+/**
+ * The user's default table views, keyed by collection name, while the app serves the route that sets them.
+ * The default rows read unscoped, so an app's hook on them never hides one.
+ * Their bookmarks read as the bookmarks list reads them: the user's own or shared, of a readable collection.
+ */
+async function describeDefaultViews(
+  user: User,
+  routes: readonly string[],
+): Promise<Record<string, BookmarkDefault>> {
+  if (!hasRoute(routes, 'PUT /dashboard/bookmarks/[collection]/default')) return {};
+  const chosen = await queryUntyped('DashboardBookmarkDefaults')
+    .unscoped()
+    .where({ user: user.UUID })
+    .pluck('bookmark');
+  if (isEmpty(chosen)) return {};
+  const bookmarks = await queryUntyped('DashboardBookmarks')
+    .where({ UUID: { in: chosen }, or: [{ user: user.UUID }, { shared: true }] })
+    .select('UUID', 'collection', 'view')
+    .findMany();
+  const views: Record<string, BookmarkDefault> = {};
+  for (const { UUID, collection, view } of bookmarks) {
+    if (await bookmarkTarget(collection as string)) {
+      views[collection as string] = { bookmark: UUID as string, view: view as string };
+    }
+  }
+  return views;
 }
 
 /**

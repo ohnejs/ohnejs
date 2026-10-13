@@ -2,9 +2,14 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { before, describe, it } from 'node:test';
 
 import type { TableURLState } from '../../../../src/base/dashboard/components/collection-table-state.ts';
-import type { DashboardCollection } from '../../../../src/dashboard/runtime/meta-types.ts';
+import type {
+  DashboardCollection,
+  DashboardMeta,
+} from '../../../../src/dashboard/runtime/meta-types.ts';
 
+import { dashboardMeta, invalidateDashboardMeta } from '../../../../src/dashboard/runtime/meta.ts';
 import { login } from '../../../../src/dashboard/runtime/session.ts';
+import { settle } from '../../../dashboard/router/_browser.ts';
 import { baseBrowser } from '../_browser.ts';
 
 const POSTS: DashboardCollection = {
@@ -65,6 +70,64 @@ describe('table view memory', () => {
     await signIn('grace');
     strictEqual(data.rememberedView(POSTS), '');
     strictEqual(data.rememberedPickerView('posts'), undefined);
+  });
+});
+
+describe('rememberedView', () => {
+  let data!: typeof import('../../../../src/base/dashboard/components/collection-table-data.ts');
+  const named = (name: string): DashboardCollection => ({
+    ...POSTS,
+    name,
+    segment: name.toLowerCase(),
+  });
+  const meta: DashboardMeta = {
+    menu: [],
+    collections: [],
+    blocks: [],
+    roles: [],
+    capabilities: [],
+    routes: [],
+    locales: ['en'],
+    defaultLocale: 'en',
+    languages: ['en'],
+    accountFields: [],
+    accountLayout: [],
+    defaultViews: {
+      Notes: { bookmark: 'b-notes', view: 'order=title' },
+      Tags: { bookmark: 'b-tags', view: '' },
+    },
+  };
+
+  before(async () => {
+    baseBrowser('/collections/notes');
+    data = await import('../../../../src/base/dashboard/components/collection-table-data.ts');
+    await signIn('linus');
+    Object.assign(globalThis, {
+      fetch: async (url: string) =>
+        url.endsWith('/dashboard') ? Response.json(meta) : new Response(null, { status: 404 }),
+    });
+    invalidateDashboardMeta();
+    dashboardMeta();
+    await settle();
+  });
+
+  it("falls back to the user's default view, prefixed for `location.search`", () => {
+    strictEqual(data.rememberedView(named('Notes')), '?order=title');
+  });
+
+  it('keeps an empty default view bare, without a stray `?`', () => {
+    strictEqual(data.rememberedView(named('Tags')), '');
+  });
+
+  it('answers an empty view without a memory or a default', () => {
+    strictEqual(data.rememberedView(named('Drafts')), '');
+  });
+
+  it('prefers the remembered view over the default, an empty one included', () => {
+    data.rememberView('notes', '?page=2');
+    strictEqual(data.rememberedView(named('Notes')), '?page=2');
+    data.rememberView('notes', '');
+    strictEqual(data.rememberedView(named('Notes')), '');
   });
 });
 

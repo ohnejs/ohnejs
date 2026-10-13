@@ -1,5 +1,5 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
-import { describe, it } from 'node:test';
+import { before, describe, it } from 'node:test';
 
 import type { DashboardCollection } from '../../../src/base/collections-api/describe.ts';
 import type { AnyHandler, Route } from '../../../src/ohne/routes/route.ts';
@@ -10,6 +10,8 @@ import dashboardGet, {
   type DashboardMeta,
 } from '../../../src/base/api/dashboard.get.ts';
 import { hashSessionToken } from '../../../src/base/auth/_token.ts';
+import DashboardBookmarkDefaultsCollection from '../../../src/base/collections/DashboardBookmarkDefaults.ts';
+import DashboardBookmarksCollection from '../../../src/base/collections/DashboardBookmarks.ts';
 import SessionsCollection from '../../../src/base/collections/Sessions.ts';
 import UsersCollection from '../../../src/base/collections/Users.ts';
 import datePatternField from '../../../src/base/fields/date-pattern.ts';
@@ -87,6 +89,14 @@ useCollections().register('Users', {
   },
 });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
+useCollections().register('DashboardBookmarks', {
+  name: 'DashboardBookmarks',
+  collection: DashboardBookmarksCollection,
+});
+useCollections().register('DashboardBookmarkDefaults', {
+  name: 'DashboardBookmarkDefaults',
+  collection: DashboardBookmarkDefaultsCollection,
+});
 
 useRoles().register('admin', { name: 'admin', role: { capabilities: ['*'] } });
 useRoles().register('dash-user', {
@@ -532,6 +542,96 @@ describe('routes', () => {
         scoped: false,
       });
       strictEqual(collection((await call(admin)).body, 'Users').operations.create, null);
+    } finally {
+      await serve();
+    }
+  });
+});
+
+describe('defaultViews', () => {
+  const uuidOf = async (email: string): Promise<string> =>
+    (await queryUntyped('Users').where({ email }).pluck('UUID'))[0] as string;
+
+  /**
+   * Saves a bookmark of `collection` owned by `owner`, and makes it the default of `chooser`.
+   */
+  const choose = async (
+    chooser: string,
+    owner: string,
+    collection: string,
+    shared = false,
+  ): Promise<string> => {
+    const bookmark = await queryUntyped('DashboardBookmarks').createOrThrow({
+      name: collection,
+      collection,
+      view: 'order=[title]',
+      user: owner,
+      shared,
+    });
+    await queryUntyped('DashboardBookmarkDefaults').createOrThrow({
+      user: chooser,
+      collection,
+      bookmark: bookmark.UUID,
+    });
+    return bookmark.UUID as string;
+  };
+
+  let notes = '';
+  let owners = '';
+
+  before(async () => {
+    const me = await uuidOf('user@example.com');
+    const other = await uuidOf('admin@example.com');
+    notes = await choose(me, me, 'DashNotes');
+    owners = await choose(me, other, 'DashOwners', true);
+    await choose(me, me, 'DashDenied');
+    await choose(me, me, 'DashGone');
+    await choose(me, other, 'DashPublic');
+  });
+
+  it('keeps each default the user still reads: own or shared, of a readable collection', async () => {
+    const { status, body } = await call(user);
+    strictEqual(status, 200);
+    deepStrictEqual(body.defaultViews, {
+      DashNotes: { bookmark: notes, view: 'order=[title]' },
+      DashOwners: { bookmark: owners, view: 'order=[title]' },
+    });
+  });
+
+  it('drops an unshared default, and brings it back once shared again', async () => {
+    const share = (shared: boolean) =>
+      queryUntyped('DashboardBookmarks').where({ UUID: owners }).updateOrThrow({ shared });
+    await share(false);
+    try {
+      deepStrictEqual(Object.keys((await call(user)).body.defaultViews), ['DashNotes']);
+    } finally {
+      await share(true);
+    }
+    deepStrictEqual(Object.keys((await call(user)).body.defaultViews), ['DashNotes', 'DashOwners']);
+  });
+
+  it('reads the defaults past an app hook that scopes them away', async () => {
+    hook('query:filter', (ir) =>
+      ir.collection === 'DashboardBookmarkDefaults' ? { ...ir, limit: 0 } : ir,
+    );
+    try {
+      deepStrictEqual(Object.keys((await call(user)).body.defaultViews), [
+        'DashNotes',
+        'DashOwners',
+      ]);
+    } finally {
+      useHooks().delete('query:filter');
+    }
+  });
+
+  it('answers no defaults for a user who set none', async () => {
+    deepStrictEqual((await call(admin)).body.defaultViews, {});
+  });
+
+  it('answers no defaults once the app drops the route that sets them', async () => {
+    await serve(['PUT /dashboard/bookmarks/[collection]/default']);
+    try {
+      deepStrictEqual((await call(user)).body.defaultViews, {});
     } finally {
       await serve();
     }

@@ -20,6 +20,62 @@
     "empty": "No blocks added",
     "notPasted": "{count, plural, one {# block could not be pasted} other {# blocks could not be pasted}}"
   },
+  "bookmarkDefaults": {
+    "user": {
+      "label": "User",
+      "description": "The person this default view is for."
+    },
+    "collection": {
+      "label": "Collection",
+      "description": "The collection whose table the default view is for."
+    },
+    "bookmark": {
+      "label": "Bookmark",
+      "description": "The bookmark whose view is the default."
+    }
+  },
+  "bookmarks": {
+    "add": "Bookmark",
+    "applied": "Currently applied",
+    "confirmDelete": "Are you sure you want to delete the bookmark `{name}`?",
+    "defaultSettings": "Default settings",
+    "isDefault": "Currently default",
+    "myBookmarks": "My bookmarks",
+    "namePlaceholder": "e.g. Recently updated",
+    "newBookmark": "New bookmark",
+    "newName": "New name",
+    "predefined": "Predefined",
+    "rename": "Rename",
+    "renameBookmark": "Rename bookmark",
+    "setDefault": "Set as default",
+    "share": "Share",
+    "sharedBookmarks": "Shared bookmarks",
+    "sharedNote": "shared",
+    "stopSharing": "Stop sharing",
+    "title": "Bookmarks",
+    "update": "Update to current view",
+    "updated": "Updated",
+    "name": {
+      "label": "Name",
+      "description": "The name the bookmark is listed under."
+    },
+    "collection": {
+      "label": "Collection",
+      "description": "The collection whose table the view belongs to."
+    },
+    "view": {
+      "label": "View",
+      "description": "The table's sort order, filter and columns, as a query string."
+    },
+    "user": {
+      "label": "User",
+      "description": "The person who saved the bookmark, the only one who can change it."
+    },
+    "shared": {
+      "label": "Shared",
+      "description": "Whether everyone who can read the collection sees the bookmark."
+    }
+  },
   "calendar": {
     "clear": "Clear",
     "nextMonth": "Next month",

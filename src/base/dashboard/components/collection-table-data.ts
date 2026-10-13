@@ -117,11 +117,16 @@ export function rememberView(segment: string, search: string): void {
 
 /**
  * The query string a bare visit to the collection's table restores, in `location.search` form.
- * It is `''` while the tab remembers none.
+ * The tab's remembered view wins, `''` included; else the user's default view; else `''`.
+ * An empty default stays `''`, since a bare `?` would never match the location the browser reports.
+ * The discovery data is read untracked, so a restore effect never reruns when it refreshes.
  */
 export function rememberedView(collection: DashboardCollection): string {
   sync();
-  return views.get(collection.segment) ?? '';
+  const remembered = views.get(collection.segment);
+  if (!isUndefined(remembered)) return remembered;
+  const view = untracked(dashboardMeta)?.defaultViews[collection.name]?.view ?? '';
+  return view === '' ? '' : `?${view}`;
 }
 
 /**

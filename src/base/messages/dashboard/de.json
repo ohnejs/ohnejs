@@ -20,6 +20,62 @@
     "empty": "Keine Blöcke hinzugefügt",
     "notPasted": "{count, plural, one {# Block konnte nicht eingesetzt werden} other {# Blöcke konnten nicht eingesetzt werden}}"
   },
+  "bookmarkDefaults": {
+    "user": {
+      "label": "Benutzer",
+      "description": "Die Person, für die diese Standardansicht gilt."
+    },
+    "collection": {
+      "label": "Sammlung",
+      "description": "Die Sammlung, für deren Tabelle die Standardansicht gilt."
+    },
+    "bookmark": {
+      "label": "Lesezeichen",
+      "description": "Das Lesezeichen, dessen Ansicht die Standardansicht ist."
+    }
+  },
+  "bookmarks": {
+    "add": "Lesezeichen",
+    "applied": "Aktuell angewendet",
+    "confirmDelete": "Das Lesezeichen `{name}` wirklich löschen?",
+    "defaultSettings": "Standardeinstellungen",
+    "isDefault": "Aktuell Standard",
+    "myBookmarks": "Meine Lesezeichen",
+    "namePlaceholder": "z. B. Zuletzt aktualisiert",
+    "newBookmark": "Neues Lesezeichen",
+    "newName": "Neuer Name",
+    "predefined": "Vordefiniert",
+    "rename": "Umbenennen",
+    "renameBookmark": "Lesezeichen umbenennen",
+    "setDefault": "Als Standard festlegen",
+    "share": "Teilen",
+    "sharedBookmarks": "Geteilte Lesezeichen",
+    "sharedNote": "geteilt",
+    "stopSharing": "Teilen beenden",
+    "title": "Lesezeichen",
+    "update": "Auf aktuelle Ansicht aktualisieren",
+    "updated": "Aktualisiert",
+    "name": {
+      "label": "Name",
+      "description": "Der Name, unter dem das Lesezeichen aufgeführt ist."
+    },
+    "collection": {
+      "label": "Sammlung",
+      "description": "Die Sammlung, zu deren Tabelle die Ansicht gehört."
+    },
+    "view": {
+      "label": "Ansicht",
+      "description": "Sortierung, Filter und Spalten der Tabelle als Query-String."
+    },
+    "user": {
+      "label": "Benutzer",
+      "description": "Die Person, die das Lesezeichen gespeichert hat und es als Einzige ändern kann."
+    },
+    "shared": {
+      "label": "Geteilt",
+      "description": "Ob alle, die die Sammlung lesen dürfen, das Lesezeichen sehen."
+    }
+  },
   "calendar": {
     "clear": "Leeren",
     "nextMonth": "Nächster Monat",
