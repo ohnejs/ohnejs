@@ -284,13 +284,14 @@ type DeclaredOptions<K extends FieldTypeName> =
  * It drops the unique flags and `index`, having no column, and `nullable`, having no cell to hold `NULL`.
  * A forced flag is the type's fact, not the field's: the locked option disappears from the call site.
  * `unique` survives a forced index, upgrading it to a unique one.
+ * The flags read through `Exclude`, never `NonNullable`: its `& {}` resolves every field type, this one too.
  */
 type CommonOptions<K extends FieldTypeName> = FieldTypes[K]['columnType'] extends false
   ? Pick<FieldOptions, 'translatable' | 'readable' | 'writable' | 'immutable'>
   : Omit<
       FieldOptions,
-      | (NonNullable<FieldTypes[K]['forceNullable']> extends true ? 'nullable' : never)
-      | (NonNullable<FieldTypes[K]['forceIndex']> extends true ? 'index' : never)
+      | (Exclude<FieldTypes[K]['forceNullable'], undefined> extends true ? 'nullable' : never)
+      | (Exclude<FieldTypes[K]['forceIndex'], undefined> extends true ? 'index' : never)
     >;
 
 /**
@@ -299,10 +300,11 @@ type CommonOptions<K extends FieldTypeName> = FieldTypes[K]['columnType'] extend
  * Otherwise the type's declared options resolve homomorphically.
  * The common options then join per the column gate.
  * The value and presentation options join outside that gate, so every kind carries them.
+ * The gate wraps `K` in a tuple, so it never distributes over every field type.
  */
 type InstanceOptions<K extends FieldTypeName> = PresentationOptions &
   ValueOptions<DeclaredOptions<K>, ColumnValue<FieldTypes[K]['columnType']>> &
-  (K extends keyof KnownFieldOptions
+  ([K] extends [keyof KnownFieldOptions]
     ? KnownFieldOptions[K]
     : ResolveOptions<DeclaredOptions<K>> & CommonOptions<K>);
 
@@ -354,7 +356,8 @@ export function field<K extends FieldTypeName>(
   ...args: [{}] extends [InstanceOptions<K>]
     ? [options?: InstanceOptions<K>]
     : [options: InstanceOptions<K>]
-): FieldInstance<K> {
+  // A `FieldInstance` slot around the call must not widen `K` to every field type.
+): FieldInstance<NoInfer<K>> {
   return { type, options: (args[0] ?? {}) as InstanceOptions<K> };
 }
 

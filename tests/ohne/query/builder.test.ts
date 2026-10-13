@@ -204,10 +204,11 @@ describe('the typed builder narrows in a consumer app', () => {
     write(
       app,
       'fields/span.ts',
-      "import { type ChildHint, defineField, field } from 'ohnejs';\n" +
-        'export default defineField({ columnType: false, schema: (): ChildHint => ({\n' +
+      "import { defineField, field } from 'ohnejs';\n" +
+        'export default defineField({ columnType: false, schema: () => ({\n' +
         "  kind: 'child', cardinality: 'one', orderBy: 'start',\n" +
-        "  subfields: { start: field('date'), end: field('date') },\n" +
+        "  subfields: { start: field('date'), end: field('date', { nullable: true }),\n" +
+        "    days: field('integer', { default: 0 }) },\n" +
         '}) });\n',
     );
     write(

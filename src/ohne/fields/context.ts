@@ -197,12 +197,13 @@ export type FieldValidator<
  * The storage primitive a column of `TColumn` holds: the type a default value must satisfy.
  * A default is applied before any sanitizer runs, so it must already be that primitive.
  * A `json` or column-less type has no single primitive, so its default value stays `unknown`.
+ * The checks wrap `TColumn` in a tuple, so a generic column never distributes over every field type.
  */
-export type ColumnValue<TColumn extends LogicalType | false> = TColumn extends 'text'
+export type ColumnValue<TColumn extends LogicalType | false> = [TColumn] extends ['text']
   ? string
-  : TColumn extends 'integer' | 'real'
+  : [TColumn] extends ['integer' | 'real']
     ? number
-    : TColumn extends 'boolean'
+    : [TColumn] extends ['boolean']
       ? boolean
       : unknown;
 
