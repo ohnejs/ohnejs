@@ -28,6 +28,7 @@ export * from './case/is-pascal-case.ts';
 export * from './case/is-sentence-case.ts';
 export * from './case/is-snake-case.ts';
 export * from './case/is-title-case.ts';
+export * from './case/lowercase.ts';
 export * from './case/split-tokens.ts';
 export * from './case/split-words.ts';
 export * from './case/to-camel-case.ts';
