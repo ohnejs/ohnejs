@@ -215,7 +215,7 @@ export const objectType: FieldType<ObjectFieldOptions> = {
           if (!touched.value && isUndefined(base)) return {};
           return { value: null };
         }
-        if (!touched.value && isUndefined(base) && !form.dirty()) return {};
+        if (field.nullable && !touched.value && isUndefined(base) && !form.dirty()) return {};
         return form.read();
       },
       setErrors(errors) {
