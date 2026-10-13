@@ -189,6 +189,8 @@ const author = await response.json();
 - `api` rejects only when the request itself fails. Check `response.ok`: an error body has the
   [HTTP error](../api/errors.md) shape, `statusCode`, `message`, and
   [`data`](../api/errors.md#attaching-data) when attached.
+- `readAPIError(response, fallback)` reads that body into the `{ status, message, data }` that
+  `useResource` and `useAction` report. `fallback` is the message when the body carries none.
 - A `401` from a route outside `/auth/` is an [expired session](../auth/authentication.md#sessions).
   A page inside the base layer's [frame](./pages.md#the-frame) then opens a sign-in popup in place.
 

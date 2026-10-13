@@ -598,7 +598,8 @@ widths as `name|width|minWidth`, each a CSS length or percentage like `320px` or
   column. A translatable collection shows three, then `_translations`.
 
 A viewer can rearrange the columns in the dashboard. Their choice is stored in the URL and overrides
-the declared defaults until they restore them.
+the declared defaults until they restore them. To keep it with a sort order and a filter, they save
+it as a [bookmark](../dashboard/bookmarks.md).
 
 ## Search
 

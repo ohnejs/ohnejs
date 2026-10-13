@@ -113,6 +113,8 @@ the browser as type-stripped JavaScript.
 - [Account settings](./dashboard/account.md) - each user's language, time zone, date and time
   formats, and smart clipboard.
 - [Search palette](./dashboard/palette.md) - Cmd+K search across records and pages.
+- [Table bookmarks](./dashboard/bookmarks.md) - save a table's view, share it, and open on it by
+  default.
 
 ## Uploads
 

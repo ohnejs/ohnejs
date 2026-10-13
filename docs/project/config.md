@@ -103,7 +103,8 @@ export default defineConfig({
 
 - `routes` - globs over route ids. A glob with a method prefix, like `'GET /admin/**'`, matches only
   that method. Without one it matches every method. When you drop a collection's create, update, or
-  delete route, or an uploads route, the dashboard hides the controls that call it.
+  delete route, an uploads route, or a [bookmarks](../dashboard/bookmarks.md#turning-bookmarks-off)
+  route, the dashboard hides the controls that call it.
 - `messages` - globs over the dot-separated key, so `dashboard.**` drops the whole group. A dropped
   key vanishes from the [catalog endpoint](../i18n/messages.md#the-catalog-endpoint),
   [`useT`](../i18n/messages.md#translating-with-uset), and the generated

@@ -201,6 +201,9 @@ Both names now complete in `defineRole`, `requireCapability`, and `userCan`, bes
 ones. The union stays open, so a name you did not declare still typechecks. The declaration adds
 completion. It does not make other names an error.
 
+The base layer declares `dashboard.bookmarks.share` this way. A role needs it to
+[share a table bookmark](../dashboard/bookmarks.md#sharing).
+
 ## Roles across layers
 
 Roles [stack](../project/layers.md#what-overrides-what) like everything a layer ships:
