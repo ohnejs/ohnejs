@@ -122,24 +122,22 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
   const naming = ref<BookmarkNamePopupOptions['target'] | null>(null);
 
   const list = useResource<BookmarkList>('GET /dashboard/bookmarks/[collection]', { params });
-  const updated = (): void => {
-    toast(t('dashboard.bookmarks.updated'), { type: 'success' });
-  };
   const update = useAction('PATCH /dashboard/bookmarks/[collection]/[uuid]', {
     params,
     reload: [list],
-    onDone: updated,
   });
   const remove = useAction('DELETE /dashboard/bookmarks/[collection]/[uuid]', {
     params,
     reload: [list],
-    onDone: () => toast(t('dashboard.record.deleted'), { type: 'success' }),
   });
   const choose = useAction('PUT /dashboard/bookmarks/[collection]/default', {
     params,
     reload: [list],
-    onDone: updated,
   });
+
+  const done = (message: string): void => {
+    toast(message, { type: 'success' });
+  };
 
   const applied = (view: string): boolean => deepEqual(parseSearchParams(view), current);
 
@@ -148,12 +146,25 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
     options.onClose(handle.close);
   };
 
-  const setDefault = (bookmark: string | null): void => {
-    if (list()?.default !== bookmark) void choose.run({ body: { bookmark } });
+  const setDefault = async (bookmark: BookmarkEntry | null): Promise<void> => {
+    const UUID = bookmark?.UUID ?? null;
+    if (list()?.default === UUID || !(await choose.run({ body: { bookmark: UUID } }))) return;
+    done(
+      isNull(bookmark)
+        ? t('dashboard.bookmarks.opensWithDefaults')
+        : t('dashboard.bookmarks.opensWith', { name: bookmark.name }),
+    );
   };
 
-  const change = (bookmark: BookmarkEntry, body: Partial<BookmarkEntry>): void =>
-    void update.run({ params: { uuid: bookmark.UUID }, body });
+  const change = async (
+    bookmark: BookmarkEntry,
+    body: Partial<BookmarkEntry>,
+    message: 'viewUpdated' | 'nowShared' | 'noLongerShared',
+  ): Promise<void> => {
+    if (await update.run({ params: { uuid: bookmark.UUID }, body })) {
+      done(t(`dashboard.bookmarks.${message}`, { name: bookmark.name }));
+    }
+  };
 
   const confirmDelete = async (bookmark: BookmarkEntry): Promise<void> => {
     const action = await openDialog({
@@ -163,7 +174,9 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
         { name: 'delete', label: t('dashboard.delete'), variant: 'destructive' },
       ],
     });
-    if (action === 'delete') await remove.run({ params: { uuid: bookmark.UUID } });
+    if (action === 'delete' && (await remove.run({ params: { uuid: bookmark.UUID } }))) {
+      done(t('dashboard.bookmarks.deleted', { name: bookmark.name }));
+    }
   };
 
   const ownActions = (bookmark: BookmarkEntry): MenuItem[] => {
@@ -173,7 +186,7 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
       items.push({
         label: 'dashboard.bookmarks.update',
         icon: 'device-floppy',
-        onSelect: () => change(bookmark, { view: options.view }),
+        onSelect: () => void change(bookmark, { view: options.view }, 'viewUpdated'),
       });
     }
     items.push('---');
@@ -181,14 +194,14 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
       items.push({
         label: 'dashboard.bookmarks.share',
         icon: 'users-plus',
-        onSelect: () => change(bookmark, { shared: true }),
+        onSelect: () => void change(bookmark, { shared: true }, 'nowShared'),
       });
     }
     if (canUpdate && bookmark.shared) {
       items.push({
         label: 'dashboard.bookmarks.stopSharing',
         icon: 'users-minus',
-        onSelect: () => change(bookmark, { shared: false }),
+        onSelect: () => void change(bookmark, { shared: false }, 'noLongerShared'),
       });
     }
     if (editable) {
@@ -243,20 +256,19 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
       () => apply(view()),
     );
 
-  const defaultButton = (value: () => BookmarkList, bookmark: () => string | null): Child =>
-    canDefault
-      ? markButton(
-          'star',
-          () => value().default === bookmark(),
-          () =>
-            t(
-              value().default === bookmark()
-                ? 'dashboard.bookmarks.isDefault'
-                : 'dashboard.bookmarks.setDefault',
-            ),
-          () => setDefault(bookmark()),
-        )
-      : null;
+  const defaultButton = (
+    value: () => BookmarkList,
+    bookmark: () => BookmarkEntry | null,
+  ): Child => {
+    if (!canDefault) return null;
+    const chosen = (): boolean => value().default === (bookmark()?.UUID ?? null);
+    return markButton(
+      'star',
+      chosen,
+      () => t(chosen() ? 'dashboard.bookmarks.isDefault' : 'dashboard.bookmarks.setDefault'),
+      () => void setDefault(bookmark()),
+    );
+  };
 
   const section = (label: () => string, ...content: Child[]): HTMLElement =>
     h(
@@ -288,7 +300,7 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
         ),
       ),
       applyButton(() => item().view),
-      defaultButton(value, () => item().UUID),
+      defaultButton(value, item),
       when(
         () => ownActions(item()).some((action) => action !== '---'),
         () =>
@@ -308,7 +320,7 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
     row(
       h('span', { class: 'ohne-mr-auto ohne-truncate' }, () => item().name),
       applyButton(() => item().view),
-      defaultButton(value, () => item().UUID),
+      defaultButton(value, item),
     );
 
   const sections = (value: () => BookmarkList): HTMLElement => {

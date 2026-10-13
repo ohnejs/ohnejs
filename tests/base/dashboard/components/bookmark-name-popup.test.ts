@@ -131,7 +131,7 @@ describe('bookmarkNamePopup', () => {
         ['GET', '/dashboard/bookmarks/posts', undefined],
       ],
     );
-    strictEqual(toasts().at(0), 'dashboard.created');
+    strictEqual(toasts().at(0), 'dashboard.bookmarks.created');
     strictEqual(closes, 1);
   });
 

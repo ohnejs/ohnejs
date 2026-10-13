@@ -97,9 +97,8 @@ export function bookmarkNamePopup(options: BookmarkNamePopupOptions): Popup {
     form,
     reload: [options.list],
     onDone: () => {
-      toast(t(renamed ? 'dashboard.bookmarks.updated' : 'dashboard.created'), {
-        type: 'success',
-      });
+      const message = renamed ? 'dashboard.bookmarks.renamed' : 'dashboard.bookmarks.created';
+      toast(t(message, { name: trimmed() }), { type: 'success' });
       options.onClose(handle.close);
     },
   };

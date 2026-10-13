@@ -94,6 +94,7 @@ async function closed(): Promise<void> {
 describe('bookmarksPopup', () => {
   let bookmarksPopup!: typeof import('../../../../src/base/dashboard/components/bookmarks-popup.ts').bookmarksPopup;
   let dialogHost!: () => unknown;
+  let outlet!: FakeElement;
   let meta = metaWith(ROUTES, ['dashboard.bookmarks.share']);
   let list: BookmarkList = LIST;
   let scope: ReturnType<typeof effectScope> | undefined;
@@ -159,6 +160,14 @@ describe('bookmarksPopup', () => {
   };
 
   /**
+   * The messages of the toasts showing; a message without a catalog reads as its key.
+   */
+  const toasts = (): string[] =>
+    outlet.childNodes
+      .flatMap((list) => list.childNodes.map((item) => item.textContent))
+      .filter((text) => text !== '');
+
+  /**
    * The writes the popup sent since the test began.
    */
   const writes = (): Sent[] => sent.filter((request) => request.method !== 'GET');
@@ -174,6 +183,8 @@ describe('bookmarksPopup', () => {
     ({ bookmarksPopup } =
       await import('../../../../src/base/dashboard/components/bookmarks-popup.ts'));
     ({ dialogHost } = await import('../../../../src/dashboard/ui/dialog.ts'));
+    const { toaster } = await import('../../../../src/dashboard/ui/toaster.ts');
+    outlet = toaster() as unknown as FakeElement;
     startSession();
     await serve(meta);
   });
@@ -258,6 +269,7 @@ describe('bookmarksPopup', () => {
       { method: 'PUT', path: '/dashboard/bookmarks/posts/default', body: { bookmark: 'b-drafts' } },
     ]);
     strictEqual(sent.at(-1)?.method, 'GET');
+    strictEqual(toasts().includes('dashboard.bookmarks.opensWith'), true);
     deepStrictEqual(applied, []);
     strictEqual(closes, 0);
   });
@@ -273,6 +285,7 @@ describe('bookmarksPopup', () => {
     deepStrictEqual(writes(), [
       { method: 'PUT', path: '/dashboard/bookmarks/posts/default', body: { bookmark: null } },
     ]);
+    strictEqual(toasts().includes('dashboard.bookmarks.opensWithDefaults'), true);
   });
 
   it('offers your own rows every action, and shared rows none', async () => {
@@ -309,6 +322,9 @@ describe('bookmarksPopup', () => {
       },
     ]);
     strictEqual(sent.filter((request) => request.method === 'GET').length, 4);
+    for (const message of ['nowShared', 'noLongerShared', 'viewUpdated']) {
+      strictEqual(toasts().includes(`dashboard.bookmarks.${message}`), true);
+    }
   });
 
   it('deletes only once the confirm dialog agrees', async () => {
@@ -325,6 +341,7 @@ describe('bookmarksPopup', () => {
     deepStrictEqual(writes(), [
       { method: 'DELETE', path: '/dashboard/bookmarks/posts/b-drafts', body: undefined },
     ]);
+    strictEqual(toasts().includes('dashboard.bookmarks.deleted'), true);
   });
 
   it('saves the current view under a new name', async () => {
