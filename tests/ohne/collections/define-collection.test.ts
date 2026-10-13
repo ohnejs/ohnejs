@@ -612,6 +612,17 @@ describe('defineCollection', () => {
     );
   });
 
+  it('rejects a table column with more than a width and a min width', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          dashboard: { table: { columns: ['title|1px|2px|9px'] } },
+        }),
+      /`dashboard\.table\.columns` entry `title\|1px\|2px\|9px` has too many parts/,
+    );
+  });
+
   it('accepts a layout unchanged', () => {
     const layout = [
       { card: [{ row: ['title', 'views | 8rem'] }] },

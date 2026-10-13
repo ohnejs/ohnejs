@@ -361,7 +361,8 @@ function validateRecordLabel(
 /**
  * Rejects a malformed `dashboard.table` declaration.
  * A failure is a non-object `table` or a `columns` that is not a non-empty array of strings.
- * An entry fails naming no field, an unknown or write-only field, a repeat, or an invalid width.
+ * An entry fails naming no field, an unknown or write-only field, or a repeat.
+ * It also fails with more parts than a width and a min width, or with an invalid width.
  * `_translations` is known only beside a translatable field, so elsewhere it is the unknown-field failure.
  */
 function validateTable(
@@ -412,6 +413,14 @@ function validateTable(
       throw ohneError({
         title: 'A `dashboard.table.columns` entry names no field',
         body: [`Every \`table.columns\` entry${scope} must start with a field name.`],
+      });
+    }
+    if (widths.length > 2) {
+      throw ohneError({
+        title: `\`dashboard.table.columns\` entry \`${entry}\` has too many parts`,
+        body: [
+          `A \`table.columns\` entry${scope} is \`name\`, \`name|width\`, or \`name|width|minWidth\`.`,
+        ],
       });
     }
     if (!known.has(name)) {
