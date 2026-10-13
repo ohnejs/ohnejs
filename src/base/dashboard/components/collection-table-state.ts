@@ -44,7 +44,8 @@ export interface TableFieldMeta {
   label: Text;
 
   /**
-   * How the field stores and reads; only `column` and `record` back a sortable column.
+   * How the field stores and reads.
+   * A `column` and a `record` sort by their own column, a `childOne` by its `orderBy` part.
    */
   kind: string;
 
@@ -57,6 +58,16 @@ export interface TableFieldMeta {
    * Whether reads return the field; write-only fields never become columns.
    */
   readable: boolean;
+
+  /**
+   * The subfield a one-child composite sorts by, when its type names one.
+   */
+  orderBy?: string;
+
+  /**
+   * The composite's own fields, where its `orderBy` part is found.
+   */
+  subfields?: readonly TableFieldMeta[];
 }
 
 /**
@@ -152,9 +163,14 @@ export type TableColumnEdit = {
 
 /**
  * How a field sorts: `text` and letter icons for text columns, `numeric` for the rest.
- * `false` covers the composite kinds no single column backs, and a json column's unordered list.
+ * A one-child composite sorts as its readable `orderBy` part does.
+ * `false` covers the composites no single column backs, and a json column's unordered list.
  */
-function sortableOf(field: TableFieldMeta): false | 'text' | 'numeric' {
+export function sortableOf(field: TableFieldMeta): false | 'text' | 'numeric' {
+  if (field.kind === 'childOne' && !isUndefined(field.orderBy)) {
+    const part = field.subfields?.find((subfield) => subfield.name === field.orderBy);
+    return isUndefined(part) || !part.readable ? false : sortableOf(part);
+  }
   if (field.kind !== 'column' && field.kind !== 'record') return false;
   if (field.logicalType === 'json') return false;
   return field.logicalType === 'text' ? 'text' : 'numeric';

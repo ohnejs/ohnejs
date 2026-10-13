@@ -3,11 +3,14 @@ import { describe, it } from 'node:test';
 
 import type { User } from '../../../src/base/auth/types.ts';
 import type { DashboardCollection } from '../../../src/base/collections-api/describe.ts';
+import type { FieldTypeName } from '../../../src/ohne/fields/known-fields.ts';
 import type { HTTPMethod } from '../../../src/utils/index.ts';
 
 import { describeCollections } from '../../../src/base/collections-api/describe.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
-import { field } from '../../../src/ohne/fields/field.ts';
+import { defineField } from '../../../src/ohne/fields/define-field.ts';
+import { field, type FieldInstance } from '../../../src/ohne/fields/field.ts';
+import { useFields } from '../../../src/ohne/fields/use-fields.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
 import { routeID } from '../../../src/ohne/routes/route.ts';
@@ -42,6 +45,18 @@ useCollections().register('DescOwners', {
     fields: { name: field('text') },
   },
 });
+useFields().register('descSpan', {
+  name: 'descSpan' as FieldTypeName,
+  fieldType: defineField({
+    columnType: false,
+    schema: () => ({
+      kind: 'child',
+      cardinality: 'one',
+      subfields: { start: field('date'), end: field('date') },
+      orderBy: 'start',
+    }),
+  }),
+});
 useCollections().register('DescPublic', {
   name: 'DescPublic',
   collection: {
@@ -50,6 +65,8 @@ useCollections().register('DescPublic', {
       title: field('text'),
       stage: field('select', { choices: ['open', 'shut'], default: 'open' }),
       stamp: field('text', { default: () => 'now' }),
+      span: { type: 'descSpan', options: {} } as unknown as FieldInstance,
+      place: field('object', { fields: { city: field('text') } }),
     },
   },
 });
@@ -161,6 +178,23 @@ describe('describeCollections', () => {
     const named = (name: string) => fields.find((entry) => entry.name === name);
     strictEqual(named('stage')?.options?.default, 'open');
     strictEqual('default' in (named('stamp')?.options ?? {}), false);
+  });
+
+  it('names each subfield type and the sort key a composite type fixes', () => {
+    const fields = collectionOf(guest, 'DescPublic').fields;
+    const named = (name: string) => fields.find((entry) => entry.name === name);
+    deepStrictEqual(
+      named('span')?.subfields?.map(({ name, type }) => [name, type]),
+      [
+        ['UUID', null],
+        ['start', 'date'],
+        ['end', 'date'],
+      ],
+    );
+    strictEqual(named('span')?.type, 'descSpan');
+    strictEqual(named('span')?.orderBy, 'start');
+    strictEqual('orderBy' in (named('place') ?? {}), false);
+    strictEqual(named('place')?.subfields?.find((entry) => entry.name === 'city')?.type, 'text');
   });
 
   it('resolves a declared layout against the described fields, dropping a name it lacks', () => {

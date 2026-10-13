@@ -1,7 +1,6 @@
 import type {
   Capability,
   CollectionAPI,
-  FieldInstance,
   FieldLayout,
   FieldQueryMeta,
   LogicalType,
@@ -24,7 +23,6 @@ import {
   isEmpty,
   isJSONValue,
   isNull,
-  isPlainObject,
   isString,
   isUndefined,
   resolveLayoutNodes,
@@ -214,6 +212,11 @@ export interface DashboardField {
   subfields?: DashboardField[];
 
   /**
+   * The subfield a one-child composite sorts by, when its type names one.
+   */
+  orderBy?: string;
+
+  /**
    * How the form arranges the subfields, resolved; child kinds that declare a `layout` only.
    */
   layout?: DashboardLayoutNode[];
@@ -355,7 +358,7 @@ export function describeCollections(user: User): DashboardCollection[] {
     );
     if (isNull(operations)) continue;
     const query = queryMetadata(meta.name);
-    const fields = describeFields(query.fields, meta.collection.fields);
+    const fields = describeFields(query.fields);
     const dashboard = meta.collection.dashboard;
     const collection: DashboardCollection = {
       name: meta.name,
@@ -382,13 +385,10 @@ export function describeCollections(user: User): DashboardCollection[] {
 }
 
 /**
- * Describes every field in order, joining the query metadata with the declared instances.
+ * Describes every field in order from its query metadata.
  */
-export function describeFields(
-  fields: Record<string, FieldQueryMeta>,
-  instances: Record<string, FieldInstance> | undefined,
-): DashboardField[] {
-  return Object.entries(fields).map(([name, meta]) => describeField(name, meta, instances?.[name]));
+export function describeFields(fields: Record<string, FieldQueryMeta>): DashboardField[] {
+  return Object.entries(fields).map(([name, meta]) => describeField(name, meta));
 }
 
 /**
@@ -455,17 +455,13 @@ function served(router: Router, segment: string, operation: keyof DashboardOpera
 }
 
 /**
- * Describes one field: identity from the instance, shape and flags from the query metadata.
+ * Describes one field: its type, shape and flags from the query metadata.
  */
-function describeField(
-  name: string,
-  meta: FieldQueryMeta,
-  instance: FieldInstance | undefined,
-): DashboardField {
+function describeField(name: string, meta: FieldQueryMeta): DashboardField {
   const options = meta.options ?? {};
   const field: DashboardField = {
     name,
-    type: instance?.type ?? null,
+    type: meta.type ?? null,
     kind: meta.kind,
     label: labelOf(name, options.label),
     nullable: meta.nullable,
@@ -496,8 +492,9 @@ function describeField(
   const wire = wireOptions(meta, options);
   if (!isUndefined(wire)) field.options = wire;
   if (!isUndefined(meta.target)) field.target = meta.target;
+  if (!isUndefined(meta.orderBy)) field.orderBy = meta.orderBy;
   if (!isUndefined(meta.subfields)) {
-    field.subfields = describeFields(meta.subfields, subInstancesOf(instance));
+    field.subfields = describeFields(meta.subfields);
     const layout = resolveLayout(options.layout as FieldLayout | undefined, field.subfields);
     if (!isUndefined(layout)) field.layout = layout;
   }
@@ -544,16 +541,6 @@ function labelOf(name: string, label: unknown): Message {
 function requiredOf(meta: FieldQueryMeta): boolean {
   if (isUndefined(meta.fieldType) || meta.writable === false) return false;
   return isUndefined(meta.when) && !landsWithoutInput(meta);
-}
-
-/**
- * The composite instance's declared subfield instances, when it carries a `fields` option.
- */
-function subInstancesOf(
-  instance: FieldInstance | undefined,
-): Record<string, FieldInstance> | undefined {
-  const fields = (instance?.options as Record<string, unknown> | undefined)?.fields;
-  return isPlainObject<Record<string, FieldInstance>>(fields) ? fields : undefined;
 }
 
 /**

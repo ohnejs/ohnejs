@@ -10,6 +10,7 @@ import {
   serializeTableColumns,
   serializeTableState,
   sortableFieldsOf,
+  sortableOf,
   sortFromOrder,
   stripEditParam,
   type TableFieldMeta,
@@ -222,6 +223,21 @@ describe('sortableFieldsOf', () => {
       field('secret', { readable: false }),
     ];
     deepStrictEqual(sortableFieldsOf(fields), [title]);
+  });
+
+  it('offers a one-child composite through its readable sort part, typed by that part', () => {
+    const parts = [
+      field('start', { logicalType: 'integer' }),
+      field('label'),
+      field('note', { readable: false }),
+    ];
+    const composite = (orderBy?: string) =>
+      field('period', { kind: 'childOne', logicalType: undefined, orderBy, subfields: parts });
+    deepStrictEqual(sortableFieldsOf([composite('start'), composite(), composite('note')]), [
+      composite('start'),
+    ]);
+    strictEqual(sortableOf(composite('start')), 'numeric');
+    strictEqual(sortableOf(composite('label')), 'text');
   });
 });
 

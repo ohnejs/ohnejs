@@ -283,14 +283,10 @@ function catalogLanguages(): string[] {
 async function describeAccount(
   user: User,
 ): Promise<Pick<DashboardMeta, 'accountFields' | 'accountLayout'>> {
-  const users = useCollections().get('Users');
-  if (isUndefined(users)) return { accountFields: [], accountLayout: [] };
+  if (!useCollections().has('Users')) return { accountFields: [], accountLayout: [] };
   const layout = await accountLayout(user);
   const names = accountFields(layout);
-  const fields = describeFields(
-    pick(queryMetadata('Users').fields, names),
-    users.collection.fields,
-  );
+  const fields = describeFields(pick(queryMetadata('Users').fields, names));
   return { accountFields: fields, accountLayout: resolveLayout(layout, fields) ?? [] };
 }
 
@@ -336,7 +332,7 @@ function describeBlocks(roots: readonly DashboardField[]): DashboardBlock[] {
     if (described.has(name)) continue;
     const meta = useBlocks().get(name);
     if (isUndefined(meta)) continue;
-    const fields = describeFields(blockQueryMetadata(name).fields, meta.block.fields);
+    const fields = describeFields(blockQueryMetadata(name).fields);
     const { description, dashboard } = meta.block;
     const block: DashboardBlock = { name, label: declaredLabelOf(name, meta.block.label), fields };
     if (!isUndefined(description)) block.description = description;

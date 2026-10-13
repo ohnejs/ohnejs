@@ -62,6 +62,7 @@ export interface FilterPopupOptions {
   /**
    * The filterable field candidates, read reactively.
    * The builder keeps the ones whose field type carries a filter, and `_translations`.
+   * An `object` contributes each of its parts instead, labelled `Object > Part`.
    */
   fields: () => DashboardField[];
 
@@ -89,6 +90,26 @@ export interface FilterPopupOptions {
    * '50rem'
    */
   width?: string;
+}
+
+/**
+ * A field the filter builder offers: a top-level field, or a part reached through one-child composites.
+ */
+export interface FilterCandidate {
+  /**
+   * The rule's field, dotted through each composite, like `period.start`.
+   */
+  name: string;
+
+  /**
+   * The translated label of each hop, joined with `' > '`.
+   */
+  label: string;
+
+  /**
+   * The field the rule compares, whose type's filter renders the value input.
+   */
+  field: DashboardField;
 }
 
 const OPERATOR_LABEL_KEYS = {
@@ -242,24 +263,17 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     apply();
   };
 
-  const filterOf = (field: DashboardField): FieldFilter | undefined =>
-    field.kind === 'translations' ? translationsFilter : fieldTypeFor(field).filter;
+  const fieldChoices = (): FilterCandidate[] => filterCandidates(options.fields());
 
-  const fieldChoices = (): DashboardField[] =>
-    options
-      .fields()
-      .filter((field) => field.readable && !isUndefined(filterOf(field)))
-      .sort((a, b) => naturalCompare(translateMessage(a.label), translateMessage(b.label)));
+  const fieldByName = (name: string): FilterCandidate | undefined =>
+    fieldChoices().find((candidate) => candidate.name === name);
 
-  const fieldByName = (name: string): DashboardField | undefined =>
-    fieldChoices().find((field) => field.name === name);
-
-  const seedCondition = (field: DashboardField): FilterCondition | undefined => {
+  const seedCondition = ({ name, field }: FilterCandidate): FilterCondition | undefined => {
     const filter = filterOf(field);
     if (isUndefined(filter)) return undefined;
     return {
       key: filterKey(),
-      field: field.name,
+      field: name,
       operator: first(filter.operators(field)) ?? 'eq',
       value: filter.seed(field),
     };
@@ -316,7 +330,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
     );
 
   const valueInput = (node: () => FilterCondition, inputID: string): Child => {
-    const field = fieldByName(node().field);
+    const field = fieldByName(node().field)?.field;
     const filter = isUndefined(field) ? undefined : filterOf(field);
     if (isUndefined(field) || isUndefined(filter)) return null;
     return filter.input({
@@ -349,8 +363,9 @@ export function filterPopup(options: FilterPopupOptions): Popup {
         return node().field;
       },
       set value(next) {
-        const field = fieldByName(String(next));
-        if (isUndefined(field)) return;
+        const candidate = fieldByName(String(next));
+        if (isUndefined(candidate)) return;
+        const { field } = candidate;
         const filter = filterOf(field);
         if (isUndefined(filter)) return;
         const valid = filter.operators(field);
@@ -359,7 +374,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
         if (index === -1) return;
         items[index] = {
           key: filterKey(),
-          field: field.name,
+          field: candidate.name,
           operator: valid.includes(node().operator) ? node().operator : (first(valid) ?? 'eq'),
           value: filter.seed(field),
         };
@@ -384,11 +399,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
         { class: 'o-where-filters-condition-field' },
         select(
           fieldModel,
-          (): SelectChoice[] =>
-            fieldChoices().map((field) => ({
-              label: translateMessage(field.label),
-              value: field.name,
-            })),
+          (): SelectChoice[] => fieldChoices().map(({ name, label }) => ({ label, value: name })),
           { id: `${inputID}-field`, name: `${inputID}-field` },
         ),
       ),
@@ -401,7 +412,7 @@ export function filterPopup(options: FilterPopupOptions): Popup {
           select(
             operatorModel,
             (): SelectChoice[] => {
-              const field = fieldByName(node().field);
+              const field = fieldByName(node().field)?.field;
               const filter = isUndefined(field) ? undefined : filterOf(field);
               if (isUndefined(field) || isUndefined(filter)) return [];
               return filter.operators(field).map((operator) => ({
@@ -663,4 +674,41 @@ function rekey(node: FilterNode): void {
   if ('items' in node) {
     for (const child of node.items) rekey(child);
   }
+}
+
+/**
+ * The fields the filter builder offers, sorted by label.
+ * A readable field joins when its type carries a filter; an `object` contributes its readable parts instead.
+ */
+export function filterCandidates(fields: readonly DashboardField[]): FilterCandidate[] {
+  return candidatesOf(fields, []).sort((a, b) => naturalCompare(a.label, b.label));
+}
+
+/**
+ * The candidates under one scope, `trail` holding the composites walked to reach it.
+ */
+function candidatesOf(
+  fields: readonly DashboardField[],
+  trail: readonly DashboardField[],
+): FilterCandidate[] {
+  return fields.flatMap((field) => {
+    if (!field.readable) return [];
+    const hops = [...trail, field];
+    if (field.kind === 'childOne') {
+      return candidatesOf(
+        (field.subfields ?? []).filter((part) => part.name !== 'UUID'),
+        hops,
+      );
+    }
+    if (isUndefined(filterOf(field))) return [];
+    const name = hops.map((hop) => hop.name).join('.');
+    return [{ name, label: hops.map((hop) => translateMessage(hop.label)).join(' > '), field }];
+  });
+}
+
+/**
+ * The filter a field compares through: its type's, or the translations filter for `_translations`.
+ */
+function filterOf(field: DashboardField): FieldFilter | undefined {
+  return field.kind === 'translations' ? translationsFilter : fieldTypeFor(field).filter;
 }

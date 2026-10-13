@@ -17,6 +17,7 @@ import {
 } from 'ohnejs/dashboard';
 import { effect, isUndefined, type Ref, ref, untracked } from 'ohnejs/utils';
 
+import { sortableOf } from './collection-table-state.ts';
 import { actionButton } from './item-actions.ts';
 
 /**
@@ -89,7 +90,7 @@ export function orderBy(options: OrderByOptions): HTMLElement {
 
   const resolveItem = (field: DashboardField): OrderByItem => ({
     field: field.name,
-    type: field.logicalType === 'text' ? 'text' : 'numeric',
+    type: sortableOf(field) === 'text' ? 'text' : 'numeric',
     direction: 'asc',
   });
 
@@ -270,7 +271,7 @@ function fromModel(order: readonly string[], fields: readonly DashboardField[]):
     if (isUndefined(field)) continue;
     items.push({
       field: name,
-      type: field.logicalType === 'text' ? 'text' : 'numeric',
+      type: sortableOf(field) === 'text' ? 'text' : 'numeric',
       direction: descending ? 'desc' : 'asc',
     });
   }
