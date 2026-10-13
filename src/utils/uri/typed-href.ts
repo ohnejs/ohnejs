@@ -1,4 +1,4 @@
-const HOST = /^(?:localhost|[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+)(?::\d+)?(?:[/?#]|$)/u;
+const HOST = /^(?:localhost|[\p{L}\p{M}\p{N}-]+(?:\.[\p{L}\p{M}\p{N}-]+)+)(?::\d+)?(?:[/?#]|$)/u;
 const SCHEME = /^[A-Za-z][A-Za-z\d+.-]*:/;
 const SPACE = /\s/;
 

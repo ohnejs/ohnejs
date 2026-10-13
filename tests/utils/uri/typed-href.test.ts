@@ -25,6 +25,7 @@ describe('typedHref', () => {
       ['localhost:3000', 'https://localhost:3000'],
       ['127.0.0.1:3000', 'https://127.0.0.1:3000'],
       ['münchen.de', 'https://münchen.de'],
+      ['cafe\u0301.example', 'https://cafe\u0301.example'],
     ]);
   });
 
