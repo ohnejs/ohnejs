@@ -73,6 +73,7 @@ export * from './database/with-lock.ts';
 export * from './env/env.ts';
 export * from './env/use-env.ts';
 export * from './error/ohne-error.ts';
+export * from './fields/bounds.ts';
 export * from './fields/builtin/blocks.ts';
 export * from './fields/builtin/boolean.ts';
 export * from './fields/builtin/color.ts';

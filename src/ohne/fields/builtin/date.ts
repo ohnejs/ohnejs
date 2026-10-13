@@ -1,4 +1,5 @@
 import { checkRange, isISODate } from '../../../utils/index.ts';
+import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { failureMessage } from '../validation-message.ts';
@@ -25,6 +26,11 @@ export const date = defineField({
      */
     max: option<string>(),
   },
+  validateOptions: ({ options }) =>
+    boundsProblem(options, {
+      parse: (bound) => (isISODate(bound) ? bound : undefined),
+      form: '`YYYY-MM-DD`',
+    }),
   validators: [
     (value) => (isISODate(value) ? undefined : 'validation.invalidDate'),
     (value, ctx) => failureMessage(checkRange(value, ctx.options)),

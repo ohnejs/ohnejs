@@ -2,6 +2,7 @@ import type { FieldInstance } from '../field.ts';
 import type { FieldLayout } from '../layout.ts';
 
 import { checkCount, isArray } from '../../../utils/index.ts';
+import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { failureMessage } from '../validation-message.ts';
@@ -56,6 +57,7 @@ export const repeater = defineField({
      */
     max: option<number>(),
   },
+  validateOptions: ({ options }) => boundsProblem(options),
   schema: (ctx) => ({
     kind: 'child',
     cardinality: 'many',

@@ -13,6 +13,7 @@ import {
   richTextLength,
   richTextLinks,
 } from '../../../utils/index.ts';
+import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { linksParameter, registeredLinks } from '../link-collections.ts';
 import { option } from '../option.ts';
@@ -98,6 +99,7 @@ export const richText = defineField({
      */
     max: option<number>(),
   },
+  validateOptions: ({ options }) => boundsProblem(options),
   emitType: (ctx) =>
     `${ctx.importType('ohnejs/utils', 'RichText')}<${linksParameter(ctx.options.links)}>`,
   sanitizers: [(value, ctx) => (isRichText(value) ? normalizeRichText(value, ctx.options) : value)],

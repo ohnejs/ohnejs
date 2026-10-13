@@ -1,4 +1,5 @@
 import { isISOTime, isString, isUndefined } from '../../../utils/index.ts';
+import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { validationMessage } from '../validation-message.ts';
@@ -26,6 +27,11 @@ export const time = defineField({
      */
     max: option<string>(),
   },
+  validateOptions: ({ options }) =>
+    boundsProblem(options, {
+      parse: (bound) => (isString(bound) && isISOTime(bound) ? padTime(bound) : undefined),
+      form: '`HH:MM:SS` or `HH:MM`',
+    }),
   sanitizers: [(value) => (isString(value) && isISOTime(value) ? padTime(value) : value)],
   validators: [
     (value) => (isISOTime(value) ? undefined : 'validation.invalidTime'),

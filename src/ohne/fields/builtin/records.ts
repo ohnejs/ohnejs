@@ -1,6 +1,7 @@
 import type { CollectionName } from '../../collections/known-collections.ts';
 
 import { checkCount, isArray } from '../../../utils/index.ts';
+import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { failureMessage } from '../validation-message.ts';
@@ -57,6 +58,7 @@ export const records = defineField({
      */
     max: option<number>(),
   },
+  validateOptions: ({ options }) => boundsProblem(options),
   schema: (ctx) => ({
     kind: 'junction',
     collection: ctx.options.collection,

@@ -1,4 +1,5 @@
 import { checkText } from '../../../utils/index.ts';
+import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { failureMessage } from '../validation-message.ts';
@@ -42,5 +43,6 @@ export const text = defineField({
      */
     multiline: option({ default: false }),
   },
+  validateOptions: ({ options }) => boundsProblem(options),
   validators: [(value, ctx) => failureMessage(checkText(value, ctx.options))],
 });

@@ -1,4 +1,5 @@
-import { isString, isUndefined } from '../../../utils/index.ts';
+import { isRealNumber, isString, isUndefined } from '../../../utils/index.ts';
+import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { validationMessage } from '../validation-message.ts';
@@ -39,6 +40,14 @@ export const dateTime = defineField({
      */
     timezone: option<string>(),
   },
+  validateOptions: ({ options }) =>
+    boundsProblem(options, {
+      parse: (bound) => {
+        const ms = isString(bound) || isRealNumber(bound) ? instant(bound) : undefined;
+        return isRealNumber(ms) ? ms : undefined;
+      },
+      form: 'epoch milliseconds or an ISO 8601 string',
+    }),
   validators: [
     (value, ctx) => {
       const { min, max } = ctx.options;

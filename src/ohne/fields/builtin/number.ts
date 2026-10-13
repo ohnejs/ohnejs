@@ -1,4 +1,5 @@
 import { checkRange, isDecimalString, isRealNumber } from '../../../utils/index.ts';
+import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
 import { failureMessage } from '../validation-message.ts';
@@ -22,6 +23,7 @@ export const number = defineField({
      */
     max: option<number>(),
   },
+  validateOptions: ({ options }) => boundsProblem(options),
   validators: [(value, ctx) => failureMessage(checkRange(value, ctx.options))],
   search: {
     default: false,

@@ -12,6 +12,7 @@ import {
   isUndefined,
   uniqueArray,
 } from '../../../utils/index.ts';
+import { boundsProblem } from '../bounds.ts';
 import { choiceListProblem, matchingChoices } from '../choice.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
@@ -51,7 +52,9 @@ export const multiSelect = defineField({
     max: option<number>(),
   },
   validateOptions: ({ options }) =>
-    isUndefined(options.choices) ? undefined : choiceListProblem(options.choices),
+    (isUndefined(options.choices) ? undefined : choiceListProblem(options.choices)) ??
+    boundsProblem(options) ??
+    choiceCountProblem(options.choices, options.min),
   emitType: (ctx) =>
     isUndefined(ctx.options.choices)
       ? 'string[]'
@@ -76,3 +79,18 @@ export const multiSelect = defineField({
     return isEmpty(values) ? null : { includesAny: values };
   },
 });
+
+/**
+ * What makes `min` unreachable, as error body rows, or `undefined` when a list can hold enough.
+ * The values are distinct, so a list holds at most one entry per choice.
+ */
+function choiceCountProblem(
+  choices: readonly FieldChoice<Message>[] | undefined,
+  min: number | undefined,
+): string[] | undefined {
+  if (isUndefined(choices) || isUndefined(min) || min <= choices.length) return undefined;
+  return [
+    `\`min\` is \`${min}\`, above the \`${choices.length}\` choices, so no list can hold enough.`,
+    'Lower `min`, or add choices.',
+  ];
+}
