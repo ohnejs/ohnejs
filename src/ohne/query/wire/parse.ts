@@ -417,11 +417,21 @@ function parseOrder(
     if (isUndefined(fieldMeta) || fieldMeta.readable === false) {
       throw invalidFieldError(field, `order[${index}]`, didYouMean(field, readableNames(meta)));
     }
-    if (isUndefined(fieldMeta.column)) throw invalidFieldError(field, `order[${index}]`, undefined);
+    if (!sortable(fieldMeta)) throw invalidFieldError(field, `order[${index}]`, undefined);
     if (seen.has(field)) throw duplicateOrderFieldError(field, `order[${index}]`);
     seen.add(field);
     return { field, direction };
   });
+}
+
+/**
+ * Whether the wire may sort by a field: a column, or a composite whose sort-key part is readable.
+ * A hidden part refuses, so ordering never leaks its values.
+ */
+function sortable(field: FieldQueryMeta): boolean {
+  if (!isUndefined(field.column)) return true;
+  if (isUndefined(field.orderBy)) return false;
+  return field.subfields?.[field.orderBy]?.readable !== false;
 }
 
 /**

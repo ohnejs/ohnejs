@@ -1,11 +1,14 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
 import type { WireErrorData } from '../../../../src/ohne/query/wire/errors.ts';
 
 import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { field } from '../../../../src/ohne/fields/field.ts';
+import { defineField } from '../../../../src/ohne/fields/define-field.ts';
+import { field, type FieldInstance } from '../../../../src/ohne/fields/field.ts';
+import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { HTTPError } from '../../../../src/ohne/http/http-error.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
@@ -89,6 +92,34 @@ useCollections().register('WAccounts', {
       profile: field('record', { collection: 'WProfiles' }),
       audit: field('record', { collection: 'WProfiles', readable: false }),
       vault: field('blocks', { allow: ['WVault'] }),
+    },
+  },
+});
+
+for (const [name, readable] of [
+  ['wSpan', true],
+  ['wSealedSpan', false],
+] as const) {
+  useFields().register(name, {
+    name: name as FieldTypeName,
+    fieldType: defineField({
+      columnType: false,
+      schema: () => ({
+        kind: 'child',
+        cardinality: 'one',
+        subfields: { start: field('text', readable ? {} : { readable: false }) },
+        orderBy: 'start',
+      }),
+    }),
+  });
+}
+
+useCollections().register('WEvents', {
+  name: 'WEvents',
+  collection: {
+    fields: {
+      span: { type: 'wSpan', options: {} } as unknown as FieldInstance,
+      sealed: { type: 'wSealedSpan', options: {} } as unknown as FieldInstance,
     },
   },
 });
@@ -338,6 +369,17 @@ describe('parseQueryParams rejects with a stable code and dot path', () => {
 
   it('rejects ordering by a field with no column', () => {
     deepStrictEqual(failure('order=[tags]'), { code: 'invalidField', path: 'order[0]' });
+  });
+
+  it('orders by a composite through its sort key, unless the key part is hidden', () => {
+    const events = (query: string) =>
+      parseQueryParams(parseSearchParams(query), queryMetadata('WEvents'), DEFAULT_QUERY_GUARDS);
+    deepStrictEqual(events('order=[-span]').order, [{ field: 'span', direction: 'desc' }]);
+    deepStrictEqual(caught(() => events('order=[sealed]')).data, {
+      code: 'invalidField',
+      path: 'order[0]',
+    });
+    deepStrictEqual(failure('order=[meta]'), { code: 'invalidField', path: 'order[0]' });
   });
 
   it('rejects a duplicate order field', () => {

@@ -305,7 +305,7 @@ function recordsMembership(
   const junction = dialect.quote(nextAlias(ctx));
   const [parentLink, targetLink] = junctionLinks(field, dialect);
   const match = inFragment(`${junction}.${targetLink}`, targets);
-  const pin = localePin(field, junction, dialect, ctx);
+  const pin = localePin(field, junction, dialect, ctx.locale);
   const where = isNull(pin) ? match : joinFragments([match, pin], ' AND ');
   return {
     sql: `${selfUUID(scope, dialect)} IN (SELECT ${junction}.${parentLink} FROM ${dialect.quote(field.table as string)} ${junction} WHERE ${where.sql})`,
@@ -558,21 +558,21 @@ function childCorrelation(
   dialect: Dialect,
   ctx: CompileContext,
 ): Correlation {
-  const pin = localePin(field, alias, dialect, ctx);
+  const pin = localePin(field, alias, dialect, ctx.locale);
   return { inner: parentLink, outer: selfUUID(scope, dialect), pin, keyed: true };
 }
 
 /**
  * The `_localeCode` predicate of a locale-scoped derived table, `null` for an unscoped one.
  */
-function localePin(
+export function localePin(
   field: FieldQueryMeta,
   alias: string,
   dialect: Dialect,
-  ctx: CompileContext,
+  locale: string,
 ): SQLFragment | null {
   if (field.localeScoped !== true) return null;
-  return rawFragment(`${alias}.${dialect.quote('_localeCode')} = ?`, [ctx.locale]);
+  return rawFragment(`${alias}.${dialect.quote('_localeCode')} = ?`, [locale]);
 }
 
 /**

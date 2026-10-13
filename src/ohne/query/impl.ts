@@ -109,7 +109,7 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   orderBy(field: string, direction: OrderDirection = 'asc'): this {
     const entry = this.meta.fields[field];
     if (isUndefined(entry)) throw unknownFieldError(field, this.meta);
-    if (isUndefined(entry.column)) {
+    if (isUndefined(entry.column) && isUndefined(entry.orderBy)) {
       throw ohneError({
         title: `Cannot order by \`${field}\``,
         body: [

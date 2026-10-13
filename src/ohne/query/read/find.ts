@@ -77,7 +77,9 @@ export function compileReadTail(
     parts.push(`WHERE ${where.sql}`);
     params.push(...where.params);
   }
-  parts.push(`ORDER BY ${compileOrder(ir, meta, dialect)}`);
+  const order = compileOrder(ir, meta, dialect, locale);
+  parts.push(`ORDER BY ${order.sql}`);
+  params.push(...order.params);
   const limit = compileLimit(ir);
   if (limit.sql !== '') {
     parts.push(limit.sql);

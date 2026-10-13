@@ -805,10 +805,12 @@ function queryFieldType(
       ...queryFieldsOf(owner, (hint as ChildHint).subfields, context),
     ];
     const body = subfields.map((field) => `${propertyKey(field.name)}: ${field.type}`).join('; ');
+    const sortable = kind === 'childOne' && !isUndefined((hint as ChildHint).orderBy);
     return metaLiteral(
       [
         `child: ${literalString(cardinality)}`,
         `fields: { ${body} }`,
+        ...(sortable ? ['sortable: true'] : []),
         ...(hidden ? ['readable: false'] : []),
         ...(translatable ? ['localeScoped: true'] : []),
       ],

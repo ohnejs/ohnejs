@@ -77,6 +77,13 @@ export interface ChildHint {
    * Composites and relations nest freely; deeper composites derive further child tables.
    */
   subfields: Record<string, FieldInstance>;
+
+  /**
+   * The subfield a query sorts by when `orderBy` names the composite itself, like `start` for a date range.
+   * It must be a direct subfield that stores a column, and the cardinality `one`.
+   * Omitted, the composite is not sortable.
+   */
+  orderBy?: string;
 }
 
 /**

@@ -590,11 +590,16 @@ export type PopulatableField<C extends CollectionName> = string extends keyof Fi
 
 /**
  * The fields `orderBy` accepts: every column-bearing field, `record` foreign keys included.
+ * A one-child composite joins when its type names a sort key.
  */
 export type OrderableField<C extends CollectionName> = string extends keyof FieldsOf<C>
   ? string
   : {
-      [K in keyof FieldsOf<C> & string]: FieldsOf<C>[K] extends { scalar: unknown } ? K : never;
+      [K in keyof FieldsOf<C> & string]: FieldsOf<C>[K] extends
+        | { scalar: unknown }
+        | { sortable: true }
+        ? K
+        : never;
     }[keyof FieldsOf<C> & string];
 
 /**

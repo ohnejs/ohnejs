@@ -174,6 +174,7 @@ describe('queryMetadata', () => {
         title: {
           kind: 'column',
           fieldType: text,
+          type: 'text',
           options: TEXT,
           nullable: false,
           logicalType: 'text',
@@ -183,6 +184,7 @@ describe('queryMetadata', () => {
         summary: {
           kind: 'column',
           fieldType: text,
+          type: 'text',
           options: { ...TEXT, nullable: true },
           nullable: true,
           logicalType: 'text',
@@ -192,6 +194,7 @@ describe('queryMetadata', () => {
         views: {
           kind: 'column',
           fieldType: integer,
+          type: 'integer',
           options: COMMON,
           nullable: false,
           logicalType: 'integer',
@@ -200,6 +203,7 @@ describe('queryMetadata', () => {
         featured: {
           kind: 'column',
           fieldType: boolean,
+          type: 'boolean',
           options: { ...COMMON, display: 'checkbox' },
           nullable: false,
           logicalType: 'boolean',
@@ -208,6 +212,7 @@ describe('queryMetadata', () => {
         author: {
           kind: 'record',
           fieldType: record,
+          type: 'record',
           options: { ...COMMON, nullable: true, collection: 'QUsers' },
           nullable: true,
           logicalType: 'text',
@@ -218,6 +223,7 @@ describe('queryMetadata', () => {
         tags: {
           kind: 'records',
           fieldType: records,
+          type: 'records',
           options: { ...LIST, collection: 'QTags' },
           nullable: false,
           target: 'QTags',
@@ -227,6 +233,7 @@ describe('queryMetadata', () => {
         meta: {
           kind: 'childOne',
           fieldType: object,
+          type: 'object',
           options: { ...COMMON, fields: metaFields },
           nullable: true,
           table: 'QPosts_meta',
@@ -236,6 +243,7 @@ describe('queryMetadata', () => {
             description: {
               kind: 'column',
               fieldType: text,
+              type: 'text',
               options: { ...TEXT, nullable: true },
               nullable: true,
               logicalType: 'text',
@@ -245,6 +253,7 @@ describe('queryMetadata', () => {
             links: {
               kind: 'childMany',
               fieldType: repeater,
+              type: 'repeater',
               options: { ...LIST, fields: linkFields },
               nullable: false,
               table: 'QPosts_meta_links',
@@ -254,6 +263,7 @@ describe('queryMetadata', () => {
                 url: {
                   kind: 'column',
                   fieldType: text,
+                  type: 'text',
                   options: TEXT,
                   nullable: false,
                   logicalType: 'text',
@@ -267,6 +277,7 @@ describe('queryMetadata', () => {
         sections: {
           kind: 'childMany',
           fieldType: repeater,
+          type: 'repeater',
           options: { ...LIST, fields: sectionFields },
           nullable: false,
           table: 'QPosts_sections',
@@ -276,6 +287,7 @@ describe('queryMetadata', () => {
             heading: {
               kind: 'column',
               fieldType: text,
+              type: 'text',
               options: TEXT,
               nullable: false,
               logicalType: 'text',
@@ -287,6 +299,7 @@ describe('queryMetadata', () => {
         content: {
           kind: 'blocks',
           fieldType: blocks,
+          type: 'blocks',
           options: LIST,
           nullable: false,
           table: 'QPosts_content',
@@ -318,6 +331,7 @@ describe('queryMetadata', () => {
     deepStrictEqual(queryMetadata('QTags').fields.posts, {
       kind: 'records',
       fieldType: records,
+      type: 'records',
       options: { ...LIST, collection: 'QPosts', inverse: 'tags' },
       nullable: false,
       target: 'QPosts',

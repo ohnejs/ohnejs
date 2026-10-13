@@ -193,6 +193,11 @@ describe('composite conditions', () => {
     deepStrictEqual(await titles(posts().where({ meta: { empty: true } })), ['Fourth', 'Second']);
   });
 
+  it('a negation inside a child-one has never matches a record without the object', async () => {
+    const where = { meta: { has: { not: { note: { equalsTo: 'm1' } } } } };
+    deepStrictEqual(await titles(posts().where(where)), ['Third']);
+  });
+
   it('a child-many has reads the repeater table', async () => {
     deepStrictEqual(await titles(posts().where({ sections: { has: { heading: 'Intro' } } })), [
       'First',

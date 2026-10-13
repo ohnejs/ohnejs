@@ -54,6 +54,11 @@ export interface FieldQueryMeta {
   fieldType?: FieldType;
 
   /**
+   * The field type's registered name, as the instance declares it; absent on the system entries.
+   */
+  type?: string;
+
+  /**
    * The resolved instance options, frozen once at metadata build and shared by every consumer.
    * Absent on the system entries.
    */
@@ -154,6 +159,11 @@ export interface FieldQueryMeta {
    * The child table's own fields, its item `UUID` included; child kinds only.
    */
   subfields?: Record<string, FieldQueryMeta>;
+
+  /**
+   * The subfield `orderBy` sorts by when it names the composite; `childOne` only, from the hint.
+   */
+  orderBy?: string;
 
   /**
    * The resolved block types the field admits, sorted; `blocks` kind only.
@@ -474,6 +484,7 @@ function fieldEntry(
     return {
       kind,
       fieldType,
+      type: instance.type,
       options,
       nullable: false,
       table: derivedTableName(logical, name),
@@ -490,6 +501,7 @@ function fieldEntry(
     return {
       kind: 'records',
       fieldType,
+      type: instance.type,
       options,
       nullable: false,
       target,
@@ -506,14 +518,17 @@ function fieldEntry(
     const subfields: Record<string, FieldQueryMeta> = Object.assign(Object.create(null), {
       UUID: uuidEntry(),
     });
-    addFieldEntries(subfields, (hint as ChildHint).subfields, `${logical}_${name}`, home);
+    const { subfields: declared, orderBy } = hint as ChildHint;
+    addFieldEntries(subfields, declared, `${logical}_${name}`, home);
     return {
       kind,
       fieldType,
+      type: instance.type,
       options,
       nullable: kind === 'childOne',
       table: derivedTableName(logical, name),
       subfields,
+      ...(kind === 'childOne' && !isUndefined(orderBy) ? { orderBy } : {}),
       ...gate,
       ...flags,
       ...(translatable ? { localeScoped: true } : {}),
@@ -523,6 +538,7 @@ function fieldEntry(
   return {
     kind: kind === 'foreignKey' ? 'record' : 'column',
     fieldType,
+    type: instance.type,
     options,
     nullable: options.nullable,
     logicalType: fieldType.columnType as LogicalType,

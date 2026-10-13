@@ -81,6 +81,11 @@ export interface QueryFieldMeta {
   fields?: Record<string, QueryFieldMeta>;
 
   /**
+   * Marks a one-child composite whose type names a sort key, so `orderBy` accepts it.
+   */
+  sortable?: true;
+
+  /**
    * The field's `when` condition, in object form, present only when the instance declares one.
    * A type-only passenger: the query builder ignores it.
    */

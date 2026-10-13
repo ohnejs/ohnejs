@@ -203,6 +203,15 @@ describe('the typed builder narrows in a consumer app', () => {
     );
     write(
       app,
+      'fields/span.ts',
+      "import { type ChildHint, defineField, field } from 'ohnejs';\n" +
+        'export default defineField({ columnType: false, schema: (): ChildHint => ({\n' +
+        "  kind: 'child', cardinality: 'one', orderBy: 'start',\n" +
+        "  subfields: { start: field('date'), end: field('date') },\n" +
+        '}) });\n',
+    );
+    write(
+      app,
       'collections/Posts.ts',
       "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({ fields: {\n' +
@@ -216,6 +225,7 @@ describe('the typed builder narrows in a consumer app', () => {
         "  meta: field('object', { fields: { note: field('text') } }),\n" +
         "  sections: field('repeater', { fields: { heading: field('text') } }),\n" +
         "  content: field('blocks'),\n" +
+        "  span: field('span'),\n" +
         '} });\n',
     );
 
@@ -246,6 +256,7 @@ describe('the typed builder narrows in a consumer app', () => {
     ok(shared.includes("tags: { records: 'Tags' };"));
     ok(shared.includes("meta: { child: 'one'; fields: {"));
     ok(shared.includes("sections: { child: 'many'; fields: {"));
+    ok(/span: \{ child: 'one'; fields: \{[^\n]*\}; sortable: true \};/.test(shared));
     ok(shared.includes("content: { blocks: 'CTA' | 'Hero' };"));
     ok(shared.includes('export interface GeneratedBlockQueryFields {'));
     ok(
@@ -574,6 +585,9 @@ query('Posts').where('nope', 'x');
 query('Posts').select('nope');
 // @ts-expect-error a records field cannot be ordered
 query('Posts').orderBy('tags');
+query('Posts').orderBy('span', 'desc');
+// @ts-expect-error an object without a sort key cannot be ordered
+query('Posts').orderBy('meta');
 // @ts-expect-error only relation fields can be populated
 query('Posts').populate('title');
 // @ts-expect-error a populate subselect gates against the target's fields

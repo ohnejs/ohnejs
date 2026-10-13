@@ -19,7 +19,7 @@ import type {
   TableSchema,
 } from './table-schema.ts';
 
-import { createRegistry, isUndefined, naturalCompare } from '../../../utils/index.ts';
+import { createRegistry, isEmpty, isUndefined, naturalCompare } from '../../../utils/index.ts';
 import { resolveAllowedBlocks } from '../../blocks/resolve-allowed-blocks.ts';
 import { validateBlockDefinition } from '../../blocks/validate-block.ts';
 import { validateCollectionDefinition } from '../../collections/validate-collection.ts';
@@ -445,6 +445,34 @@ function resolveListKey(
 }
 
 /**
+ * Throws unless a child hint's `orderBy` names a column-bearing subfield of a cardinality-one composite.
+ */
+function validateSortKey(
+  hint: ChildHint,
+  columns: readonly ColumnSchema[],
+  label: string,
+  owner: DerivedParent['owner'],
+): void {
+  const key = hint.orderBy;
+  if (isUndefined(key)) return;
+  const sortable = columns.map((column) => column.name);
+  if (hint.cardinality === 'one' && sortable.includes(key)) return;
+  const where = `Field \`${label}\` in ${ownerLabel(owner)}`;
+  throw ohneError({
+    title: `Field \`${label}\` cannot order by \`${key}\``,
+    body:
+      hint.cardinality === 'many'
+        ? [`${where} holds many rows per record, so no single part can sort it.`, 'Drop `orderBy`.']
+        : [
+            `${where} sorts by \`${key}\`, which is not one of its subfields that stores a column.`,
+            ...(isEmpty(sortable)
+              ? []
+              : ['', 'Name one of these:', ...sortable.map((name) => `- \`${name}\``)]),
+          ],
+  });
+}
+
+/**
  * Resolves one field against the field-type registry, materializes its hint, and validates it.
  * `name` is the field's own key; `label` the dotted path from the owner, for the error messages.
  */
@@ -595,6 +623,7 @@ function buildChildTable(
     parentKey: one ? undefined : parentKey,
   };
   const members = buildFieldMembers(hint.subfields, next, registries, reachable);
+  validateSortKey(hint, members.columns, label, parent.owner);
 
   const columns: ColumnSchema[] = [
     UUID_COLUMN,

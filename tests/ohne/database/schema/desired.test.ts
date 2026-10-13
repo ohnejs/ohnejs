@@ -1155,6 +1155,74 @@ describe('buildDesiredSchema', () => {
     );
   });
 
+  it('admits a sort key naming a column-bearing part of a one-child composite', () => {
+    useFields().register('dSorted', {
+      name: 'dSorted' as FieldTypeName,
+      fieldType: defineField({
+        columnType: false,
+        schema: () => ({
+          kind: 'child',
+          cardinality: 'one',
+          subfields: { start: field('text') },
+          orderBy: 'start',
+        }),
+      }),
+    });
+    const tables = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: {
+          fields: { span: { type: 'dSorted', options: {} } as unknown as FieldInstance },
+        },
+      }),
+      useFields(),
+    );
+    deepStrictEqual(
+      tables.map((table) => table.name),
+      ['Posts', 'Posts_span'],
+    );
+  });
+
+  it('rejects a sort key on many rows, on a missing part, or on a column-less part', () => {
+    const sorted = (cardinality: 'one' | 'many', orderBy: string): FieldTypeMeta['fieldType'] =>
+      defineField({
+        columnType: false,
+        schema: () => ({
+          kind: 'child',
+          cardinality,
+          subfields: {
+            start: field('text'),
+            extra: field('object', { fields: { note: field('text') } }),
+          },
+          orderBy,
+        }),
+      });
+    const build = (type: string) => () =>
+      buildDesiredSchema(
+        collections({
+          name: 'Posts',
+          collection: { fields: { span: { type, options: {} } as unknown as FieldInstance } },
+        }),
+        useFields(),
+      );
+    for (const [name, cardinality, key] of [
+      ['dMany', 'many', 'start'],
+      ['dMissing', 'one', 'nope'],
+      ['dColumnless', 'one', 'extra'],
+    ] as const) {
+      useFields().register(name, {
+        name: name as FieldTypeName,
+        fieldType: sorted(cardinality, key),
+      });
+    }
+    throws(build('dMany'), bodyMatching(/holds many rows per record/));
+    throws(build('dMissing'), /Field `span` cannot order by `nope`/);
+    throws(
+      build('dColumnless'),
+      bodyMatching(/sorts by `extra`.*\n\nName one of these:\n- `start`/s),
+    );
+  });
+
   it('rejects a subfield name that is not camelCase, naming the composite scope', () => {
     throws(
       () =>
