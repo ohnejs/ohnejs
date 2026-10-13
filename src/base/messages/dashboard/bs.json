@@ -318,15 +318,18 @@
   },
   "table": {
     "allCount": "Svi ({count})",
+    "columnsDropped": "Kolone nije bilo moguće prikazati i vraćene su na zadane",
     "confirmDeleteMany": "Da li zaista želite obrisati {count, plural, one {# zapis} few {# zapisa} other {# zapisa}}?",
     "confirmDeleteOne": "Da li zaista želite obrisati ovaj zapis?",
     "deleteCount": "Obriši {count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
+    "filterDropped": "Filter nije bilo moguće primijeniti i uklonjen je",
     "noData": "Nema dostupnih podataka",
     "pageCount": "Stranica ({count})",
     "selectPageOrAll": "Želite li odabrati {perPage, plural, one {# zapis} few {# zapisa} other {# zapisa}} na ovoj stranici ili svih {total} zapisa?",
     "selectedAcrossPages": "Odabrano {entryCount, plural, one {# zapis} few {# zapisa} other {# zapisa}} kroz {pageCount, plural, one {# stranicu} few {# stranice} other {# stranica}}",
     "selectedCount": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",
-    "selectedOnPage": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} na ovoj stranici"
+    "selectedOnPage": "Odabrano {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} na ovoj stranici",
+    "sortDropped": "Sortiranje nije bilo moguće primijeniti i vraćeno je na zadano"
   },
   "tableOverview": "Pregled tabele",
   "time": {

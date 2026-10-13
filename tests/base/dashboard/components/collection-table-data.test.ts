@@ -67,3 +67,57 @@ describe('table view memory', () => {
     strictEqual(data.rememberedPickerView('posts'), undefined);
   });
 });
+
+describe('loadTablePage', () => {
+  let data!: typeof import('../../../../src/base/dashboard/components/collection-table-data.ts');
+  const PAGE = { records: [], page: 1, lastPage: 1, perPage: 50, total: 0 };
+
+  /**
+   * Answers every request with `response`.
+   */
+  const answer = (response: () => Response): void => {
+    Object.assign(globalThis, { fetch: async () => response() });
+  };
+
+  before(async () => {
+    baseBrowser('/collections/posts');
+    data = await import('../../../../src/base/dashboard/components/collection-table-data.ts');
+  });
+
+  it('resolves the page the endpoint answers', async () => {
+    answer(() => Response.json(PAGE));
+    deepStrictEqual(await data.loadTablePage('posts', {}), PAGE);
+    deepStrictEqual(await data.loadPage('posts', {}), PAGE);
+  });
+
+  it('resolves the refused path of a `400`, which `loadPage` reads as a failure', async () => {
+    const refusal = {
+      statusCode: 400,
+      message: 'Unknown field',
+      data: { code: 'invalidField', path: 'where.x' },
+    };
+    answer(() => Response.json(refusal, { status: 400 }));
+    deepStrictEqual(await data.loadTablePage('posts', {}), { refused: 'where.x' });
+    strictEqual(await data.loadPage('posts', {}), undefined);
+  });
+
+  it('keeps an empty refused path, which ties the refusal to no part', async () => {
+    const refusal = { data: { code: 'invalidPagination', path: '' } };
+    answer(() => Response.json(refusal, { status: 400 }));
+    deepStrictEqual(await data.loadTablePage('posts', {}), { refused: '' });
+  });
+
+  it('resolves `undefined` for any other failure', async () => {
+    answer(() => Response.json({ data: { path: 'where.x' } }, { status: 403 }));
+    strictEqual(await data.loadTablePage('posts', {}), undefined);
+    answer(() => Response.json({ message: 'Bad body' }, { status: 400 }));
+    strictEqual(await data.loadTablePage('posts', {}), undefined);
+    answer(() => new Response('not json', { status: 400 }));
+    strictEqual(await data.loadTablePage('posts', {}), undefined);
+    answer(() => {
+      throw new TypeError('offline');
+    });
+    strictEqual(await data.loadTablePage('posts', {}), undefined);
+    strictEqual(await data.loadPage('posts', {}), undefined);
+  });
+});

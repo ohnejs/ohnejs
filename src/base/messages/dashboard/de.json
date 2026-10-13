@@ -318,15 +318,18 @@
   },
   "table": {
     "allCount": "Alle ({count})",
+    "columnsDropped": "Die Spalten konnten nicht angezeigt werden und wurden zurückgesetzt",
     "confirmDeleteMany": "Wirklich {count, plural, one {# Datensatz} other {# Datensätze}} löschen?",
     "confirmDeleteOne": "Diesen Datensatz wirklich löschen?",
     "deleteCount": "{count, plural, one {# Datensatz} other {# Datensätze}} löschen",
+    "filterDropped": "Der Filter konnte nicht angewendet werden und wurde entfernt",
     "noData": "Keine Daten verfügbar",
     "pageCount": "Seite ({count})",
     "selectPageOrAll": "{perPage, plural, one {# Datensatz} other {# Datensätze}} auf dieser Seite auswählen oder alle {total} Datensätze?",
     "selectedAcrossPages": "{entryCount, plural, one {# Datensatz} other {# Datensätze}} über {pageCount, plural, one {# Seite} other {# Seiten}} ausgewählt",
     "selectedCount": "{count, plural, one {# Datensatz} other {# Datensätze}} ausgewählt",
-    "selectedOnPage": "{count, plural, one {# Datensatz} other {# Datensätze}} auf dieser Seite ausgewählt"
+    "selectedOnPage": "{count, plural, one {# Datensatz} other {# Datensätze}} auf dieser Seite ausgewählt",
+    "sortDropped": "Die Sortierung konnte nicht angewendet werden und wurde zurückgesetzt"
   },
   "tableOverview": "Tabellenübersicht",
   "time": {

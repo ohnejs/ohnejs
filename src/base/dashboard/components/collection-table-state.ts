@@ -2,6 +2,7 @@ import type { Text } from 'ohnejs/dashboard';
 
 import {
   type ConditionObject,
+  isDotPathInside,
   isEmpty,
   isNumber,
   isPlainObject,
@@ -429,6 +430,39 @@ export function serializeTableState(
     where: state.where as SearchParamValue | undefined,
     columns: state.columns,
   });
+}
+
+/**
+ * The patch that drops the part of `state` a query refused at the wire error `path`.
+ * A `where` path drops the filter, an `order` path the order, and a `select` path the chosen columns.
+ * Returns `undefined` when `state` does not carry that part, so there is nothing left to drop.
+ *
+ * @example
+ * ```ts
+ * const state = { page: 1, order: ['title'], where: { age: 2 }, columns: undefined }
+ *
+ * healView(state, 'where.age', ['-_updatedAt']) // -> { where: undefined }
+ * healView(state, 'order[0]', ['-_updatedAt'])  // -> { order: ['-_updatedAt'] }
+ * healView(state, 'select[1]', ['-_updatedAt']) // -> undefined
+ * ```
+ */
+export function healView(
+  state: TableURLState,
+  path: string,
+  defaultOrder: readonly string[],
+): Partial<TableURLState> | undefined {
+  if (isDotPathInside(path, 'where')) {
+    return isUndefined(state.where) ? undefined : { where: undefined };
+  }
+  if (isDotPathInside(path, 'order')) {
+    const ordered = state.order.join(',') !== defaultOrder.join(',');
+    return ordered ? { order: [...defaultOrder] } : undefined;
+  }
+  if (isDotPathInside(path, 'select')) {
+    const chosen = !isUndefined(state.columns) && !isEmpty(state.columns);
+    return chosen ? { columns: undefined } : undefined;
+  }
+  return undefined;
 }
 
 /**

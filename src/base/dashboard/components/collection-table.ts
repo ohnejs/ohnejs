@@ -60,7 +60,9 @@ import {
   columnFields,
   DEFAULT_ORDER,
   displayFor,
+  droppedMessage,
   loadPage,
+  loadTablePage,
   PER_PAGE,
   readableFields,
   rememberedView,
@@ -78,6 +80,7 @@ import {
   selectedCountOf,
 } from './collection-table-selection.ts';
 import {
+  healView,
   parseTableState,
   resolveTableColumns,
   serializeTableColumns,
@@ -152,6 +155,7 @@ css`
  * The table rebuilds whenever the query changes, except for the `edit` param its cell popups own.
  * The last query string per segment is remembered.
  * It is restored whenever the query arrives bare, unless back or forward brought it.
+ * A view part the query endpoint refuses is dropped with a toast, replacing the URL.
  * Every cell renders its field's display inside an editable cell whose popup patches only that field.
  * Sorting, the filter and sorting popups, and the pagination push new URL state.
  * Rows select with shift ranges into the batch delete.
@@ -254,9 +258,17 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
     const mine = (generation += 1);
     // Read inside the load effect, so a content-language switch reloads the page at that locale.
     const locale = activeLocale();
-    void loadPage(segment, queryBody(locale)).then(async (loaded) => {
+    void loadTablePage(segment, queryBody(locale)).then(async (loaded) => {
       if (generation !== mine) return;
-      if (isUndefined(loaded)) {
+      if (isUndefined(loaded) || 'refused' in loaded) {
+        const patch = isUndefined(loaded)
+          ? undefined
+          : healView(state, loaded.refused, DEFAULT_ORDER);
+        if (!isUndefined(patch)) {
+          toast(t(droppedMessage(patch)), { type: 'warning' });
+          push(patch, true);
+          return;
+        }
         data.value ??= [];
       } else {
         const answered = await loadVerdicts(collection, pageUUIDs(loaded.records), locale);

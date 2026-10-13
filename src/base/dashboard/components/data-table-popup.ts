@@ -18,6 +18,7 @@ import {
   table,
   type TableColumn,
   type TableSort,
+  toast,
   translateMessage,
   useHotkeys,
   useT,
@@ -45,7 +46,8 @@ import {
   columnFields,
   DEFAULT_ORDER,
   displayFor,
-  loadPage,
+  droppedMessage,
+  loadTablePage,
   PER_PAGE,
   readableFields,
   rememberedPickerView,
@@ -57,6 +59,7 @@ import {
 } from './collection-table-data.ts';
 import { admitsRow, pageUUIDs } from './collection-table-selection.ts';
 import {
+  healView,
   parseTableState,
   resolveTableColumns,
   serializeTableColumns,
@@ -140,6 +143,7 @@ css`
  *
  * The table pages, sorts by its headers, and configures through the filter, columns, and sorting popups.
  * Its view state is remembered per collection; the first open seeds from the collection page's own view.
+ * A view part the query endpoint refuses is dropped with a toast, as on the collection page.
  * Single mode picks on double-click or the row's Select action and closes.
  * Multiple mode selects with checkboxes and shift ranges across pages, and applies explicitly.
  * A row's actions also open the record in a new tab, as edit or view by the row's update verdict.
@@ -218,9 +222,17 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     const mine = (generation += 1);
     // Read inside the load effect, so a content-language switch reloads the page at that locale.
     const locale = collection.translatable ? activeContentLocale() : undefined;
-    void loadPage(segment, queryBody(locale)).then(async (loaded) => {
+    void loadTablePage(segment, queryBody(locale)).then(async (loaded) => {
       if (generation !== mine) return;
-      if (isUndefined(loaded)) {
+      if (isUndefined(loaded) || 'refused' in loaded) {
+        const patch = isUndefined(loaded)
+          ? undefined
+          : healView(state, loaded.refused, DEFAULT_ORDER);
+        if (!isUndefined(patch)) {
+          toast(t(droppedMessage(patch)), { type: 'warning' });
+          push(patch);
+          return;
+        }
         data.value ??= [];
       } else {
         const answered = await loadVerdicts(collection, pageUUIDs(loaded.records), locale);

@@ -118,8 +118,9 @@ const POSTS: DashboardCollection = {
   labelFields: [],
 };
 
+let browser!: FakeBrowser;
+
 describe('collectionTable', () => {
-  let browser!: FakeBrowser;
   let edit!: typeof import('../../../../src/base/dashboard/components/edit-table-field-popup.ts');
   const loads: number[] = [];
 
@@ -434,5 +435,88 @@ describe('collectionTable sheet', () => {
     strictEqual(bodyRows(root)[0]!.textContent, 'No data available');
     records = RECORDS;
     scope?.dispose();
+  });
+});
+
+describe('collectionTable refused views', () => {
+  const PAGE = { records: [], page: 1, lastPage: 1, perPage: 50, total: 0 };
+  const bodies: Record<string, unknown>[] = [];
+  let refuse: (body: Record<string, unknown>) => string | undefined = () => undefined;
+  let outlet!: FakeElement;
+
+  /**
+   * The messages of the toasts showing; without catalogs a message reads as its key.
+   */
+  const toasts = (): string[] =>
+    outlet.childNodes
+      .flatMap((list) => list.childNodes.map((item) => item.textContent))
+      .filter((text) => text !== '');
+
+  /**
+   * Opens `path` and returns the query bodies its table sent while it settled.
+   */
+  const open = async (path: string): Promise<Record<string, unknown>[]> => {
+    bodies.length = 0;
+    await navigate(path);
+    await idle();
+    return [...bodies];
+  };
+
+  before(async () => {
+    Object.assign(globalThis, {
+      fetch: async (url: string, init?: RequestInit) => {
+        if (!url.endsWith('/collections/posts/query')) return new Response(null, { status: 404 });
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        bodies.push(body);
+        const path = refuse(body);
+        if (path === undefined) return Response.json(PAGE);
+        const data = { code: 'invalidField', path };
+        return Response.json({ statusCode: 400, message: 'Refused', data }, { status: 400 });
+      },
+    });
+    const { toaster } = await import('../../../../src/dashboard/ui/toaster.ts');
+    outlet = toaster() as unknown as FakeElement;
+  });
+
+  it('drops a refused filter with one toast, and reloads without it', async () => {
+    refuse = (body) => (body.where === undefined ? undefined : 'where.title');
+    const sent = await open('/collections/posts?where={title:x}');
+    deepStrictEqual(
+      sent.map((body) => body.where),
+      [{ title: 'x' }, undefined],
+    );
+    strictEqual(location.search, '');
+    strictEqual(browser.replaces.at(-1), '/collections/posts');
+    deepStrictEqual(toasts(), ['dashboard.table.filterDropped']);
+  });
+
+  it('drops a refused order back to the default', async () => {
+    refuse = (body) => (String(body.order) === '-_updatedAt' ? undefined : 'order[0]');
+    const sent = await open('/collections/posts?order=title');
+    deepStrictEqual(
+      sent.map((body) => body.order),
+      [['title'], ['-_updatedAt']],
+    );
+    strictEqual(location.search, '');
+  });
+
+  it('restores the declared columns once, then stops when those are refused too', async (t) => {
+    t.mock.method(console, 'warn', () => {});
+    refuse = () => 'select[0]';
+    const shown = toasts().length;
+    const sent = await open('/collections/posts?columns=[title]');
+    strictEqual(sent.length, 2);
+    strictEqual(location.search, '');
+    strictEqual(toasts().length, shown + 1);
+    strictEqual(toasts()[0], 'dashboard.table.columnsDropped');
+  });
+
+  it('leaves the grid empty when the refused part is not in the view', async () => {
+    refuse = () => 'select[0]';
+    const shown = toasts().length;
+    const sent = await open('/collections/posts?page=2');
+    strictEqual(sent.length, 1);
+    strictEqual(location.search, '?page=2');
+    strictEqual(toasts().length, shown);
   });
 });

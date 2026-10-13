@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   editableTableColumns,
+  healView,
   parseTableState,
   resolveTableColumns,
   serializeTableColumnEdits,
@@ -126,6 +127,56 @@ describe('serializeTableState', () => {
       '?edit=[title,abc]&page=9&order=[-views]',
     );
     strictEqual(query, 'edit=[title,abc]&page=2&order=[title]');
+  });
+});
+
+describe('healView', () => {
+  const state: TableURLState = {
+    page: 2,
+    order: ['title'],
+    where: { views: { atLeast: 'x' } },
+    columns: ['title', 'views'],
+  };
+  const bare: TableURLState = {
+    page: 2,
+    order: [...DEFAULT_ORDER],
+    where: undefined,
+    columns: undefined,
+  };
+
+  it('drops the filter for a path inside `where`, and for a bare `where`', () => {
+    deepStrictEqual(healView(state, 'where.views.atLeast', DEFAULT_ORDER), { where: undefined });
+    deepStrictEqual(healView(state, 'where', DEFAULT_ORDER), { where: undefined });
+  });
+
+  it('restores the default order for a path inside `order`', () => {
+    deepStrictEqual(healView(state, 'order[0]', DEFAULT_ORDER), { order: DEFAULT_ORDER });
+    deepStrictEqual(healView(state, 'order', DEFAULT_ORDER), { order: DEFAULT_ORDER });
+  });
+
+  it('restores the declared columns for a path inside `select`', () => {
+    deepStrictEqual(healView(state, 'select[1]', DEFAULT_ORDER), { columns: undefined });
+    deepStrictEqual(healView(state, 'select', DEFAULT_ORDER), { columns: undefined });
+  });
+
+  it('drops nothing when the state does not carry the refused part', () => {
+    strictEqual(healView(bare, 'where.views', DEFAULT_ORDER), undefined);
+    strictEqual(healView(bare, 'order[0]', DEFAULT_ORDER), undefined);
+    strictEqual(healView(bare, 'select[1]', DEFAULT_ORDER), undefined);
+    strictEqual(healView({ ...bare, columns: [] }, 'select[1]', DEFAULT_ORDER), undefined);
+  });
+
+  it('drops nothing for a path outside the view', () => {
+    strictEqual(healView(state, '', DEFAULT_ORDER), undefined);
+    strictEqual(healView(state, 'locale', DEFAULT_ORDER), undefined);
+    strictEqual(healView(state, 'perPage', DEFAULT_ORDER), undefined);
+    strictEqual(healView(state, 'whereabouts', DEFAULT_ORDER), undefined);
+  });
+
+  it('copies the default order, so the patch never aliases it', () => {
+    const patch = healView(state, 'order[0]', DEFAULT_ORDER);
+    patch?.order?.push('views');
+    deepStrictEqual(DEFAULT_ORDER, ['-_updatedAt']);
   });
 });
 

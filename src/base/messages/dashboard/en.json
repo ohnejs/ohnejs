@@ -318,15 +318,18 @@
   },
   "table": {
     "allCount": "All ({count})",
+    "columnsDropped": "The columns could not be shown and were reset",
     "confirmDeleteMany": "Are you sure you want to delete {count, plural, one {# record} other {# records}}?",
     "confirmDeleteOne": "Are you sure you want to delete this record?",
     "deleteCount": "Delete {count, plural, one {# record} other {# records}}",
+    "filterDropped": "The filter could not be applied and was cleared",
     "noData": "No data available",
     "pageCount": "Page ({count})",
     "selectPageOrAll": "Would you like to select {perPage, plural, one {# record} other {# records}} on this page or all {total} records?",
     "selectedAcrossPages": "Selected {entryCount, plural, one {# record} other {# records}} across {pageCount, plural, one {# page} other {# pages}}",
     "selectedCount": "Selected {count, plural, one {# record} other {# records}}",
-    "selectedOnPage": "Selected {count, plural, one {# record} other {# records}} on this page"
+    "selectedOnPage": "Selected {count, plural, one {# record} other {# records}} on this page",
+    "sortDropped": "The sorting could not be applied and was reset"
   },
   "tableOverview": "Table overview",
   "time": {

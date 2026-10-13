@@ -12,10 +12,21 @@ import {
   formatRelative,
   h,
   joinLabel,
+  readAPIError,
   seedLabel,
   useDashboardLanguage,
 } from 'ohnejs/dashboard';
-import { hasKey, isEmpty, isNumber, isString, onCleanup, shortUUID, untracked } from 'ohnejs/utils';
+import {
+  hasKey,
+  isEmpty,
+  isNumber,
+  isPlainObject,
+  isString,
+  isUndefined,
+  onCleanup,
+  shortUUID,
+  untracked,
+} from 'ohnejs/utils';
 
 import { sortableFieldsOf, type TableURLState } from './collection-table-state.ts';
 import { translationsCell } from './translations-cell.ts';
@@ -132,22 +143,50 @@ export function rememberedPickerView(segment: string): TableURLState | undefined
 }
 
 /**
+ * Loads one page through `POST /collections/[segment]/query`.
+ * A `400` that names a wire error path resolves `{ refused }`, the path of the refused query part.
+ * Any other failure resolves `undefined`.
+ */
+export async function loadTablePage(
+  segment: string,
+  body: Record<string, unknown>,
+): Promise<QueryPage | { refused: string } | undefined> {
+  try {
+    const response = await api(`POST /collections/${segment}/query`, {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (response.ok) return (await response.json()) as QueryPage;
+    if (response.status !== 400) return undefined;
+    const { data } = await readAPIError(response, '');
+    return isPlainObject(data) && isString(data.path) ? { refused: data.path } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Loads one page through `POST /collections/[segment]/query`; a failure resolves `undefined`.
  */
 export async function loadPage(
   segment: string,
   body: Record<string, unknown>,
 ): Promise<QueryPage | undefined> {
-  try {
-    const response = await api(`POST /collections/${segment}/query`, {
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) return undefined;
-    return (await response.json()) as QueryPage;
-  } catch {
-    return undefined;
-  }
+  const loaded = await loadTablePage(segment, body);
+  return isUndefined(loaded) || 'refused' in loaded ? undefined : loaded;
+}
+
+/**
+ * The message a table surface toasts once `healView` produced `patch`, naming the part it dropped.
+ */
+export function droppedMessage(
+  patch: Partial<TableURLState>,
+):
+  | 'dashboard.table.filterDropped'
+  | 'dashboard.table.sortDropped'
+  | 'dashboard.table.columnsDropped' {
+  if (hasKey(patch, 'where')) return 'dashboard.table.filterDropped';
+  return hasKey(patch, 'order') ? 'dashboard.table.sortDropped' : 'dashboard.table.columnsDropped';
 }
 
 /**
