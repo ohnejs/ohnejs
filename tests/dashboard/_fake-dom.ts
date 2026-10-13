@@ -135,6 +135,18 @@ export function findElement(
 }
 
 /**
+ * The observed targets of every live `ResizeObserver`, so a test can report a size to them.
+ */
+const resizeTargets = new Map<object, (entries: { contentRect: { width: number } }[]) => void>();
+
+/**
+ * Reports `width` as the content width of `target` to every observer watching it.
+ */
+export function resizeTo(target: object, width: number): void {
+  resizeTargets.get(target)?.([{ contentRect: { width } }]);
+}
+
+/**
  * Whether `element`'s `class` attribute lists `name`.
  */
 export function hasClass(element: FakeElement, name: string): boolean {
@@ -150,8 +162,18 @@ Object.assign(globalThis, {
     replaceSync(): void {}
   },
   ResizeObserver: class {
-    observe(): void {}
-    disconnect(): void {}
+    #targets: object[] = [];
+    #callback: (entries: { contentRect: { width: number } }[]) => void;
+    constructor(callback: (entries: { contentRect: { width: number } }[]) => void) {
+      this.#callback = callback;
+    }
+    observe(target: object): void {
+      this.#targets.push(target);
+      resizeTargets.set(target, this.#callback);
+    }
+    disconnect(): void {
+      for (const target of this.#targets) resizeTargets.delete(target);
+    }
   },
   MutationObserver: class {
     observe(): void {}

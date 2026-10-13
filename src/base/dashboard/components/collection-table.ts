@@ -3,6 +3,7 @@ import {
   attachTooltip,
   bubble,
   button,
+  type ButtonOptions,
   type Child,
   countVerdicts,
   css,
@@ -40,6 +41,7 @@ import {
   type ConditionObject,
   deepEqual,
   effect,
+  first,
   hasKey,
   hasRoute,
   isEmpty,
@@ -106,6 +108,8 @@ const NO_VERDICTS: RowVerdicts = {
   select: undefined,
 };
 
+const COMPACT_FOOTER_WIDTH = 768;
+
 css`
   .o-collection-table {
     display: flex;
@@ -142,6 +146,17 @@ css`
   .o-collection-table-footer .ohne-pagination-buttons {
     margin: -0.75rem -0.25rem;
     padding: 0.75rem 0.25rem;
+  }
+
+  @container (max-width: 767px) {
+    .o-collection-table-footer-has-selection .ohne-pagination {
+      display: none;
+    }
+
+    .o-collection-table-footer .ohne-justify-between > .ohne-row {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
   }
 
   .o-collection-table-title {
@@ -678,16 +693,23 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
     },
   });
 
+  const compact = ref(false);
+  const newOptions: ButtonOptions = { variant: 'primary', href: `/collections/${segment}/new` };
   const newButton = canCreate
-    ? button([h('span', null, () => t('dashboard.new')), icon('note')], {
-        variant: 'primary',
-        href: `/collections/${segment}/new`,
-      })
+    ? when(
+        () => compact.value,
+        () => button(() => t('dashboard.new'), { ...newOptions, icon: 'note', iconOnly: true }),
+        () => button([h('span', null, () => t('dashboard.new')), icon('note')], newOptions),
+      )
     : null;
 
   const footer = h(
     'div',
-    { class: 'o-collection-table-footer' },
+    {
+      class: () =>
+        'o-collection-table-footer' +
+        (isEmpty(selected.value) ? '' : ' o-collection-table-footer-has-selection'),
+    },
     h(
       'div',
       { class: 'ohne-justify-between' },
@@ -844,6 +866,12 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
   };
   window.addEventListener('keydown', onArrowKey);
   onCleanup(() => window.removeEventListener('keydown', onArrowKey));
+
+  const observer = new ResizeObserver((entries) => {
+    compact.value = (first(entries)?.contentRect.width ?? Infinity) < COMPACT_FOOTER_WIDTH;
+  });
+  observer.observe(footer);
+  onCleanup(() => observer.disconnect());
 
   return h(
     'div',

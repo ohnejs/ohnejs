@@ -15,7 +15,13 @@ import { startSession } from '../../../../src/dashboard/runtime/_request.ts';
 import { dashboardMeta, invalidateDashboardMeta } from '../../../../src/dashboard/runtime/meta.ts';
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
-import { FakeElement, type FakeNode, findElement, hasClass } from '../../../dashboard/_fake-dom.ts';
+import {
+  FakeElement,
+  type FakeNode,
+  findElement,
+  hasClass,
+  resizeTo,
+} from '../../../dashboard/_fake-dom.ts';
 import { pageModule, settle } from '../../../dashboard/router/_browser.ts';
 import { baseBrowser } from '../_browser.ts';
 
@@ -282,11 +288,11 @@ describe('collectionTable sheet', () => {
   /**
    * Mounts the raiders sheet with the dialog host, answers its first page, and lets it settle.
    */
-  const sheet = async (): Promise<FakeElement> => {
+  const sheet = async (collection = RAIDERS): Promise<FakeElement> => {
     scope?.dispose();
     scope = effectScope();
     const root = scope.run(() =>
-      h('div', null, collectionTable(RAIDERS) as Node, dialogHost() as Node),
+      h('div', null, collectionTable(collection) as Node, dialogHost() as Node),
     )!;
     flush();
     answer();
@@ -388,6 +394,25 @@ describe('collectionTable sheet', () => {
     strictEqual(byClass(root, 'ohne-button-destructive').length, 1);
     pickAction(root, 'Jaina', 'dashboard.deselect');
     strictEqual(byClass(root, 'ohne-table-check').length, 0);
+  });
+
+  it('folds New to an icon below 768px of footer, and marks the footer while rows are selected', async () => {
+    const root = await sheet({
+      ...RAIDERS,
+      operations: { ...RAIDERS.operations, create: allowed },
+    });
+    const footer = byClass(root, 'o-collection-table-footer')[0]!;
+    const create = (): FakeElement => byClass(footer, 'ohne-button-primary')[0]!;
+    strictEqual(create().getAttribute('aria-label'), null);
+    resizeTo(footer, 767);
+    flush();
+    strictEqual(create().getAttribute('aria-label'), 'dashboard.new');
+    resizeTo(footer, 768);
+    flush();
+    strictEqual(create().getAttribute('aria-label'), null);
+    strictEqual(hasClass(footer, 'o-collection-table-footer-has-selection'), false);
+    pickAction(root, 'Jaina', 'dashboard.select');
+    strictEqual(hasClass(footer, 'o-collection-table-footer-has-selection'), true);
   });
 
   it('ranges with Shift from the row selected alone', async () => {
