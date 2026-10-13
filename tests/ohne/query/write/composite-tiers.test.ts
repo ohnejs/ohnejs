@@ -33,10 +33,12 @@ useCollections().register('CTiers', {
       }),
       repSan: field('repeater', { fields: { heading: field('text') }, sanitizers: [bangHeadings] }),
       objVal: field('object', {
+        nullable: true,
         fields: { note: field('text') },
         validators: [() => 'object-validator-ran'],
       }),
       objSan: field('object', {
+        nullable: true,
         fields: { note: field('text') },
         sanitizers: [
           (value) =>

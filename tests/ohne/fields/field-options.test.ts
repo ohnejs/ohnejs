@@ -166,7 +166,6 @@ describe('field over a column-less field type', () => {
     // @ts-expect-error a composite field has no column to constrain
     field('object', { fields: { street: field('text') }, unique: true });
 
-    // @ts-expect-error an absent object row already reads as `null`
     field('object', { fields: { street: field('text') }, nullable: true });
 
     // @ts-expect-error a repeater with no items is empty, never `NULL`

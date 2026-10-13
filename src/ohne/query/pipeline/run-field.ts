@@ -80,7 +80,7 @@ export function isProvided(input: Readonly<Record<string, unknown>>, name: strin
  */
 function isDefaultShaped(meta: FieldQueryMeta, value: unknown): boolean {
   if (meta.kind === 'column' || meta.kind === 'record') return true;
-  if (meta.kind === 'childOne') return isNull(value) || isObject(value);
+  if (meta.kind === 'childOne') return isNull(value) ? meta.nullable : isObject(value);
   if (!isArray(value)) return false;
   return meta.kind === 'records' ? value.every(isString) : value.every(isObject);
 }
@@ -136,7 +136,6 @@ export async function defaultPath(
   if (meta.kind === 'records' || meta.kind === 'childMany' || meta.kind === 'blocks') {
     return forbidden && !inactive ? { errors: { [name]: 'validation.required' } } : land([]);
   }
-  if (meta.kind === 'childOne') return { value: null };
   if (!isUndefined(meta.fieldType?.defaultValue)) {
     const value = await resolveDefaultValue(meta.fieldType.defaultValue, wctx);
     if (!forbidden || !isArray(value) || !isEmpty(value)) return land(value);

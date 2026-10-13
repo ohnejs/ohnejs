@@ -67,7 +67,7 @@ export interface FieldQueryMeta {
   /**
    * Whether the field's value shape admits `null`.
    * Column kinds read the resolved option, `forceNullable` folded.
-   * `childOne` is always nullable; `records`, `childMany`, and `translations` never are.
+   * `childOne` reads the resolved option like a column; `records`, `childMany`, and `translations` never are.
    */
   nullable: boolean;
 
@@ -525,7 +525,7 @@ function fieldEntry(
       fieldType,
       type: instance.type,
       options,
-      nullable: kind === 'childOne',
+      nullable: kind === 'childOne' && options.nullable === true,
       table: derivedTableName(logical, name),
       subfields,
       ...(kind === 'childOne' && !isUndefined(orderBy) ? { orderBy } : {}),

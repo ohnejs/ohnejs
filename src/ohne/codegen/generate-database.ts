@@ -933,7 +933,8 @@ function columnDefaulted(
  * Emits one field's create-input type and whether it is optional.
  *
  * A column or `record` takes its value type, optional when nullable or defaulted.
- * A `records` list is optional and defaults to `[]`; an `object` is optional and accepts `null`.
+ * A `records` list is optional and defaults to `[]`.
+ * An `object` is optional when nullable or defaulted, and takes `null` only when nullable.
  * A `repeater` is an optional list of item shapes; a create item carries no `UUID`.
  * A blocks field is an optional list of `{ block; fields }` envelopes, defaulting to `[]`.
  * A list that `forbidsEmpty` is required instead, as `listOptional` decides.
@@ -955,9 +956,11 @@ function insertFieldType(
   }
   if (kind === 'junction') return { type: 'string[]', optional: listOptional(options) };
   if (kind === 'childOne') {
+    const nullable = options.nullable === true;
+    const type = insertObjectType(owner, hint as ChildHint, context);
     return {
-      type: `${insertObjectType(owner, hint as ChildHint, context)} | null`,
-      optional: true,
+      type: nullable ? `${type} | null` : type,
+      optional: nullable || columnDefaulted(options, resolved.registered.fieldType),
     };
   }
   if (kind === 'childMany') {
@@ -1032,9 +1035,11 @@ function updateFieldType(
   }
   if (kind === 'junction') return { type: 'string[]', optional: listOptional(options) };
   if (kind === 'childOne') {
+    const nullable = options.nullable === true;
+    const type = updateObjectType(owner, hint as ChildHint, context, false);
     return {
-      type: `${updateObjectType(owner, hint as ChildHint, context, false)} | null`,
-      optional: true,
+      type: nullable ? `${type} | null` : type,
+      optional: nullable || columnDefaulted(options, resolved.registered.fieldType),
     };
   }
   if (kind === 'childMany') {

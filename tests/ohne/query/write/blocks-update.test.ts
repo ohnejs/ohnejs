@@ -65,6 +65,7 @@ useCollections().register('BUDecks', {
     fields: {
       name: field('text'),
       intro: field('object', {
+        nullable: true,
         fields: { note: field('text'), banner: field('blocks', { allow: ['BUHero'] }) },
       }),
       sections: field('repeater', {

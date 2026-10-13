@@ -30,6 +30,7 @@ useCollections().register('Raids', {
       loot: field('records', { collection: 'Items' }),
       previous: field('record', { collection: 'Raids' }),
       plan: field('object', {
+        nullable: true,
         fields: { tactic: field('text'), password: field('text', { readable: false }) },
       }),
     },

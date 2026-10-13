@@ -127,6 +127,7 @@ export async function guardDiffs(
     await guardAlter(db, dialect, diff, creating, findings);
   }
   await probeDisallowed(db, dialect, live, desired, findings);
+  await probeChildless(db, dialect, live, desired, creating, findings);
   const migratable = [
     ...findings.losses,
     ...findings.purgeable.map((item) => danglingLine(item.table, item.foreignKey, item.count)),
@@ -305,6 +306,47 @@ async function probeDisallowed(
       findings.disallowed.push({ table: table.name, type: row.type, count: row.count, allowed });
     }
   }
+}
+
+/**
+ * Probes every required one-child table for live parent rows that hold no child row.
+ * Such a row would read `null` under a type that promises a value.
+ * The sync refuses until a fill gives it one.
+ * A child table this sync creates, or drops and recreates, has no rows yet, so every live parent row counts.
+ */
+async function probeChildless(
+  db: Transaction,
+  dialect: Dialect,
+  live: readonly TableSchema[],
+  desired: readonly TableSchema[],
+  creating: ReadonlySet<string>,
+  findings: Findings,
+): Promise<void> {
+  const liveNames = new Set(live.map((table) => table.name));
+  for (const table of desired) {
+    if (table.derived?.kind !== 'childOne' || table.derived.required !== true) continue;
+    const parent = table.foreignKeys.find((key) => key.column === '_parentUUID')?.targetTable;
+    if (isUndefined(parent) || !liveNames.has(parent) || creating.has(parent)) continue;
+    const count =
+      liveNames.has(table.name) && !creating.has(table.name)
+        ? await countWhere(db, dialect, parent, childlessCondition(dialect, parent, table.name))
+        : await countRows(db, dialect, parent);
+    if (count === 0) continue;
+    const owner = table.derived.collection ?? table.derived.block;
+    findings.unfilled.push(
+      `- field \`${owner}.${table.derived.path.join('.')}\` is required, but \`${parent}\` holds \`${count}\` ${pluralize(count, 'row')} without a \`${table.name}\` row`,
+    );
+  }
+}
+
+/**
+ * The condition matching parent rows with no row in their one-child table.
+ */
+function childlessCondition(dialect: Dialect, parent: string, child: string): string {
+  return (
+    `NOT EXISTS (SELECT 1 FROM ${dialect.quote(child)} WHERE ` +
+    `${dialect.quote(child)}.${dialect.quote('_parentUUID')} = ${dialect.quote(parent)}.${dialect.quote('UUID')})`
+  );
 }
 
 /**

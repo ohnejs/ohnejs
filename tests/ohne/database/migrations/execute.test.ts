@@ -2031,6 +2031,97 @@ describe('executeMigrations with fills', () => {
     await db.close();
   });
 
+  it('gives each record a required child row on a fill, creating the child table', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['p1', 'p2']);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-city', {
+          from: null,
+          to: { collection: 'Posts', field: 'address.city' },
+          transform: (_value, row) => `City of ${String(row._parentUUID)}`,
+        }),
+      ],
+      desired: [
+        posts,
+        table('Posts_address', {
+          columns: [
+            UUID,
+            { name: '_parentUUID', type: 'text', notNull: true },
+            { name: 'city', type: 'text', notNull: true },
+          ],
+          foreignKeys: [
+            {
+              column: '_parentUUID',
+              targetTable: 'Posts',
+              targetColumn: 'UUID',
+              onDelete: 'cascade',
+            },
+          ],
+          derived: { collection: 'Posts', path: ['address'], kind: 'childOne', required: true },
+        }),
+      ],
+      claimed: classifySchema([posts]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-city', status: 'applied' }]);
+    const rows = await db.query<{ _parentUUID: string; city: string }>(
+      'SELECT "_parentUUID", "city" FROM "Posts_address" ORDER BY "_parentUUID"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row._parentUUID, row.city]),
+      [
+        ['p1', 'City of p1'],
+        ['p2', 'City of p2'],
+      ],
+    );
+    await db.close();
+  });
+
+  it('refuses to create required child rows another column would leave `NULL`', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const address = table('Posts_address', {
+      columns: [
+        UUID,
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: 'street', type: 'text', notNull: true },
+        { name: 'city', type: 'text', notNull: true },
+      ],
+      foreignKeys: [
+        { column: '_parentUUID', targetTable: 'Posts', targetColumn: 'UUID', onDelete: 'cascade' },
+      ],
+      derived: { collection: 'Posts', path: ['address'], kind: 'childOne', required: true },
+    });
+    await materialize(db, [posts, address]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['p1']);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-city', {
+            from: null,
+            to: { collection: 'Posts', field: 'address.city' },
+            transform: () => 'Dalaran',
+          }),
+        ],
+        desired: [posts, address],
+        claimed: classifySchema([posts, address]),
+        force: false,
+      }),
+      (error: { title?: string; body?: string[] }) => {
+        match(error.title ?? '', /cannot create `Posts_address` rows/);
+        match(
+          (error.body ?? []).join('\n'),
+          /`Posts` holds `1` row without a `Posts_address` row, and `street` refuses `NULL`/,
+        );
+        return true;
+      },
+    );
+    await db.close();
+  });
+
   it('fills a block field on the per-type table', async () => {
     const db = await open();
     const hero = table('block_Hero', {

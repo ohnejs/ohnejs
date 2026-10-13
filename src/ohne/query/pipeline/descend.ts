@@ -63,7 +63,8 @@ export async function runCompositeTiers(
  * An absent field takes its empty default, except at the top level of an update, where it is skipped.
  * An explicit `undefined` counts as absent, exactly as `prepareScalar` reads it.
  * A nested composite item is always full, so an absent list or object subfield defaults even under an update.
- * A list rejects `null` - its empty value is `[]`; an `object` accepts `null`, which clears the child row.
+ * A list rejects `null`, since its empty value is `[]`.
+ * A nullable `object` accepts `null`, which clears the child row.
  * Phase B runs the field's own sanitizers and validators over every value, a default included.
  * Only an inactive list's own `[]` is `trusted`, which the scope processor resolves.
  * A provided `object` or repeater also carries its coerced `snapshot`, the view a sibling `when` reads.
@@ -84,7 +85,11 @@ export async function prepareComposite(
   }
   const value = input[name];
   if (meta.kind === 'childOne') {
-    if (isNull(value)) return { value: null, provided: true };
+    if (isNull(value)) {
+      return meta.nullable
+        ? { value: null, provided: true }
+        : { errors: { [name]: 'validation.notNullable' } };
+    }
     if (!isObject(value)) return { errors: { [name]: 'validation.invalidValue' } };
     return { value, provided: true, snapshot: await fieldSnapshot(name, meta, value, ctx) };
   }

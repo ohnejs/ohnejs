@@ -24,7 +24,7 @@ useCollections().register('PPost', {
       rating: field('number', { nullable: true }),
       author: field('record', { collection: 'PUser' }),
       tags: field('records', { collection: 'PTag' }),
-      meta: field('object', { fields: metaFields }),
+      meta: field('object', { nullable: true, fields: metaFields }),
       sections: field('repeater', { fields: sectionFields }),
     },
   },
@@ -140,6 +140,7 @@ useCollections().register('PDefaults', {
         ],
       }),
       meta: field('object', {
+        nullable: true,
         fields: metaFields,
         default: () => ({ note: 'n' }),
         validators: [() => 'object-validator-ran'],

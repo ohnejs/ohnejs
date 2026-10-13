@@ -235,7 +235,7 @@ describe('queryMetadata', () => {
           fieldType: object,
           type: 'object',
           options: { ...COMMON, fields: metaFields },
-          nullable: true,
+          nullable: false,
           table: 'QPosts_meta',
           search: true,
           subfields: {

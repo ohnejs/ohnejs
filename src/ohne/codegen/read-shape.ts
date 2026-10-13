@@ -457,7 +457,10 @@ function valueTypeOf(
   if (!isUndefined(fieldType.schema)) {
     const options = resolveFieldOptions(fieldType, { ...instance.options });
     const hint = fieldType.schema({ name, options });
-    if (hint.kind === 'child') return { type: childValueType(owner, path, hint, walk) };
+    if (hint.kind === 'child') {
+      const nullable = options.nullable === true || options.translatable === true;
+      return { type: childValueType(owner, path, hint, walk, nullable) };
+    }
     if (hint.kind === 'blocks') {
       const allowed = allowedBlocksOf(owner, name, hint, walk);
       return { type: walk.blocksType({ owner, path, allowed }) };
@@ -501,10 +504,16 @@ export function documentedShape(
 /**
  * Assembles a composite's inline record shape from its subfields, recursively.
  * The item `UUID` leads the shape, matching the read: every child row exposes its stable identity.
- * `one` cardinality reads back one row or none, so the shape is nullable; `many` is an array.
+ * `one` cardinality reads back one row, or none when `nullable` (or a locale lacks one); `many` is an array.
  * A `select` cannot address a subfield, so a `readable: false` one drops from the shape entirely.
  */
-function childValueType(owner: ShapeOwner, path: string, hint: ChildHint, walk: ShapeWalk): string {
+function childValueType(
+  owner: ShapeOwner,
+  path: string,
+  hint: ChildHint,
+  walk: ShapeWalk,
+  nullable: boolean,
+): string {
   const prefix = hint.cardinality === 'one' ? `${path}.` : `${path}[].`;
   const members = [
     { doc: jsdocBlock(ITEM_UUID_DOC), line: 'UUID: string;' },
@@ -521,7 +530,8 @@ function childValueType(owner: ShapeOwner, path: string, hint: ChildHint, walk: 
         };
       }),
   ];
-  return documentedShape(members, hint.cardinality === 'one' ? '} | null' : '}[]');
+  if (hint.cardinality === 'many') return documentedShape(members, '}[]');
+  return documentedShape(members, nullable ? '} | null' : '}');
 }
 
 /**
@@ -668,7 +678,8 @@ function fieldBullets(
 }
 
 /**
- * Whether the field itself permits `null`: a lone child row or a nullable-or-forced column, never a list.
+ * Whether the field itself permits `null`: a nullable one-child row, or a nullable or forced column.
+ * A list never does.
  * A translatable column also reads `null` per missing locale, which the translatability line already conveys.
  */
 function fieldNullable(
@@ -676,7 +687,7 @@ function fieldNullable(
   options: ResolvedFieldStorage['options'],
   fieldType: FieldType,
 ): boolean {
-  if (kind === 'childOne') return true;
+  if (kind === 'childOne') return options.nullable === true;
   if (kind === 'childMany' || kind === 'junction' || kind === 'blocks') return false;
   return options.nullable === true || fieldType.forceNullable === true;
 }

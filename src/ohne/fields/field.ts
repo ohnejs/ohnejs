@@ -13,7 +13,7 @@ import { hasKey, isPlainObject, isUndefined } from '../../utils/index.ts';
  */
 export interface FieldOptions {
   /**
-   * Whether the column permits `NULL`.
+   * Whether the value admits `null`: a column permits `NULL`, and a one-child composite may hold no row.
    *
    * @default
    * false
@@ -278,16 +278,31 @@ type DeclaredOptions<K extends FieldTypeName> =
   FieldTypes[K] extends FieldType<infer O> ? O : Record<string, never>;
 
 /**
+ * The storage hint field type `K` returns from `schema`, or `never` when it declares none.
+ */
+type HintOf<K extends FieldTypeName> = FieldTypes[K] extends { schema?(ctx: never): infer H }
+  ? H
+  : never;
+
+/**
  * The common options legal for field type `K`, keyed off its `columnType` and forced-flag literals.
  * A column-less type keeps `translatable` and the visibility flags (`readable`, `writable`, `immutable`).
  * Its derived table can still be locale-scoped, and every kind can hide or lock itself.
- * It drops the unique flags and `index`, having no column, and `nullable`, having no cell to hold `NULL`.
+ * It drops the unique flags and `index`, having no column.
+ * It drops `nullable` too, except on a one-child composite, whose absent row reads `null`.
  * A forced flag is the type's fact, not the field's: the locked option disappears from the call site.
  * `unique` survives a forced index, upgrading it to a unique one.
  * The flags read through `Exclude`, never `NonNullable`: its `& {}` resolves every field type, this one too.
  */
 type CommonOptions<K extends FieldTypeName> = FieldTypes[K]['columnType'] extends false
-  ? Pick<FieldOptions, 'translatable' | 'readable' | 'writable' | 'immutable'>
+  ? Pick<
+      FieldOptions,
+      | 'translatable'
+      | 'readable'
+      | 'writable'
+      | 'immutable'
+      | ([HintOf<K>] extends [{ kind: 'child'; cardinality: 'one' }] ? 'nullable' : never)
+    >
   : Omit<
       FieldOptions,
       | (Exclude<FieldTypes[K]['forceNullable'], undefined> extends true ? 'nullable' : never)

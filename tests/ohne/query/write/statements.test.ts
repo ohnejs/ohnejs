@@ -29,6 +29,7 @@ useCollections().register('STPost', {
       items: field('repeater', { fields: { name: field('text'), qty: field('integer') } }),
       body: field('blocks', { allow: ['STHero'] }),
       meta: field('object', {
+        nullable: true,
         fields: {
           note: field('text'),
           links: field('repeater', { fields: { label: field('text') } }),

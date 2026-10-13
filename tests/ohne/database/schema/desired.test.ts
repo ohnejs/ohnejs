@@ -767,6 +767,7 @@ describe('buildDesiredSchema', () => {
       collection: 'Posts',
       path: ['address'],
       kind: 'childOne',
+      required: true,
     });
   });
 
@@ -1079,31 +1080,38 @@ describe('buildDesiredSchema', () => {
     );
   });
 
-  it('rejects nullable on a composite, the message following the cardinality', () => {
-    const cases = [
-      { type: 'object', pattern: /absent row already reads as `null`/ },
-      { type: 'repeater', pattern: /empty, never `NULL`/ },
-    ];
-    for (const { type, pattern } of cases) {
-      throws(
-        () =>
-          buildDesiredSchema(
-            collections({
-              name: 'Posts',
-              collection: {
-                fields: {
-                  meta: {
-                    type,
-                    options: { fields: { x: field('text') }, nullable: true },
-                  } as unknown as FieldInstance,
-                },
+  it('takes nullable on an object, which then leaves its table unrequired', () => {
+    const [, child] = buildDesiredSchema(
+      collections({
+        name: 'Posts',
+        collection: {
+          fields: { meta: field('object', { nullable: true, fields: { x: field('text') } }) },
+        },
+      }),
+      useFields(),
+    );
+    deepStrictEqual(child!.derived, { collection: 'Posts', path: ['meta'], kind: 'childOne' });
+  });
+
+  it('rejects nullable on a repeater, which is empty, never `NULL`', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: {
+                meta: {
+                  type: 'repeater',
+                  options: { fields: { x: field('text') }, nullable: true },
+                } as unknown as FieldInstance,
               },
-            }),
-            useFields(),
-          ),
-        bodyMatching(pattern),
-      );
-    }
+            },
+          }),
+          useFields(),
+        ),
+      bodyMatching(/empty, never `NULL`/),
+    );
   });
 
   it('rejects unique and index on a composite field', () => {
@@ -1484,7 +1492,12 @@ describe('buildDesiredSchema', () => {
         onDelete: 'cascade',
       },
     ]);
-    deepStrictEqual(meta.derived, { block: 'Hero', path: ['meta'], kind: 'childOne' });
+    deepStrictEqual(meta.derived, {
+      block: 'Hero',
+      path: ['meta'],
+      kind: 'childOne',
+      required: true,
+    });
     deepStrictEqual(tables[4]!.derived, { block: 'Hero', path: ['links'], kind: 'childMany' });
   });
 

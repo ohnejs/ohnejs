@@ -375,7 +375,7 @@ function buildFieldMembers(
     if (hint?.kind === 'child') {
       members.columnless.add(name);
       members.derived.push(
-        ...buildChildTable(parent, name, label, hint, registries, reachable, locale),
+        ...buildChildTable(parent, name, label, hint, registries, reachable, locale, options),
       );
       continue;
     }
@@ -590,6 +590,7 @@ function buildJunctionTable(
  * Subfields walk the same routing as collection fields, so composites and relations nest freely.
  * Returns the child table first, its own derived tables after, depth-first.
  *
+ * A `one` composite that is not `nullable` marks its origin `required`, unless a locale may lack its row.
  * A translatable composite's child table gains `_localeCode` and is scoped per (parent, locale).
  * The `one` unique widens over it; a `many` list orders per locale.
  * Nested tables stay plain: they scope through their parent chain.
@@ -605,6 +606,7 @@ function buildChildTable(
   registries: SchemaRegistries,
   reachable: Set<string>,
   locale: boolean,
+  options: Readonly<Record<string, unknown>>,
 ): TableSchema[] {
   const scope = `${parent.owner.name}.${label}`;
   const subnames = Object.keys(hint.subfields);
@@ -614,7 +616,11 @@ function buildChildTable(
   const one = hint.cardinality === 'one';
   const parentKey = locale ? ['_parentUUID', '_localeCode'] : ['_parentUUID'];
   const logical = `${parent.logical}_${name}`;
-  const origin = originOf(parent, name, one ? 'childOne' : 'childMany');
+  const required = one && !locale && options.nullable !== true;
+  const origin: DerivedOrigin = {
+    ...originOf(parent, name, one ? 'childOne' : 'childMany'),
+    ...(required ? { required: true } : {}),
+  };
   const next: DerivedParent = {
     owner: parent.owner,
     logical,

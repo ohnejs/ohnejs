@@ -68,8 +68,9 @@ describe('validateField default rules', () => {
     throws(() => check({ default: null }, columnLess, blocksHint), /default to `null`/);
   });
 
-  it('accepts a `null` default on an object, which clears the child row', () => {
-    doesNotThrow(() => check({ default: null }, columnLess, childOne));
+  it('accepts a `null` default only on a nullable object', () => {
+    doesNotThrow(() => check({ nullable: true, default: null }, columnLess, childOne));
+    throws(() => check({ default: null }, columnLess, childOne), /default to `null`/);
   });
 
   it('rejects a literal default on a relation or composite', () => {

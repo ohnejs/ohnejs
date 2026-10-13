@@ -140,6 +140,7 @@ useCollections().register('WNSubstrate', {
   collection: {
     fields: {
       meta: field('object', {
+        nullable: true,
         fields: { n: field('integer', { default: 5 }), tag: field('text', { nullable: true }) },
       }),
       items: field('repeater', { fields: { x: field('text', { default: 'go' }) } }),

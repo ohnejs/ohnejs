@@ -39,7 +39,7 @@ useCollections().register('QPosts', {
       summary: field('text', { nullable: true }),
       author: field('record', { collection: 'QUsers' }),
       tags: field('records', { collection: 'QTags' }),
-      meta: field('object', { fields: { note: field('text') } }),
+      meta: field('object', { nullable: true, fields: { note: field('text') } }),
       sections: field('repeater', { fields: { label: field('text') } }),
     },
   },
@@ -223,10 +223,10 @@ describe('the typed builder narrows in a consumer app', () => {
         "  teaser: field('text', { translatable: true, default: '' }),\n" +
         "  author: field('record', { collection: 'Users' }),\n" +
         "  tags: field('records', { collection: 'Tags' }),\n" +
-        "  meta: field('object', { fields: { note: field('text') } }),\n" +
+        "  meta: field('object', { nullable: true, fields: { note: field('text') } }),\n" +
         "  sections: field('repeater', { fields: { heading: field('text') } }),\n" +
         "  content: field('blocks'),\n" +
-        "  span: field('span'),\n" +
+        "  span: field('span', { nullable: true }),\n" +
         '} });\n',
     );
 

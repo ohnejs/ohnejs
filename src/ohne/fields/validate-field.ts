@@ -299,13 +299,11 @@ export function validateField(args: ValidateFieldArgs): void {
       ],
     });
   }
-  if (hint?.kind === 'child' && !isUndefined(options.nullable)) {
+  if (hint?.kind === 'child' && hint.cardinality === 'many' && !isUndefined(options.nullable)) {
     throw ohneError({
       title: `Field \`${name}\` cannot be nullable`,
       body: [
-        hint.cardinality === 'one'
-          ? `${where} holds at most one child row, and an absent row already reads as \`null\`.`
-          : `${where} is an ordered list: with no items it is empty, never \`NULL\`.`,
+        `${where} is an ordered list: with no items it is empty, never \`NULL\`.`,
         'Drop `nullable`.',
       ],
     });
@@ -359,7 +357,7 @@ export function validateField(args: ValidateFieldArgs): void {
   }
   if (
     options.writable === false &&
-    fieldType.columnType !== false &&
+    (fieldType.columnType !== false || (hint?.kind === 'child' && hint.cardinality === 'one')) &&
     options.nullable !== true &&
     fieldType.forceNullable !== true &&
     (!hasKey(options, 'default') || isUndefined(options.default)) &&
@@ -408,7 +406,7 @@ export function validateField(args: ValidateFieldArgs): void {
     const value = options.default;
     const valueShapeNullable =
       hint?.kind === 'child'
-        ? hint.cardinality === 'one'
+        ? hint.cardinality === 'one' && options.nullable === true
         : hint?.kind === 'junction' || hint?.kind === 'blocks'
           ? false
           : options.nullable === true || fieldType.forceNullable === true;

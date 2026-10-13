@@ -60,6 +60,7 @@ useCollections().register('LProfiles', {
   collection: {
     fields: {
       meta: field('object', {
+        nullable: true,
         translatable: true,
         fields: { note: field('text', { nullable: true }) },
       }),

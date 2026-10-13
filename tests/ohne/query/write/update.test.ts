@@ -50,7 +50,10 @@ useCollections().register('UPost', {
       summary: field('text', { nullable: true }),
       author: field('record', { collection: 'UUser' }),
       tags: field('records', { collection: 'UTag' }),
-      meta: field('object', { fields: { note: field('text', { nullable: true }) } }),
+      meta: field('object', {
+        nullable: true,
+        fields: { note: field('text', { nullable: true }) },
+      }),
       sections: field('repeater', {
         fields: { heading: field('text'), slug: field('text', { nullable: true }) },
       }),
@@ -94,6 +97,7 @@ useCollections().register('UNest', {
   collection: {
     fields: {
       box: field('object', {
+        nullable: true,
         fields: { items: field('repeater', { fields: { label: field('text') } }) },
       }),
     },

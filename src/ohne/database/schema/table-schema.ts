@@ -96,6 +96,12 @@ export interface DerivedOrigin {
   kind: 'junction' | 'childOne' | 'childMany' | 'blocksWrapper';
 
   /**
+   * Whether every parent row must hold its child row; a `childOne` that is not `nullable` only.
+   * The guard probes live parents against it, so making a composite required never strands a row.
+   */
+  required?: true;
+
+  /**
    * The block types the wrapper may hold, resolved against the block registry; `blocksWrapper` only.
    * The guard probes live rows against it, so a type removal or allow-list shrink never passes silently.
    */

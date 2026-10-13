@@ -50,6 +50,7 @@ useCollections().register('LPosts', {
         translatable: true,
       }),
       meta: field('object', {
+        nullable: true,
         translatable: true,
         fields: { note: field('text') },
       }),

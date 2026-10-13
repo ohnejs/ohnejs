@@ -42,8 +42,8 @@ useCollections().register('OEvents', {
   collection: {
     fields: {
       title: field('text'),
-      span: composite('oSpan'),
-      meta: field('object', { fields: { note: field('text') } }),
+      span: composite('oSpan', { nullable: true }),
+      meta: field('object', { nullable: true, fields: { note: field('text') } }),
     },
   },
 });

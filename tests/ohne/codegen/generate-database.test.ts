@@ -272,7 +272,7 @@ describe('generateDatabase', () => {
 
     ok(
       bare.includes(
-        '    address: {\n      UUID: string;\n      street: string;\n      city: string | null;\n    } | null;',
+        '    address: {\n      UUID: string;\n      street: string;\n      city: string | null;\n    };',
       ),
     );
     ok(
@@ -280,6 +280,36 @@ describe('generateDatabase', () => {
         '    sections: {\n      UUID: string;\n      title: string;\n      items: {\n        UUID: string;\n        label: string;\n      }[];\n    }[];',
       ),
     );
+  });
+
+  it('reads a one-child composite as `null` only when nullable or per locale', async () => {
+    const app = join(root, 'composite-null');
+    writePackage(app, 'composite-null');
+    write(
+      app,
+      'collections/Posts.ts',
+      'export default { fields: {\n' +
+        "  address: { type: 'object', options: { fields: { city: { type: 'text', options: {} } } } },\n" +
+        "  notes: { type: 'object', options: { nullable: true, fields: { body: { type: 'text', options: {} } } } },\n" +
+        "  local: { type: 'object', options: { translatable: true, fields: { tag: { type: 'text', options: {} } } } },\n" +
+        "  items: { type: 'repeater', options: { fields: { geo: { type: 'object', options: { fields: { lat: { type: 'number', options: {} } } } } } } },\n" +
+        '} };\n',
+    );
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const bare = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
+    const reads = section(bare, 'GeneratedCollections');
+    const inserts = section(bare, 'GeneratedInserts');
+
+    ok(reads.includes('    address: {\n      UUID: string;\n      city: string;\n    };'));
+    ok(reads.includes('    notes: {\n      UUID: string;\n      body: string;\n    } | null;'));
+    ok(reads.includes('    local: {\n      UUID: string;\n      tag: string;\n    } | null;'));
+    ok(inserts.includes('    address: {\n'));
+    ok(inserts.includes('    notes?: {\n'));
+    const updates = section(bare, 'GeneratedUpdates');
+    ok(updates.includes('      geo: {\n'));
+    ok(!updates.includes('geo?:'));
   });
 
   it('documents each field with a headline and resolved-config bullets', async () => {
@@ -1203,7 +1233,7 @@ describe('generateDatabase', () => {
     const bare = stripDocs(readFileSync(paths[0] ?? '', 'utf8'));
     const blocks = section(bare, 'GeneratedBlocks');
 
-    ok(bare.includes('    profile: {\n      UUID: string;\n      bio: string;\n    } | null;'));
+    ok(bare.includes('    profile: {\n      UUID: string;\n      bio: string;\n    };'));
     ok(!section(bare, 'GeneratedCollections').includes('pin'));
     ok(bare.includes('pin: { scalar: string; readable: false }'));
     ok(blocks.includes('  Teaser: {\n    headline: string;\n  };'));

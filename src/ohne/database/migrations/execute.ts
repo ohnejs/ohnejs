@@ -528,6 +528,7 @@ async function runMove(
  * A missing column lands nullable first; the sync's diff tightens it once the values are in.
  * A missing column must be desired or consumed by a later migration, or the fill is stale and refuses.
  * An absent table skips: it holds no rows to fill, and the diff creates it empty.
+ * A required one-child table is the exception: each record without its child row gains one, as on a move.
  * A cell already holding a value is never touched, so the same fill is correct over any live state.
  */
 async function runFill(
@@ -538,6 +539,8 @@ async function runFill(
 ): Promise<MigrationStamp> {
   const { to, transform } = form;
   if (foreign(engine, to.table)) refuseForeign(meta, to.table);
+  const parent = requiredChildParent(engine, to.table);
+  if (!isUndefined(parent)) await fillChildless(engine, meta, to, parent, transform);
   const schema = present(engine, to.table) ? await describe(engine, to.table) : undefined;
   const column = schema?.columns.find((item) => item.name === to.column);
   if (isUndefined(column) && !(await columnSatisfied(engine, to, later))) {
@@ -560,6 +563,72 @@ async function runFill(
   }
   await runValuePass(engine, meta, to.table, to.column, transform, true);
   return { name: meta.name, status: 'applied' };
+}
+
+/**
+ * The live parent of a required one-child table, or `undefined` when there is none.
+ */
+function requiredChildParent(engine: Engine, table: string): string | undefined {
+  const wanted = engine.desired.find((item) => item.name === table);
+  if (wanted?.derived?.kind !== 'childOne' || wanted.derived.required !== true) return undefined;
+  const parent = wanted.foreignKeys.find((key) => key.column === '_parentUUID')?.targetTable;
+  return !isUndefined(parent) && present(engine, parent) ? parent : undefined;
+}
+
+/**
+ * Gives each parent record without its required child row one, holding the transform's value in `to`.
+ * The table materializes first when missing, so a fill can back a newly added required `object`.
+ * Another column that refuses `NULL` could never hold a valid row, so the fill refuses instead.
+ */
+async function fillChildless(
+  engine: Engine,
+  meta: MigrationMeta,
+  to: ColumnAddress,
+  parent: string,
+  transform: MigrationTransform,
+): Promise<void> {
+  const { db, dialect } = engine;
+  const schema = await materializeTarget(engine, meta, to);
+  const parentSchema = await describe(engine, parent);
+  const parents = await db.query<Record<string, SQLValue>>(
+    `SELECT * FROM ${dialect.quote(parent)} WHERE NOT EXISTS (SELECT 1 FROM ${dialect.quote(to.table)} ` +
+      `WHERE ${dialect.quote(to.table)}.${dialect.quote('_parentUUID')} = ${dialect.quote(parent)}.${dialect.quote('UUID')})`,
+  );
+  if (isEmpty(parents)) return;
+  const blocking = schema.columns.find(
+    (column) => column.notNull && !['UUID', '_parentUUID', to.column].includes(column.name),
+  );
+  if (!isUndefined(blocking)) {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` cannot create \`${to.table}\` rows`,
+      body: [
+        `\`${parent}\` holds \`${parents.length}\` ${pluralize(parents.length, 'row')} without a \`${to.table}\` row, and \`${blocking.name}\` refuses \`NULL\`.`,
+        'Give those records the field through your app first, or make it `nullable`.',
+      ],
+      path: meta.file,
+    });
+  }
+  const column = schema.columns.find((item) => item.name === to.column) as ColumnSchema;
+  const insert =
+    `INSERT INTO ${dialect.quote(to.table)} (${['UUID', '_parentUUID', to.column].map((name) => dialect.quote(name)).join(', ')}) ` +
+    'VALUES (?, ?, ?)';
+  const doomed: Record<string, SQLValue>[] = [];
+  for (const record of parents) {
+    const row: Record<string, SQLValue> = { UUID: uuidv7(), _parentUUID: record.UUID ?? null };
+    const ctx = switchContext(engine, undefined);
+    const out = await applyRowTransform(meta, transform, null, schema, row, ctx, engine);
+    if (out === DELETE_RECORD) {
+      doomed.push(record);
+      continue;
+    }
+    if (isUndefined(out)) continue;
+    await db.run(insert, [
+      row.UUID ?? null,
+      row._parentUUID ?? null,
+      dialect.serialize(column.type, out),
+    ]);
+  }
+  await deleteOwnedRows(engine, parentSchema, doomed);
 }
 
 /**

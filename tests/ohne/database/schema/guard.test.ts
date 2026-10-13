@@ -65,6 +65,104 @@ function bodyOf(error: OhneError): string {
 }
 
 describe('guardDiffs', () => {
+  it('refuses a required one-child table over parent rows that hold no child row', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const child = (required: boolean): TableSchema =>
+      table('Posts_meta', {
+        columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+        foreignKeys: [
+          {
+            column: '_parentUUID',
+            targetTable: 'Posts',
+            targetColumn: 'UUID',
+            onDelete: 'cascade',
+          },
+        ],
+        derived: {
+          collection: 'Posts',
+          path: ['meta'],
+          kind: 'childOne',
+          ...(required ? { required: true as const } : {}),
+        },
+      });
+    await materialize(db, [posts, child(false)]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['a', 'b']);
+    await db.run('INSERT INTO "Posts_meta" ("UUID", "_parentUUID") VALUES (?, ?)', ['m', 'a']);
+    deepStrictEqual(await guard(db, [posts, child(false)], [posts, child(false)]), {
+      deletions: [],
+      warnings: [],
+    });
+    const error = await refusalOf(guard(db, [posts, child(false)], [posts, child(true)]));
+    match(
+      bodyOf(error),
+      /field `Posts.meta` is required, but `Posts` holds `1` row without a `Posts_meta` row/,
+    );
+    await db.run('INSERT INTO "Posts_meta" ("UUID", "_parentUUID") VALUES (?, ?)', ['n', 'b']);
+    deepStrictEqual(await guard(db, [posts, child(false)], [posts, child(true)]), {
+      deletions: [],
+      warnings: [],
+    });
+    await db.close();
+  });
+
+  it('counts a one-child table the sync recreates as holding no rows', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const parentKey = {
+      column: '_parentUUID',
+      targetTable: 'Posts',
+      targetColumn: 'UUID',
+      onDelete: 'cascade',
+    } as const;
+    const junction = table('Posts_meta', {
+      columns: [
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: '_targetUUID', type: 'text', notNull: true },
+      ],
+      primaryKey: ['_parentUUID', '_targetUUID'],
+      derived: { collection: 'Posts', path: ['meta'], kind: 'junction' },
+    });
+    const one = table('Posts_meta', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      foreignKeys: [parentKey],
+      derived: { collection: 'Posts', path: ['meta'], kind: 'childOne', required: true },
+    });
+    await materialize(db, [posts, junction]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
+    await db.run('INSERT INTO "Posts_meta" ("_parentUUID", "_targetUUID") VALUES (?, ?)', [
+      'a',
+      't',
+    ]);
+    const error = await refusalOf(guard(db, [posts, junction], [posts, one], true));
+    match(
+      bodyOf(error),
+      /field `Posts.meta` is required, but `Posts` holds `1` row without a `Posts_meta` row/,
+    );
+    await db.close();
+  });
+
+  it('refuses a new required one-child table over a populated parent', async () => {
+    const db = await open();
+    const posts = table('Posts');
+    const child = table('Posts_meta', {
+      columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
+      foreignKeys: [
+        { column: '_parentUUID', targetTable: 'Posts', targetColumn: 'UUID', onDelete: 'cascade' },
+      ],
+      derived: { collection: 'Posts', path: ['meta'], kind: 'childOne', required: true },
+    });
+    await materialize(db, [posts]);
+    deepStrictEqual(await guard(db, [posts], [posts, child]), { deletions: [], warnings: [] });
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
+    const error = await refusalOf(guard(db, [posts], [posts, child]));
+    match(
+      bodyOf(error),
+      /field `Posts.meta` is required, but `Posts` holds `1` row without a `Posts_meta` row/,
+    );
+    await db.close();
+  });
+
   it('lets an empty diff through untouched', async () => {
     const db = await open();
     deepStrictEqual(await guard(db, [], []), { deletions: [], warnings: [] });

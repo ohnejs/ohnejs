@@ -23,12 +23,14 @@ import { validateFieldType } from './validate-field.ts';
  * `TOptions` captures the options this type declares, so `field('<name>', ...)` narrows to them.
  * `TColumn` keeps the `columnType` literal, so column-less types stay distinguishable at the type level.
  * `TForceNullable` and `TForceIndex` keep the forced flags, so `field(...)` hides the options they lock.
+ * `THint` keeps the storage hint `schema` returns, so a one-child composite keeps `nullable`.
  */
 export interface FieldType<
   TOptions extends Record<string, AnyOptionDef> = Record<string, AnyOptionDef>,
   TColumn extends LogicalType | false = LogicalType | false,
   TForceNullable extends boolean = boolean,
   TForceIndex extends boolean = boolean,
+  THint extends StorageHint = StorageHint,
 > {
   /**
    * The storage primitive of the field's own column, or `false` when the field owns no column.
@@ -103,7 +105,7 @@ export interface FieldType<
    * `ctx` carries the field's name and its resolved options.
    * Mutually exclusive with `emitType` and `emitJSONType`: the framework derives the type from the hint.
    */
-  schema?(ctx: FieldContext<TOptions>): StorageHint;
+  schema?(ctx: FieldContext<TOptions>): THint;
 
   /**
    * Emits the field's TypeScript value type as source, run at codegen time.
@@ -362,9 +364,10 @@ export function defineField<
   TColumn extends LogicalType | false = LogicalType | false,
   TForceNullable extends boolean = boolean,
   TForceIndex extends boolean = boolean,
+  THint extends StorageHint = StorageHint,
 >(
-  type: FieldType<TOptions, TColumn, TForceNullable, TForceIndex>,
-): FieldType<TOptions, TColumn, TForceNullable, TForceIndex> {
+  type: FieldType<TOptions, TColumn, TForceNullable, TForceIndex, THint>,
+): FieldType<TOptions, TColumn, TForceNullable, TForceIndex, THint> {
   validateFieldType(type);
   return type;
 }
