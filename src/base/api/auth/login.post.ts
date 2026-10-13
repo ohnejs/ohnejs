@@ -6,13 +6,12 @@ import {
   unauthorized,
   useDatabase,
 } from 'ohnejs';
-import { isString, isUndefined } from 'ohnejs/utils';
+import { isString, isUndefined, normalizeEmail } from 'ohnejs/utils';
 import { passwordNeedsRehash, verifyPassword } from 'ohnejs/utils/crypto';
 
 import type { User } from '../../auth/types.ts';
 
 import { translate } from '../../../ohne/http/translate.ts';
-import { normalizeEmail } from '../../auth/_email.ts';
 import { enforceLoginRateLimit } from '../../auth/_login-rate-limit.ts';
 import { acquirePasswordPermit } from '../../auth/_password-permits.ts';
 import { passwordRehashes } from '../../auth/_sessions.ts';
