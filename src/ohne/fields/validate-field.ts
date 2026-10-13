@@ -124,6 +124,7 @@ export interface ValidateFieldArgs {
  * - `translatable` is a top-level collection field's flag: subfields and block fields reject it.
  * - An `inverse` field follows the owning side's junction, so it rejects `translatable` too.
  * - `uniquePerLocale` narrows a unique on a translatable field, so it requires both flags.
+ * - `uniquePerLocale` is top-level only: a subfield or block field's unique spans every locale.
  * - `uniquePerParent` narrows a unique too, so it requires the flag; its placement is the schema's rule.
  * - `writable: false` on a required column with no default, instance or type, would fail every create.
  * - `immutable` on top of `writable: false` is redundant - the wider flag already locks updates.
@@ -251,6 +252,17 @@ export function validateField(args: ValidateFieldArgs): void {
       body: [
         "An inverse field reuses the owning side's junction, so the owning field decides translatability.",
         'Drop `translatable`.',
+      ],
+    });
+  }
+  if (options.uniquePerLocale === true && (nested || owner.kind === 'block')) {
+    throw ohneError({
+      title: `Field \`${name}\` cannot scope its unique per locale`,
+      body: [
+        nested
+          ? `${where} is a subfield, and its \`unique\` spans every locale of every record.`
+          : `${where} belongs to a block, and its \`unique\` spans every locale of every instance.`,
+        'Drop `uniquePerLocale`.',
       ],
     });
   }

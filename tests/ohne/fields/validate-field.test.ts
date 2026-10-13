@@ -184,6 +184,33 @@ describe('validateField write flags', () => {
       'Field `field` cannot be immutable',
     );
   });
+
+  for (const [where, owner, nested] of [
+    ['a subfield', { kind: 'collection', name: 'Posts' }, true],
+    ['a block field', { kind: 'block', name: 'Hero' }, false],
+  ] as const) {
+    it(`rejects \`uniquePerLocale\` on ${where} with a fix that does not loop`, () => {
+      throws(
+        () =>
+          validateField({
+            owner,
+            name: 'field',
+            nested,
+            instance: {
+              type: 'x',
+              options: { unique: true, uniquePerLocale: true },
+            } as unknown as FieldInstance,
+            fieldType: column,
+            hint: undefined,
+          }),
+        (error: unknown) =>
+          isOhneError(error) &&
+          error.title === 'Field `field` cannot scope its unique per locale' &&
+          Array.isArray(error.body) &&
+          error.body.at(-1) === 'Drop `uniquePerLocale`.',
+      );
+    });
+  }
 });
 
 describe('validateField validateOptions', () => {
