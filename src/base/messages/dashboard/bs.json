@@ -132,6 +132,9 @@
   "duplicate": "Dupliciraj",
   "edit": "Uredi",
   "editFieldValue": "Uredi vrijednost polja",
+  "email": {
+    "write": "Napiši email"
+  },
   "empty": {
     "title": "Nema zapisa",
     "body": "Ova kolekcija je prazna."

@@ -132,6 +132,9 @@
   "duplicate": "Duplicate",
   "edit": "Edit",
   "editFieldValue": "Edit field value",
+  "email": {
+    "write": "Write an email"
+  },
   "empty": {
     "title": "No records",
     "body": "This collection is empty."

@@ -132,6 +132,9 @@
   "duplicate": "Duplizieren",
   "edit": "Bearbeiten",
   "editFieldValue": "Feldwert bearbeiten",
+  "email": {
+    "write": "E-Mail schreiben"
+  },
   "empty": {
     "title": "Keine Datensätze",
     "body": "Diese Sammlung ist leer."
