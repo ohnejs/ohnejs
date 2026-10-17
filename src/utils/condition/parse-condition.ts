@@ -5,6 +5,7 @@ import { isNumber } from '../is/is-number.ts';
 import { isPlainObject } from '../is/is-plain-object.ts';
 import { isString } from '../is/is-string.ts';
 import { isUndefined } from '../is/is-undefined.ts';
+import { parseFieldPath } from './field-path.ts';
 import {
   compareOperators,
   type CompareOperator,
@@ -87,28 +88,6 @@ function join(path: string, key: string): string {
  */
 function isScalar(value: unknown): value is string | number | boolean {
   return isString(value) || isNumber(value) || isBoolean(value);
-}
-
-/**
- * Splits a field key into an optional `/`, one `..` per leading `../`, then dot parts; an empty part fails.
- */
-function fieldPath(key: string, path: string): string[] {
-  const segments: string[] = [];
-  let rest = key;
-  if (rest.startsWith('/')) {
-    segments.push('/');
-    rest = rest.slice(1);
-  }
-  while (rest.startsWith('../')) {
-    segments.push('..');
-    rest = rest.slice(3);
-  }
-  if (rest === '') fail('invalidShape', path, key);
-  for (const segment of rest.split('.')) {
-    if (segment === '') fail('invalidShape', path, key);
-    segments.push(segment);
-  }
-  return segments;
 }
 
 /**
@@ -230,7 +209,7 @@ function parseWhere(input: unknown, path: string, depth: number, maxDepth: numbe
     } else if (key === 'not') {
       parts.push(negate(parseWhere(value, keyPath, depth + 1, maxDepth)));
     } else {
-      const field = fieldPath(key, keyPath);
+      const field = parseFieldPath(key) ?? fail('invalidShape', keyPath, key);
       if (isNull(value)) {
         fail('nullEquality', keyPath, key);
       } else if (isScalar(value)) {
