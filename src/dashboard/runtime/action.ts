@@ -3,8 +3,10 @@ import type { SearchParamValue } from '../../utils/search-params/coerce-token.ts
 import type { APIRouteID } from './known-api-routes.ts';
 import type { Resource, RouteValues } from './resource.ts';
 
+import { formatLocaleCode } from '../../utils/i18n/format-locale-code.ts';
 import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
+import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { mapValues } from '../../utils/object/map-values.ts';
 import { ref } from '../../utils/reactive/ref.ts';
@@ -146,6 +148,7 @@ interface Call {
  * Local form errors and an empty patch send nothing.
  * A busy `503` is retried once, after its `Retry-After` or a second.
  * A `422` routes its `data.errors` onto the form's fields and toasts the error count.
+ * When it names a `data.locale`, as a create with `locales` does, the toast names that locale too.
  * A `401` is left to the session handler; any other failure toasts the server's message.
  * `onError` replaces every failure toast.
  * On success the form is rebased, the `reload` resources reload, and `onDone` gets the answer.
@@ -184,8 +187,10 @@ export function useAction<T = unknown>(
     const unplaced = isUndefined(errors) || isUndefined(form) ? undefined : form.setErrors(errors);
     if (!isUndefined(options.onError)) options.onError(error);
     else if (!isUndefined(errors) && !isEmpty(errors)) {
+      const at = localeOf(error.data);
+      const where = isUndefined(at) ? '' : ` (${formatLocaleCode(at)})`;
       const rows = isUndefined(unplaced)
-        ? Object.entries(errors).map(([path, message]) => `\`${path}\`: ${message}`)
+        ? Object.entries(errors).map(([path, message]) => `\`${path}\`${where}: ${message}`)
         : [unplaced].filter((message) => message !== '');
       toast(foundErrors(Object.keys(errors).length), {
         type: 'error',
@@ -282,6 +287,13 @@ function parseJSON(text: string): unknown {
 function errorsOf(data: unknown): Readonly<Record<string, string>> | undefined {
   if (!isPlainObject(data) || !isPlainObject(data.errors)) return undefined;
   return data.errors as Readonly<Record<string, string>>;
+}
+
+/**
+ * The locale a `422` names as where its errors are, when it names one.
+ */
+function localeOf(data: unknown): string | undefined {
+  return isPlainObject(data) && isString(data.locale) ? data.locale : undefined;
 }
 
 /**

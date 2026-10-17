@@ -28,6 +28,7 @@ function collection(
     label: 'Posts',
     translatable,
     singleton: false,
+    duplicable: false,
     operations: { read: open, create: null, update: null, delete: null, ...operations },
     fields: [],
     labelFields: [],

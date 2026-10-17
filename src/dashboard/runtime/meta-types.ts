@@ -266,6 +266,15 @@ export interface DashboardCollection {
   singleton: boolean;
 
   /**
+   * Whether a duplicate can succeed as is, so the dashboard offers it.
+   * Never on a collection that declares `duplicate: false`.
+   * It can when the collection shapes its copies with a `duplicate` function.
+   * Otherwise no required field may be one a copy leaves out.
+   * A copy leaves out top-level `unique` fields, unreadable ones, and `copy: false` types.
+   */
+  duplicable: boolean;
+
+  /**
    * The collection's operations, each `null` when closed.
    */
   operations: DashboardOperations;
