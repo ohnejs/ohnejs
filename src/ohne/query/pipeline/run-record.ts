@@ -38,6 +38,7 @@ export interface RecordWriteContext {
 
   /**
    * Whether the record is being created or updated.
+   * A create's `locales` run as an `update` each, since they write one locale of a record that exists.
    */
   operation: FieldOperation;
 
@@ -52,6 +53,7 @@ declare module 'ohnejs' {
     /**
      * Filters the raw input of a create or update before the pipeline coerces it, inside the transaction.
      * Fires once per create or update call, however many records the update matches.
+     * A create with `locales` fires it once more per locale, as an `update` carrying that locale's values.
      * One site covers every caller, so a timestamps, tenant, or audit layer stamps input everywhere.
      * Return a replacement record, or mutate the passed object in place and return nothing.
      * The `ctx` carries the `collection`, the `operation`, and the open `tx`.
@@ -69,6 +71,7 @@ declare module 'ohnejs' {
 export interface ScopeContext {
   /**
    * Whether the record is being created or updated.
+   * A create's `locales` run as an `update` each, since they write one locale of a record that exists.
    */
   operation: FieldOperation;
 

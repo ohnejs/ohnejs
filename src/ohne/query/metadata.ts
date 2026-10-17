@@ -231,6 +231,11 @@ export interface CollectionQueryMeta {
   singleton?: true;
 
   /**
+   * Marks a collection whose records are never duplicated, as its `duplicate: false` declares.
+   */
+  duplicate?: false;
+
+  /**
    * The `<Owner>__translations` table holding the translatable columns, one row per (record, locale).
    * Present when at least one translatable field carries a column.
    */
@@ -356,6 +361,13 @@ export function blockQueryMetadata(block: string): BlockQueryMeta {
 }
 
 /**
+ * Whether an entry's value differs per locale: a `companion` column or a `localeScoped` table.
+ */
+export function isTranslatableEntry(field: FieldQueryMeta): boolean {
+  return field.companion === true || field.localeScoped === true;
+}
+
+/**
  * Rejects a `record` subfield with `onDelete: 'cascade'` anywhere inside a block's field tree.
  *
  * A block's per-type row hangs beneath a polymorphic wrapper that carries no foreign key.
@@ -432,6 +444,7 @@ function buildCollectionMeta(meta: CollectionMeta): CollectionQueryMeta {
     compositeUniques,
     ...(translatable ? { translatable: true } : {}),
     ...(meta.collection.singleton === true ? { singleton: true } : {}),
+    ...(meta.collection.duplicate === false ? { duplicate: false } : {}),
     ...(companion ? { companionTable: companionTableName(meta.name) } : {}),
   };
 }

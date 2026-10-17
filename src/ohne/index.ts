@@ -44,6 +44,7 @@ export * from './collections/known-collections.ts';
 export * from './collections/known-locales.ts';
 export * from './collections/known-relations.ts';
 export * from './collections/known-singletons.ts';
+export * from './collections/known-unduplicable.ts';
 export * from './collections/record-label.ts';
 export * from './collections/scan-layer-collections.ts';
 export * from './collections/use-collections.ts';

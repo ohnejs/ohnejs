@@ -1,6 +1,7 @@
+import type { LocaleCode } from '../../collections/known-locales.ts';
 import type { Message } from '../../messages/known-messages.ts';
 
-import { hasKey } from '../../../utils/index.ts';
+import { hasKey, isUndefined } from '../../../utils/index.ts';
 
 /**
  * A write's field failures, keyed by dot-path.
@@ -23,12 +24,18 @@ export interface ValidationError extends Error {
    * The field failures, keyed by dot-path; every value a `Message` resolved at the boundary.
    */
   errors: FieldErrors;
+
+  /**
+   * The locale whose values failed, when a create with `locales` failed at one of them.
+   */
+  locale?: LocaleCode;
 }
 
 /**
  * Builds the branded error an `*OrThrow` write throws when validation fails.
  *
  * It carries the `errors` map verbatim, so a caller catching it reads the same paths a result would.
+ * A `locale` names the locale whose values failed, as a failed create with `locales` reports it.
  * The message names the failing paths, so an uncaught throw still reads at a glance.
  *
  * @example
@@ -36,13 +43,14 @@ export interface ValidationError extends Error {
  * throw validationError({ title: 'This field is required' })
  * ```
  */
-export function validationError(errors: FieldErrors): ValidationError {
+export function validationError(errors: FieldErrors, locale?: LocaleCode): ValidationError {
   const error = new Error(
     `Validation failed: ${Object.keys(errors).join(', ')}`,
   ) as ValidationError;
   error.name = 'ValidationError';
   Object.defineProperty(error, VALIDATION_ERROR, { value: true });
   error.errors = errors;
+  if (!isUndefined(locale)) error.locale = locale;
   return error;
 }
 

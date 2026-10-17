@@ -18,6 +18,18 @@ import type { UpdateOutcome } from './write/update.ts';
 export type ConditionInput = Record<string, unknown>;
 
 /**
+ * The options an untyped `create` takes.
+ */
+export interface UntypedCreateOptions {
+  /**
+   * Translatable values for other locales, keyed by locale, written in the create's own transaction.
+   * Each one writes at its locale as `.locale(code).update()` would.
+   * A failure there names it as `locale`.
+   */
+  locales?: Record<string, Record<string, unknown>>;
+}
+
+/**
  * The callback `whereAny` runs: it opens branches off `group` and returns the ones to OR together.
  *
  * @example
@@ -386,6 +398,7 @@ export interface UntypedQueryBuilder {
   /**
    * Creates one record, returning it on success or the field failures on validation error.
    * The whole write runs in one transaction; nothing persists when it returns a failure.
+   * `locales` writes other locales' translatable values in that same transaction.
    * Refused on a singleton, whose one record already exists.
    *
    * @example
@@ -393,7 +406,7 @@ export interface UntypedQueryBuilder {
    * const outcome = await queryUntyped('Posts').create({ title: 'Hello' })
    * ```
    */
-  create(input: Record<string, unknown>): Promise<CreateOutcome>;
+  create(input: Record<string, unknown>, options?: UntypedCreateOptions): Promise<CreateOutcome>;
 
   /**
    * Creates one record and returns it, throwing an `isValidationError` error carrying the failures instead.
@@ -404,7 +417,37 @@ export interface UntypedQueryBuilder {
    * const post = await queryUntyped('Posts').createOrThrow({ title: 'Hello' })
    * ```
    */
-  createOrThrow(input: Record<string, unknown>): Promise<QueryRecord>;
+  createOrThrow(
+    input: Record<string, unknown>,
+    options?: UntypedCreateOptions,
+  ): Promise<QueryRecord>;
+
+  /**
+   * Creates a copy of the record with this `UUID`, every locale it holds included, in one transaction.
+   * The source reads through the chain, so `access`, `select`, and `query:filter` decide what it reaches.
+   * `overrides` land where the copy is created: the chain's locale, else the default or first locale held.
+   * Answers `undefined` when the chain cannot reach the source; refused on a singleton.
+   *
+   * @example
+   * ```ts
+   * const outcome = await queryUntyped('Posts').duplicate(uuid, { slug: 'hello-again' })
+   * ```
+   */
+  duplicate(uuid: string, overrides?: Record<string, unknown>): Promise<CreateOutcome | undefined>;
+
+  /**
+   * Duplicates the record with this `UUID` and returns the copy, throwing an `isValidationError` on failure.
+   * Answers `undefined` when the chain cannot reach the source; refused on a singleton.
+   *
+   * @example
+   * ```ts
+   * const copy = await queryUntyped('Posts').duplicateOrThrow(uuid)
+   * ```
+   */
+  duplicateOrThrow(
+    uuid: string,
+    overrides?: Record<string, unknown>,
+  ): Promise<QueryRecord | undefined>;
 
   /**
    * Updates every matching record, returning them re-read on success or the field failures on error.

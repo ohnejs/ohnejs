@@ -1,4 +1,5 @@
 import type { ConditionNode } from '../../utils/index.ts';
+import type { LocaleCode } from '../collections/known-locales.ts';
 import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection, OrderEntry, PopulateNode } from './ir.ts';
 import type { CollectionQueryMeta } from './metadata.ts';
@@ -8,6 +9,7 @@ import type {
   ConditionInput,
   PopulateBuild,
   PopulateSpec,
+  UntypedCreateOptions,
   UntypedQueryBuilder,
   UntypedWhereBranch,
   UntypedWhereGroup,
@@ -36,6 +38,7 @@ import { unknownFieldError, validateCondition } from './validate-condition.ts';
 import { lowerField } from './where-field.ts';
 import { runCreate } from './write/create.ts';
 import { runDelete, runDeleteTranslation, type DeleteOutcome } from './write/delete.ts';
+import { duplicateDraft } from './write/duplicate.ts';
 import { validationError } from './write/errors.ts';
 import { runUpdate, type UpdateOutcome } from './write/update.ts';
 
@@ -178,30 +181,45 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
     return pluckRows(this.freeze(), field);
   }
 
-  create(input: Record<string, unknown>): Promise<CreateOutcome> {
+  create(input: Record<string, unknown>, options?: UntypedCreateOptions): Promise<CreateOutcome> {
     if (this.meta.singleton) throw singletonRefuses(this.meta.collection, 'create');
-    return runCreate(
-      this.meta.collection,
-      input,
-      this.localeValue,
-      this.joinedTx,
-      this.unscopedChain,
-      this.linkResolver,
-    );
+    return this.runCreate(input, this.localeValue, options?.locales);
   }
 
-  async createOrThrow(input: Record<string, unknown>): Promise<QueryRecord> {
+  async createOrThrow(
+    input: Record<string, unknown>,
+    options?: UntypedCreateOptions,
+  ): Promise<QueryRecord> {
     if (this.meta.singleton) throw singletonRefuses(this.meta.collection, 'create');
-    const outcome = await runCreate(
+    return orThrow(await this.runCreate(input, this.localeValue, options?.locales));
+  }
+
+  async duplicate(
+    uuid: string,
+    overrides: Record<string, unknown> = {},
+  ): Promise<CreateOutcome | undefined> {
+    if (this.meta.singleton) throw singletonRefuses(this.meta.collection, 'duplicate');
+    if (this.meta.duplicate === false) {
+      throw ohneError({
+        title: `Cannot \`duplicate\` on \`${this.meta.collection}\``,
+        body: [`Collection \`${this.meta.collection}\` declares \`duplicate: false\`.`],
+      });
+    }
+    const draft = await duplicateDraft(
       this.meta.collection,
-      input,
-      this.localeValue,
-      this.joinedTx,
-      this.unscopedChain,
-      this.linkResolver,
+      this.localeValue as LocaleCode | null,
+      (locale) => readFirst(this.sourceIR(uuid, locale)),
     );
-    if (!outcome.ok) throw validationError(outcome.errors);
-    return outcome.record;
+    if (isUndefined(draft)) return undefined;
+    return this.runCreate({ ...draft.input, ...overrides }, draft.locale, draft.locales);
+  }
+
+  async duplicateOrThrow(
+    uuid: string,
+    overrides?: Record<string, unknown>,
+  ): Promise<QueryRecord | undefined> {
+    const outcome = await this.duplicate(uuid, overrides);
+    return isUndefined(outcome) ? undefined : orThrow(outcome);
   }
 
   update(input: Record<string, unknown>): Promise<UpdateOutcome> {
@@ -303,6 +321,45 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
   }
 
   /**
+   * Runs a create at `locale` with this chain's transaction, scope, and link reach.
+   */
+  private runCreate(
+    input: Record<string, unknown>,
+    locale: string | null,
+    locales?: Record<string, Record<string, unknown>>,
+  ): Promise<CreateOutcome> {
+    return runCreate(
+      this.meta.collection,
+      input,
+      locale,
+      this.joinedTx,
+      this.unscopedChain,
+      this.linkResolver,
+      locales,
+    );
+  }
+
+  /**
+   * The IR that reads a duplicate's source at `locale`: the chain's conditions and selection, unpopulated.
+   * A populated relation reads as a record, not the `UUID` a write takes, so a copy reads none.
+   */
+  private sourceIR(uuid: string, locale: string | null): QueryIR {
+    return freezeIR({
+      collection: this.meta.collection,
+      conditions: [...this.conditions, toConditionNode({ UUID: uuid }, this.meta)],
+      select: this.selected,
+      order: [],
+      limit: null,
+      offset: null,
+      populate: [],
+      locale,
+      access: this.accessNodes,
+      wire: null,
+      unscoped: this.unscopedChain,
+    });
+  }
+
+  /**
    * Snapshots the accumulated state into an immutable IR for a terminal to compile and execute.
    */
   private freeze(): QueryIR {
@@ -327,17 +384,25 @@ export class QueryBuilderImpl implements UntypedQueryBuilder {
  */
 function singletonRefuses(
   collection: string,
-  operation: 'create' | 'delete',
+  operation: 'create' | 'duplicate' | 'delete',
 ): ReturnType<typeof ohneError> {
   return ohneError({
     title: `Cannot \`${operation}\` on singleton \`${collection}\``,
     body: [
       'A singleton holds exactly one record, created when the schema syncs.',
-      operation === 'create'
-        ? 'Use `update` to change it.'
-        : 'Use `deleteTranslation` on a locale-scoped chain to drop one locale.',
+      operation === 'delete'
+        ? 'Use `deleteTranslation` on a locale-scoped chain to drop one locale.'
+        : 'Use `update` to change it.',
     ],
   });
+}
+
+/**
+ * Unwraps a create's outcome into its record, throwing the failure as a validation error.
+ */
+function orThrow(outcome: CreateOutcome): QueryRecord {
+  if (!outcome.ok) throw validationError(outcome.errors, outcome.locale);
+  return outcome.record;
 }
 
 /**

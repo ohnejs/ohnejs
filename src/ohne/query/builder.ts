@@ -3,6 +3,7 @@ import type { BlockName } from '../blocks/known-blocks.ts';
 import type { CollectionName, KnownCollections } from '../collections/known-collections.ts';
 import type { LocaleCode } from '../collections/known-locales.ts';
 import type { KnownSingletons } from '../collections/known-singletons.ts';
+import type { KnownUnduplicable } from '../collections/known-unduplicable.ts';
 import type { Transaction } from '../database/adapter.ts';
 import type { OrderDirection } from './ir.ts';
 import type { BlockQueryFieldsOf } from './known-block-query-fields.ts';
@@ -928,8 +929,46 @@ interface Terminals<C extends CollectionName, S, P, N extends boolean> {
 
 /**
  * A create's result: the new record, or the field failures keyed by dot-path.
+ * A failure carries `locale` when a create with `locales` failed at one of them.
  */
-export type CreateResult<T> = { ok: true; record: T } | { ok: false; errors: FieldErrors };
+export type CreateResult<T> =
+  | { ok: true; record: T }
+  | { ok: false; errors: FieldErrors; locale?: LocaleCode };
+
+/**
+ * The names of one collection's translatable fields, read from the generated marker vocabulary.
+ */
+type TranslatableKey<C extends CollectionName> = {
+  [K in keyof FieldsOf<C>]: FieldsOf<C>[K] extends { companion: true } | { localeScoped: true }
+    ? K
+    : never;
+}[keyof FieldsOf<C>];
+
+/**
+ * The values one more locale of a create carries: the create input's translatable fields.
+ * Narrows to the generated shape once codegen has run; falls back to a permissive record until then.
+ */
+export type TranslatableInputOf<C extends CollectionName> = string extends keyof FieldsOf<C>
+  ? Record<string, unknown>
+  : Partial<Pick<InsertInputOf<C>, Extract<TranslatableKey<C>, keyof InsertInputOf<C>>>>;
+
+/**
+ * The options a create takes on a collection with translatable fields.
+ */
+export interface CreateOptions<C extends CollectionName> {
+  /**
+   * Translatable values for other locales, keyed by locale, written in the create's own transaction.
+   * Each one writes at its locale as `.locale(code).update()` would.
+   * A failure there names it as `locale`.
+   */
+  locales?: Partial<Record<LocaleCode, TranslatableInputOf<C>>>;
+}
+
+/**
+ * The trailing options a create takes: none on a collection whose every value is shared across locales.
+ */
+type CreateOptionsOf<C extends CollectionName> =
+  IsTranslatable<C> extends true ? [options?: CreateOptions<C>] : [];
 
 /**
  * An update's result: the matched records re-read in their final state, or the field failures by dot-path.
@@ -954,19 +993,26 @@ interface Joinable<Self> {
 
 /**
  * The create terminals, available before a filter narrows the query to a specific set of rows.
+ * A singleton offers none, since its one record already exists.
  */
 interface WriteEntry<C extends CollectionName, S, P> {
   /**
    * Creates one record, returning it on success or the field failures on a validation error.
    * The whole write runs in one transaction; nothing persists when it returns a failure.
+   * `locales` writes other locales' translatable values in that same transaction.
    *
    * @example
    * ```ts
    * const result = await query('Posts').create({ title: 'Hi' })
    * if (result.ok) result.record // the new post
+   *
+   * await query('Posts').create({ title: 'Hi' }, { locales: { de: { title: 'Hallo' } } })
    * ```
    */
-  create(input: InsertInputOf<C>): Promise<CreateResult<QueryRow<C, S, P>>>;
+  create(
+    input: InsertInputOf<C>,
+    ...options: CreateOptionsOf<C>
+  ): Promise<CreateResult<QueryRow<C, S, P>>>;
 
   /**
    * Creates one record and returns it, throwing an `isValidationError` error carrying the failures instead.
@@ -976,7 +1022,47 @@ interface WriteEntry<C extends CollectionName, S, P> {
    * const post = await query('Posts').createOrThrow({ title: 'Hi' })
    * ```
    */
-  createOrThrow(input: InsertInputOf<C>): Promise<QueryRow<C, S, P>>;
+  createOrThrow(
+    input: InsertInputOf<C>,
+    ...options: CreateOptionsOf<C>
+  ): Promise<QueryRow<C, S, P>>;
+}
+
+/**
+ * The duplicate terminals, offered beside `create` unless the collection declares `duplicate: false`.
+ */
+interface DuplicateEntry<C extends CollectionName, S, P> {
+  /**
+   * Creates a copy of the record with this `UUID`, every locale it holds included, in one transaction.
+   * Top-level `unique` fields and `copy: false` types are left out, so the copy never collides with them.
+   * The collection's `duplicate` function shapes the copy.
+   * `overrides` land where the copy is created: the chain's locale, else the default or first locale held.
+   * Answers `undefined` when the chain cannot read the source.
+   *
+   * @example
+   * ```ts
+   * const result = await query('Posts').duplicate(uuid, { slug: 'hello-again' })
+   * if (result?.ok) result.record // the copy
+   * ```
+   */
+  duplicate(
+    uuid: string,
+    overrides?: Partial<InsertInputOf<C>>,
+  ): Promise<CreateResult<QueryRow<C, S, P>> | undefined>;
+
+  /**
+   * Duplicates the record with this `UUID` and returns the copy, throwing an `isValidationError` on failure.
+   * Answers `undefined` when the chain cannot read the source.
+   *
+   * @example
+   * ```ts
+   * const copy = await query('Posts').duplicateOrThrow(uuid)
+   * ```
+   */
+  duplicateOrThrow(
+    uuid: string,
+    overrides?: Partial<InsertInputOf<C>>,
+  ): Promise<QueryRow<C, S, P> | undefined>;
 }
 
 /**
@@ -1072,6 +1158,11 @@ type IsTranslatable<C extends CollectionName> = string extends keyof FieldsOf<C>
 type IsSingleton<C extends CollectionName> = C extends keyof KnownSingletons ? true : false;
 
 /**
+ * Whether a collection declares `duplicate: false`, read from the generated marker.
+ */
+type IsUnduplicable<C extends CollectionName> = C extends keyof KnownUnduplicable ? true : false;
+
+/**
  * The `locale` scope, moving a chain into its locale-scoped shape.
  */
 interface LocaleMethod<Localed> {
@@ -1111,7 +1202,9 @@ export type PendingQuery<
   P = never,
   L extends boolean = false,
 > = PendingBase<C, S, P, L> &
-  (IsSingleton<C> extends true ? UpdateMutations<C, S, P> : WriteEntry<C, S, P>) &
+  (IsSingleton<C> extends true
+    ? UpdateMutations<C, S, P>
+    : WriteEntry<C, S, P> & (IsUnduplicable<C> extends true ? object : DuplicateEntry<C, S, P>)) &
   (L extends true
     ? IsSingleton<C> extends true
       ? DeleteTranslationMutation

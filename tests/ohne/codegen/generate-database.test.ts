@@ -106,6 +106,8 @@ describe('generateDatabase', () => {
     ok(shared.includes('export interface GeneratedDatabases {}'));
     ok(shared.includes('export interface GeneratedSingletons {}'));
     ok(node.includes('interface KnownSingletons extends GeneratedSingletons {}'));
+    ok(shared.includes('export interface GeneratedUnduplicable {}'));
+    ok(node.includes('interface KnownUnduplicable extends GeneratedUnduplicable {}'));
     ok(node.includes('interface KnownCollections extends GeneratedCollections {}'));
     ok(node.includes('interface KnownBlocks extends GeneratedBlocks {}'));
     ok(node.includes('interface KnownBlockQueryFields extends GeneratedBlockQueryFields {}'));
@@ -515,6 +517,19 @@ describe('generateDatabase', () => {
     ok(!capabilities.includes("'collection.Settings.create'"));
     ok(!capabilities.includes("'collection.Settings.delete'"));
     ok(capabilities.includes("'collection.Posts.create': true;"));
+  });
+
+  it('lists a `duplicate: false` collection in GeneratedUnduplicable', async () => {
+    const app = join(root, 'unduplicable');
+    writePackage(app, 'unduplicable');
+    write(app, 'collections/Posts.ts', 'export default { fields: {} };\n');
+    write(app, 'collections/Files.ts', 'export default { duplicate: false, fields: {} };\n');
+
+    await loadLayers(app);
+    const paths = await generateDatabase(app);
+    const shared = readFileSync(paths[0] ?? '', 'utf8');
+
+    ok(shared.includes('export interface GeneratedUnduplicable {\n  Files: true;\n}'));
   });
 
   it('emits only the wildcard capabilities when there are no collections', async () => {

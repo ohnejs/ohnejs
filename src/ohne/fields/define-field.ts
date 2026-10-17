@@ -238,6 +238,21 @@ export interface FieldType<
   deserialize?(value: unknown, ctx: FieldContext<TOptions>): unknown;
 
   /**
+   * Set `false` when the value a read returns is not valid write input, as a stored hash is not.
+   * A record copy, a duplicate or a copied translation, then leaves the field out.
+   *
+   * @example
+   * ```ts
+   * defineField({
+   *   columnType: 'text',
+   *   serialize: (value) => hash(value as string),
+   *   copy: false,
+   * })
+   * ```
+   */
+  copy?: false;
+
+  /**
    * How word search matches a field of this type.
    *
    * - `false` locks the type out: a field of it never matches words and refuses `search: true`.

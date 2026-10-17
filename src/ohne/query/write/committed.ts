@@ -38,6 +38,7 @@ declare module 'ohnejs' {
      * A joined `.use(tx)` write inside another write's hook fires once that write commits.
      * A joined write unwound by its savepoint never fires, nor does one on a transaction you opened yourself.
      * A `deleteTranslation` reports an `update` of the records that lost the locale.
+     * A create with `locales` reports one `create`, every locale included.
      * An action: its return is ignored.
      * The payload carries the `collection`, the `operation`, and the affected `uuids`.
      */

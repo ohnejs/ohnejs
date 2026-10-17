@@ -343,7 +343,7 @@ export interface CopyTranslationContext {
   source: Record<string, unknown>;
 
   /**
-   * The default write input: the translatable, writable, mutable fields, row `UUID`s shed.
+   * The default write input: the translatable fields a copy may write, row `UUID`s shed.
    */
   input: Record<string, unknown>;
 
@@ -356,6 +356,27 @@ export interface CopyTranslationContext {
    * The resolved locale the copy writes to, one of `collections.locales`.
    */
   targetLocale: LocaleCode;
+}
+
+/**
+ * The context a collection's `duplicate` function receives, once per locale the copy writes.
+ */
+export interface DuplicateContext {
+  /**
+   * The source record as `locale` reads it, within the fields the duplicating read selects.
+   */
+  source: Record<string, unknown>;
+
+  /**
+   * The default write input at `locale`: the fields a copy may write, top-level `unique` ones left out.
+   */
+  input: Record<string, unknown>;
+
+  /**
+   * The locale this input writes, one of `collections.locales`.
+   * A collection with no translatable field always sees the default locale.
+   */
+  locale: LocaleCode;
 }
 
 /**
@@ -432,7 +453,7 @@ export interface CollectionDefinition<
    * Shapes the write input when a translation copies to another locale.
    * The context carries the source record, the computed default `input`, and both resolved locales.
    * The returned object replaces the default input, and the function may be async.
-   * Only translatable, writable, mutable fields ever write - other keys never apply.
+   * Only the translatable fields a copy may write ever write - other keys never apply.
    * A copy therefore cannot touch values shared across locales.
    * Row `UUID`s are shed from the result, so copied child rows insert as fresh rows.
    * Omitted, the default input writes as is.
@@ -448,6 +469,29 @@ export interface CollectionDefinition<
   copyTranslation?: (
     context: CopyTranslationContext,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+
+  /**
+   * Shapes the write input when a record is duplicated, once for the new record and once per other locale.
+   * `false` refuses every duplicate, for records whose copy would be wrong, like a stored file's.
+   * The context carries the source record and the computed default `input` at that `locale`.
+   * The returned object replaces the default input, and the function may be async.
+   * A copy leaves top-level `unique` fields out, so return fresh values for the ones you want kept.
+   * Only the fields a copy may write ever write - other keys never apply.
+   * It runs before the write, so a free name it picks can still collide and fail as `notUnique`.
+   * Omitted, the default input writes as is.
+   *
+   * @example
+   * ```ts
+   * ({ source, input }) => ({
+   *   ...input,
+   *   title: `${source.title} (copy)`,
+   *   slug: `${source.slug}-copy`,
+   * })
+   * ```
+   */
+  duplicate?:
+    | false
+    | ((context: DuplicateContext) => Record<string, unknown> | Promise<Record<string, unknown>>);
 
   /**
    * How the dashboard presents this collection: its menu icon, record labels, list view, and editor layout.
@@ -508,6 +552,13 @@ export interface AnyCollectionDefinition {
   copyTranslation?: (
     context: CopyTranslationContext,
   ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+
+  /**
+   * Shapes the write input when a record is duplicated, or `false` refuses every duplicate.
+   */
+  duplicate?:
+    | false
+    | ((context: DuplicateContext) => Record<string, unknown> | Promise<Record<string, unknown>>);
 
   /**
    * How the dashboard presents the collection; omitted, every presentation default applies.

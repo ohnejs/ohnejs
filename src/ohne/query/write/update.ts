@@ -69,6 +69,11 @@ export type UpdateOutcome =
   | { ok: false; errors: FieldErrors };
 
 /**
+ * What a write path answers once it has written, or the failures that stopped it before any write.
+ */
+type WriteAttempt = { ok: true } | { ok: false; errors: FieldErrors };
+
+/**
  * The context the row-condition filter fires with before a write resolves its matched set.
  */
 export interface RecordConditionContext {
@@ -255,8 +260,9 @@ export async function runUpdate(
  * The update attempt inside the transaction: validate, resolve the matched set, precheck, then write.
  * Every precheck returns `{ ok: false }` before any write, so a failure leaves the database untouched.
  * An ungated update writes the whole scope everywhere; a gated one partitions activation first.
+ * `fill` marks a create's locale fill: the record is new, so no update hook fires and nothing is re-read.
  */
-async function attemptUpdate(
+export async function attemptUpdate(
   tx: Transaction,
   meta: CollectionQueryMeta,
   dialect: Dialect,
@@ -265,6 +271,7 @@ async function attemptUpdate(
   locale: string | null,
   unscoped: boolean,
   linkResolver: ReachResolver | null,
+  fill = false,
 ): Promise<UpdateOutcome> {
   const code = effectiveLocale(locale);
   const reach: LinkReach | undefined = isNull(linkResolver)
@@ -286,30 +293,25 @@ async function attemptUpdate(
 
   const matched = await matchedUUIDs(tx, dialect, meta, condition, code);
   if (isEmpty(matched)) return { ok: true, records: [] };
-  await beforeUpdate({
-    collection: meta.collection as CollectionName,
-    condition,
-    matched,
-    tx,
-    locale: code as LocaleCode,
-  });
+  if (!fill) {
+    await beforeUpdate({
+      collection: meta.collection as CollectionName,
+      condition,
+      matched,
+      tx,
+      locale: code as LocaleCode,
+    });
+  }
 
   const gates = whenGates(meta.fields, processed.input, scope);
-  if (isEmpty(gates) && !hasNestedGates(scope)) {
-    return attemptPlainUpdate(tx, meta, dialect, scope, matched, code, locale, unscoped, reach);
-  }
-  return attemptGatedUpdate(
-    tx,
-    meta,
-    dialect,
-    scope,
-    gates,
-    matched,
-    code,
-    locale,
-    unscoped,
-    reach,
-  );
+  const written =
+    isEmpty(gates) && !hasNestedGates(scope)
+      ? await attemptPlainUpdate(tx, meta, dialect, scope, matched, code, locale, reach)
+      : await attemptGatedUpdate(tx, meta, dialect, scope, gates, matched, code, locale, reach);
+  if (!written.ok) return written;
+  if (fill) return { ok: true, records: [] };
+  const records = await readMatched(meta.collection, matched, locale, false, unscoped);
+  return { ok: true, records: await afterUpdate(meta.collection, records, tx, code) };
 }
 
 /**
@@ -324,9 +326,8 @@ async function attemptPlainUpdate(
   matched: readonly string[],
   code: string,
   locale: string | null,
-  unscoped: boolean,
   reach: LinkReach | undefined,
-): Promise<UpdateOutcome> {
+): Promise<WriteAttempt> {
   if (matched.length > 1 && scope.uniqueProbes.length > 0) {
     return { ok: false, errors: fannedErrors(scope.uniqueProbes) };
   }
@@ -391,16 +392,7 @@ async function attemptPlainUpdate(
     await upsertCompanion(tx, dialect, meta, companion, matched, code, companionPlan);
   }
   await applyReconcile(tx, dialect, plan);
-
-  return {
-    ok: true,
-    records: await afterUpdate(
-      meta.collection,
-      await readMatched(meta.collection, matched, locale, false, unscoped),
-      tx,
-      code,
-    ),
-  };
+  return { ok: true };
 }
 
 /**
@@ -431,9 +423,8 @@ async function attemptGatedUpdate(
   matched: readonly string[],
   code: string,
   locale: string | null,
-  unscoped: boolean,
   reach: LinkReach | undefined,
-): Promise<UpdateOutcome> {
+): Promise<WriteAttempt> {
   const records = await readMatched(meta.collection, matched, locale, true, true);
   const overlays = new Map(
     records.map((record) => [record.UUID as string, { ...record, ...scope.values }]),
@@ -546,16 +537,7 @@ async function attemptGatedUpdate(
     }
   }
   await applyReconcile(tx, dialect, plan);
-
-  return {
-    ok: true,
-    records: await afterUpdate(
-      meta.collection,
-      await readMatched(meta.collection, matched, locale, false, unscoped),
-      tx,
-      code,
-    ),
-  };
+  return { ok: true };
 }
 
 /**

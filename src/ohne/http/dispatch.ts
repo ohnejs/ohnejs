@@ -208,7 +208,11 @@ export async function dispatch(
       return toResponse(await resolveResult(result, event), event.response);
     } catch (error) {
       if (isValidationError(error)) {
-        const http = unprocessable(undefined, { errors: resolveFieldErrors(error.errors) });
+        const errors = resolveFieldErrors(error.errors);
+        const http = unprocessable(
+          undefined,
+          isUndefined(error.locale) ? { errors } : { errors, locale: error.locale },
+        );
         return resolveErrorResponse(toResponse(http, event.response), http, event);
       }
       if (isBusyError(error)) {

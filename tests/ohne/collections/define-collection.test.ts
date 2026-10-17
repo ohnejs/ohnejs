@@ -822,6 +822,43 @@ describe('defineCollection', () => {
       /`copyTranslation` needs a translatable field/,
     );
   });
+
+  it('accepts a duplicate function on a collection with no translatable field', () => {
+    const duplicate = ({ input }: { input: Record<string, unknown> }) => input;
+    const definition = defineCollection({ fields: { title: field('text') }, duplicate });
+    deepStrictEqual(definition.duplicate, duplicate);
+  });
+
+  it('accepts `duplicate: false`', () => {
+    strictEqual(
+      defineCollection({ fields: { title: field('text') }, duplicate: false }).duplicate,
+      false,
+    );
+  });
+
+  it('rejects a non-function duplicate', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `duplicate` must be a function
+          duplicate: true,
+        }),
+      /Invalid `duplicate` declaration/,
+    );
+  });
+
+  it('rejects a duplicate function on a singleton', () => {
+    throws(
+      () =>
+        defineCollection({
+          singleton: true,
+          fields: { title: field('text', { default: '' }) },
+          duplicate: ({ input }) => input,
+        }),
+      /`duplicate` on a singleton/,
+    );
+  });
 });
 
 describe('table columns and `_translations`', () => {

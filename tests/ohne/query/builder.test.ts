@@ -232,6 +232,13 @@ describe('the typed builder narrows in a consumer app', () => {
 
     write(
       app,
+      'collections/Files.ts',
+      "import { defineCollection, field } from 'ohnejs';\n" +
+        "export default defineCollection({ duplicate: false, fields: { name: field('text') } });\n",
+    );
+
+    write(
+      app,
       'collections/Settings.ts',
       "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({ singleton: true, fields: {\n' +
@@ -443,6 +450,19 @@ export async function writes(): Promise<void> {
   const { deleted } = await query('Posts').where('views', (c) => c.atLeast(1)).delete();
   const d: number = deleted;
   void d;
+
+  await query('Posts').create(
+    { title: 'x', views: 1, featured: true },
+    { locales: { de: { teaser: 'Hallo' } } },
+  );
+  const copy = await query('Posts').duplicate('u1', { title: 'copy' });
+  if (copy?.ok) {
+    const cv: number = copy.record.views;
+    void cv;
+  }
+  const thrown = await query('Posts').locale('de').duplicateOrThrow('u1');
+  const tv: number | undefined = thrown?.views;
+  void tv;
 }
 
 export async function blocks(): Promise<void> {
@@ -543,6 +563,18 @@ query('Settings').create({});
 query('Settings').createOrThrow({});
 // @ts-expect-error a singleton is never deleted
 query('Settings').where('theme', 'dark').delete();
+// @ts-expect-error a singleton is never duplicated
+query('Settings').duplicate('x');
+// @ts-expect-error a collection declaring duplicate: false is never duplicated
+query('Files').duplicateOrThrow('x');
+// @ts-expect-error a duplicate copies one record, never a filtered set
+query('Posts').where('title', 'x').duplicate('u1');
+// @ts-expect-error Users has no translatable field, so a create takes no locales
+query('Users').create({ name: 'x' }, { locales: {} });
+// @ts-expect-error a locale carries translatable fields only
+query('Posts').create({ title: 'x', views: 1, featured: true }, { locales: { de: { title: 'y' } } });
+// @ts-expect-error the locale is outside the configured set
+query('Posts').create({ title: 'x', views: 1, featured: true }, { locales: { fr: { teaser: 'y' } } });
 // @ts-expect-error deleteTranslation exists only after locale, on a singleton too
 query('Settings').deleteTranslation();
 // @ts-expect-error a refinement strips the write terminals on a singleton too

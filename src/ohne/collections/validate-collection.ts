@@ -38,6 +38,7 @@ const SAMPLE_UUID = '00000000-0000-0000-0000-000000000000';
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
  * - `singleton` must be a boolean; when `true`, `api` may name `read` and `update` only.
  * - `copyTranslation` must be a function, on a collection with at least one translatable field.
+ * - `duplicate` must be `false` or a function, on a collection that is not a singleton.
  * - `dashboard` is an object holding only `icon`, `recordLabel`, `recordPath`, `table`, `layout`, `search`.
  * - `dashboard.icon` must name an icon the vendored set carries.
  * - `dashboard.recordLabel` must list distinct, readable, plain text fields, ten at most.
@@ -59,6 +60,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateAPI(definition.api, collection);
   validateSingleton(definition.singleton, definition.api, collection);
   validateCopyTranslation(definition.copyTranslation, definition.fields, collection);
+  validateDuplicate(definition.duplicate, definition.singleton, collection);
   validateDashboard(definition.dashboard, definition.fields, collection);
 }
 
@@ -226,6 +228,33 @@ function validateCopyTranslation(
       body: [
         `No field${scope} is \`translatable\`, so no translation could ever copy.`,
         'Mark a field `translatable: true`, or drop the option.',
+      ],
+    });
+  }
+}
+
+/**
+ * Rejects a malformed `duplicate` declaration.
+ * A failure is a value other than `false` or a function, or either on a singleton, never duplicated.
+ */
+function validateDuplicate(duplicate: unknown, singleton: unknown, collection?: string): void {
+  if (isUndefined(duplicate)) return;
+  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  if (duplicate !== false && !isFunction(duplicate)) {
+    throw ohneError({
+      title: 'Invalid `duplicate` declaration',
+      body: [
+        `The \`duplicate\` option${scope} must be \`false\` or a function.`,
+        'It receives the copy context and returns the write input.',
+      ],
+    });
+  }
+  if (singleton === true) {
+    throw ohneError({
+      title: '`duplicate` on a singleton',
+      body: [
+        `The collection${scope} is a singleton, so its one record is never duplicated.`,
+        'Drop the option.',
       ],
     });
   }
