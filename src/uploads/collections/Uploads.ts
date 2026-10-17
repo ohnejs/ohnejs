@@ -22,6 +22,7 @@ import type {} from '../fields/_augment.ts';
  */
 const uploads = defineCollection({
   api: { read: true },
+  duplicate: false,
   compositeIndexes: [{ fields: ['directory', 'name'], unique: true }],
   dashboard: { icon: 'library-photo', recordLabel: 'name', recordPath: '/media?details=[uuid]' },
   fields: {
