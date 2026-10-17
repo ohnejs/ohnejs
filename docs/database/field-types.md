@@ -84,6 +84,42 @@ covers them in depth.
 | `when`            | -            | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
 | `writable`        | `true`       | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
+### `code`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/code-dark.png">
+  <img alt="The code field in the dashboard" src="../images/field-types/code-light.png">
+</picture>
+
+Source code, edited with line numbers and highlighting. Tab indents, and Escape leaves the editor.
+
+| Option            | Default | What it does                                                                                                                                                                                       |
+| ----------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `allowEmpty`      | `false` | Accepts the empty string `''`.                                                                                                                                                                     |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                                                  |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed.                            |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                                              |
+| `indent`          | `2`     | What Tab inserts: that many spaces, or `'tab'`.                                                                                                                                                    |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                                                   |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                                                     |
+| `language`        | -       | The language to highlight: `ts`, `json`, `css`, `html`, `markdown`, `sql`, `yaml`, `xml`, `sh` or `gitignore`, or a file name like `config.json`. `json` also rejects a value that does not parse. |
+| `languageFrom`    | -       | A sibling field whose value names the language, or a file path like `app.json`.                                                                                                                    |
+| `max`             | -       | The most characters a value may hold, counted like `String#length`, so an emoji counts as 2.                                                                                                       |
+| `min`             | -       | The fewest characters a value may hold, counted the same way.                                                                                                                                      |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                                                        |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                                                |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                                           |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                                                   |
+| `search`          | `false` | `true` lets [search](./collections.md#search) match any value that contains the typed word.                                                                                                        |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                                                  |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                                                    |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                                                  |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                                                      |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                                                    |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                                                  |
+| `wrap`            | `false` | Wraps long lines instead of scrolling sideways.                                                                                                                                                    |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                                                    |
+
 ### `color`
 
 <picture>
