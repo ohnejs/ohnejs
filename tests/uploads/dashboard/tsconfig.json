@@ -2,11 +2,7 @@
   "extends": "../../../tsconfig.browser.json",
   "compilerOptions": {
     "types": ["node"],
-    "paths": { "app/*": ["../../../src/base/dashboard/*"] }
+    "paths": { "app/*": ["../../../src/uploads/dashboard/*", "../../../src/base/dashboard/*"] }
   },
-  "include": [
-    "components/media-item.test.ts",
-    "../../../.ohne/shared/**/*.ts",
-    "../../../.ohne/browser/**/*.ts"
-  ]
+  "include": ["**/*.ts", "../../../.ohne/shared/**/*.ts", "../../../.ohne/browser/**/*.ts"]
 }

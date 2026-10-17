@@ -1,0 +1,8 @@
+{
+  "extends": "../../../tsconfig.browser.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": { "app/*": ["../../../src/ai/dashboard/*", "../../../src/base/dashboard/*"] }
+  },
+  "include": ["**/*.ts", "../../../.ohne/shared/**/*.ts", "../../../.ohne/browser/**/*.ts"]
+}

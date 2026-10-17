@@ -8,6 +8,7 @@
     "src/ai/dashboard",
     "tests/dashboard",
     "tests/base/dashboard",
-    "tests/uploads/dashboard/components/media-item.test.ts"
+    "tests/uploads/dashboard",
+    "tests/ai/dashboard"
   ]
 }
