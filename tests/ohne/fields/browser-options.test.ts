@@ -53,6 +53,7 @@ describe('browser field options', () => {
     assertDrift<'date'>(true);
     assertDrift<'time'>(true);
     assertDrift<'color'>(true);
+    assertDrift<'code'>(true);
     assertDrift<'email'>(true);
     assertDrift<'url'>(true);
     assertDrift<'dateTime'>(true);

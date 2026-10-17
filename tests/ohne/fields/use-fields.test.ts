@@ -8,6 +8,7 @@ describe('useFields', () => {
     deepStrictEqual(useFields().keys().sort(), [
       'blocks',
       'boolean',
+      'code',
       'color',
       'date',
       'dateTime',
@@ -36,6 +37,7 @@ describe('useFields', () => {
     strictEqual(useFields().get('number')?.fieldType.columnType, 'real');
     strictEqual(useFields().get('boolean')?.fieldType.columnType, 'boolean');
     strictEqual(useFields().get('color')?.fieldType.columnType, 'text');
+    strictEqual(useFields().get('code')?.fieldType.columnType, 'text');
     strictEqual(useFields().get('record')?.fieldType.columnType, 'text');
     strictEqual(useFields().get('records')?.fieldType.columnType, false);
     strictEqual(useFields().get('object')?.fieldType.columnType, false);

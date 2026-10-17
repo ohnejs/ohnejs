@@ -77,6 +77,7 @@ export * from './error/ohne-error.ts';
 export * from './fields/bounds.ts';
 export * from './fields/builtin/blocks.ts';
 export * from './fields/builtin/boolean.ts';
+export * from './fields/builtin/code.ts';
 export * from './fields/builtin/color.ts';
 export * from './fields/builtin/date-time.ts';
 export * from './fields/builtin/date.ts';

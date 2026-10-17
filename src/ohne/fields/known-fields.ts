@@ -1,5 +1,6 @@
 import type { blocks } from './builtin/blocks.ts';
 import type { boolean } from './builtin/boolean.ts';
+import type { code } from './builtin/code.ts';
 import type { color } from './builtin/color.ts';
 import type { dateTime } from './builtin/date-time.ts';
 import type { date } from './builtin/date.ts';
@@ -84,6 +85,11 @@ export interface KnownFields {
    * A hex color, stored as lowercase `#rrggbb`, or `#rrggbbaa` when the field takes `alpha`.
    */
   color: typeof color;
+
+  /**
+   * Source text, stored with `\n` line endings and highlighted in the dashboard.
+   */
+  code: typeof code;
 
   /**
    * An email address, stored trimmed with its local part and domain lowercased.

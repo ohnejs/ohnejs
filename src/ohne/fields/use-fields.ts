@@ -4,6 +4,7 @@ import type { FieldTypeName } from './known-fields.ts';
 import { createRegistry, type Registry } from '../../utils/index.ts';
 import { blocks } from './builtin/blocks.ts';
 import { boolean } from './builtin/boolean.ts';
+import { code } from './builtin/code.ts';
 import { color } from './builtin/color.ts';
 import { dateTime } from './builtin/date-time.ts';
 import { date } from './builtin/date.ts';
@@ -50,6 +51,7 @@ for (const [name, fieldType] of [
   ['date', date],
   ['time', time],
   ['color', color],
+  ['code', code],
   ['email', email],
   ['url', url],
   ['dateTime', dateTime],
