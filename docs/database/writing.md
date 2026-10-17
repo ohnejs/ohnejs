@@ -39,7 +39,8 @@ failing field to a [message](../i18n/messages.md#validation-messages):
 - or the string a custom validator returned.
 
 A nested failure is listed under its path, like `sections[2].title`. To show a key as text,
-translate it with [`useT`](../i18n/messages.md#translating-with-uset).
+translate it with [`useT`](../i18n/messages.md#translating-with-uset). A create that writes
+[several locales](./translations.md#writing) and fails at one also names it in `locale`.
 
 When you would rather handle failures as exceptions, `createOrThrow` returns the record directly
 and throws a `ValidationError` whose `errors` carries the same map:
@@ -266,6 +267,44 @@ A delete cascades: a record's child rows and its relation links are deleted with
 - `restrict` blocks the delete while the reference exists. Inside an HTTP handler that becomes a
   [`409`](../api/errors.md#write-failures). Outside one, `isReferenceViolation` from `ohnejs`
   recognizes the error the blocked delete throws.
+
+## Duplicating records
+
+`duplicate` copies a record into a new one, every locale it holds included:
+
+```ts
+const result = await query('Posts').duplicate(post.UUID, { slug: 'hello-again' });
+```
+
+- It returns what `create` returns, and `duplicateOrThrow` returns the copy. Both answer `undefined`
+  when the chain cannot read the source.
+- The second argument sets fields on the copy, at the locale it is created at: the chain's, else the
+  default or the first one the source holds.
+- A copy leaves out top-level `unique` fields, unreadable fields, and
+  [`copy: false`](./custom-field-types.md#storage) types like `password`. A required one fails with
+  `required` unless you set it, at every locale the copy writes.
+
+To fill those on every copy, give the collection a `duplicate` function. It runs once per locale,
+with the source read at that locale:
+
+```ts
+// collections/Posts.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    title: field('text', { translatable: true }),
+    slug: field('text', { unique: true }),
+  },
+  duplicate: ({ source, input }) => ({
+    ...input,
+    title: `${source.title} (copy)`,
+    slug: `${source.slug}-copy`,
+  }),
+});
+```
+
+Set `duplicate: false` instead to refuse every duplicate, as `Uploads` does.
 
 ## Locales
 

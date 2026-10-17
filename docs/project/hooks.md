@@ -255,8 +255,10 @@ hook('record:before-change', (input, ctx) => {
 });
 ```
 
-- It fires once per record, for both operations, inside the transaction, before the input is
-  frozen.
+- It fires once per create or update call, however many records the update matches, inside the
+  transaction, before the input is frozen.
+- A create with [`locales`](../database/translations.md#writing) fires it once more per locale, as
+  an `update` carrying that locale's values.
 
 ### `record:validate`
 
@@ -284,6 +286,7 @@ hook('record:validate', (errors, scope, ctx) => {
   [`{ ok: false, errors }`](../database/writing.md#the-result), and nothing is written. Returning
   `undefined` or an empty map lets the write continue.
 - Read the coerced values from `scope.values`.
+- A create with `locales` fires it once more per locale, as an `update`.
 
 ### `record:after-create`
 
@@ -304,6 +307,7 @@ hook('record:after-create', async (record, ctx) => {
 ```
 
 - It fires inside the transaction.
+- A create with `locales` fires it once, after every locale is written.
 - Return a replacement record to reshape what the caller receives.
 - The `ctx` carries the `collection`, the open `tx`, and the effective `locale`.
 
@@ -444,6 +448,7 @@ hook('record:committed', async ({ collection, operation, uuids }) => {
   that rolled back.
 - The payload carries the `collection`, the `operation`, and the affected `uuids`.
 - A `deleteTranslation` reports an `update` of the records that lost the locale.
+- A create with `locales` reports one `create`, every locale included.
 
 ## Reading records
 

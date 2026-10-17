@@ -171,6 +171,11 @@ an unvalidated value, so it returns `[]` for anything it cannot read.
 runs after the validators, so they check the value before it is encoded. The `password` type hashes
 its value there.
 
+Set `copy: false` when the value a read returns is not valid write input. A
+[duplicate](./writing.md#duplicating-records) or a
+[copied translation](./translations.md#copying-a-translation) then leaves the field out. The
+`password` type sets it, since its stored hash would be hashed again.
+
 A type that references another collection, like the uploads layer's
 [`image` and `images`](../uploads/fields.md), returns a storage layout from `schema` instead:
 

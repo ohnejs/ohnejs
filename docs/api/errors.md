@@ -94,7 +94,8 @@ To replace the generic response, such as with a branded error page, filter it wi
 Database writes turn their own failures into responses:
 
 - A [validation failure](../database/writing.md#the-result) becomes a `422` whose `data.errors`
-  gives each failing field a message.
+  gives each failing field a message. When a create writes
+  [several locales](../database/translations.md#writing) and one fails, `data.locale` names it.
 - A [busy database](../database/engine.md#transactions) becomes a `503` with `Retry-After`.
 - A [delete blocked](../database/writing.md#deleting-records) by a referencing record becomes a
   `409`.

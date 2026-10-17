@@ -152,10 +152,22 @@ await query('Posts')
   .update({ title: 'Hallo' }); // stores title under 'de'
 ```
 
+To create a record with several locales at once, pass the other locales' translatable values as
+`locales`:
+
+```ts
+await query('Posts').create({ title: 'Hello' }, { locales: { de: { title: 'Hallo' } } });
+```
+
+- Each locale is written as an update at that locale, in the create's own transaction, so the
+  record lands with every locale or not at all.
+- A failure at one locale names it in `locale` beside `errors`.
+
 When a record has no translation at the update's locale, the update creates it:
 
-- Omitted translatable fields take their [defaults](./writing.md#defaults), so a required one
-  without a default fails with `required`.
+- Writing a translatable scalar or `record` gives the omitted ones their
+  [defaults](./writing.md#defaults), so a required one without a default fails with `required`.
+- Writing only translatable lists stores their items and asks for nothing else.
 - The returned record's `_translations` lists the locale just written.
 
 An update that touches no translatable field changes nothing about translations: a record without a
@@ -167,6 +179,9 @@ Copying fills a record's translatable values in one locale from another. The das
 through `POST /collections/posts/[uuid]/translations/copy`, which the
 [collections API](../api/collections.md#translations) serves when it exposes the collection's
 `update`.
+
+To copy a whole record instead, every locale included,
+[duplicate it](./writing.md#duplicating-records).
 
 To change what a copy writes, give the collection a `copyTranslation` function. It receives the
 `source` record, the default `input`, the `sourceLocale`, and the `targetLocale`, and returns the
@@ -186,9 +201,9 @@ export default defineCollection({
 ```
 
 A copied translation now starts unpublished. Whatever the function returns, the copy writes only
-translatable fields that are
-[writable and not `immutable`](./collections.md#write-only-and-locked-fields), so it never touches a
-value shared across locales.
+translatable fields, so it never touches a value shared across locales. It skips a
+[locked or write-only](./collections.md#write-only-and-locked-fields) field and a
+[`copy: false`](./custom-field-types.md#storage) type.
 
 A [record link](./rich-text.md#checking-record-links) in a copied value is checked as new, since
 the target locale never held it. A dead link in the source fails the copy at the link's path.

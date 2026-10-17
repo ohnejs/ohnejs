@@ -35,6 +35,7 @@ POST   /collections/posts                             create a record
 GET    /collections/posts/[uuid]                      read one record
 PATCH  /collections/posts/[uuid]                      update one record
 DELETE /collections/posts/[uuid]                      delete one record
+POST   /collections/posts/[uuid]/duplicate            copy one record into a new one
 POST   /collections/posts/verdicts                    ask which records a write may touch
 GET    /collections/posts/[uuid]/translations         list the locales holding a translation
 POST   /collections/posts/[uuid]/translations/copy    copy one locale's translation onto another
@@ -90,6 +91,10 @@ POST /collections/posts
 - `DELETE` answers `204`.
 - A translatable collection writes one locale at a time: `?locale=de` on the create or update writes
   that locale's values.
+- `POST /collections/posts/[uuid]/duplicate`
+  [copies a record](../database/writing.md#duplicating-records) and answers `201` with the copy.
+  Its JSON body sets fields on the copy, `{}` for none. It needs `read` and `create`, and runs
+  `create`'s [`access`](#the-write-input) once per locale it writes.
 
 [Failures](./errors.md#write-failures) have the same shapes as in the rest of ohne:
 
@@ -114,8 +119,9 @@ The translation routes manage a record's locales as units, on a collection with
   has a translation, in the configured order. It is the same list as its `_translations`, so a
   read scope whose `select` leaves `_translations` out answers `404`.
 - `POST /collections/posts/[uuid]/translations/copy`
-  [copies a translation](../database/translations.md#copying-a-translation). An optional JSON body
-  names the `source` locale, `?locale=` names the target, and it answers the target's new state.
+  [copies a translation](../database/translations.md#copying-a-translation). A JSON body, `{}` or
+  `{ source }`, names the locale to copy from, `?locale=` names the target, and it answers the
+  target's new state.
 - `DELETE /collections/posts/[uuid]/translations`
   [removes all of one locale's values](../database/translations.md#deleting-translations).
   `?locale=de` drops the German translation, and the record and every other locale stay. It answers
@@ -234,8 +240,8 @@ that does not exist. That includes `UUID`, so name it when clients address rows.
 
 A `read` scope applies to every read endpoint. An `update` or `delete` scope decides which rows the
 write may touch: a row outside `where` answers `404` as if it did not exist. A client can
-[ask before it writes](#asking-before-a-write). A create has no rows yet, so only `true` or `false`
-applies.
+[ask before it writes](#asking-before-a-write). A create has no rows to filter, so its `where` does
+nothing, and its `select` still narrows the answered record.
 
 The filter checks the row as it is stored, so an update body can move a row out of the scope, for
 example when an author gives a post to someone else. Protect such a field through the scope's
@@ -259,6 +265,8 @@ reveals what you cannot read. These links only need to exist:
 - A link the record already holds, sent again in the same field. The same `UUID` in another field is
   a new link.
 - A link to your own user.
+
+A [duplicate](#writing) copies the source's links as new links, so each must be one you can read.
 
 A `where` on translatable fields matches per locale, so it can allow a record in `en` and hide it in
 `de`. The endpoints then reduce the record's `_translations` to the allowed locales. They also refuse
