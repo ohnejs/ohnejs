@@ -12,12 +12,21 @@ function occupy(port: number, host?: string): Promise<Server> {
   });
 }
 
-function isFree(port: number): Promise<boolean> {
+function bindsOn(port: number, host?: string): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = createServer();
-    probe.once('error', () => resolve(false));
-    probe.listen(port, () => probe.close(() => resolve(true)));
+    probe.once('error', (error: NodeJS.ErrnoException) =>
+      resolve(['EADDRNOTAVAIL', 'EAFNOSUPPORT', 'EINVAL'].includes(error.code ?? '')),
+    );
+    probe.listen(port, host, () => probe.close(() => resolve(true)));
   });
+}
+
+// A process can hold only `127.0.0.1`, which a wildcard bind does not see, so probe as `freePort` does.
+async function isFree(port: number): Promise<boolean> {
+  return (
+    (await bindsOn(port)) && (await bindsOn(port, '127.0.0.1')) && (await bindsOn(port, '::1'))
+  );
 }
 
 /**
