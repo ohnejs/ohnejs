@@ -13,11 +13,7 @@ import {
 } from 'ohnejs/utils';
 
 import { useUploadsConfig } from '../config.ts';
-
-/**
- * The most `UUID`s one bulk request may name.
- */
-export const BULK_LIMIT = 1000;
+import { BULK_LIMIT } from './_bulk-limit.ts';
 
 /**
  * The options every route that streams a file body declares.

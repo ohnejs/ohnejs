@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import { useEnv } from '../../../../src/ohne/env/use-env.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import privatePost from '../../../../src/uploads/api/uploads/private.post.ts';
-import { BULK_LIMIT } from '../../../../src/uploads/uploads/_body.ts';
+import { BULK_LIMIT } from '../../../../src/uploads/uploads/_bulk-limit.ts';
 import { createFolder } from '../../../../src/uploads/uploads/create-folder.ts';
 import { putUpload } from '../../../../src/uploads/uploads/put-upload.ts';
 import { updateUpload } from '../../../../src/uploads/uploads/update-upload.ts';

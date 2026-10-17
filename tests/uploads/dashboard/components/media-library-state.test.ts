@@ -26,7 +26,7 @@ import {
   searchWhere,
   splitFileName,
 } from '../../../../src/uploads/dashboard/components/media-library-state.ts';
-import { BULK_LIMIT } from '../../../../src/uploads/uploads/_body.ts';
+import { BULK_LIMIT } from '../../../../src/uploads/uploads/_bulk-limit.ts';
 import { effectScope, parseDuration, sleep } from '../../../../src/utils/index.ts';
 
 function upload(path: string, kind: 'file' | 'folder' = 'file'): UploadRecord {
