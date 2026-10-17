@@ -17,6 +17,7 @@ import {
   isNullish,
   isString,
   isUndefined,
+  nextTick,
   onCleanup,
   type Ref,
   ref,
@@ -124,6 +125,7 @@ css`
  * A file deleted from the details popup clears the link.
  * An upload through the control lands in the root folder and applies once it passes the field's constraints.
  * The picker reopens where the viewer last browsed, starting in the linked file's folder.
+ * Linking and clearing swap the control's buttons; focus held by one that left lands on the picker button.
  */
 export function mediaControl(image: boolean): NonNullable<FieldType['control']> {
   return (context) => {
@@ -143,6 +145,7 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
     const details = ref<UploadRecord | null>(null);
     const detailsTab = ref<DetailsTab>('details');
     let memory: MediaPickerMemory | undefined;
+    let picker: HTMLElement | undefined;
 
     const baseUUID = (): string | null => (isString(base) ? base : null);
     const current = (): string | null => model.value;
@@ -150,11 +153,22 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
       const uuid = current();
       return isNull(uuid) ? null : mediaRecords.get(uuid);
     };
+    // The swap mounts on the flush, so the hand-off waits for it and only acts once focus really left.
+    const keepFocus = (write: () => void): void => {
+      const inside = root.contains(document.activeElement);
+      write();
+      if (!inside) return;
+      void nextTick().then(() => {
+        if (!root.contains(document.activeElement)) picker?.focus();
+      });
+    };
     const set = (next: string | null): void => {
-      model.value = next;
-      touched.value = true;
-      routed.value = '';
-      context.onInput();
+      keepFocus(() => {
+        model.value = next;
+        touched.value = true;
+        routed.value = '';
+      });
+      context.onInput(true);
     };
     const openPicker = (): void => {
       memory ??= createPickerMemory(untracked(record)?.directory);
@@ -166,6 +180,7 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
     };
     const describe = (el: HTMLElement): HTMLElement => {
       describeControl(el, context.field, context.path, () => routed.value);
+      picker = el;
       return el;
     };
 
@@ -251,6 +266,7 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
         return tile(() => linked, {
           view: tileView,
           compact: true,
+          lazy: false,
           onPick: () => openDetails(linked),
         });
       }),
@@ -330,6 +346,13 @@ export function mediaControl(image: boolean): NonNullable<FieldType['control']> 
         model.value = baseUUID();
         touched.value = false;
         routed.value = '';
+      },
+      restore(value) {
+        keepFocus(() => {
+          model.value = isString(value) ? value : null;
+          touched.value = !isUndefined(value);
+          routed.value = '';
+        });
       },
     };
   };

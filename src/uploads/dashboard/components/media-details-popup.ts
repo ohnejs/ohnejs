@@ -40,6 +40,7 @@ import {
   toast,
   useDashboardLanguage,
   useHotkeys,
+  useUnsavedChanges,
   when,
 } from 'ohnejs/dashboard';
 import {
@@ -54,6 +55,7 @@ import {
   isNumber,
   isUndefined,
   naturalCompare,
+  nextTick,
   onCleanup,
   recordHref,
   ref,
@@ -405,6 +407,7 @@ export async function loadUpload(
  * The type, size, and dimensions follow.
  * It ends with the URL and a copy button.
  * Description edits the alt text at the content locale with undo and redo over a `History`.
+ * An undo or redo of a change on a hidden tab switches to that tab.
  * Variants lists every named image variant with its tokens, byte size, rendered size, and a copy button.
  * That tab exists only while the record carries `variants`; on a private file it says when the links expire.
  * Pressing or dragging on an image preview places the focal point.
@@ -443,33 +446,35 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     });
   }
   const locked = (): boolean => inherited.value && current.value.private === true;
-  const edits = new History<DetailsState>().push(seed);
+  const edits = new History<DetailsState>({ watchUnsavedChanges: false }).push(seed);
   const descriptionField = collection?.fields.find((entry) => entry.name === 'description');
 
-  const buildForm = (state: DetailsState): FieldForm | undefined =>
-    isUndefined(descriptionField)
-      ? undefined
-      : createFieldForm(
-          [descriptionField],
-          { description: state.description },
-          {
-            mode: 'edit',
-            path: '',
-            readOnly: !canEdit,
-            readOnlyRows: true,
-            language: () => activeContentLocale() ?? language.value,
-            onInput: () => {
-              const state = currentState();
-              if (!isUndefined(state)) void edits.pushDebounced(state);
-            },
+  const form: FieldForm | undefined = isUndefined(descriptionField)
+    ? undefined
+    : createFieldForm(
+        [descriptionField],
+        { description: seed.description },
+        {
+          mode: 'edit',
+          path: '',
+          readOnly: !canEdit,
+          readOnlyRows: true,
+          language: () => activeContentLocale() ?? language.value,
+          onInput: (discrete) => {
+            if (discrete === true) recordEdit();
+            else void edits.pushDebounced(currentState());
           },
-        );
-  const form = ref(buildForm(seed));
-  onCleanup(() => form.value?.dispose());
+        },
+      );
+  onCleanup(() => form?.dispose());
   onCleanup(() => edits.clear());
 
-  const currentState = (): DetailsState | undefined => {
-    const value = (form.value?.snapshot(edits.getCurrentState()) ?? {}) as Partial<DetailsState>;
+  // The form reads dirty before its typing lands in the history, so the guard asks on either.
+  const dirty = (): boolean => edits.isDirty.value || form?.dirty() === true;
+  useUnsavedChanges(dirty);
+
+  const currentState = (): DetailsState => {
+    const value = (form?.draft(edits.getCurrentState()) ?? {}) as Partial<DetailsState>;
     return {
       description: hasKey(value, 'description')
         ? (value.description ?? null)
@@ -480,15 +485,22 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const restore = (state: DetailsState): void => {
-    form.value?.dispose();
-    form.value = buildForm(state);
+    const tab = tabOfChange(currentState(), state);
+    form?.restore({ description: state.description });
     focal.value = { focalX: state.focalX, focalY: state.focalY };
     priv.value = state.private;
+    if (isUndefined(tab) || tab === activeTab.value) return;
+    activeTab.value = tab;
+    // The outgoing panel took the focus with it, and keys stop reaching the popup without one.
+    void nextTick().then(() => {
+      if (handle.root.contains(document.activeElement)) return;
+      if (tab === 'description') form?.focus();
+      else handle.root.querySelector<HTMLElement>('[role="switch"]')?.focus();
+    });
   };
 
   const recordEdit = (): void => {
-    const state = currentState();
-    if (!isUndefined(state)) edits.push(state);
+    edits.flush().push(currentState());
   };
   const setFocal = (focalX: number | null, focalY: number | null): void => {
     focal.value = { focalX, focalY };
@@ -505,19 +517,18 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     },
   };
 
-  const errored = (): boolean => (form.value?.errored() ?? false) || unplaced.value !== '';
+  const errored = (): boolean => (form?.errored() ?? false) || unplaced.value !== '';
 
   const save = async (): Promise<void> => {
     if (busy.value || !canEdit) return;
-    const reading = form.value?.read();
+    const reading = form?.read();
     if (!isUndefined(reading?.errors)) {
       unplaced.value = '';
-      form.value?.setErrors(reading.errors);
-      form.value?.focusError();
+      form?.setErrors(reading.errors);
+      form?.focusError();
       return;
     }
     const state = currentState();
-    if (isUndefined(state)) return;
     busy.value = true;
     const outcome = await writeDetails(
       current.value.UUID,
@@ -528,7 +539,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
     if (outcome.kind === 'saved') {
       const next = detailsStateOf(outcome.record);
       current.value = outcome.record;
-      form.value?.rebase({ description: next.description });
+      form?.rebase({ description: next.description });
       focal.value = { focalX: next.focalX, focalY: next.focalY };
       priv.value = next.private;
       edits.push(next).setOriginalState(next);
@@ -544,7 +555,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       const { toggle, rest } = privateErrors(outcome.errors);
       refused.value = toggle;
       if (isEmpty(outcome.errors)) unplaced.value = outcome.message;
-      else if (!isEmpty(rest)) unplaced.value = form.value?.setErrors(rest) ?? outcome.message;
+      else if (!isEmpty(rest)) unplaced.value = form?.setErrors(rest) ?? outcome.message;
       if (toggle !== '' && isEmpty(rest)) activeTab.value = 'details';
       toast(
         t('dashboard.foundErrors', { count: Math.max(1, Object.keys(outcome.errors).length) }),
@@ -607,7 +618,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const close = async (force = false): Promise<void> => {
-    if (force || !edits.isDirty.value || (await confirmLeave())) {
+    if (force || !dirty() || (await confirmLeave())) {
       edits.clear();
       options.onClose(handle.close);
     }
@@ -857,7 +868,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const descriptionPanel = (): Child => [
-    () => form.value?.render(),
+    () => form?.render(),
     image ? focalRow() : null,
     when(
       () => unplaced.value !== '',
@@ -1111,7 +1122,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
       () => [linkButton(), linkMenu()],
     ),
     when(
-      () => edits.isDirty.value,
+      dirty,
       () => saveButton,
       () => closeButton,
     ),
@@ -1156,6 +1167,15 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   }
 
   return handle;
+}
+
+/**
+ * The tab that shows what a step from `from` to `to` changes, or `undefined` when the preview shows it.
+ */
+function tabOfChange(from: DetailsState, to: DetailsState): DetailsTab | undefined {
+  if (from.description !== to.description) return 'description';
+  if (from.private !== to.private) return 'details';
+  return undefined;
 }
 
 /**

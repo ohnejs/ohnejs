@@ -53,6 +53,15 @@ export interface MediaFileTileOptions {
    * false
    */
   compact?: boolean;
+
+  /**
+   * Whether the thumbnail waits until it nears the viewport before it loads.
+   * A form field turns it off, so its rebuilt tile paints a cached image in its first frame.
+   *
+   * @default
+   * true
+   */
+  lazy?: boolean;
 }
 
 const NOT_DISABLED: MediaItemDisabled = { value: false };
@@ -323,7 +332,7 @@ export function mediaImageItem(
       h('img', {
         alt: () => record().description ?? '',
         src: () => previewURL(record()),
-        loading: 'lazy',
+        loading: options.lazy === false ? 'eager' : 'lazy',
         class: 'o-media-image-thumbnail',
       }),
       when(

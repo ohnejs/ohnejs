@@ -1,4 +1,5 @@
 import { loadPage } from 'app/components/collection-table-data.ts';
+import { activeContentLocale } from 'app/components/content-language-switcher.ts';
 import {
   attachTooltip,
   css,
@@ -241,7 +242,7 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
         touched.value = true;
         routed.value = '';
         erroredIndices.value = [];
-        context.onInput();
+        context.onInput(true);
       });
     });
     silent = false;
@@ -276,11 +277,14 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
     ): Promise<DynamicChipsPaginatedChoices> => {
       const constraint = constraintWhere(constraints, image);
       const search = searchWhere(keyword);
+      // Read at the content locale, as the cache does, so a seeded record carries the viewer's alt text.
+      const locale = uploadsCollection()?.translatable ? activeContentLocale() : undefined;
       const loaded = await loadPage('uploads', {
         where: isUndefined(search) ? constraint : { and: [constraint, search] },
         order: ['-uploadedAt'],
         page,
         perPage: PER_PAGE,
+        ...(isUndefined(locale) ? {} : { locale }),
       });
       if (isUndefined(loaded)) {
         return { choices: [], currentPage: 1, lastPage: 1, perPage: PER_PAGE, total: 0 };
@@ -331,7 +335,7 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
             );
           }
           const tile = isDisplayableImage(record) ? mediaImageItem : mediaFileItem;
-          return tile(() => record, { view: tileView, compact: true });
+          return tile(() => record, { view: tileView, compact: true, lazy: false });
         }),
       );
       onCleanup(attachTooltip(el, () => choice.tooltip ?? null));
@@ -466,6 +470,10 @@ export function mediaListControl(image: boolean): NonNullable<FieldType['control
       rebase(value) {
         base = listOf(value);
         reset(base);
+      },
+      restore(value) {
+        reset(listOf(value));
+        touched.value = !isUndefined(value);
       },
     };
   };
