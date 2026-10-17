@@ -727,6 +727,7 @@ export const AI_DEFAULTS = {
     'GET /collections/[collection]/[uuid]': 'read',
     'GET /collections/[collection]/[uuid]/translations': 'read',
     'POST /collections/[collection]': 'write',
+    'POST /collections/[collection]/[uuid]/duplicate': 'write',
     'PATCH /collections/[collection]/[uuid]': 'write',
     'DELETE /collections/[collection]/[uuid]': 'destructive',
     'DELETE /collections/[collection]/[uuid]/translations': 'destructive',

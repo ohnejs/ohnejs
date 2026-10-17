@@ -9,6 +9,7 @@ describe('tierOf', () => {
     await withAI(undefined, () => {
       strictEqual(tierOf('POST', '/collections/[collection]/query'), 'read');
       strictEqual(tierOf('PATCH', '/collections/[collection]/[uuid]'), 'write');
+      strictEqual(tierOf('POST', '/collections/[collection]/[uuid]/duplicate'), 'write');
       strictEqual(tierOf('DELETE', '/collections/[collection]/[uuid]'), 'destructive');
       strictEqual(
         tierOf('POST', '/collections/[collection]/[uuid]/translations/copy'),

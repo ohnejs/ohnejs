@@ -382,7 +382,7 @@ describe('shapeReceipt', () => {
     );
   });
 
-  it('echoes the uuid, names a created record, and lists the locales a translations read answers', async () => {
+  it('echoes the uuid, names a created or duplicated record, and lists the locales a translations read answers', async () => {
     const uuid = { params: { uuid: UUID } };
     const get: ReceiptSource = {
       route: { method: 'GET', pattern: '/collections/[collection]/[uuid]', body: 'none' },
@@ -407,6 +407,24 @@ describe('shapeReceipt', () => {
       status: 201,
       uuid: 'new',
     });
+    const duplicate: ReceiptSource = {
+      route: {
+        method: 'POST',
+        pattern: '/collections/[collection]/[uuid]/duplicate',
+        body: 'overrides',
+      },
+      proposal: {
+        route: 'POST /collections/items/[uuid]/duplicate',
+        tier: 'write',
+        ...uuid,
+        body: {},
+      },
+      identity: false,
+    };
+    deepStrictEqual(
+      await shapeReceipt(duplicate, { status: 201, body: { UUID: 'copy', name: 'x' } }),
+      { route: 'POST /collections/items/[uuid]/duplicate', status: 201, uuid: 'copy' },
+    );
     const translations: ReceiptSource = {
       route: {
         method: 'GET',

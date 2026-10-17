@@ -58,7 +58,14 @@ export interface ApprovalTableOptions {
 /**
  * What a write proposal does, which names its verdict and its words.
  */
-type Verb = 'create' | 'update' | 'delete' | 'copyTranslations' | 'deleteTranslations' | 'request';
+type Verb =
+  | 'create'
+  | 'duplicate'
+  | 'update'
+  | 'delete'
+  | 'copyTranslations'
+  | 'deleteTranslations'
+  | 'request';
 
 /**
  * One row of the table: a record a write reaches, or the one record a create makes.
@@ -98,7 +105,12 @@ interface LoadedRows {
  */
 const PAGE = 50;
 
-const VERDICT_OF: Readonly<Record<Verb, 'update' | 'delete' | 'deleteTranslation'>> = {
+/**
+ * The verdict each verb asks for its rows; a duplicate asks none, since it copies what the person reads.
+ */
+const VERDICT_OF: Readonly<
+  Record<Exclude<Verb, 'duplicate'>, 'update' | 'delete' | 'deleteTranslation'>
+> = {
   create: 'update',
   update: 'update',
   delete: 'delete',
@@ -266,7 +278,10 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
         label: () => t('ai.dashboard.batch.changes'),
         minWidth: '8em',
         render: (row) => {
-          if (!row.mine) return h('div', { class: 'ohne-muted' }, t('ai.dashboard.batch.notYours'));
+          if (!row.mine) {
+            const refused = row.verb === 'duplicate' ? 'notReadable' : 'notYours';
+            return h('div', { class: 'ohne-muted' }, t(`ai.dashboard.batch.${refused}`));
+          }
           return h(
             'div',
             null,
@@ -398,6 +413,7 @@ function headerLine(
 /**
  * The rows of every write: a write by set expanded, a record named, or the record a create makes.
  * An update then reads the current values of the fields it sets, one page of records at a time.
+ * A duplicate's rows are the person's when their read finds them, and each shows the overrides.
  * A write by set whose expansion fails gets no rows and is listed as failed.
  */
 async function loadRows(
@@ -409,7 +425,12 @@ async function loadRows(
     const verb = verbOf(proposal);
     const collection = collectionOfRoute(proposal.route) ?? null;
     const locale = localeOf(proposal);
-    const base = { proposal: index, verb, collection, changes: [] as Change[] };
+    const base = {
+      proposal: index,
+      verb,
+      collection,
+      changes: verb === 'duplicate' ? proposed(proposal, collection) : ([] as Change[]),
+    };
     if (isNull(collection) || (isUndefined(proposal.where) && isUndefined(proposal.params?.uuid))) {
       rows.push({
         ...base,
@@ -420,12 +441,14 @@ async function loadRows(
       });
       continue;
     }
-    const operation = VERDICT_OF[verb];
     const own: ApprovalRow[] = [];
     if (!isUndefined(proposal.where)) {
       const expanded = await expandSet(proposal, collection, {
         page: (body) => loadPage(collection.segment, body),
-        verdict: async (UUIDs) => (await loadVerdicts(collection, UUIDs, locale))[operation],
+        verdict: async (UUIDs) =>
+          verb === 'duplicate'
+            ? new Set(UUIDs)
+            : (await loadVerdicts(collection, UUIDs, locale))[VERDICT_OF[verb]],
       });
       if (isUndefined(expanded)) {
         failed.add(index);
@@ -437,18 +460,35 @@ async function loadRows(
       }
     } else {
       const uuid = proposal.params?.uuid as string;
-      const verdicts = await loadVerdicts(collection, [uuid], locale);
-      own.push({
-        ...base,
-        id: `${index}:${uuid}`,
-        UUID: uuid,
-        mine: verdicts[operation].has(uuid),
-      });
+      const mine =
+        verb === 'duplicate'
+          ? await readsRecord(collection, uuid, locale)
+          : (await loadVerdicts(collection, [uuid], locale))[VERDICT_OF[verb]].has(uuid);
+      own.push({ ...base, id: `${index}:${uuid}`, UUID: uuid, mine });
     }
     if (verb === 'update') await fillChanges(own, proposal, collection, locale);
     rows.push(...own);
   }
   return { rows, failed };
+}
+
+/**
+ * Whether the person's read finds the record `uuid` of `collection`, at `locale` when one is named.
+ * A duplicate copies what the person reads, so a record their read hides is not theirs to copy.
+ */
+async function readsRecord(
+  collection: DashboardCollection,
+  uuid: string,
+  locale: string | undefined,
+): Promise<boolean> {
+  const page = await loadPage(collection.segment, {
+    where: { UUID: uuid },
+    select: ['UUID'],
+    page: 1,
+    perPage: 1,
+    ...(isUndefined(locale) ? {} : { locale }),
+  });
+  return page?.records.some((record) => record.UUID === uuid) === true;
 }
 
 /**
@@ -559,6 +599,7 @@ function verbOf(proposal: Proposal): Verb {
   if (!path.startsWith('/collections/')) return 'request';
   if (path.endsWith('/translations/copy')) return 'copyTranslations';
   if (path.endsWith('/translations')) return 'deleteTranslations';
+  if (path.endsWith('/duplicate')) return 'duplicate';
   if (method === 'DELETE') return 'delete';
   return method === 'PATCH' ? 'update' : 'create';
 }

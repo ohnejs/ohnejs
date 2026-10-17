@@ -9,9 +9,11 @@ import { AI_DEFAULTS } from '../../../src/ai/config.ts';
 import { checkProposal } from '../../../src/ai/turns/proposals.ts';
 import { renderSurface } from '../../../src/ai/turns/surface.ts';
 import { requireUser } from '../../../src/base/auth/require-user.ts';
+import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
+import { field } from '../../../src/ohne/fields/field.ts';
 import { readJSONBody } from '../../../src/ohne/http/read-json-body.ts';
 import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
-import { call, route, signIn, withAI } from '../_fixture.ts';
+import { call, route, signIn, syncSchema, withAI } from '../_fixture.ts';
 
 useRoutes().register('POST /search', {
   method: 'POST',
@@ -20,6 +22,19 @@ useRoutes().register('POST /search', {
   layer: 'ohnejs/base',
   handler: () => null,
 });
+useCollections().register('Relics', {
+  name: 'Relics',
+  collection: {
+    api: { read: true, create: true },
+    dashboard: { recordLabel: 'name' },
+    fields: {
+      name: field('text'),
+      serial: field('text', { immutable: true }),
+      sealed: field('text', { writable: false, nullable: true }),
+    },
+  },
+});
+await syncSchema();
 
 type Outcome =
   | { ok: true; proposal: Proposal; identity: boolean }
@@ -50,6 +65,9 @@ const PATCH = 'PATCH /collections/characters/[uuid]';
 const PATCH_ITEM = 'PATCH /collections/items/[uuid]';
 const COPY = 'POST /collections/items/[uuid]/translations/copy';
 const CREATE_ITEM = 'POST /collections/items';
+const DUPLICATE = 'POST /collections/characters/[uuid]/duplicate';
+const DUPLICATE_ITEM = 'POST /collections/items/[uuid]/duplicate';
+const DUPLICATE_RELIC = 'POST /collections/relics/[uuid]/duplicate';
 
 /**
  * Checks `proposal` as the officer, or as the person `token` signs in, under the default settings.
@@ -481,5 +499,72 @@ describe('checkProposal', () => {
       true,
     );
     strictEqual((await check({ route: del, params: { uuid: UUID } })).ok, true);
+  });
+
+  it('sends a copy without a body as `{}`', async () => {
+    const at = { params: { uuid: UUID }, query: { locale: 'de' } };
+    deepStrictEqual(await check({ route: COPY, ...at }), {
+      ok: true,
+      proposal: { route: COPY, tier: 'destructive', ...at, body: {} },
+      identity: false,
+    });
+  });
+
+  it('takes a duplicate without a body as `{}`, its overrides on settable fields alone', async () => {
+    const at = { params: { uuid: UUID } };
+    deepStrictEqual(await check({ route: DUPLICATE, ...at }), {
+      ok: true,
+      proposal: { route: DUPLICATE, tier: 'write', ...at, body: {} },
+      identity: false,
+    });
+    deepStrictEqual(
+      await check({ route: DUPLICATE, ...at, body: { nope: 1 } }),
+      refused(DUPLICATE, 'invalidField', 'body.nope'),
+    );
+    deepStrictEqual(
+      await check({ route: DUPLICATE, ...at, body: { UUID } }),
+      refused(DUPLICATE, 'invalidField', 'body.UUID'),
+    );
+    deepStrictEqual(
+      await check({ route: DUPLICATE_RELIC, ...at, body: { sealed: 'x' } }, admin.token),
+      refused(DUPLICATE_RELIC, 'invalidField', 'body.sealed'),
+    );
+    strictEqual(
+      (await check({ route: DUPLICATE_RELIC, ...at, body: { serial: 'x' } }, admin.token)).ok,
+      true,
+    );
+  });
+
+  it('offers a duplicate only with both read and create, and takes any field at a locale', async () => {
+    deepStrictEqual(
+      await check({ route: DUPLICATE_ITEM, params: { uuid: UUID } }),
+      refused(DUPLICATE_ITEM, 'unknownRoute', 'route'),
+    );
+    const at = { params: { uuid: UUID }, query: { locale: 'de' } };
+    strictEqual(
+      (
+        await check(
+          { route: DUPLICATE_ITEM, ...at, body: { name: 'Kopie', rarity: 'epic' } },
+          admin.token,
+        )
+      ).ok,
+      true,
+    );
+    deepStrictEqual(
+      await check({ route: DUPLICATE, ...at }),
+      refused(DUPLICATE, 'localeNotApplicable', 'query.locale'),
+    );
+  });
+
+  it('duplicates by set, its filter parsed as the list read', async () => {
+    deepStrictEqual(await check({ route: DUPLICATE, where: { level: 60 } }), {
+      ok: true,
+      proposal: { route: DUPLICATE, tier: 'write', where: { level: 60 }, body: {} },
+      identity: false,
+    });
+    deepStrictEqual(
+      await check({ route: DUPLICATE, where: { owner: { has: { email: 'a' } } } }),
+      refused(DUPLICATE, 'invalidField', 'where.owner.email'),
+    );
   });
 });

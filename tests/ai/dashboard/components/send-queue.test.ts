@@ -100,6 +100,17 @@ describe('requestOf', () => {
     strictEqual(requestOf(RETIRE, 'c-1').route, 'PATCH /collections/characters/c-1');
   });
 
+  it('sends an empty body as JSON, with its content type', () => {
+    const { init } = requestOf({
+      route: 'POST /collections/items/[uuid]/duplicate',
+      tier: 'write',
+      params: { uuid: 'a' },
+      body: {},
+    });
+    strictEqual(init.body, '{}');
+    deepStrictEqual(init.headers, { 'content-type': 'application/json' });
+  });
+
   it('sends a proposal without a body with no headers', () => {
     const { route, init } = requestOf({
       route: 'DELETE /collections/items/[uuid]',

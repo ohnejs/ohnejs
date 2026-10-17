@@ -167,6 +167,7 @@ const MAX_INSTRUCTION = 4_000;
  * A wire query in the body or the query parses as the person's read would.
  * Its reach answers `false` for every denied collection, so a `has` or `populate` into one fails.
  * A locale-tagged update may carry translatable fields alone; a create writes the others as well.
+ * A duplicate's overrides name settable fields alone, and without a body it sends `{}`, as a copy does.
  * A write by set needs a route with a `uuid` param above the read tier, and its filter parses the same way.
  * A transform stands in for an update's body and names rewritable fields alone, translatable at a locale.
  * A list read without a window gets `page: 1`, so its receipt carries a total.
@@ -315,6 +316,7 @@ function checkSearch(
 
 /**
  * Checks the body by what the route takes, and whether a list read's filter passed the identity rule.
+ * A copy or a duplicate without a body gets `{}`, so the browser sends it as JSON.
  */
 async function checkBody(
   body: unknown,
@@ -357,7 +359,16 @@ async function checkBody(
       'body',
     );
     if (!source.ok) return source;
-    return { ok: true, value: { body: given, identity: false } };
+    return { ok: true, value: { body: given ?? {}, identity: false } };
+  }
+  if (route.body === 'overrides') {
+    for (const key of Object.keys(given ?? {})) {
+      const field = collection.meta.fields[key];
+      if (isUndefined(field?.fieldType) || field.writable === false) {
+        return failed('invalidField', `body.${key}`);
+      }
+    }
+    return { ok: true, value: { body: given ?? {}, identity: false } };
   }
   if (isUndefined(given)) return failed('invalidShape', 'body');
   if (route.method === 'PATCH' && !isUndefined(locale)) {

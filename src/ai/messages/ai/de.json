@@ -142,6 +142,7 @@
     },
     "batch": {
       "create": "{count, plural, one {# Datensatz} other {# Datensätze}} in {collection} anlegen",
+      "duplicate": "{count, plural, one {# Datensatz} other {# Datensätze}} in {collection} duplizieren",
       "update": "{count, plural, one {# Datensatz} other {# Datensätze}} in {collection} ändern",
       "delete": "{count, plural, one {# Datensatz} other {# Datensätze}} aus {collection} löschen",
       "copyTranslations": "Übersetzungen auf {count, plural, one {# Datensatz} other {# Datensätze}} in {collection} kopieren",
@@ -151,6 +152,7 @@
       "every": "jeder Datensatz, bei dem {filter}",
       "verb": {
         "create": "Anlegen",
+        "duplicate": "Duplizieren",
         "update": "Ändern",
         "delete": "Löschen",
         "copyTranslations": "Übersetzungen kopieren",
@@ -162,6 +164,7 @@
       "changes": "Änderungen",
       "newRecord": "Neuer Datensatz",
       "notYours": "Nicht von dir bearbeitbar",
+      "notReadable": "Nicht von dir lesbar",
       "noRows": "Nichts passt",
       "loadFailed": "Die betroffenen Datensätze konnten nicht geladen werden, daher kann diese Änderung nicht freigegeben werden",
       "approveSelected": "Ausgewählte freigeben",

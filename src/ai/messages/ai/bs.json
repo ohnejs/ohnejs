@@ -142,6 +142,7 @@
     },
     "batch": {
       "create": "Kreiraj {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} u {collection}",
+      "duplicate": "Dupliciraj {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} iz {collection}",
       "update": "Izmijeni {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} u {collection}",
       "delete": "Obriši {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} iz {collection}",
       "copyTranslations": "Kopiraj prijevode na {count, plural, one {# zapis} few {# zapisa} other {# zapisa}} u {collection}",
@@ -151,6 +152,7 @@
       "every": "svaki zapis gdje {filter}",
       "verb": {
         "create": "Kreiraj",
+        "duplicate": "Dupliciraj",
         "update": "Izmijeni",
         "delete": "Obriši",
         "copyTranslations": "Kopiraj prijevode",
@@ -162,6 +164,7 @@
       "changes": "Izmjene",
       "newRecord": "Novi zapis",
       "notYours": "Nije vaše za uređivanje",
+      "notReadable": "Nije vaše za čitanje",
       "noRows": "Ništa ne odgovara",
       "loadFailed": "Zapise na koje se ova izmjena odnosi nije moguće učitati, pa je ne možete odobriti",
       "approveSelected": "Odobri odabrane",

@@ -97,13 +97,17 @@ const ITEMS_READ = [
   'POST /collections/items/query',
   'POST /collections/items/verdicts',
 ];
-const CHARACTERS = [
-  'DELETE /collections/characters/[uuid]',
+const CHARACTERS_READ = [
   'GET /collections/characters/[uuid]',
-  'PATCH /collections/characters/[uuid]',
-  'POST /collections/characters',
   'POST /collections/characters/query',
   'POST /collections/characters/verdicts',
+];
+const CHARACTERS = [
+  ...CHARACTERS_READ,
+  'DELETE /collections/characters/[uuid]',
+  'PATCH /collections/characters/[uuid]',
+  'POST /collections/characters',
+  'POST /collections/characters/[uuid]/duplicate',
 ];
 const GUILDS_READ = [
   'GET /collections/guilds/[uuid]',
@@ -135,19 +139,13 @@ describe('renderSurface', () => {
       const { routes, text } = await surfaceFor(officer.token, false, ['read']);
       deepStrictEqual(
         routes,
-        [
-          ...CHARACTERS.filter(
-            (id) => id.startsWith('GET') || id.startsWith('POST /collections/characters/'),
-          ),
-          ...GUILDS_READ,
-          ...ITEMS_READ,
-          'POST /search',
-        ].toSorted(),
+        [...CHARACTERS_READ, ...GUILDS_READ, ...ITEMS_READ, 'POST /search'].toSorted(),
       );
       ok(!text.includes('PATCH /collections/items/[uuid]'));
       const { routes: writes } = await surfaceFor(officer.token, false, ['write', 'destructive']);
       ok(!writes.some((id) => id.startsWith('GET') || id.endsWith('/query')));
       ok(writes.includes('PATCH /collections/characters/[uuid]'));
+      ok(writes.includes('POST /collections/characters/[uuid]/duplicate'));
       ok(writes.includes('DELETE /collections/characters/[uuid]'));
     });
   });
@@ -167,6 +165,7 @@ describe('renderSurface', () => {
       const { routes, collections } = await surfaceFor(admin.token);
       ok(routes.includes('DELETE /collections/items/[uuid]'));
       ok(routes.includes('DELETE /collections/items/[uuid]/translations'));
+      ok(routes.includes('POST /collections/items/[uuid]/duplicate'));
       ok(!routes.some((id) => /\/(users|sessions|ai-turns)\b/.test(id)));
       deepStrictEqual(collections, ['Items', 'Guilds', 'Characters']);
     });

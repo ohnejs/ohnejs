@@ -199,7 +199,7 @@ describe('tagAutoAccept', () => {
     deepStrictEqual(await tagged(lenient, batchOf(transform)), [false]);
   });
 
-  it('never tags an app route or a translation copy', async () => {
+  it('never tags an app route, a translation copy or a duplicate', async () => {
     const lenient = { ...ON, autoAccept: { max: 99, fields: { Items: true as const }, ask: [] } };
     const app = entry('POST', '/reports', { body: {} }, null);
     deepStrictEqual(await tagged(lenient, batchOf(app)), [false]);
@@ -209,5 +209,8 @@ describe('tagAutoAccept', () => {
     });
     copy.route.body = 'copy';
     deepStrictEqual(await tagged(lenient, batchOf(copy)), [false]);
+    const duplicate = entry('POST', `${RECORD}/duplicate`, { params: { uuid: UUID }, body: {} });
+    duplicate.route.body = 'overrides';
+    deepStrictEqual(await tagged(lenient, batchOf(duplicate)), [false]);
   });
 });

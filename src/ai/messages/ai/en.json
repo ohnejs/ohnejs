@@ -142,6 +142,7 @@
     },
     "batch": {
       "create": "Create {count, plural, one {# record} other {# records}} in {collection}",
+      "duplicate": "Duplicate {count, plural, one {# record} other {# records}} of {collection}",
       "update": "Update {count, plural, one {# record} other {# records}} of {collection}",
       "delete": "Delete {count, plural, one {# record} other {# records}} of {collection}",
       "copyTranslations": "Copy translations onto {count, plural, one {# record} other {# records}} of {collection}",
@@ -151,6 +152,7 @@
       "every": "every record where {filter}",
       "verb": {
         "create": "Create",
+        "duplicate": "Duplicate",
         "update": "Update",
         "delete": "Delete",
         "copyTranslations": "Copy translations",
@@ -162,6 +164,7 @@
       "changes": "Changes",
       "newRecord": "New record",
       "notYours": "Not yours to edit",
+      "notReadable": "Not yours to read",
       "noRows": "Nothing matches",
       "loadFailed": "Could not load the records this change reaches, so it cannot be approved",
       "approveSelected": "Approve selected",

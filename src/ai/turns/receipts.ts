@@ -78,7 +78,7 @@ export interface Receipt {
   route: string;
 
   /**
-   * The `uuid` param the proposal named, or the `UUID` a create answered.
+   * The `uuid` param the proposal named, or the `UUID` a create or a duplicate answered.
    */
   uuid?: string;
 
@@ -353,9 +353,8 @@ export async function shapeReceipt(
     if (route.body === 'query') shapeList(receipt, result.body, identity);
     if (route.body === 'verdicts' && !isUndefined(body)) shapeVerdicts(receipt, body, identity);
     if (route.body === 'search') shapeSearch(receipt, body, values);
-    if (route.body === 'record' && route.method === 'POST' && isString(body?.UUID)) {
-      receipt.uuid = body.UUID;
-    }
+    const creates = route.body === 'record' || route.body === 'overrides';
+    if (creates && route.method === 'POST' && isString(body?.UUID)) receipt.uuid = body.UUID;
     if (route.pattern.endsWith('/translations') && isArray(body?.locales)) {
       receipt.locales = body.locales.filter(isString);
     }

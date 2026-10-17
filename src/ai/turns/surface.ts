@@ -49,11 +49,20 @@ import { tierOf } from './tiers.ts';
  * - `verdicts`: `where` or `UUIDs`, with a `locale`.
  * - `record`: a record's fields, as a create or update takes them.
  * - `copy`: an optional `source` locale.
+ * - `overrides`: the fields a duplicate sets on the copy, optional.
  * - `none`: nothing.
  * - `search`: a `POST /search` body, `q` with an optional `collection`, `via`, `limit` and `offset`.
  * - `app`: any JSON object, since the route is the app's own.
  */
-export type BodyShape = 'query' | 'verdicts' | 'record' | 'copy' | 'none' | 'search' | 'app';
+export type BodyShape =
+  | 'query'
+  | 'verdicts'
+  | 'record'
+  | 'copy'
+  | 'overrides'
+  | 'none'
+  | 'search'
+  | 'app';
 
 /**
  * One route the assistant may propose, as the surface lists it.
@@ -173,8 +182,9 @@ export interface Surface {
 }
 
 interface ShippedRoute {
-  needs: keyof ReachableCollection['operations'];
+  needs: readonly (keyof ReachableCollection['operations'])[];
   translatable?: true;
+  duplicates?: true;
   query: readonly string[];
   body: BodyShape;
 }
@@ -185,33 +195,43 @@ interface ShippedRoute {
 const SEARCH_ROUTE = 'POST /search';
 
 /**
- * The shipped collections routes: the operation each needs, and what a proposal to it may carry.
+ * The shipped collections routes: the operations each needs, and what a proposal to it may carry.
  */
 const SHIPPED: Readonly<Record<string, ShippedRoute>> = {
-  'POST /collections/[collection]/query': { needs: 'read', query: [], body: 'query' },
-  'POST /collections/[collection]/verdicts': { needs: 'read', query: [], body: 'verdicts' },
+  'POST /collections/[collection]/query': { needs: ['read'], query: [], body: 'query' },
+  'POST /collections/[collection]/verdicts': { needs: ['read'], query: [], body: 'verdicts' },
   'GET /collections/[collection]/[uuid]': {
-    needs: 'read',
+    needs: ['read'],
     query: ['select', 'populate', 'locale'],
     body: 'none',
   },
   'GET /collections/[collection]/[uuid]/translations': {
-    needs: 'read',
+    needs: ['read'],
     translatable: true,
     query: [],
     body: 'none',
   },
-  'POST /collections/[collection]': { needs: 'create', query: ['locale'], body: 'record' },
-  'PATCH /collections/[collection]/[uuid]': { needs: 'update', query: ['locale'], body: 'record' },
-  'DELETE /collections/[collection]/[uuid]': { needs: 'delete', query: [], body: 'none' },
+  'POST /collections/[collection]': { needs: ['create'], query: ['locale'], body: 'record' },
+  'POST /collections/[collection]/[uuid]/duplicate': {
+    needs: ['read', 'create'],
+    duplicates: true,
+    query: ['locale'],
+    body: 'overrides',
+  },
+  'PATCH /collections/[collection]/[uuid]': {
+    needs: ['update'],
+    query: ['locale'],
+    body: 'record',
+  },
+  'DELETE /collections/[collection]/[uuid]': { needs: ['delete'], query: [], body: 'none' },
   'DELETE /collections/[collection]/[uuid]/translations': {
-    needs: 'delete',
+    needs: ['delete'],
     translatable: true,
     query: ['locale'],
     body: 'none',
   },
   'POST /collections/[collection]/[uuid]/translations/copy': {
-    needs: 'update',
+    needs: ['update'],
     translatable: true,
     query: ['locale'],
     body: 'copy',
@@ -246,7 +266,7 @@ const ASK_WORDS: Readonly<Record<AIAskKind, string>> = {
  * Renders the surface for `user`: locales, limits, the routes, collections and pages they reach, and skills.
  * The limits state which writes run without asking, once the person turned auto-accept on.
  * A collection `ai.deny.collections` lists never appears, whatever the person may do with it.
- * A route appears when `ai.routes` gives it a tier and the person may run its operation on that collection.
+ * A route appears when `ai.routes` gives it a tier and the person may run its operations on that collection.
  * With `tiers`, a flow node's, only the routes of those tiers appear, so the node can propose no other.
  * Fields outside the person's read scope stay out, as do the ones no read returns.
  * The pages are the person's sidebar rows and their account page, never a denied collection's.
@@ -438,8 +458,9 @@ function offeredRoutes(
       if (isNull(method) || isUndefined(shipped)) continue;
       const tier = tierOf(method, pattern);
       if (!open(tier)) continue;
-      if (!operations[shipped.needs]) continue;
+      if (!shipped.needs.every((operation) => operations[operation])) continue;
       if (shipped.translatable && meta.translatable !== true) continue;
+      if (shipped.duplicates && meta.duplicate === false) continue;
       add({
         id: routeID(method, pattern.replace('[collection]', described.segment)),
         method,

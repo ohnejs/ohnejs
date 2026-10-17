@@ -12,6 +12,7 @@ Records live in collections. Every record has \`UUID\` and \`_updatedAt\` (epoch
 - \`POST /collections/<segment>/verdicts\`: \`{ where }\` counts, \`{ UUIDs }\` names, what your update and delete may touch. Ask it before a bulk write.
 - \`GET .../[uuid]/translations\`: the locales a record holds.
 - \`POST .../[uuid]/translations/copy\`: copy one locale onto another; \`query.locale\` is the target, body \`{ source }\`. Copying is not translating. \`DELETE .../[uuid]/translations\`: delete one translation; \`query.locale\` is required.
+- \`POST .../[uuid]/duplicate\`: copy a record into a new one, every translation included (201). Body: the fields to change on the copy, \`{}\` for none; unique fields are not copied, so a required unique field needs a value, and a translatable one fails at the copy's other locales. \`query.locale\` is the locale the body's translatable values land at. The receipt's \`uuid\` is the copy.
 
 ## Filters
 \`where\` is an object; keys are fields; sibling keys AND. \`{ level: 60 }\` is equality, \`{ level: { atLeast: 60 } }\` a comparison.
