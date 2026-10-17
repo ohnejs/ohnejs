@@ -13,6 +13,7 @@ import {
   dropdownItem,
   fallbackLabel,
   type FieldForm,
+  type FieldFormOptions,
   h,
   icon,
   joinLabel,
@@ -30,6 +31,7 @@ import {
   useHotkeys,
   useRoute,
   useT,
+  useUnsavedChanges,
   when,
 } from 'ohnejs/dashboard';
 import {
@@ -145,7 +147,7 @@ export interface RecordEditor {
   saved: () => RecordRow;
 
   /**
-   * The live form, rebuilt on every load and every undo or redo.
+   * The live form, rebuilt on every load; an undo or redo patches it in place.
    * It is `undefined` until the record is read.
    */
   form: Ref<FieldForm | undefined>;
@@ -164,6 +166,12 @@ export interface RecordEditor {
    * The undo history of the form's state.
    */
   history: History;
+
+  /**
+   * Whether the record holds unsaved edits: a history step past the saved state, or typing not yet landed.
+   * Reactive.
+   */
+  dirty: () => boolean;
 
   /**
    * Goes up whenever the form's content changes: an edit, an undo or redo, a load, or a save.
@@ -207,7 +215,7 @@ export interface RecordEditor {
   remove: () => Promise<void>;
 
   /**
-   * Rebuilds the form from a state the history restored.
+   * Takes a state the history restored into the live form, control by control.
    */
   restore: (state: RecordRow) => void;
 }
@@ -217,8 +225,9 @@ export interface RecordEditor {
  *
  * Create and edit share this one editor; `uuid` absent means create.
  * A singleton never creates: `uuid` absent there edits its one record.
- * Every edit debounce-pushes onto a `History`; undo and redo rebuild the form from the restored state.
- * Leaving dirty edits asks first, in-app and on tab close, through the history's unsaved-changes guard.
+ * A keystroke debounce-pushes onto a `History` and a discrete change pushes at once.
+ * Undo and redo patch the form in place from the restored state.
+ * Leaving dirty edits asks first, in-app and on tab close, while the history or the form reads dirty.
  * Cmd/Ctrl+S saves while no overlay is open.
  * A `422` routes onto the rows it names and raises the error count toast.
  * A vanished record redirects to the collection with a toast, a singleton's to the overview.
@@ -252,6 +261,7 @@ export function useRecordEditor(
     omit: collection.fields
       .filter((field) => !field.writable || field.immutable)
       .map((field) => field.name),
+    watchUnsavedChanges: false,
   });
 
   const revision = ref(0);
@@ -259,7 +269,10 @@ export function useRecordEditor(
     revision.value = untracked(() => revision.value) + 1;
   };
 
-  const buildForm = (initial: RecordRow | undefined): FieldForm =>
+  const buildForm = (
+    initial: RecordRow | undefined,
+    folds?: FieldFormOptions['folds'],
+  ): FieldForm =>
     createFieldForm(lockOutside(formFields, verdicts.value?.select), initial, {
       mode: create ? 'create' : 'edit',
       path: '',
@@ -267,10 +280,13 @@ export function useRecordEditor(
       readOnly: !canWrite(),
       layout: collection.layout,
       language: () => useDashboardLanguage().value,
-      onInput: () => {
+      folds,
+      onInput: (discrete) => {
         revise();
         const state = currentState();
-        if (!isUndefined(state)) void history.pushDebounced(state);
+        if (isUndefined(state)) return;
+        if (discrete === true) history.flush().push(state);
+        else void history.pushDebounced(state);
       },
     });
 
@@ -282,12 +298,33 @@ export function useRecordEditor(
   const busy = ref(false);
   onCleanup(() => form.value?.dispose());
 
+  // The form reads dirty before its typing lands in the history, so the guard asks on either.
+  const dirty = (): boolean => history.isDirty.value || form.value?.dirty() === true;
+  useUnsavedChanges(dirty);
+
   const currentState = (): RecordRow | undefined =>
-    form.value?.snapshot(history.getCurrentState()) as RecordRow | undefined;
+    form.value?.draft(history.getCurrentState()) as RecordRow | undefined;
+
+  const rebuildForm = (initial: RecordRow): void => {
+    const live = untracked(() => form.value);
+    const folds = live?.folds();
+    live?.dispose();
+    form.value = buildForm(initial, folds);
+  };
 
   const restore = (restored: RecordRow): void => {
-    form.value?.dispose();
-    form.value = buildForm({ ...untracked(() => loaded.value), ...restored });
+    const item = { ...untracked(() => loaded.value), ...restored };
+    const live = untracked(() => form.value);
+    if (isUndefined(live)) rebuildForm(item);
+    else live.restore(item);
+    revise();
+  };
+
+  // Re-baselines the form and the history on the loaded record, so nothing reads dirty.
+  const settle = (live: FieldForm): void => {
+    live.rebase(untracked(() => loaded.value));
+    const settled = currentState();
+    if (!isUndefined(settled)) history.push(settled).setOriginalState(settled);
     revise();
   };
 
@@ -318,8 +355,7 @@ export function useRecordEditor(
     verdicts.value = await (asked ?? ask());
     loaded.value = row;
     seedRecordLabel(collection, row, locale);
-    form.value?.dispose();
-    form.value = buildForm(row);
+    rebuildForm(row);
     history.push(currentState() ?? {});
     revise();
     state.value = 'ready';
@@ -351,7 +387,7 @@ export function useRecordEditor(
     if (collection.translatable) {
       let applied = untracked(activeContentLocale);
       const switchLocale = async (next: string | undefined): Promise<void> => {
-        const allowed = !busy.value && (!history.isDirty.value || (await confirmLeave()));
+        const allowed = !busy.value && (!dirty() || (await confirmLeave()));
         if (!allowed) {
           contentLocale.value = applied;
           return;
@@ -379,7 +415,11 @@ export function useRecordEditor(
     }
     const full = (reading.value ?? {}) as RecordRow;
     const body = create ? full : changedSince(full, history.getOriginalState() ?? {});
-    if (!create && isEmpty(body)) return;
+    // A draft that writes the same stored value, like a case-only address edit, is saved by settling.
+    if (!create && isEmpty(body)) {
+      settle(live);
+      return;
+    }
     const focused = document.activeElement;
     busy.value = true;
     const outcome = await write(
@@ -394,10 +434,7 @@ export function useRecordEditor(
     if (outcome.kind === 'saved') {
       // A scoped answer omits the fields outside its `select`; the last read still holds their values.
       loaded.value = { ...untracked(() => loaded.value), ...outcome.record };
-      live.rebase(untracked(() => loaded.value));
-      const settled = currentState();
-      if (!isUndefined(settled)) history.push(settled).setOriginalState(settled);
-      revise();
+      settle(live);
       seedRecordLabel(
         collection,
         untracked(() => loaded.value),
@@ -468,6 +505,7 @@ export function useRecordEditor(
     state,
     busy,
     history,
+    dirty,
     revision,
     canCreate,
     canTranslate,
@@ -592,7 +630,7 @@ export function recordEditorFooter(editor: RecordEditor): Child {
     { variant: 'outline', onClick: () => void editor.save() },
   );
   effect(() => {
-    const dirty = history.isDirty.value;
+    const dirty = editor.dirty();
     saveButton.classList.toggle('ohne-button-primary', dirty);
     saveButton.classList.toggle('ohne-button-outline', !dirty);
   });

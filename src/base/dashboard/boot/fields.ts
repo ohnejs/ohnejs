@@ -108,7 +108,7 @@ css`
   }
 `;
 
-// The hash never reaches the browser and an emptied field omits, so a password is never cleared here.
+// The control never shows a stored value and an emptied field omits, so a password is never cleared here.
 registerFieldType('password', {
   display() {
     return dimMark('···');
@@ -177,6 +177,10 @@ registerFieldType('password', {
       read() {
         return raw.value === '' ? {} : { value: raw.value };
       },
+      // An empty draft still names the field, so a restore never falls back to the stored hash.
+      draft() {
+        return raw.value;
+      },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         for (const [key, message] of Object.entries(errors)) {
@@ -197,6 +201,10 @@ registerFieldType('password', {
       },
       rebase() {
         raw.value = '';
+        routed.value = '';
+      },
+      restore(value) {
+        raw.value = isString(value) ? value : '';
         routed.value = '';
       },
     };
@@ -238,11 +246,11 @@ registerFieldType('roles', {
     });
     silent = false;
 
-    const reset = (next: readonly string[]): void => {
+    const reset = (next: readonly string[], asTouched = false): void => {
       silent = true;
       model.value = [...next];
       silent = false;
-      touched.value = false;
+      touched.value = asTouched;
       routed.value = '';
       erroredIndices.value = [];
     };
@@ -297,6 +305,10 @@ registerFieldType('roles', {
       rebase(value) {
         base = listOf(value);
         reset(base);
+      },
+      restore(value) {
+        if (isUndefined(value)) reset(base);
+        else reset(listOf(value), true);
       },
     };
   },
@@ -394,16 +406,21 @@ registerFieldType('datePattern', {
     }, 1000);
     onCleanup(() => clearInterval(timer));
 
+    // A ref in between, so a tick that formats the same text again never touches the text node.
+    const shown = ref('');
+    effect(() => {
+      const pattern = raw.value.trim();
+      const { language, timeZone } = dateTimePreferences();
+      shown.value = isEmpty(pattern)
+        ? '-'
+        : formatDatePattern(now.value, pattern, { language, timeZone });
+    });
+
     const preview = h(
       'span',
       { class: 'o-date-pattern-preview' },
       h('span', { class: 'ohne-shrink-0' }, () => `${t('dashboard.account.preview')}:`),
-      h('span', { class: 'ohne-truncate' }, () => {
-        const pattern = raw.value.trim();
-        if (pattern === '') return '-';
-        const { language, timeZone } = dateTimePreferences();
-        return formatDatePattern(now.value, pattern, { language, timeZone });
-      }),
+      h('span', { class: 'ohne-truncate' }, () => shown.value),
     );
 
     const box = textInput(raw, {
@@ -444,6 +461,10 @@ registerFieldType('datePattern', {
       rebase(value) {
         base = value;
         stored.value = patternOf(value);
+        routed.value = '';
+      },
+      restore(value) {
+        raw.value = isUndefined(value) ? stored.value : patternOf(value);
         routed.value = '';
       },
     };
@@ -580,6 +601,11 @@ function codeControl(
       base = value;
       model.value = isString(value) ? value : null;
       touched.value = false;
+      routed.value = '';
+    },
+    restore(value) {
+      model.value = isString(value) ? value : isUndefined(value) && isString(base) ? base : null;
+      touched.value = !isUndefined(value);
       routed.value = '';
     },
   };

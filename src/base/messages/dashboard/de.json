@@ -102,6 +102,9 @@
     "pasteInside": "Darin einsetzen"
   },
   "close": "Schließen",
+  "code": {
+    "lines": "{count, plural, one {# Zeile} other {# Zeilen}}"
+  },
   "collapse": "Einklappen",
   "collections": "Sammlungen",
   "color": {

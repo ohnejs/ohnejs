@@ -102,6 +102,9 @@
     "pasteInside": "Paste inside"
   },
   "close": "Close",
+  "code": {
+    "lines": "{count, plural, one {# line} other {# lines}}"
+  },
   "collapse": "Collapse",
   "collections": "Collections",
   "color": {

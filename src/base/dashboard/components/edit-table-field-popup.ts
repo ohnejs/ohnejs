@@ -6,7 +6,6 @@ import {
   type DashboardCollection,
   type DashboardField,
   fallbackLabel,
-  type FieldForm,
   fieldMessage,
   h,
   labelOf,
@@ -21,6 +20,7 @@ import {
   useHotkeys,
   useRoute,
   useT,
+  useUnsavedChanges,
   when,
 } from 'ohnejs/dashboard';
 import {
@@ -142,6 +142,8 @@ export function setEditQueryParam(
  * The single-field edit popup.
  *
  * It hosts one field's control through `createFieldForm`, with undo and redo over a `History`.
+ * A keystroke debounce-pushes a step and a discrete change pushes at once.
+ * Undo and redo patch the control in place.
  * Cmd/Ctrl+S saves, and closing is dirty-guarded through the leave prompt.
  * The save patches only this field; a `422` routes onto the control and raises the error count toast.
  * A message for a field the popup does not show, like a translation's required slug, renders below it.
@@ -157,42 +159,37 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
   const disabled = options.disabled ?? false;
   const unplaced = ref('');
 
-  const buildForm = (initial: Record<string, unknown>): FieldForm =>
-    createFieldForm([field], initial, {
-      mode: 'edit',
-      path: '',
-      renderUUID: true,
-      readOnly: disabled,
-      readOnlyRows: true,
-      language: () => useDashboardLanguage().value,
-      onInput: () => {
-        const state = currentState();
-        if (!isUndefined(state)) void history.pushDebounced(state);
-      },
-    });
-
+  const history = new History({ watchUnsavedChanges: false });
   const seed: Record<string, unknown> = { [field.name]: options.value };
-  const history = new History().push(seed);
-  const form = ref<FieldForm>(buildForm(seed));
-  onCleanup(() => form.value.dispose());
+  const form = createFieldForm([field], seed, {
+    mode: 'edit',
+    path: '',
+    renderUUID: true,
+    readOnly: disabled,
+    readOnlyRows: true,
+    language: () => useDashboardLanguage().value,
+    onInput: (discrete) => {
+      if (discrete === true) history.flush().push(currentState());
+      else void history.pushDebounced(currentState());
+    },
+  });
+  onCleanup(() => form.dispose());
 
-  const currentState = (): Record<string, unknown> =>
-    form.value.snapshot(history.getCurrentState());
+  const currentState = (): Record<string, unknown> => form.draft(history.getCurrentState());
+  // Untracked: a tracked seed read would subscribe the hosting region to the first keystroke.
+  history.push(untracked(currentState));
 
-  const restore = (state: Record<string, unknown> | undefined): void => {
-    if (isUndefined(state)) return;
-    form.value.dispose();
-    form.value = buildForm(state);
-  };
+  // The form reads dirty before its typing lands in the history, so the guard asks on either.
+  const dirty = (): boolean => history.isDirty.value || form.dirty();
+  useUnsavedChanges(dirty);
 
   const write = useAction<Record<string, unknown>>('PATCH /collections/[collection]/[uuid]', {
     params: { collection: collection.segment, uuid },
     onDone: (saved) => {
       // A scoped answer omits a field outside its `select`; the seed still holds its value.
-      const record = { ...seed, ...saved };
-      const state = { [field.name]: record[field.name] };
-      form.value.rebase(record);
-      history.push(state).setOriginalState(state);
+      form.rebase({ ...seed, ...saved });
+      const settled = currentState();
+      history.push(settled).setOriginalState(settled);
       toast(t('dashboard.saved'), { type: 'success', description: translateMessage(field.label) });
       options.onUpdated?.(saved);
       options.onClose(handle.close);
@@ -208,9 +205,9 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
         toast(error.message, { type: 'error' });
         return;
       }
-      const leftover = form.value.setErrors(errors);
+      const leftover = form.setErrors(errors);
       unplaced.value = leftover === '' ? '' : namedMessage(collection, errors, leftover);
-      form.value.focusError();
+      form.focusError();
       toast(t('dashboard.foundErrors', { count: Object.keys(errors).length }), {
         type: 'error',
       });
@@ -219,11 +216,11 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
 
   const save = async (): Promise<void> => {
     if (write.busy() || disabled) return;
-    const reading = form.value.read();
+    const reading = form.read();
     unplaced.value = '';
     if (!isUndefined(reading.errors)) {
-      form.value.setErrors(reading.errors);
-      form.value.focusError();
+      form.setErrors(reading.errors);
+      form.focusError();
       return;
     }
     await write.run({
@@ -233,7 +230,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
   };
 
   const guardedClose = async (): Promise<void> => {
-    if (!history.isDirty.value || (await confirmLeave())) {
+    if (!dirty() || (await confirmLeave())) {
       options.onClose(handle.close);
     }
   };
@@ -255,9 +252,9 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
     onClick: () => void save(),
   });
   effect(() => {
-    const dirty = history.isDirty.value;
-    saveButton.classList.toggle('ohne-button-primary', dirty);
-    saveButton.classList.toggle('ohne-button-outline', !dirty);
+    const unsaved = dirty();
+    saveButton.classList.toggle('ohne-button-primary', unsaved);
+    saveButton.classList.toggle('ohne-button-outline', !unsaved);
   });
 
   const hotkeys = useHotkeys({
@@ -271,7 +268,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
     h(
       'fieldset',
       { class: 'o-edit-field-fields', disabled: () => write.busy() },
-      () => form.value.render(),
+      () => form.render(),
       when(
         () => unplaced.value !== '',
         () => fieldMessage(() => unplaced.value, { error: () => true }),
@@ -297,7 +294,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
         : h(
             'div',
             { class: 'ohne-justify-between' },
-            historyButtons(history, restore, hotkeys),
+            historyButtons(history, (state) => form.restore(state), hotkeys),
             saveButton,
           ),
       onClose: () => void guardedClose(),

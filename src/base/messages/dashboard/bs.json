@@ -102,6 +102,9 @@
     "pasteInside": "Zalijepi unutra"
   },
   "close": "Zatvori",
+  "code": {
+    "lines": "{count, plural, one {# linija} few {# linije} other {# linija}}"
+  },
   "collapse": "Skupi",
   "collections": "Kolekcije",
   "color": {

@@ -5,6 +5,7 @@
   "invalidColorAlpha": "Dieser Wert muss eine Hex-Farbe wie `#ff8800` oder `#ff880080` sein",
   "invalidDate": "Dieser Wert muss ein Kalenderdatum im Format `YYYY-MM-DD` sein",
   "invalidEmail": "Dieser Wert muss eine E-Mail-Adresse wie `thrall@orgrimmar.example` sein",
+  "invalidJSON": "Dieser Wert muss gültiges JSON sein",
   "invalidLink": "Dieser Link muss eine Web-, E-Mail- oder Telefonadresse, ein `/Pfad` oder ein `#Fragment` sein",
   "invalidReference": "Der referenzierte Datensatz existiert nicht",
   "invalidTime": "Dieser Wert muss eine Uhrzeit im Format `HH:MM:SS` sein",

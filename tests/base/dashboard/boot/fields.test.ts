@@ -45,4 +45,22 @@ describe('the `password` control', () => {
     strictEqual(reveal?.getAttribute('aria-pressed'), 'true');
     strictEqual(reveal?.getAttribute('aria-label'), 'dashboard.field.hidePassword');
   });
+
+  it('drafts its text, empty included, so an undo never reaches for the stored hash', () => {
+    const field = { name: 'password', type: 'password' } as DashboardField;
+    const control = fieldTypeFor(field).control?.({
+      field,
+      initial: 'scrypt$32768$8$1$salt$hash',
+      mode: 'edit',
+      path: 'password',
+      language: () => 'en',
+      onInput() {},
+    });
+    flush();
+    strictEqual(control?.draft?.(), '');
+    control?.restore?.('s3cret!');
+    strictEqual(control?.draft?.(), 's3cret!');
+    control?.restore?.('');
+    strictEqual(control?.draft?.(), '');
+  });
 });

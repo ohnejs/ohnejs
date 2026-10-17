@@ -1,14 +1,13 @@
 import { useHotkeys } from 'ohnejs/dashboard';
-import { debounce, effect, onCleanup } from 'ohnejs/utils';
+import { nextTick } from 'ohnejs/utils';
 
 /**
- * The scroll surface `historyScrollState` pins.
+ * The scroll surface `historyScrollState` holds.
  * The caller adapts its scroll container to this shape, e.g. wrapping a `ScrollableHandle`.
  */
 export interface HistoryScroll {
   /**
    * The current vertical scroll offset in pixels.
-   * Must read a reactive source, such as `ScrollableHandle.y`, so the pinning effect sees changes.
    */
   y(): number;
 
@@ -19,42 +18,27 @@ export interface HistoryScroll {
 }
 
 /**
- * Renderless scroll pinning across undo and redo re-renders.
+ * Renderless scroll holding across undo and redo re-renders.
  *
  * It listens for the `undo` and `redo` hotkeys on `document`, in overlays and while typing alike.
- * Its listeners fire alongside the `historyButtons` ones.
- * On each trigger it records the current scroll offset.
- * For 250 milliseconds it then forcibly reverts any scroll change, so DOM-reflow jumps cannot move the view.
- * Another trigger within the window re-records the offset and restarts the timer.
+ * On each one it records the scroll offset.
+ * Once the re-render flushes, before anything paints, it puts that offset back.
+ * A restore that rebuilds the focused control makes the browser clamp the scroll, so the view would jump.
+ * Scrolls after that stand, so `historyButtons` can still reveal the field a step changed.
+ * Create it before its `historyButtons`, whose listener prevents the keystroke that later listeners skip.
  * Returns `null`, so it can sit in a children list as a renderless member.
- * Create it inside a reactive region; the hotkey listener and the pinning effect die with it.
+ * Create it inside a reactive region; the hotkey listener dies with it.
  */
 export function historyScrollState(scroll: HistoryScroll): null {
   const { listen } = useHotkeys({ allowInOverlays: true, allowWhileTyping: ['undo', 'redo'] });
-  let pinnedY = 0;
-  let stopWatcher: (() => void) | null = null;
 
-  const pause = (): void => {
-    stopWatcher?.();
-    stopWatcher = null;
-  };
-  const schedulePause = debounce(pause, 250);
-
-  const trigger = (): void => {
-    pinnedY = scroll.y();
-    stopWatcher ??= effect(() => {
-      if (scroll.y() !== pinnedY) scroll.setY(pinnedY);
-    });
-    schedulePause();
+  const hold = (): void => {
+    const y = scroll.y();
+    void nextTick().then(() => scroll.setY(y));
   };
 
-  listen('undo', trigger);
-  listen('redo', trigger);
-
-  onCleanup(() => {
-    schedulePause.cancel();
-    pause();
-  });
+  listen('undo', hold);
+  listen('redo', hold);
 
   return null;
 }

@@ -5,6 +5,7 @@
   "invalidColorAlpha": "Ova vrijednost mora biti heks boja poput `#ff8800` ili `#ff880080`",
   "invalidDate": "Ova vrijednost mora biti kalendarski datum u obliku `YYYY-MM-DD`",
   "invalidEmail": "Ova vrijednost mora biti email adresa poput `thrall@orgrimmar.example`",
+  "invalidJSON": "Ova vrijednost mora biti ispravan JSON",
   "invalidLink": "Ovaj link mora biti web, e-mail ili telefonska adresa, `/putanja` ili `#fragment`",
   "invalidReference": "Referencirani zapis ne postoji",
   "invalidTime": "Ova vrijednost mora biti vrijeme u obliku `HH:MM:SS`",

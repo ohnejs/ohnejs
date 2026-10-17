@@ -91,14 +91,82 @@ describe('History', () => {
     strictEqual(history.getCurrentIndex(), 1);
   });
 
-  it('debounces pushes and blocks undo while one pends', async () => {
+  it('debounces pushes, and an undo lands the pending one before stepping back', async () => {
     const history = new History({ watchUnsavedChanges: false });
     history.push({ a: 1 }).push({ a: 2 });
-    const pending = history.pushDebounced({ a: 3 }, 10);
-    strictEqual(history.undo(), undefined);
-    await pending;
-    strictEqual(history.size.value, 3);
+    void history.pushDebounced({ a: 3 }, 10);
+    strictEqual(history.size.value, 2);
     deepStrictEqual(history.undo(), { a: 2 });
+    deepStrictEqual(history.redo(), { a: 3 });
+    await sleep(20);
+    strictEqual(history.size.value, 3);
+  });
+
+  it('lands a pending push before a redo, which then has nothing left to redo', () => {
+    const history = new History({ watchUnsavedChanges: false });
+    history.push({ a: 1 }).push({ a: 2 });
+    history.undo();
+    void history.pushDebounced({ a: 9 }, 10);
+    strictEqual(history.redo(), undefined);
+    deepStrictEqual(history.getCurrentState(), { a: 9 });
+  });
+
+  it('counts a pending push that changes the state as a step already landed', () => {
+    const history = new History({ watchUnsavedChanges: false });
+    history.push({ a: 1 }).push({ a: 2 });
+    history.undo();
+    void history.pushDebounced({ a: 3 }, 1000);
+    deepStrictEqual(
+      [
+        history.canUndo.value,
+        history.undoCount.value,
+        history.canRedo.value,
+        history.redoCount.value,
+      ],
+      [true, 1, false, 0],
+    );
+    strictEqual(history.isDirty.value, true);
+    void history.pushDebounced({ a: 1 }, 1000);
+    deepStrictEqual(
+      [
+        history.canUndo.value,
+        history.undoCount.value,
+        history.canRedo.value,
+        history.redoCount.value,
+      ],
+      [false, 0, true, 1],
+    );
+    strictEqual(history.isDirty.value, false);
+    history.clear();
+  });
+
+  it('counts a pending push on a full stack without passing the cap', () => {
+    const history = new History({ watchUnsavedChanges: false, maxStates: 2 });
+    history.push({ a: 1 }).push({ a: 2 });
+    void history.pushDebounced({ a: 3 }, 1000);
+    strictEqual(history.undoCount.value, 1);
+    history.flush();
+    strictEqual(history.undoCount.value, 1);
+  });
+
+  it('says whether a debounced push waits to land', async () => {
+    const history = new History({ watchUnsavedChanges: false });
+    history.push({ a: 1 });
+    strictEqual(history.isPending(), false);
+    const pending = history.pushDebounced({ a: 2 }, 1000);
+    strictEqual(history.isPending(), true);
+    history.flush();
+    await pending;
+    strictEqual(history.isPending(), false);
+  });
+
+  it('resolves a debounced push when a flush lands it', async () => {
+    const history = new History({ watchUnsavedChanges: false });
+    history.push({ a: 1 });
+    const pending = history.pushDebounced({ a: 2 }, 1000);
+    history.flush();
+    strictEqual(await pending, history);
+    deepStrictEqual(history.getCurrentState(), { a: 2 });
   });
 
   it('coalesces overlapping debounced pushes to the last state', async () => {

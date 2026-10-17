@@ -20,6 +20,7 @@ import {
   useDocumentTitle,
   useHotkeys,
   useT,
+  useUnsavedChanges,
   when,
 } from 'ohnejs/dashboard';
 import { effect, isEmpty, isNullish, isUndefined, onCleanup, ref, untracked } from 'ohnejs/utils';
@@ -71,8 +72,9 @@ css`
  * The signed-in user's own settings surface, at `/account`.
  *
  * The discovery data lists the fields; an empty list redirects to the overview with a toast.
- * Every edit debounce-pushes onto a `History`; undo and redo rebuild the form from the restored state.
- * Leaving dirty edits asks first, in-app and on tab close, through the history's unsaved-changes guard.
+ * A keystroke debounce-pushes onto a `History` and a discrete change pushes at once.
+ * Undo and redo patch the form in place from the restored state.
+ * Leaving dirty edits asks first, in-app and on tab close, while the history or the form reads dirty.
  * Cmd/Ctrl+S saves while no overlay is open.
  * Save patches the dirty fields through `updateSessionUser`; a `422` routes onto the rows it names.
  * A saved language change keeps the form: its labels follow the language in place.
@@ -81,12 +83,18 @@ export function accountEditor(): Child {
   const t = useT();
   useDocumentTitle('dashboard.account.title');
 
-  const history = new History();
+  const history = new History({ watchUnsavedChanges: false });
   const form = ref<FieldForm | undefined>(undefined);
   const busy = ref(false);
 
-  const currentState = (): AccountState | undefined =>
-    form.value?.snapshot(history.getCurrentState()) as AccountState | undefined;
+  // The form reads dirty before its typing lands in the history, so the guard asks on either.
+  const dirty = (): boolean => history.isDirty.value || form.value?.dirty() === true;
+  useUnsavedChanges(dirty);
+
+  const settle = (live: FieldForm): void => {
+    const settled = live.draft(history.getCurrentState());
+    history.push(settled).setOriginalState(settled);
+  };
 
   const save = async (): Promise<void> => {
     const live = form.value;
@@ -98,7 +106,11 @@ export function accountEditor(): Child {
       return;
     }
     const patch = (reading.value ?? {}) as AccountState;
-    if (isEmpty(patch)) return;
+    // A draft that writes the stored value, like a case-only address edit, is saved by settling.
+    if (isEmpty(patch)) {
+      settle(live);
+      return;
+    }
     const focused = document.activeElement;
     const localeBefore = sessionUser()?.contentLanguage ?? null;
     busy.value = true;
@@ -108,8 +120,7 @@ export function accountEditor(): Child {
     if (focused instanceof HTMLElement && focused.isConnected) focused.focus();
     if (outcome.kind === 'saved') {
       live.rebase({ ...outcome.user });
-      const settled = live.snapshot(history.getCurrentState()) as AccountState;
-      history.push(settled).setOriginalState(settled);
+      settle(live);
       if (outcome.user.contentLanguage !== localeBefore) {
         contentLocale.value = outcome.user.contentLanguage ?? undefined;
       }
@@ -176,31 +187,33 @@ export function accountEditor(): Child {
       return null;
     }
 
-    const buildForm = (initial: AccountState): FieldForm =>
-      createFieldForm(meta.accountFields, initial, {
+    const live = createFieldForm(
+      meta.accountFields,
+      { ...user },
+      {
         mode: 'edit',
         path: '',
         readOnlyRows: true,
         layout: meta.accountLayout,
         language: () => useDashboardLanguage().value,
-        onInput: () => {
-          const state = currentState();
-          if (!isUndefined(state)) void history.pushDebounced(state);
+        onInput: (discrete) => {
+          const state = live.draft(history.getCurrentState());
+          if (discrete === true) history.flush().push(state);
+          else void history.pushDebounced(state);
         },
-      });
-
-    form.value = buildForm({ ...user });
+      },
+    );
+    form.value = live;
     onCleanup(() => {
-      form.value?.dispose();
+      live.dispose();
       form.value = undefined;
     });
     // Untracked: a tracked seed read would subscribe the whole region to the first keystroke.
-    history.push(untracked(currentState) ?? {});
+    history.push(untracked(() => live.draft()));
 
-    const restore = (restored: AccountState): void => {
-      form.value?.dispose();
-      form.value = buildForm(restored);
-    };
+    // A state holds the form's fields; the session user still holds the read-only rows' values.
+    const restore = (restored: AccountState): void =>
+      live.restore({ ...untracked(sessionUser), ...restored });
 
     const headerEl = h(
       'div',
@@ -220,9 +233,7 @@ export function accountEditor(): Child {
     const mainEl = h(
       'div',
       { class: 'o-account-main' },
-      h('fieldset', { class: 'o-account-fields', disabled: () => busy.value }, () =>
-        form.value?.render(),
-      ),
+      h('fieldset', { class: 'o-account-fields', disabled: () => busy.value }, () => live.render()),
     );
 
     const containerEl = container([headerEl, mainEl]);
@@ -257,9 +268,9 @@ export function accountEditor(): Child {
       onClick: () => void save(),
     });
     effect(() => {
-      const dirty = history.isDirty.value;
-      saveButton.classList.toggle('ohne-button-primary', dirty);
-      saveButton.classList.toggle('ohne-button-outline', !dirty);
+      const unsaved = dirty();
+      saveButton.classList.toggle('ohne-button-primary', unsaved);
+      saveButton.classList.toggle('ohne-button-outline', !unsaved);
     });
 
     const footerEl = h(
