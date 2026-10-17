@@ -4,6 +4,9 @@ import type { NumberFieldOptions } from '../known-field-types.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
+import { clamp } from '../../../utils/number/clamp.ts';
+import { countDecimals } from '../../../utils/number/count-decimals.ts';
+import { roundTo } from '../../../utils/number/round-to.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { checkRange } from '../../../utils/validate/check-range.ts';
 import { h } from '../../render/h.ts';
@@ -21,6 +24,8 @@ import { parseRealValue } from '../parse.ts';
  * The editor and control parse entry strictly to a finite double.
  * An emptied editor or control writes `null` on a nullable field; a non-nullable one omits.
  * The control validates on blur and on read; a changed value is checked against `min` and `max` too.
+ * The arrow keys step it by 1, by 10 with Shift, kept to the value's own decimal places.
+ * They stop at `min` and `max`.
  */
 export const numberType: FieldType<NumberFieldOptions> = {
   display({ value }) {
@@ -63,6 +68,18 @@ export const numberType: FieldType<NumberFieldOptions> = {
     control.classList.add('ohne-input-numeric');
     input.setAttribute('inputmode', 'decimal');
     input.addEventListener('input', touch);
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      const parsed = parseRealValue(field, raw.value);
+      if (!isNumber(parsed.value)) return;
+      event.preventDefault();
+      const step = (event.shiftKey ? 10 : 1) * (event.key === 'ArrowUp' ? 1 : -1);
+      const stepped = roundTo(parsed.value + step, countDecimals(parsed.value));
+      raw.value = String(
+        clamp(stepped, field.options?.min ?? -Infinity, field.options?.max ?? Infinity),
+      );
+      touch();
+    });
     input.addEventListener('blur', () => {
       const parsed = parseRealValue(field, raw.value);
       local.value = isUndefined(parsed.error) ? '' : t(parsed.error);
@@ -73,6 +90,11 @@ export const numberType: FieldType<NumberFieldOptions> = {
       if (isUndefined(base.value)) return raw.value.trim() !== '';
       const parsed = parseRealValue(field, raw.value);
       return !isUndefined(parsed.error) || parsed.value !== base.value;
+    };
+    const show = (value: unknown): void => {
+      raw.value = isNullish(value) ? '' : String(value as string | number);
+      local.value = '';
+      routed.value = '';
     };
 
     return {
@@ -89,6 +111,11 @@ export const numberType: FieldType<NumberFieldOptions> = {
             : undefined,
         );
       },
+      draft() {
+        if (isUndefined(base.value) && raw.value.trim() === '') return undefined;
+        const parsed = parseRealValue(field, raw.value);
+        return isUndefined(parsed.error) ? parsed.value : raw.value;
+      },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         for (const [key, message] of Object.entries(errors)) {
@@ -102,14 +129,13 @@ export const numberType: FieldType<NumberFieldOptions> = {
         input.focus();
       },
       revert() {
-        raw.value = isNullish(base.value) ? '' : String(base.value as number);
-        local.value = '';
-        routed.value = '';
+        show(base.value);
       },
       rebase(value) {
         base.value = value;
         routed.value = '';
       },
+      restore: show,
     };
   },
   filter: {

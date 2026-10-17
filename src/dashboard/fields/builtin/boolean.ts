@@ -21,7 +21,7 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  * The control is a checkbox, a switch under `display: 'switch'`, or a two-choice group under `'buttons'`.
  * The group's choices read `falseLabel` and `trueLabel`, falling back to the catalog's no and yes.
  * It stays pristine until touched; once touched it reads binary.
- * A stored `null` therefore returns to `null` only through the row's revert.
+ * A stored `null` therefore returns to `null` only through the row's revert or an undo.
  */
 export const booleanType: FieldType<BooleanFieldOptions> = {
   display({ value }) {
@@ -44,15 +44,15 @@ export const booleanType: FieldType<BooleanFieldOptions> = {
   control({ field, initial, path, disabled, onInput }) {
     const t = useT();
     let base = initial;
-    const checked = ref(base === true);
-    const touched = ref(false);
+    const held = ref(initial);
+    const checked = ref(initial === true);
     const routed = ref('');
 
     const error = (): string => routed.value;
     const touch = (): void => {
-      touched.value = true;
+      held.value = checked.value;
       routed.value = '';
-      onInput();
+      onInput(true);
     };
     const display = field.options?.display;
     let element: HTMLElement;
@@ -87,15 +87,19 @@ export const booleanType: FieldType<BooleanFieldOptions> = {
     describeControl(proxy, field, path, error);
 
     const wire = (): unknown => {
-      if (touched.value) return checked.value;
-      return isNullish(base) ? (field.nullable ? null : false) : base === true;
+      if (isNullish(held.value)) return field.nullable ? null : false;
+      return held.value === true;
+    };
+    const show = (value: unknown): void => {
+      held.value = value;
+      checked.value = value === true;
+      routed.value = '';
     };
 
     return {
       element,
       read() {
-        if (!touched.value && isUndefined(base)) return {};
-        return { value: wire() };
+        return isUndefined(held.value) ? {} : { value: wire() };
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -106,22 +110,19 @@ export const booleanType: FieldType<BooleanFieldOptions> = {
       },
       error,
       dirty() {
-        return touched.value && wire() !== (isUndefined(base) ? undefined : (base ?? null));
+        return !isUndefined(held.value) && held.value !== (base ?? null);
       },
       focus() {
         proxy.focus();
       },
       revert() {
-        checked.value = base === true;
-        touched.value = false;
-        routed.value = '';
+        show(base);
       },
       rebase(value) {
         base = value;
-        checked.value = value === true;
-        touched.value = false;
-        routed.value = '';
+        show(value);
       },
+      restore: show,
     };
   },
   filter: {

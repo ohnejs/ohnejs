@@ -82,4 +82,43 @@ describe('select', () => {
     flush();
     strictEqual(find(live, 'ohne-select-placeholder')?.textContent, 'Alliance');
   });
+
+  describe('keyboard and focus', () => {
+    const choices = (): { value: string; label: string }[] => [
+      { value: 'utc', label: 'UTC' },
+      { value: 'cet', label: 'CET' },
+    ];
+
+    it('opens on Enter while closed', () => {
+      const combobox = find(select(ref<string>('utc'), choices), 'ohne-select')!;
+      fire(combobox, 'keydown', { key: 'Enter' });
+      flush();
+      strictEqual(combobox.getAttribute('aria-expanded'), 'true');
+    });
+
+    it('leaves Escape alone while closed, so focus stays', () => {
+      const combobox = find(select(ref<string>('utc'), choices), 'ohne-select')!;
+      const event = fire(combobox, 'keydown', { key: 'Escape' });
+      strictEqual(event.defaultPrevented, false);
+      strictEqual(event.propagationStopped, false);
+    });
+
+    it('returns focus to the combobox after a mouse pick', () => {
+      const model = ref<string>('utc');
+      const combobox = find(select(model, choices), 'ohne-select')!;
+      fire(combobox, 'click');
+      flush();
+      const row = findElement(combobox, (el) => el.textContent === 'CET')!;
+      let focused = false;
+      Object.assign(combobox, {
+        contains: (node: unknown) => node === row,
+        focus: () => (focused = true),
+      });
+      Object.assign(document, { activeElement: row });
+      fire(row, 'click');
+      Object.assign(document, { activeElement: null });
+      strictEqual(model.value, 'cet');
+      strictEqual(focused, true);
+    });
+  });
 });

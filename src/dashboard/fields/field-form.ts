@@ -1,6 +1,6 @@
 import type { Child } from '../render/insert.ts';
 import type { DashboardField, DashboardLayoutNode } from '../runtime/meta-types.ts';
-import type { ControlReading, FieldControl } from './field-type.ts';
+import type { ControlReading, FieldControl, FieldFolds } from './field-type.ts';
 
 import { first } from '../../utils/array/first.ts';
 import { evaluateCondition } from '../../utils/condition/evaluate-condition.ts';
@@ -9,6 +9,7 @@ import { conditionResolver } from '../../utils/condition/resolve-condition.ts';
 import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { deepEqual } from '../../utils/object/deep-equal.ts';
 import { hasKey } from '../../utils/object/has-key.ts';
 import { computed, type ComputedRef } from '../../utils/reactive/computed.ts';
 import { effectScope } from '../../utils/reactive/effect-scope.ts';
@@ -18,6 +19,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { translateMessage, useT } from '../runtime/use-t.ts';
 import { blocksOf } from './_blocks.ts';
+import { foldsAt } from './_folds.ts';
 import { carriedField, carryValue } from './_items.ts';
 import { renderFieldLayout } from './field-layout.ts';
 import { fieldRow } from './field-row.ts';
@@ -110,9 +112,16 @@ export interface FieldFormOptions {
   layout?: readonly DashboardLayoutNode[];
 
   /**
-   * Fires on any user change in any of the form's controls.
+   * Which items open collapsed, as a previous form's `folds` answered it.
+   * A host passes it when it rebuilds the form over the same record, as on an undo.
    */
-  onInput?(): void;
+  folds?: FieldFolds;
+
+  /**
+   * Fires on any user change in any of the form's controls.
+   * `discrete` marks a change complete in itself, as `FieldControlContext.onInput` passes it.
+   */
+  onInput?(discrete?: boolean): void;
 }
 
 /**
@@ -156,10 +165,18 @@ export interface FieldForm {
 
   /**
    * Reads the whole value as far as it parses: a control that fails to parse keeps its `fallback` value.
-   * An undo history passes its current state, so one field mid-edit never stalls the rest.
-   * Required fields go unchecked, so a copy of an item mid-edit reads whole too.
+   * A live consumer passes its last value, so one field mid-edit never stalls the rest.
+   * Required fields go unchecked.
    */
   snapshot(fallback?: Readonly<Record<string, unknown>>): Record<string, unknown>;
+
+  /**
+   * Reads the whole value as the user has it, checks aside: each control's `draft`, down through nested items.
+   * An undo history records it, so a step holds a mid-edit address or an item with an empty required field.
+   * A copy of an item takes it too, so the copy carries the text as typed.
+   * A control without a draft reads, and keeps its `fallback` value when that fails, as `snapshot` does.
+   */
+  draft(fallback?: Readonly<Record<string, unknown>>): Record<string, unknown>;
 
   /**
    * Routes messages onto the form's controls, keyed relative to the form: a failed `read`'s, or the server's.
@@ -167,6 +184,11 @@ export interface FieldForm {
    * Returns the first message that matched no control, or `''` when every message placed.
    */
   setErrors(errors: Readonly<Record<string, string>>): string;
+
+  /**
+   * Which items show collapsed, down through nested forms, for the host to pass to the form it rebuilds.
+   */
+  folds(): FieldFolds;
 
   /**
    * Whether any control currently shows a message. Reactive.
@@ -206,6 +228,14 @@ export interface FieldForm {
    * A field the item holds no value for re-baselines to its `options.default`, as it was seeded.
    */
   rebase(item: Readonly<Record<string, unknown>> | undefined): void;
+
+  /**
+   * Takes a restored item into the live controls, as an undo or redo lands it.
+   * A control whose value differs takes it through `restore`; one whose value matches is left untouched.
+   * A control without `restore` takes it through `rebase` and `revert`, so the value becomes its baseline.
+   * A field the item holds no value for restores to its `options.default`, as it was seeded.
+   */
+  restore(item: Readonly<Record<string, unknown>> | undefined): void;
 
   /**
    * Releases every effect the form's controls created.
@@ -313,7 +343,8 @@ export function createFieldForm(
                 disabled: !settable,
                 language: options.language,
                 ancestors: () => [...ancestors(), values],
-                onInput: () => options.onInput?.(),
+                folds: foldsAt(options.folds, field.name),
+                onInput: (discrete) => options.onInput?.(discrete),
               }),
             ),
           )
@@ -346,8 +377,9 @@ export function createFieldForm(
     selected: readonly ControlRow[],
     withCarry: boolean,
     fallback: Readonly<Record<string, unknown>> = {},
-    checked = false,
+    mode: 'checked' | 'parsed' | 'draft' = 'parsed',
   ): { item: Record<string, unknown>; errors: Record<string, string> } => {
+    const checked = mode === 'checked';
     const item: Record<string, unknown> = {};
     const errors: Record<string, string> = blank();
     if (withCarry) {
@@ -360,6 +392,11 @@ export function createFieldForm(
     }
     for (const row of selected) {
       if (!active(row.field.name)) continue;
+      if (mode === 'draft' && !isUndefined(row.control.draft)) {
+        const draft = row.control.draft();
+        if (!isUndefined(draft)) item[row.field.name] = draft;
+        continue;
+      }
       const reading = row.control.read();
       const failure =
         checked && checksRequired && row.field.required && isUndefined(reading.errors)
@@ -379,7 +416,7 @@ export function createFieldForm(
     return { item, errors };
   };
   const collect = (selected: readonly ControlRow[], withCarry: boolean): ControlReading => {
-    const { item, errors } = gather(selected, withCarry, {}, true);
+    const { item, errors } = gather(selected, withCarry, {}, 'checked');
     return isEmpty(errors) ? { value: item } : { errors };
   };
 
@@ -466,6 +503,9 @@ export function createFieldForm(
     snapshot(fallback) {
       return gather(rows, true, fallback).item;
     },
+    draft(fallback) {
+      return gather(rows, true, fallback, 'draft').item;
+    },
     setErrors(errors) {
       let unplaced = '';
       const grouped = new Map<string, Record<string, string>>();
@@ -485,6 +525,15 @@ export function createFieldForm(
         if (leftover !== '' && unplaced === '') unplaced = leftover;
       }
       return unplaced;
+    },
+    folds() {
+      return {
+        children: Object.fromEntries(
+          rows.flatMap(({ field, control }) =>
+            isUndefined(control.folds) ? [] : [[field.name, control.folds()]],
+          ),
+        ),
+      };
     },
     errored() {
       return activeRows().some((row) => rowErrored(row));
@@ -511,6 +560,21 @@ export function createFieldForm(
     rebase(item) {
       seed = item;
       for (const row of [...rows, ...lockedRows]) row.control.rebase(seedOf(row.field, item));
+    },
+    restore(item) {
+      seed = item;
+      const current = gather(rows, false, {}, 'draft').item;
+      for (const { field, control } of rows) {
+        const value = seedOf(field, item);
+        const held = hasKey(current, field.name) ? current[field.name] : undefined;
+        if (deepEqual(held, value)) continue;
+        if (isUndefined(control.restore)) {
+          control.rebase(value);
+          control.revert();
+        } else {
+          control.restore(value);
+        }
+      }
     },
     dispose() {
       scope.dispose();

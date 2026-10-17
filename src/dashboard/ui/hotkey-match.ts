@@ -62,7 +62,8 @@ export interface HotkeyContext {
  * Resolves a keystroke to a hotkey action, or `null` when nothing matches.
  * `delete` and `close` come first, then the platform gate, then the letter.
  * The gate is Command on mac and Control elsewhere, never with Alt or the other modifier.
- * `save` alone ignores `editing` and `disabled`; on non-mac `Ctrl+Shift+Z` is deliberately nothing.
+ * `save` alone ignores `editing` and `disabled`.
+ * Redo answers to both `Shift+Z` and `Y` on every platform.
  * The `allowWhileTyping` actions ignore `editing` as well, but never `disabled`.
  *
  * @example
@@ -100,7 +101,7 @@ function resolveAction(stroke: KeyStroke, mac: boolean, idle: boolean): HotkeyAc
   if (letter === 'y') return stroke.shift || !idle ? null : 'redo';
   if (letter === 'z') {
     if (!idle) return null;
-    return mac && stroke.shift ? 'redo' : stroke.shift ? null : 'undo';
+    return stroke.shift ? 'redo' : 'undo';
   }
   if (letter === 'k') return !stroke.shift && idle ? 'search' : null;
   if (letter === 'a') return !stroke.shift && idle ? 'selectAll' : null;

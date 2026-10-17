@@ -4,3 +4,4 @@ import './foundation/03-base.ts';
 import './foundation/04-utils.ts';
 import './foundation/05-prose.ts';
 import './foundation/06-tooltip.ts';
+import './foundation/07-syntax.ts';

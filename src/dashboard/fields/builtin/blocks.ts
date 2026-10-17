@@ -1,6 +1,6 @@
 import type { DashboardBlock } from '../../runtime/meta-types.ts';
 import type { FieldForm } from '../field-form.ts';
-import type { FieldControl } from '../field-type.ts';
+import type { FieldControl, FieldFolds } from '../field-type.ts';
 
 import { isArray } from '../../../utils/is/is-array.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
@@ -18,21 +18,33 @@ import { button } from '../../ui/button.ts';
 import { icon } from '../../ui/icon.ts';
 import { structure, type StructureHandle } from '../../ui/structure.ts';
 import { blocksOf } from '../_blocks.ts';
-import { blockNamed, itemFormSupports } from '../_items.ts';
+import { itemFolds, listFolds } from '../_folds.ts';
+import { blockNamed, entryKey, identityOf, itemFormSupports, uuidOf } from '../_items.ts';
 import { openBlockPicker } from '../block-picker-popup.ts';
-import { clipboardData, stripUUIDs } from '../clipboard.ts';
+import { clipboardData, stripIdentities } from '../clipboard.ts';
 import { createFieldForm } from '../field-form.ts';
 import { dimMark, type FieldType, registerUntypedFieldType } from '../field-type.ts';
-import { structureActions, structureErrorMark, structureItemError } from '../structure-chrome.ts';
+import {
+  focusAfterRemoval,
+  focusAfterRestore,
+  focusOrigin,
+  type ItemFocus,
+  structureActions,
+  structureErrorMark,
+  structureItemError,
+  trackItemFocus,
+} from '../structure-chrome.ts';
 
 /**
  * One editable block instance in a `blocks` list.
  *
  * `$key` is local and monotonic, never the instance `UUID`.
  * A fresh item has no `UUID` yet, and a reordered row must keep its DOM.
- * `uuid` absent is what inserts the item on save.
+ * `uuid` absent is what inserts the item on save; such an item drafts its `$key` in its place.
+ * Either one keys the item's folds and finds its node again across undo states.
  * `$expanded` gates only rendering; the form outlives every collapse, so edits survive.
  * Expanding replaces the node with a copy, so `$key` and `form` identify it, never the object.
+ * `focus` remembers where focus stood around the item, shared by those copies.
  * A type literal, so the structure's `Record<string, unknown>` item constraint accepts it.
  */
 export type BlockNode = {
@@ -42,6 +54,7 @@ export type BlockNode = {
   uuid: string | undefined;
   form: FieldForm;
   own: Ref<string>;
+  focus: ItemFocus;
 };
 
 /**
@@ -99,9 +112,6 @@ export function blocksHandleOf(control: FieldControl | undefined): BlocksHandle 
   return isUndefined(control) ? undefined : handles.get(control);
 }
 
-// Shared across every blocks control, so a cross-structure drop never lands a colliding `$key`.
-let nextNodeKey = 0;
-
 css`
   .ohne-structure:not(.ohne-structure-empty) + .ohne-blocks-add {
     margin-top: 0.75rem;
@@ -157,8 +167,12 @@ export const blocksType: FieldType = {
     const owner = effectScope();
     const ownForms = new WeakSet<FieldForm>();
 
-    const nodeOf = (item: Readonly<Record<string, unknown>>, expanded: boolean): BlockNode => {
-      const key = (nextNodeKey += 1);
+    const nodeOf = (
+      item: Readonly<Record<string, unknown>>,
+      expanded: boolean,
+      folds?: FieldFolds,
+      key = entryKey(item),
+    ): BlockNode => {
       const name = isString(item.block) ? item.block : '';
       // Seeding a fresh item's form `undefined` keeps its immutable subfields settable.
       const fields = isPlainObject<Record<string, unknown>>(item.fields) ? item.fields : undefined;
@@ -171,29 +185,55 @@ export const blocksType: FieldType = {
           layout: type?.layout,
           language: context.language,
           ancestors: context.ancestors,
+          folds,
           onInput: context.onInput,
         }),
       );
       ownForms.add(form);
       return {
         $key: key,
-        $expanded: expanded,
+        $expanded: expanded && folds?.collapsed !== true,
         block: name,
-        uuid: isString(item.UUID) ? item.UUID : undefined,
+        uuid: uuidOf(item),
         form,
         own: ref(''),
+        focus: {},
       };
     };
 
-    const baseItems = (): Readonly<Record<string, unknown>>[] =>
-      (isArray(base) ? base : []).filter((item) => isPlainObject<Record<string, unknown>>(item));
+    const baseItems = (): Readonly<Record<string, unknown>>[] => itemsOf(base);
 
-    const baseNodes = (expanded: boolean): BlockNode[] =>
-      baseItems().map((item) => nodeOf(item, expanded));
+    const baseNodes = (expanded: boolean, folds?: FieldFolds): BlockNode[] =>
+      baseItems().map((item) => nodeOf(item, expanded, itemFolds(folds, item)));
 
-    const nodes = ref<BlockNode[]>(baseNodes(true));
+    // A block the list no longer holds is rebuilt over its stored base, so its dirt reads against the record.
+    const nodeFor = (item: Readonly<Record<string, unknown>>, expanded: boolean): BlockNode => {
+      const uuid = uuidOf(item);
+      const stored = baseItems().find((candidate) => !isUndefined(uuid) && candidate.UUID === uuid);
+      const folds = itemFolds(context.folds, item);
+      const node = nodeOf(stored ?? { block: item.block }, expanded, folds, entryKey(item));
+      node.uuid = uuid;
+      node.form.restore(fieldsOf(item));
+      return node;
+    };
+
+    const unmoved = (list: readonly BlockNode[]): boolean => {
+      const items = baseItems();
+      return (
+        items.length === list.length &&
+        list.every((node, index) => (node.uuid ?? node.$key) === identityOf(items[index]))
+      );
+    };
+
+    const nodes = ref<BlockNode[]>(baseNodes(true, context.folds));
     const touched = ref(false);
     const routed = ref('');
+    // Nodes a removal or a restore took out, kept whole so an undo brings back the same card and fold.
+    const parked: BlockNode[] = [];
+
+    const unpark = (): void => {
+      for (const node of parked.splice(0)) node.form.dispose();
+    };
 
     const allExpanded = (): boolean => nodes.value.every((node) => node.$expanded);
     const allCollapsed = (): boolean => nodes.value.every((node) => !node.$expanded);
@@ -203,6 +243,7 @@ export const blocksType: FieldType = {
       (blockNamed(blocks, name)?.fields ?? []).some((field) => field.name !== 'UUID');
 
     const rebuild = (): void => {
+      unpark();
       for (const node of nodes.value) node.form.dispose();
       const expanded = nodes.value.length === 0 || !allCollapsed();
       nodes.value = baseNodes(expanded);
@@ -212,11 +253,11 @@ export const blocksType: FieldType = {
       nodes.value = next;
       touched.value = true;
       routed.value = '';
-      context.onInput();
+      context.onInput(true);
     };
 
     const valueOf = (form: FieldForm): Record<string, unknown> => {
-      const value = stripUUIDs(form.snapshot());
+      const value = stripIdentities(form.draft());
       return isPlainObject<Record<string, unknown>>(value) ? value : {};
     };
 
@@ -230,34 +271,48 @@ export const blocksType: FieldType = {
       change(list);
     };
 
-    const addAt = (name: string, at?: number): BlockNode => {
-      const node = nodeOf({ block: name }, true);
+    const insert = (placed: BlockNode[], at: number | undefined, source?: BlockNode): void => {
+      const origin = focusOrigin(document.activeElement, source);
+      for (const node of placed) node.focus.origin = origin;
       const list = nodes.value;
-      change(isUndefined(at) ? [...list, node] : [...list.slice(0, at), node, ...list.slice(at)]);
+      change(
+        isUndefined(at)
+          ? [...list, ...placed]
+          : [...list.slice(0, at), ...placed, ...list.slice(at)],
+      );
+    };
+
+    const addAt = (name: string, at?: number, source?: BlockNode): BlockNode => {
+      const node = nodeOf({ block: name }, true);
+      insert([node], at, source);
       return node;
     };
 
     const remove = (target: BlockNode): void => {
-      target.form.dispose();
-      change(nodes.value.filter((node) => node !== target));
-    };
-
-    const duplicate = (target: BlockNode): void => {
-      const list = nodes.value;
-      const at = list.indexOf(target);
+      const at = nodes.value.indexOf(target);
       if (at < 0) return;
-      const copy = nodeOf({ block: target.block, fields: valueOf(target.form) }, target.$expanded);
-      change([...list.slice(0, at), copy, ...list.slice(at)]);
+      target.focus.origin = undefined;
+      parked.push(target);
+      change(nodes.value.filter((node) => node !== target));
+      if (!isUndefined(addButton)) focusAfterRemoval(nodes.value, at, addButton);
     };
 
-    const pasteAt = (at: number): void => {
+    const duplicate = (target: BlockNode): BlockNode | undefined => {
+      const at = nodes.value.indexOf(target);
+      if (at < 0) return undefined;
+      const copy = nodeOf({ block: target.block, fields: valueOf(target.form) }, target.$expanded);
+      insert([copy], at, target);
+      return copy;
+    };
+
+    const pasteAt = (at: number, source: BlockNode): BlockNode | undefined => {
       const payload = clipboardData.value;
-      if (isNull(payload) || payload.ohneClipboardDataType !== 'blocks') return;
+      if (isNull(payload) || payload.ohneClipboardDataType !== 'blocks') return undefined;
       const pasted = payload.data.map((item) =>
         nodeOf({ block: item.$key, fields: omit(item, ['$key']) }, true),
       );
-      const list = nodes.value;
-      change([...list.slice(0, at), ...pasted, ...list.slice(at)]);
+      insert(pasted, at, source);
+      return pasted[0];
     };
 
     const toggleExpanded = (target: BlockNode): void => {
@@ -280,13 +335,14 @@ export const blocksType: FieldType = {
       change(items.map(adopt));
     };
 
-    const focusNew = (node: BlockNode): void => {
-      queueMicrotask(() => node.form.focus());
+    // The new card mounts on the reactive flush's microtask; focusing sooner hits a detached input.
+    const focusNew = (node: BlockNode | undefined): void => {
+      queueMicrotask(() => node?.form.focus());
     };
 
-    const pick = (at?: number): void => {
+    const pick = (at?: number, source?: BlockNode): void => {
       void openBlockPicker(offered).then((name) => {
-        if (!isNull(name)) focusNew(addAt(name, at));
+        if (!isNull(name)) focusNew(addAt(name, at, source));
       });
     };
 
@@ -308,8 +364,17 @@ export const blocksType: FieldType = {
 
     // Built on first read, in the control's scope, so a surface that never shows the cards never builds them.
     let element: HTMLElement | undefined;
-    const buildElement = (): HTMLElement =>
-      h(
+    let addButton: HTMLElement | undefined;
+    const buildElement = (): HTMLElement => {
+      addButton = button([icon('plus'), h('span', null, () => t('dashboard.addBlock'))], {
+        variant: 'outline',
+        disabled: off || offered.length === 0 ? (): boolean => true : undefined,
+        onClick: () => {
+          if (offered.length > 1) pick();
+          else if (offered.length === 1) focusNew(addAt(offered[0] as string));
+        },
+      });
+      return h(
         'div',
         { tabindex: '-1' },
         structure<BlockNode>(nodes, {
@@ -326,54 +391,62 @@ export const blocksType: FieldType = {
             h('span', { class: 'ohne-muted ohne-truncate' }, () => labelOf(node().block, blocks)),
             off
               ? null
-              : structureActions({
-                  index,
-                  count: () => nodes.value.length,
-                  expanded: () => node().$expanded,
-                  allExpanded,
-                  allCollapsed,
-                  onToggleExpanded: () => toggleExpanded(node()),
-                  onExpandAll: () => setAllExpanded(true),
-                  onCollapseAll: () => setAllExpanded(false),
-                  onMove: (delta) => {
-                    surface?.resumeScrollWatcher();
-                    move(node(), delta);
-                    surface?.pauseScrollWatcher();
-                  },
-                  onAdd:
-                    offered.length === 0
-                      ? undefined
-                      : (at) => {
-                          if (offered.length > 1) pick(at);
-                          else addAt(offered[0] as string, at);
-                        },
-                  copyPayload: () => ({
-                    ohneClipboardDataType: 'blocks',
-                    data: [{ $key: node().block, ...valueOf(node().form) }],
+              : trackItemFocus(
+                  untracked(() => node().focus),
+                  structureActions({
+                    index,
+                    count: () => nodes.value.length,
+                    expanded: () => node().$expanded,
+                    allExpanded,
+                    allCollapsed,
+                    onToggleExpanded: () => toggleExpanded(node()),
+                    onExpandAll: () => setAllExpanded(true),
+                    onCollapseAll: () => setAllExpanded(false),
+                    onMove: (delta) => {
+                      surface?.resumeScrollWatcher();
+                      move(node(), delta);
+                      surface?.pauseScrollWatcher();
+                    },
+                    onAdd:
+                      offered.length === 0
+                        ? undefined
+                        : (at) => {
+                            if (offered.length > 1) pick(at, node());
+                            else focusNew(addAt(offered[0] as string, at, node()));
+                          },
+                    copyPayload: () => ({
+                      ohneClipboardDataType: 'blocks',
+                      data: [{ $key: node().block, ...valueOf(node().form) }],
+                    }),
+                    canPaste: () => {
+                      const payload = clipboardData.value;
+                      return (
+                        !isNull(payload) &&
+                        payload.ohneClipboardDataType === 'blocks' &&
+                        payload.data.every(({ $key }) => offered.includes($key))
+                      );
+                    },
+                    onPaste: (at) => focusNew(pasteAt(at, node())),
+                    onDuplicate: () => focusNew(duplicate(node())),
+                    onRemove: () => remove(node()),
                   }),
-                  canPaste: () => {
-                    const payload = clipboardData.value;
-                    return (
-                      !isNull(payload) &&
-                      payload.ohneClipboardDataType === 'blocks' &&
-                      payload.data.every(({ $key }) => offered.includes($key))
-                    );
-                  },
-                  onPaste: pasteAt,
-                  onDuplicate: () => duplicate(node()),
-                  onRemove: () => remove(node()),
-                }),
+                  false,
+                ),
           ],
           // Untracked reads keep expand-all's replacement from rebuilding the body and dropping focus.
           item: (node) => {
             const form = untracked(() => node().form);
             const name = untracked(() => node().block);
-            return h(
-              'div',
-              { class: 'ohne-blocks-item' },
-              hasFields(name)
-                ? form.render()
-                : h('span', { class: 'ohne-muted' }, () => t('dashboard.noFieldsToDisplay')),
+            return trackItemFocus(
+              untracked(() => node().focus),
+              h(
+                'div',
+                { class: 'ohne-blocks-item' },
+                hasFields(name)
+                  ? form.render()
+                  : h('span', { class: 'ohne-muted' }, () => t('dashboard.noFieldsToDisplay')),
+              ),
+              true,
             );
           },
           itemBefore: (node) =>
@@ -383,19 +456,12 @@ export const blocksType: FieldType = {
           itemAfter: (node) => structureItemError(() => node().own.value),
           onCommit: settle,
         }),
-        h(
-          'div',
-          { class: 'ohne-blocks-add' },
-          button([icon('plus'), h('span', null, () => t('dashboard.addBlock'))], {
-            variant: 'outline',
-            disabled: off || offered.length === 0 ? (): boolean => true : undefined,
-            onClick: () => {
-              if (offered.length > 1) pick();
-              else if (offered.length === 1) focusNew(addAt(offered[0] as string));
-            },
-          }),
-        ),
+        h('div', { class: 'ohne-blocks-add' }, addButton),
       );
+    };
+
+    const pristine = (): boolean =>
+      !touched.value && isUndefined(base) && !nodes.value.some((node) => node.form.dirty());
 
     const control: FieldControl = {
       get element() {
@@ -403,13 +469,10 @@ export const blocksType: FieldType = {
         return element;
       },
       read() {
-        const live = nodes.value;
-        if (!touched.value && isUndefined(base) && !live.some((node) => node.form.dirty())) {
-          return {};
-        }
+        if (pristine()) return {};
         const errors = blank();
         const items: Record<string, unknown>[] = [];
-        live.forEach((node, index) => {
+        nodes.value.forEach((node, index) => {
           const reading = node.form.read();
           if (!isUndefined(reading.errors)) {
             for (const [key, message] of Object.entries(reading.errors)) {
@@ -417,13 +480,13 @@ export const blocksType: FieldType = {
             }
             return;
           }
-          const item: Record<string, unknown> = { block: node.block };
-          if (!isUndefined(node.uuid)) item.UUID = node.uuid;
-          item.fields = reading.value ?? {};
-          items.push(item);
+          items.push(itemOf(node, reading.value ?? {}));
         });
         if (Object.keys(errors).length > 0) return { errors };
         return { value: items };
+      },
+      draft() {
+        return pristine() ? undefined : nodes.value.map((node) => draftOf(node));
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -464,6 +527,7 @@ export const blocksType: FieldType = {
       },
       error: () => routed.value,
       errored: () => nodes.value.some(flagged),
+      folds: () => listFolds(nodes.value),
       dirty: () => touched.value || nodes.value.some((node) => node.form.dirty()),
       focus() {
         const target = nodes.value.find(flagged) ?? nodes.value[0];
@@ -489,6 +553,7 @@ export const blocksType: FieldType = {
       },
       rebase(value) {
         base = value;
+        unpark();
         const items = baseItems();
         const live = nodes.value;
         // Rebasing in place keeps forms, focus, and open rows; a rebuild would drop them.
@@ -501,10 +566,8 @@ export const blocksType: FieldType = {
         if (matches) {
           items.forEach((item, index) => {
             const node = live[index] as BlockNode;
-            node.uuid = isString(item.UUID) ? item.UUID : undefined;
-            node.form.rebase(
-              isPlainObject<Record<string, unknown>>(item.fields) ? item.fields : {},
-            );
+            node.uuid = uuidOf(item);
+            node.form.rebase(fieldsOf(item));
             node.own.value = '';
           });
           // Readers of `nodes` key on the saved `UUID`s too, so the in-place update must still notify them.
@@ -515,11 +578,66 @@ export const blocksType: FieldType = {
         touched.value = false;
         routed.value = '';
       },
+      restore(value) {
+        const live = nodes.value;
+        const expanded = live.length === 0 || !allCollapsed();
+        const pool = [...parked.splice(0), ...live];
+        // A live node wins over a parked one with the same identity.
+        const known = new Map(pool.map((node) => [node.uuid ?? node.$key, node]));
+        const next = itemsOf(value).map((item) => {
+          const identity = identityOf(item);
+          const node = isUndefined(identity) ? undefined : known.get(identity);
+          if (isUndefined(node) || node.block !== item.block) return nodeFor(item, expanded);
+          node.own.value = '';
+          node.form.restore(fieldsOf(item));
+          return node;
+        });
+        parked.push(...pool.filter((node) => !next.includes(node)));
+        nodes.value = next;
+        touched.value = !unmoved(next);
+        routed.value = '';
+        if (!isUndefined(addButton)) focusAfterRestore(live, next, addButton);
+      },
     };
     handles.set(control, handle);
     return control;
   },
 };
+
+/**
+ * The stored items of a list value, anything that is no item dropped.
+ */
+function itemsOf(value: unknown): Readonly<Record<string, unknown>>[] {
+  return (isArray(value) ? value : []).filter((item) =>
+    isPlainObject<Record<string, unknown>>(item),
+  );
+}
+
+/**
+ * The item's `fields`, `{}` when it carries none.
+ */
+function fieldsOf(item: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  return isPlainObject<Record<string, unknown>>(item.fields) ? item.fields : {};
+}
+
+/**
+ * The node's wire item: its type, its `UUID` when it has one, and `fields` as read.
+ */
+function itemOf(node: BlockNode, fields: unknown): Record<string, unknown> {
+  const item: Record<string, unknown> = { block: node.block };
+  if (!isUndefined(node.uuid)) item.UUID = node.uuid;
+  item.fields = fields;
+  return item;
+}
+
+/**
+ * The node's drafted item, which carries the node's `$key` in place of a `UUID` it does not have yet.
+ */
+function draftOf(node: BlockNode): Record<string, unknown> {
+  const item = itemOf(node, node.form.draft());
+  if (isUndefined(node.uuid)) item.$key = node.$key;
+  return item;
+}
 
 /**
  * Every block type a stored list holds, at every depth, so the round-trip gate sees them all.

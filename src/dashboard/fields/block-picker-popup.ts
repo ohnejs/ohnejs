@@ -134,12 +134,14 @@ css`
  * Opens a search-first popup over the block types `allowed` names, or every described type when omitted.
  * Typing anywhere before the search input takes focus funnels into the search.
  * Arrows walk the grid: up and down move within a column, left and right step through the list.
+ * A vertical step with nothing left in its column takes the next block along instead.
  * Enter picks the highlighted block, and Tab moves focus onto the grid itself.
  * Mouse highlighting pauses after keyboard moves until the pointer really travels again.
  *
  * Resolves with the picked block name the moment it is chosen, before the close animation.
- * Escape and the overlay click resolve `null` and restore focus to the previously focused element.
- * A pick leaves focus to the caller.
+ * Escape, in the search too, and the overlay click resolve `null`.
+ * Both restore focus to the previously focused element.
+ * A pick leaves focus to the caller, and swallows its Enter so no newline lands in what the caller focuses.
  */
 export function openBlockPicker(allowed?: readonly string[]): Promise<string | null> {
   return new Promise((resolve) => {
@@ -196,7 +198,7 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
         const list = filteredBlocks.value;
         const index = list.findIndex((block) => block.name === highlightedBlock.value);
         if (index === -1) return;
-        const previous = list[index - (sameColumn ? 2 : 1)];
+        const previous = list[index - (sameColumn ? 2 : 1)] ?? list[index - 1];
         if (!isUndefined(previous)) highlightedBlock.value = previous.name;
       };
 
@@ -209,7 +211,7 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
         const list = filteredBlocks.value;
         const index = list.findIndex((block) => block.name === highlightedBlock.value);
         if (index === -1) return;
-        const next = list[index + (sameColumn ? 2 : 1)];
+        const next = list[index + (sameColumn ? 2 : 1)] ?? list[index + 1];
         if (!isUndefined(next)) highlightedBlock.value = next.name;
       };
 
@@ -271,6 +273,16 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
           highlightedBlock.value = getFirstFilteredBlock();
         });
       });
+      // Capture, ahead of the input's own Escape, which would only blur it and leave the popup open.
+      search.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key !== 'Escape') return;
+          event.stopPropagation();
+          settle(null);
+        },
+        true,
+      );
       search.addEventListener('keydown', (event) => {
         const clean = !event.metaKey && !event.altKey && !event.ctrlKey && !event.shiftKey;
         if (event.key === 'ArrowDown' && clean) highlightNext(true);
@@ -278,6 +290,7 @@ export function openBlockPicker(allowed?: readonly string[]): Promise<string | n
         else if (event.key === 'ArrowLeft' && clean) highlightPrevious();
         else if (event.key === 'ArrowRight' && clean) highlightNext();
         else if (event.key === 'Enter' && !isNull(highlightedBlock.value)) {
+          event.preventDefault();
           choose(highlightedBlock.value);
         } else if (event.key === 'Tab' && !event.shiftKey) {
           mousePaused.value = false;

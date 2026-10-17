@@ -119,9 +119,17 @@ export interface FieldControlContext<O = Record<string, unknown>> {
   ancestors?: () => readonly Readonly<Record<string, unknown>>[];
 
   /**
-   * Fires on any user change, so the host can clear a stale failure line.
+   * Which of the control's items open collapsed, as the control's `folds` answered it before a rebuild.
+   * A composite hands each item's node to that item's form.
    */
-  onInput(): void;
+  folds?: FieldFolds;
+
+  /**
+   * Fires on any user change, so the host can clear a stale failure line.
+   * `discrete` marks a change complete in itself: a pick, a toggle, a removed chip, a moved item.
+   * An undo history lands it as its own step at once, where a keystroke waits for the typing to pause.
+   */
+  onInput(discrete?: boolean): void;
 }
 
 /**
@@ -141,6 +149,26 @@ export interface ControlReading {
 }
 
 /**
+ * Which structure items show collapsed, so a rebuilt form opens them as the user left them.
+ * It is view state: an undo history never records it, so an undo neither takes nor reverts a fold.
+ * An item's node is its own form's node, plus whether the item shows collapsed.
+ */
+export interface FieldFolds {
+  /**
+   * Whether the item shows collapsed.
+   *
+   * @default
+   * false
+   */
+  collapsed?: boolean;
+
+  /**
+   * The nodes below: a form's by field name, a list's by item `UUID`, else by the `$key` its draft carries.
+   */
+  children?: Readonly<Record<string, FieldFolds>>;
+}
+
+/**
  * A live form control: state lives in the control, verdicts flow through the handle.
  * The hosting form owns the write; a control never talks to the network for its value.
  */
@@ -155,6 +183,16 @@ export interface FieldControl {
    * It shows nothing: the hosting form routes the messages back through `setErrors`.
    */
   read(): ControlReading;
+
+  /**
+   * The value the control rebuilds from as `initial`, checks aside: what the user has, valid or not.
+   * A text control answers its text as typed, so a step keeps its case and a mid-edit address.
+   * A composite answers its item forms' snapshots, so an item with an empty required field counts.
+   * `undefined` omits the field, as `read` answering `{}` does for a pristine control over none.
+   * The hosting form's `draft` collects it for an undo history, so one failing check never drops a step.
+   * Omitted, the form takes `read`'s value, or its fallback when that read fails.
+   */
+  draft?(): unknown;
 
   /**
    * Routes server messages keyed relative to this field; `''` addresses the control itself.
@@ -172,6 +210,12 @@ export interface FieldControl {
    * Omitted, `error` alone decides; the hosting form reads it for the first-error jump.
    */
   errored?(): boolean;
+
+  /**
+   * Which of the control's items show collapsed, nested forms included, for a host rebuilding the form.
+   * Omitted, the control has nothing to fold.
+   */
+  folds?(): FieldFolds;
 
   /**
    * Whether the parsed value differs from the baseline. Reactive.
@@ -192,6 +236,15 @@ export interface FieldControl {
    * Re-baselines the control after a successful save, so `dirty` clears without a remount.
    */
   rebase(value: unknown): void;
+
+  /**
+   * Takes a restored value into the live control, as an undo or redo lands it.
+   * The baseline stays, so the value reads dirty against it exactly as if the user had entered it.
+   * `undefined` returns the control to pristine, where `read` answers `{}`.
+   * Messages clear as on any change, and `onInput` never fires.
+   * Omitted, the hosting form shows the value through `rebase` and `revert`, so it becomes the baseline.
+   */
+  restore?(value: unknown): void;
 
   /**
    * The control's own slot for the row's marks, for a control that shows its own label.
@@ -475,6 +528,10 @@ const FALLBACK: FieldType = {
         routed.value = '';
       },
       rebase(value) {
+        base = value;
+        routed.value = '';
+      },
+      restore(value) {
         base = value;
         routed.value = '';
       },

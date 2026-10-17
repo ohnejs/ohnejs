@@ -19,31 +19,44 @@ import { icon } from '../../ui/icon.ts';
 import { structure } from '../../ui/structure.ts';
 import { blocksOf } from '../_blocks.ts';
 import { checkedReading } from '../_checked-reading.ts';
-import { itemFormSupports } from '../_items.ts';
+import { itemFolds, listFolds } from '../_folds.ts';
+import { entryKey, identityOf, itemFormSupports, uuidOf } from '../_items.ts';
 import { summaryParts, summarySpan, summaryTitle } from '../_summary.ts';
-import { clipboardData, stripUUIDs } from '../clipboard.ts';
+import { clipboardData, stripIdentities } from '../clipboard.ts';
 import { createFieldForm } from '../field-form.ts';
 import {
   dimMark,
   type FieldControlContext,
+  type FieldFolds,
   type FieldType,
   registerFieldType,
 } from '../field-type.ts';
-import { structureActions, structureErrorMark, structureItemError } from '../structure-chrome.ts';
+import {
+  focusAfterRemoval,
+  focusAfterRestore,
+  focusOrigin,
+  type ItemFocus,
+  structureActions,
+  structureErrorMark,
+  structureItemError,
+  trackItemFocus,
+} from '../structure-chrome.ts';
 
 /**
  * One list row: the structure's `$key` and `$expanded` beside the item's form and its own message.
+ * `uuid` is the stored item's; a fresh or copied item has none and drafts its `$key` in its place.
+ * Either one keys the item's folds and finds its entry again across undo states.
+ * `focus` remembers where focus stood around the item, shared by the copies an expand toggle makes.
  * A type literal, so the structure's `Record<string, unknown>` item constraint accepts it.
  */
 type RepeaterEntry = {
   $key: number;
   $expanded: boolean;
+  uuid: string | undefined;
   form: FieldForm;
   own: Ref<string>;
+  focus: ItemFocus;
 };
-
-// Shared across every repeater control, so a cross-structure drop never lands a colliding `$key`.
-let nextEntryKey = 0;
 
 css`
   .ohne-structure:not(.ohne-structure-empty) + .ohne-repeater-add {
@@ -106,22 +119,56 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
     const entryOf = (
       item: Readonly<Record<string, unknown>> | undefined,
       expanded: boolean,
+      folds?: FieldFolds,
+      key = entryKey(item),
     ): RepeaterEntry => {
-      const key = (nextEntryKey += 1);
-      const form = owner.run(() => itemForm(context, subfields, item, key));
+      const form = owner.run(() => itemForm(context, subfields, item, key, folds));
       ownForms.add(form);
-      return { $key: key, $expanded: expanded, form, own: ref('') };
+      return {
+        $key: key,
+        $expanded: expanded && folds?.collapsed !== true,
+        uuid: uuidOf(item),
+        form,
+        own: ref(''),
+        focus: {},
+      };
     };
 
-    const baseItems = (): Readonly<Record<string, unknown>>[] =>
-      (isArray(base) ? base : []).filter((item) => isPlainObject<Record<string, unknown>>(item));
+    const baseItems = (): Readonly<Record<string, unknown>>[] => itemsOf(base);
 
-    const baseEntries = (expanded: boolean): RepeaterEntry[] =>
-      baseItems().map((item) => entryOf(item, expanded));
+    const baseEntries = (expanded: boolean, folds?: FieldFolds): RepeaterEntry[] =>
+      baseItems().map((item) => entryOf(item, expanded, itemFolds(folds, item)));
 
-    const entries = ref<RepeaterEntry[]>(baseEntries(true));
+    // An item the list no longer holds is rebuilt over its stored base, so its dirt reads against the record.
+    const entryFor = (
+      item: Readonly<Record<string, unknown>>,
+      expanded: boolean,
+    ): RepeaterEntry => {
+      const uuid = uuidOf(item);
+      const stored = baseItems().find((candidate) => !isUndefined(uuid) && candidate.UUID === uuid);
+      const entry = entryOf(stored, expanded, itemFolds(context.folds, item), entryKey(item));
+      entry.uuid = uuid;
+      entry.form.restore(item);
+      return entry;
+    };
+
+    const unmoved = (list: readonly RepeaterEntry[]): boolean => {
+      const items = baseItems();
+      return (
+        items.length === list.length &&
+        list.every((entry, index) => (entry.uuid ?? entry.$key) === identityOf(items[index]))
+      );
+    };
+
+    const entries = ref<RepeaterEntry[]>(baseEntries(true, context.folds));
     const touched = ref(false);
     const routed = ref('');
+    // Entries a removal or a restore took out, kept whole so an undo brings back the same card and fold.
+    const parked: RepeaterEntry[] = [];
+
+    const unpark = (): void => {
+      for (const entry of parked.splice(0)) entry.form.dispose();
+    };
 
     const allExpanded = (): boolean => entries.value.every((entry) => entry.$expanded);
     const allCollapsed = (): boolean => entries.value.every((entry) => !entry.$expanded);
@@ -129,6 +176,7 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       entry.own.value !== '' || entry.form.errored();
 
     const rebuild = (): void => {
+      unpark();
       for (const entry of entries.value) entry.form.dispose();
       const expanded = entries.value.length === 0 || !allCollapsed();
       entries.value = baseEntries(expanded);
@@ -138,12 +186,17 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       entries.value = next;
       touched.value = true;
       routed.value = '';
-      context.onInput();
+      context.onInput(true);
     };
 
     const valueOf = (form: FieldForm): Record<string, unknown> => {
-      const value = stripUUIDs(form.snapshot());
+      const value = stripIdentities(form.draft());
       return isPlainObject<Record<string, unknown>>(value) ? value : {};
+    };
+
+    const draftOf = (entry: RepeaterEntry): unknown => {
+      const draft = entry.form.draft();
+      return isUndefined(entry.uuid) ? { ...draft, $key: entry.$key } : draft;
     };
 
     const move = (target: RepeaterEntry, delta: -1 | 1): void => {
@@ -156,32 +209,44 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       change(list);
     };
 
-    const addAt = (at?: number): RepeaterEntry => {
-      const entry = entryOf(undefined, true);
+    const insert = (
+      entry: RepeaterEntry,
+      at: number | undefined,
+      source?: RepeaterEntry,
+    ): RepeaterEntry => {
+      entry.focus.origin = focusOrigin(document.activeElement, source);
       const list = entries.value;
       change(isUndefined(at) ? [...list, entry] : [...list.slice(0, at), entry, ...list.slice(at)]);
       return entry;
     };
 
+    const addAt = (at?: number, source?: RepeaterEntry): RepeaterEntry =>
+      insert(entryOf(undefined, true), at, source);
+
     const remove = (target: RepeaterEntry): void => {
-      target.form.dispose();
-      change(entries.value.filter((entry) => entry !== target));
-    };
-
-    const duplicate = (target: RepeaterEntry): void => {
-      const list = entries.value;
-      const at = list.indexOf(target);
+      const at = entries.value.indexOf(target);
       if (at < 0) return;
-      const copy = entryOf(valueOf(target.form), target.$expanded);
-      change([...list.slice(0, at), copy, ...list.slice(at)]);
+      target.focus.origin = undefined;
+      parked.push(target);
+      change(entries.value.filter((entry) => entry !== target));
+      focusAfterRemoval(entries.value, at, addButton);
     };
 
-    const pasteAt = (at: number): void => {
+    const duplicate = (target: RepeaterEntry): RepeaterEntry | undefined => {
+      const at = entries.value.indexOf(target);
+      if (at < 0) return undefined;
+      return insert(entryOf(valueOf(target.form), target.$expanded), at, target);
+    };
+
+    const pasteAt = (at: number, source: RepeaterEntry): RepeaterEntry | undefined => {
       const payload = clipboardData.value;
-      if (isNull(payload) || payload.ohneClipboardDataType !== 'structure-item') return;
-      const entry = entryOf(omit(payload.data, ['$type']), true);
-      const list = entries.value;
-      change([...list.slice(0, at), entry, ...list.slice(at)]);
+      if (isNull(payload) || payload.ohneClipboardDataType !== 'structure-item') return undefined;
+      return insert(entryOf(omit(payload.data, ['$type']), true), at, source);
+    };
+
+    // The new card mounts on the reactive flush's microtask; focusing sooner hits a detached input.
+    const focusNew = (entry: RepeaterEntry | undefined): void => {
+      queueMicrotask(() => entry?.form.focus());
     };
 
     const toggleExpanded = (target: RepeaterEntry): void => {
@@ -194,7 +259,7 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       entries.value = entries.value.map((entry) => ({ ...entry, $expanded: expanded }));
     };
 
-    // A cross-dropped item's form lives in the donor's scope, so it rebuilds here, shed of every `UUID`.
+    // A cross-dropped item's form lives in the donor's scope, so it rebuilds here, shed of every identity.
     const settle = (items: RepeaterEntry[]): void => {
       change(
         items.map((item) =>
@@ -202,6 +267,12 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
         ),
       );
     };
+
+    const addButton = button([icon('plus'), h('span', null, () => t('dashboard.addItem'))], {
+      variant: 'outline',
+      disabled: off ? (): boolean => true : undefined,
+      onClick: () => focusNew(addAt()),
+    });
 
     const element = h(
       'div',
@@ -217,37 +288,45 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
           h('span', { class: 'ohne-muted ohne-truncate' }, () => `#${index() + 1}`),
           off
             ? null
-            : structureActions({
-                index,
-                count: () => entries.value.length,
-                expanded: () => entry().$expanded,
-                allExpanded,
-                allCollapsed,
-                onToggleExpanded: () => toggleExpanded(entry()),
-                onExpandAll: () => setAllExpanded(true),
-                onCollapseAll: () => setAllExpanded(false),
-                onMove: (delta) => move(entry(), delta),
-                onAdd: (at) => addAt(at),
-                copyPayload: () => ({
-                  ohneClipboardDataType: 'structure-item',
-                  data: { $type: itemType, ...valueOf(entry().form) },
+            : trackItemFocus(
+                untracked(() => entry().focus),
+                structureActions({
+                  index,
+                  count: () => entries.value.length,
+                  expanded: () => entry().$expanded,
+                  allExpanded,
+                  allCollapsed,
+                  onToggleExpanded: () => toggleExpanded(entry()),
+                  onExpandAll: () => setAllExpanded(true),
+                  onCollapseAll: () => setAllExpanded(false),
+                  onMove: (delta) => move(entry(), delta),
+                  onAdd: (at) => focusNew(addAt(at, entry())),
+                  copyPayload: () => ({
+                    ohneClipboardDataType: 'structure-item',
+                    data: { $type: itemType, ...valueOf(entry().form) },
+                  }),
+                  canPaste: () => {
+                    const payload = clipboardData.value;
+                    return (
+                      !isNull(payload) &&
+                      payload.ohneClipboardDataType === 'structure-item' &&
+                      payload.data.$type === itemType
+                    );
+                  },
+                  onPaste: (at) => focusNew(pasteAt(at, entry())),
+                  onDuplicate: () => focusNew(duplicate(entry())),
+                  onRemove: () => remove(entry()),
                 }),
-                canPaste: () => {
-                  const payload = clipboardData.value;
-                  return (
-                    !isNull(payload) &&
-                    payload.ohneClipboardDataType === 'structure-item' &&
-                    payload.data.$type === itemType
-                  );
-                },
-                onPaste: pasteAt,
-                onDuplicate: () => duplicate(entry()),
-                onRemove: () => remove(entry()),
-              }),
+                false,
+              ),
         ],
-        // The form is stable per row, so an untracked read is safe; it holds focus through expand-all.
+        // The form and the memory are stable per row, so untracked reads hold focus through expand-all.
         item: (entry) =>
-          h('div', { class: 'ohne-repeater-item' }, untracked(() => entry().form).render()),
+          trackItemFocus(
+            untracked(() => entry().focus),
+            h('div', { class: 'ohne-repeater-item' }, untracked(() => entry().form).render()),
+            true,
+          ),
         itemBefore: (entry) =>
           structureErrorMark(
             () => entry().own.value !== '' || (!entry().$expanded && entry().form.errored()),
@@ -255,29 +334,18 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
         itemAfter: (entry) => structureItemError(() => entry().own.value),
         onCommit: settle,
       }),
-      h(
-        'div',
-        { class: 'ohne-repeater-add' },
-        button([icon('plus'), h('span', null, () => t('dashboard.addItem'))], {
-          variant: 'outline',
-          disabled: off ? (): boolean => true : undefined,
-          onClick: () => {
-            const entry = addAt();
-            queueMicrotask(() => entry.form.focus());
-          },
-        }),
-      ),
+      h('div', { class: 'ohne-repeater-add' }, addButton),
     );
 
     const dirty = (): boolean => touched.value || entries.value.some((entry) => entry.form.dirty());
+    const pristine = (): boolean =>
+      !touched.value && isUndefined(base) && !entries.value.some((entry) => entry.form.dirty());
 
     return {
       element,
       read() {
+        if (pristine()) return {};
         const live = entries.value;
-        if (!touched.value && isUndefined(base) && !live.some((entry) => entry.form.dirty())) {
-          return {};
-        }
         const errors = blank();
         const items: Record<string, unknown>[] = [];
         live.forEach((entry, index) => {
@@ -293,6 +361,9 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
         if (Object.keys(errors).length > 0) return { errors };
         const options = context.field.options ?? {};
         return checkedReading(items, dirty() ? checkCount(items.length, options) : undefined);
+      },
+      draft() {
+        return pristine() ? undefined : entries.value.map(draftOf);
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -333,6 +404,7 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       },
       error: () => routed.value,
       errored: () => entries.value.some(flagged),
+      folds: () => listFolds(entries.value),
       dirty,
       focus() {
         const target = entries.value.find(flagged) ?? entries.value[0];
@@ -354,11 +426,14 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       },
       rebase(value) {
         base = value;
+        unpark();
         const items = baseItems();
         // A matching length rebases in place, keeping each item's controls and their focus.
         if (items.length === entries.value.length) {
           entries.value.forEach((entry, index) => {
-            entry.form.rebase(items[index]);
+            const item = items[index];
+            entry.uuid = uuidOf(item);
+            entry.form.rebase(item);
             entry.own.value = '';
           });
         } else {
@@ -367,9 +442,38 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
         touched.value = false;
         routed.value = '';
       },
+      restore(value) {
+        const live = entries.value;
+        const expanded = live.length === 0 || !allCollapsed();
+        const pool = [...parked.splice(0), ...live];
+        // A live entry wins over a parked one with the same identity.
+        const known = new Map(pool.map((entry) => [entry.uuid ?? entry.$key, entry]));
+        const next = itemsOf(value).map((item) => {
+          const identity = identityOf(item);
+          const entry = isUndefined(identity) ? undefined : known.get(identity);
+          if (isUndefined(entry)) return entryFor(item, expanded);
+          entry.own.value = '';
+          entry.form.restore(item);
+          return entry;
+        });
+        parked.push(...pool.filter((entry) => !next.includes(entry)));
+        entries.value = next;
+        touched.value = !unmoved(next);
+        routed.value = '';
+        focusAfterRestore(live, next, addButton);
+      },
     };
   },
 };
+
+/**
+ * The stored items of a list value, anything that is no item dropped.
+ */
+function itemsOf(value: unknown): Readonly<Record<string, unknown>>[] {
+  return (isArray(value) ? value : []).filter((item) =>
+    isPlainObject<Record<string, unknown>>(item),
+  );
+}
 
 /**
  * One item's form, its ids keyed by the entry's `$key` so reordered rows never collide.
@@ -379,6 +483,7 @@ function itemForm(
   subfields: readonly DashboardField[],
   item: Readonly<Record<string, unknown>> | undefined,
   key: number,
+  folds: FieldFolds | undefined,
 ): FieldForm {
   return createFieldForm(subfields, item, {
     mode: context.mode,
@@ -388,6 +493,7 @@ function itemForm(
     layout: context.field.layout,
     language: context.language,
     ancestors: context.ancestors,
+    folds,
     onInput: context.onInput,
   });
 }

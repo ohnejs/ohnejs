@@ -25,6 +25,7 @@ import { button } from './button.ts';
 import {
   addZonedMonths,
   addZonedYears,
+  calendarKeyTarget,
   clampZoned,
   daysInMonth,
   parseDateInput,
@@ -404,7 +405,9 @@ css`
  * A floater whose panel holds a month grid, month and year selector panes, and optionally a time row.
  * The model is a millisecond timestamp or `null`.
  * Without `withTime` every emitted value is midnight in the resolved time zone.
- * Arrow keys navigate while open: Left/Right step months, Down is the previous year, Up the next.
+ * Opening focuses the selected day, else today, else the first selectable day.
+ * Arrow keys move the focused day, PageUp and PageDown the month, with Shift the year.
+ * Enter or a click picks the day; a date-only pick closes the panel and focuses the trigger.
  * Shift-clicking the header chevrons steps years; Escape dismisses an open selector pane first.
  * Typing while open collects a keyword overlay that jumps to a day, month name, or year after 750ms.
  *
@@ -493,26 +496,63 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
     return withTime ? input.timestamp : startOfZonedDay(input).timestamp;
   };
 
-  const applyMonthStep = (step: (current: ZonedDate) => ZonedDate, event?: Event): boolean => {
-    if (event && isEditingText()) return false;
-    event?.preventDefault();
-    event?.stopImmediatePropagation();
+  const applyMonthStep = (step: (current: ZonedDate) => ZonedDate): void => {
     const current = zonedFromWallClock(zone(), selectedYear.value, selectedMonth.value, 1);
     const next = clampDate(step(current));
     selectedYear.value = next.year;
     selectedMonth.value = next.month;
     void nextTick().then(() => fl.container()?.focus());
-    return true;
   };
 
-  const prevMonth = (event?: Event): boolean =>
-    applyMonthStep((current) => addZonedMonths(current, -1), event);
-  const nextMonth = (event?: Event): boolean =>
-    applyMonthStep((current) => addZonedMonths(current, 1), event);
-  const prevYear = (event?: Event): boolean =>
-    applyMonthStep((current) => addZonedYears(current, -1), event);
-  const nextYear = (event?: Event): boolean =>
-    applyMonthStep((current) => addZonedYears(current, 1), event);
+  const prevMonth = (): void => applyMonthStep((current) => addZonedMonths(current, -1));
+  const nextMonth = (): void => applyMonthStep((current) => addZonedMonths(current, 1));
+  const prevYear = (): void => applyMonthStep((current) => addZonedYears(current, -1));
+  const nextYear = (): void => applyMonthStep((current) => addZonedYears(current, 1));
+
+  const focusDay = (day: number): void => {
+    void nextTick().then(() => {
+      fl.container()
+        ?.querySelector<HTMLElement>(`.ohne-calendar-day-button:not(:disabled)[data-day="${day}"]`)
+        ?.focus({ preventScroll: true });
+    });
+  };
+
+  const focusedDay = (): number | undefined => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement &&
+      active.classList.contains('ohne-calendar-day-button') &&
+      fl.container()?.contains(active)
+      ? Number(active.dataset.day)
+      : undefined;
+  };
+
+  const anchorDay = (): number => {
+    const year = selectedYear.value;
+    const month = selectedMonth.value;
+    const selected = date.value;
+    if (selected?.year === year && selected.month === month) return selected.day;
+    if (today.year === year && today.month === month) return today.day;
+    return clampDate(zonedFromWallClock(zone(), year, month, 1)).day;
+  };
+
+  // The first key from outside the grid lands on the anchor day; the next ones move from there.
+  const moveFocus = (event: KeyboardEvent): void => {
+    const from = focusedDay();
+    const current = zonedFromWallClock(
+      zone(),
+      selectedYear.value,
+      selectedMonth.value,
+      from ?? anchorDay(),
+    );
+    const target = calendarKeyTarget(current, event.key, event.shiftKey);
+    if (isUndefined(target)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const clamped = clampDate(isUndefined(from) ? current : target);
+    selectedYear.value = clamped.year;
+    selectedMonth.value = clamped.month;
+    focusDay(clamped.day);
+  };
 
   let keywordTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -729,7 +769,10 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
     if (!fl.isActive.value) {
       options.onCommit?.(emitValue);
     }
-    if (!withTime) {
+    if (withTime) {
+      focusDay(clamped.day);
+    } else {
+      fl.handle.focus({ preventScroll: true });
       void nextTick().then(() => fl.close(event));
     }
   };
@@ -896,10 +939,7 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
     onClose: () => options.onCommit?.(prepareEmitValue(date.value)),
     onKeydown: (event) => {
       onKeyDown(event);
-      if (event.key === 'ArrowDown') prevYear(event);
-      else if (event.key === 'ArrowUp') nextYear(event);
-      else if (event.key === 'ArrowLeft') prevMonth(event);
-      else if (event.key === 'ArrowRight') nextMonth(event);
+      if (noSelector() && !isEditingText()) moveFocus(event);
     },
     onBlurHandle: () => {
       focusVisible.value = false;
@@ -910,6 +950,10 @@ export function calendar(model: Ref<number | null>, options: CalendarOptions = {
     const value = displayedValue();
     if (isUndefined(value)) fl.handle.removeAttribute('title');
     else fl.handle.title = value;
+  });
+
+  effect(() => {
+    if (fl.isVisible.value) untracked(() => focusDay(anchorDay()));
   });
 
   effect(() => {

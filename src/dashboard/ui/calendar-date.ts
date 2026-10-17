@@ -318,6 +318,47 @@ export function addZonedYears(date: ZonedDate, years: number): ZonedDate {
 }
 
 /**
+ * The days an arrow key moves a calendar's focused day.
+ */
+const DAY_STEPS: Partial<Record<string, number>> = {
+  ArrowLeft: -1,
+  ArrowRight: 1,
+  ArrowUp: -7,
+  ArrowDown: 7,
+};
+
+/**
+ * The months, or years with Shift, a page key moves a calendar's focused day.
+ */
+const PAGE_STEPS: Partial<Record<string, number>> = { PageUp: -1, PageDown: 1 };
+
+/**
+ * The day a calendar grid key moves `date` to, or `undefined` for a key the grid does not take.
+ * Left and Right step a day, Up and Down a week, rolling over into the adjacent month.
+ * PageUp and PageDown step a month, or a year with `shift`, clamping the day to the target month.
+ *
+ * @example
+ * ```ts
+ * const date = zonedFromWallClock('UTC', 2024, 1, 31)
+ *
+ * calendarKeyTarget(date, 'ArrowRight', false)?.day // -> 1
+ * calendarKeyTarget(date, 'PageDown', false)?.day   // -> 29
+ * calendarKeyTarget(date, 'Enter', false)           // -> undefined
+ * ```
+ */
+export function calendarKeyTarget(
+  date: ZonedDate,
+  key: string,
+  shift: boolean,
+): ZonedDate | undefined {
+  const days = DAY_STEPS[key];
+  if (isNumber(days)) return zonedFromWallClock(date.zone, date.year, date.month, date.day + days);
+  const pages = PAGE_STEPS[key];
+  if (!isNumber(pages)) return undefined;
+  return shift ? addZonedYears(date, pages) : addZonedMonths(date, pages);
+}
+
+/**
  * Clamps `date` between `min` and `max` by instant, returning one of the three inputs unchanged.
  * On equal instants the date itself wins, so the returned object keeps its own wall clock.
  */

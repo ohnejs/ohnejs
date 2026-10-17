@@ -15,10 +15,12 @@ import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { defaultText, resolveText, type Text } from '../runtime/text.ts';
+import { refocusAfterRemoval } from './_chip-focus.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { type Primitive } from './button-group.ts';
 import { nearestContainer } from './container.ts';
 import { type DropdownHandle, dropdown } from './dropdown.ts';
+import { isHistoryHotkey } from './hotkeys.ts';
 import { icon } from './icon.ts';
 import { listenClickOutside } from './overlay.ts';
 import { attachTooltip } from './tooltip.ts';
@@ -468,7 +470,11 @@ function labelOf(choice: DynamicChipsChoice): string | undefined {
  * Addable choices search remotely with a 250ms debounce and paginate on scroll.
  * They render inside a width-matched `dropdown` that carries the focus ring.
  * Rows add on mousedown with prevented default, so the text input keeps focus for multi-adding.
+ * A pick clears the typed keyword, so an undo right after it takes back the pick.
+ * Escape closes the dropdown and keeps focus; typing or an arrow key opens it again.
+ * While the input holds a keyword, undo and redo take back that typing, never an app history step.
  * Backspace deletes in two steps, previewing the last chip destructively before removing it.
+ * Removing a chip by its X moves focus to the next X, else the previous one, else the text input.
  * Chips reorder by mouse drag or touch long-press onto the dropzones between them.
  * A trailing hidden input carries `id` and `name` for label linkage and form serialization.
  *
@@ -501,6 +507,7 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
   const dragStops: (() => void)[] = [];
 
   let root: HTMLElement | null = null;
+  let quietFocus = false;
   let choices: DynamicChipsChoice[] = [];
   let currentPage = 1;
   let lastPage = 1;
@@ -537,17 +544,18 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     void nextTick().then(() => dropdownRef.value?.update());
   };
 
+  const pick = (value: Primitive): void => {
+    model.value = [...model.value, value];
+    inputValue.value = '';
+    void nextTick().then(filterChoices);
+  };
+
   const selectHighlightedChoice = (): void => {
     const highlightedValue = filteredChoices.value[highlightedIndex.value]?.value;
     if (highlightedValue !== undefined) {
       const maxItems = options.maxItems ?? false;
-      if (maxItems === false || model.value.length < maxItems) {
-        model.value = [...model.value, highlightedValue];
-        void nextTick().then(filterChoices);
-      }
+      if (maxItems === false || model.value.length < maxItems) pick(highlightedValue);
     }
-    // The typed keyword stays but is selected, so continuing to type starts a fresh search.
-    input.select();
   };
 
   const focusPreviousChoice = (): void => {
@@ -656,7 +664,7 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     class: 'ohne-dynamic-chips-input',
     onFocus: () => {
       isFocused.value = true;
-      isDropdownVisible.value = true;
+      isDropdownVisible.value = !quietFocus;
       highlightedIndex.value = 0;
       dataInitialized.value = false;
     },
@@ -668,13 +676,21 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     },
     onInput: () => {
       inputValue.value = input.value;
+      isDropdownVisible.value = true;
     },
     onKeydown: (event: KeyboardEvent) => {
+      if (inputValue.value !== '' && isHistoryHotkey(event)) {
+        event.stopPropagation();
+        return;
+      }
       if (backspaceIndex.value !== null && event.code !== 'Backspace') {
         removeIndex.value = null;
         backspaceIndex.value = null;
       }
-      if (event.key === 'ArrowDown') {
+      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !isDropdownVisible.value) {
+        event.preventDefault();
+        isDropdownVisible.value = true;
+      } else if (event.key === 'ArrowDown') {
         event.preventDefault();
         focusNextChoice();
       } else if (event.key === 'ArrowUp') {
@@ -684,10 +700,9 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
         if (!inputValue.value) {
           const at = backspaceIndex.value;
           if (at !== null && model.value[at] && at === removeIndex.value) {
-            model.value = model.value.filter((_, i) => i !== at);
+            removeAt(at);
             removeIndex.value = null;
             backspaceIndex.value = null;
-            void nextTick().then(filterChoices);
           } else {
             backspaceIndex.value = model.value.length ? model.value.length - 1 : null;
             removeIndex.value = backspaceIndex.value;
@@ -695,9 +710,9 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
         }
       } else if (event.key === 'Enter') {
         selectHighlightedChoice();
-      } else if (event.key === 'Escape') {
+      } else if (event.key === 'Escape' && isDropdownVisible.value) {
         event.stopPropagation();
-        input.blur();
+        isDropdownVisible.value = false;
       } else if (event.key === 'Tab') {
         input.blur();
       }
@@ -707,6 +722,13 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
   batchedEffect(() => {
     if (input.value !== inputValue.value) input.value = inputValue.value;
   });
+
+  // The resolved chips drop the removed one at once, so no resolve round trip repaints the rest.
+  const removeAt = (at: number): void => {
+    selectedChoices.value = selectedChoices.value.filter((_, i) => i !== at);
+    model.value = model.value.filter((_, i) => i !== at);
+    void nextTick().then(filterChoices);
+  };
 
   const dropzone = (target: () => number): HTMLElement =>
     h('span', {
@@ -745,8 +767,7 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
         onClick: (event: MouseEvent) => event.preventDefault(),
         onMousedown: (event: MouseEvent) => {
           event.preventDefault();
-          model.value = [...model.value, choice.value];
-          void nextTick().then(filterChoices);
+          pick(choice.value);
         },
         onMouseenter: () => {
           if (pointerEvents.value) highlightedIndex.value = index;
@@ -838,9 +859,13 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
                       }),
                     onClick: () => {
                       const at = index();
-                      model.value = model.value.filter((_, i) => i !== at);
-                      void nextTick().then(filterChoices);
+                      removeAt(at);
                       removeIndex.value = null;
+                      refocusAfterRemoval(root, '.ohne-dynamic-chips-remove', at, () => {
+                        quietFocus = true;
+                        input.focus({ preventScroll: true });
+                        quietFocus = false;
+                      });
                     },
                     onFocus: () => {
                       removeIndex.value = index();

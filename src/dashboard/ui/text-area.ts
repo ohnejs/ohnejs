@@ -3,9 +3,9 @@ import type { Child } from '../render/insert.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
-import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { autosizeTextarea } from './_autosize.ts';
 import './tokens.ts';
 
 /**
@@ -199,28 +199,11 @@ export function textArea(model: Ref<string>, options: TextAreaOptions = {}): HTM
     const onBlur = options.onBlur;
     area.addEventListener('blur', (event) => onBlur(event, area.value));
   }
-  const autosize = (): void => {
-    // Collapsing to 1px first makes `scrollHeight` the exact content height plus padding.
-    area.style.height = '1px';
-    area.style.height = `${area.scrollHeight}px`;
-  };
+  const autosize = resize === 'auto' ? autosizeTextarea(area) : undefined;
   batchedEffect(() => {
     if (area.value !== model.value) area.value = model.value;
-    if (resize === 'auto') autosize();
+    autosize?.();
   });
-  if (resize === 'auto') {
-    let lastWidth = 0;
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
-      if (width === lastWidth) return;
-      lastWidth = width;
-      requestAnimationFrame(autosize);
-    });
-    observer.observe(area);
-    onCleanup(() => observer.disconnect());
-    // Out of the document `scrollHeight` is 0, so the initial value sizes once mounted.
-    queueMicrotask(autosize);
-  }
   return h(
     'div',
     {

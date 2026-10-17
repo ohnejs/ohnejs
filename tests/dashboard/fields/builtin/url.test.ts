@@ -53,6 +53,18 @@ describe('urlType control', () => {
     });
   });
 
+  it('drafts a bare host as typed, without the scheme `read` adds', () => {
+    effectScope().run(() => {
+      const site = control();
+      type(inputOf(site.element), 'orgrimmar.example');
+      strictEqual(site.draft?.(), 'orgrimmar.example');
+      deepStrictEqual(site.read(), { value: 'https://orgrimmar.example' });
+      type(inputOf(site.element), 'localhost:3000');
+      strictEqual(site.draft?.(), 'localhost:3000');
+      deepStrictEqual(site.read(), { errors: { '': 'validation.invalidURL' } });
+    });
+  });
+
   it('reads a bare host as `https://` and keeps the text as typed', () => {
     effectScope().run(() => {
       const site = control();
@@ -89,13 +101,21 @@ describe('urlType control', () => {
     });
   });
 
-  it('offers to open only a valid address', () => {
+  it('opens a valid address, and disables the one open button otherwise', () => {
     effectScope().run(() => {
       const site = control();
       strictEqual(hrefOf(site.element), 'https://dalaran.example');
       strictEqual(inputOf(site.element).getAttribute('inputmode'), 'url');
+      const link = findElement(
+        site.element as unknown as FakeElement,
+        (element) => element.getAttribute('href') !== null,
+      ) as FakeElement;
       type(inputOf(site.element), 'https://127.0.0.1');
-      strictEqual(hrefOf(site.element), undefined);
+      strictEqual(hrefOf(site.element), '');
+      strictEqual(link.getAttribute('aria-disabled'), 'true');
+      type(inputOf(site.element), 'dalaran.example/hall');
+      strictEqual(link.getAttribute('href'), 'https://dalaran.example/hall');
+      strictEqual(link.getAttribute('aria-disabled'), null);
     });
   });
 });

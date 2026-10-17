@@ -90,6 +90,7 @@ export function parseTime(time: TimeValue): number {
 
 /**
  * Composes hour, minute, and second segments into a time-of-day value in ms, clamped to `[min, max]`.
+ * Each segment first clamps into its own unit, so an out-of-range hour never spills into the minutes.
  */
 export function composeTime(
   hours: number,
@@ -98,7 +99,8 @@ export function composeTime(
   min: number,
   max: number,
 ): number {
-  return clamp((hours * 3600 + minutes * 60 + seconds) * 1000, min, max);
+  const total = clamp(hours, 0, 23) * 3600 + clamp(minutes, 0, 59) * 60 + clamp(seconds, 0, 59);
+  return clamp(total * 1000, min, max);
 }
 
 /**

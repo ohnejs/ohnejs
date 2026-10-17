@@ -193,6 +193,19 @@ export function isEditingText(): boolean {
 }
 
 /**
+ * Whether `event` is the platform's undo or redo hotkey.
+ * A text input that holds typing stops it, so its native text undo wins over an app history.
+ */
+export function isHistoryHotkey(event: KeyboardEvent): boolean {
+  const action = matchHotkey(strokeFromKeyboardEvent(event), {
+    mac: isMac(),
+    editing: false,
+    disabled: false,
+  });
+  return action === 'undo' || action === 'redo';
+}
+
+/**
  * Whether any modifier key is held on the event.
  */
 export function hasModifierKey(event: KeyboardEvent | MouseEvent): boolean {

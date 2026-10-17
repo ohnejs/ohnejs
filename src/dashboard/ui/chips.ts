@@ -11,9 +11,11 @@ import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { defaultText, resolveText, type Text } from '../runtime/text.ts';
+import { refocusAfterRemoval } from './_chip-focus.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { nearestContainer } from './container.ts';
 import { type DropdownHandle, dropdown } from './dropdown.ts';
+import { isHistoryHotkey } from './hotkeys.ts';
 import { icon } from './icon.ts';
 import { attachTooltip } from './tooltip.ts';
 import './tokens.ts';
@@ -376,6 +378,10 @@ function labelOf(choice: ChipsChoice): string {
  * Chips reorder by mouse drag or touch long-press.
  * Backspace deletes in two steps: the first press previews the last chip destructively, the second removes.
  * In select mode the dropdown filters by keywords and carries the focus ring on the field's behalf.
+ * A pick clears the typed keyword, so an undo right after it takes back the pick.
+ * Escape closes it and keeps focus; typing or an arrow key opens it again.
+ * While the input holds text, undo and redo take back that typing, never an app history step.
+ * Removing a chip by its X moves focus to the next X, else the previous one, else the text input.
  * It locks the window and `scrollContainer` scroll while open; a window resize closes it.
  * A trailing hidden input carries `id` and `name` for label linkage and form serialization.
  *
@@ -409,6 +415,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
   const dragStops: (() => void)[] = [];
 
   let root: HTMLElement | null = null;
+  let quietFocus = false;
   let dropdownHandle: DropdownHandle | null = null;
   let touchTimeout: ReturnType<typeof setTimeout> | undefined;
   let releaseOpen: (() => void) | null = null;
@@ -446,6 +453,12 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     dropdownHandle?.update();
   };
 
+  const pick = (value: string): void => {
+    model.value = [...model.value, value];
+    inputValue.value = '';
+    filterChoices();
+  };
+
   const processInputValue = (): void => {
     const value =
       (options.trim ?? true) ? inputValue.value.trim().replace(/\s+/g, ' ') : inputValue.value;
@@ -458,8 +471,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
         if ((options.enforceUniqueItems ?? true) && model.value.includes(value)) {
           inputValue.value = '';
         } else if (maxItems === false || model.value.length < maxItems) {
-          model.value = [...model.value, highlighted];
-          filterChoices();
+          pick(highlighted);
         }
       }
     } else if (!value || ((options.enforceUniqueItems ?? true) && model.value.includes(value))) {
@@ -573,7 +585,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     class: 'ohne-chips-input',
     onFocus: () => {
       isFocused.value = true;
-      isDropdownVisible.value = true;
+      isDropdownVisible.value = !quietFocus;
       highlightedIndex.value = 0;
     },
     onBlur: () => {
@@ -584,13 +596,21 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     },
     onInput: () => {
       inputValue.value = input.value;
+      isDropdownVisible.value = true;
     },
     onKeydown: (event: KeyboardEvent) => {
+      if (inputValue.value !== '' && isHistoryHotkey(event)) {
+        event.stopPropagation();
+        return;
+      }
       if (backspaceIndex.value !== null && event.code !== 'Backspace') {
         removeIndex.value = null;
         backspaceIndex.value = null;
       }
-      if (event.key === 'ArrowDown') {
+      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !isDropdownVisible.value) {
+        event.preventDefault();
+        isDropdownVisible.value = true;
+      } else if (event.key === 'ArrowDown') {
         event.preventDefault();
         focusNextChoice();
       } else if (event.key === 'ArrowUp') {
@@ -611,9 +631,9 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
         }
       } else if (event.key === 'Enter') {
         processInputValue();
-      } else if (event.key === 'Escape') {
+      } else if (event.key === 'Escape' && isDropdownVisible.value && choicesOf) {
         event.stopPropagation();
-        input.blur();
+        isDropdownVisible.value = false;
       } else if (event.key === 'Tab') {
         input.blur();
       }
@@ -651,8 +671,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
                 // Mousedown, so the text input never loses focus.
                 onMousedown: (event: MouseEvent) => {
                   event.preventDefault();
-                  model.value = [...model.value, choice().value];
-                  filterChoices();
+                  pick(choice().value);
                 },
                 onMouseenter: () => {
                   if (pointerEvents.value) highlightedIndex.value = index();
@@ -770,6 +789,11 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
                         model.value = model.value.filter((_, i) => i !== at);
                         filterChoices();
                         removeIndex.value = null;
+                        refocusAfterRemoval(root, '.ohne-chips-remove', at, () => {
+                          quietFocus = true;
+                          input.focus({ preventScroll: true });
+                          quietFocus = false;
+                        });
                       },
                       onFocus: () => {
                         removeIndex.value = index();

@@ -68,11 +68,11 @@ export const linkType: FieldType<LinkFieldOptions> = {
     const invalid = ref('');
 
     const error = (): string => routed.value || invalid.value;
-    const change = (next: Link | null): void => {
+    const change = (next: Link | null, discrete = true): void => {
       current.value = next;
       touched.value = true;
       routed.value = '';
-      onInput();
+      onInput(discrete);
     };
 
     let target: Child;
@@ -80,7 +80,7 @@ export const linkType: FieldType<LinkFieldOptions> = {
     let address: AddressInput | undefined;
 
     if (declared.length === 0) {
-      address = addressInput(current, change, invalid, off);
+      address = addressInput(current, (next) => change(next, false), invalid, off);
       describeControl(address.input, field, path, error);
       target = address.element;
       focusTarget = () => address?.input.focus();
@@ -186,6 +186,13 @@ export const linkType: FieldType<LinkFieldOptions> = {
         current.value = stored();
         touched.value = false;
         routed.value = '';
+        address?.sync();
+      },
+      restore(value) {
+        current.value = isLink(value) ? normalizeLink(value) : null;
+        touched.value = !isUndefined(value);
+        routed.value = '';
+        invalid.value = '';
         address?.sync();
       },
     };

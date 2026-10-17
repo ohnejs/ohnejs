@@ -46,7 +46,11 @@ export function insert(parent: Node, getter: () => Child): void {
     // Untracked, so a ref read by an outgoing cleanup does not subscribe this region effect.
     untracked(() => scope?.dispose());
     scope = effectScope();
-    scope.run(() => patch(start, end, getter()));
+    scope.run(() => {
+      const value = getter();
+      // A removed focused node fires `blur` at once, so the patch must not subscribe to what a handler reads.
+      untracked(() => patch(start, end, value));
+    });
   });
 }
 

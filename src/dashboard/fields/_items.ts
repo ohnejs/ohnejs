@@ -1,9 +1,49 @@
 import type { DashboardBlock, DashboardField } from '../runtime/meta-types.ts';
 
 import { isArray } from '../../utils/is/is-array.ts';
+import { isNumber } from '../../utils/is/is-number.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+
+// Shared across every list control, so a cross-structure drop never lands a colliding key.
+let nextItemKey = 0;
+
+/**
+ * The item's `UUID`, which a fresh or copied item lacks.
+ */
+export function uuidOf(item: Readonly<Record<string, unknown>> | undefined): string | undefined {
+  return isString(item?.UUID) ? item.UUID : undefined;
+}
+
+/**
+ * The client key a drafted item carries as `$key`, or `undefined` for one from the server.
+ * A list entry without a `UUID` drafts its key, so an undo state finds the entry again wherever it moved.
+ * The key never reaches the wire: `read` leaves it out, as it leaves the entry key out.
+ */
+export function keyOf(item: Readonly<Record<string, unknown>> | undefined): number | undefined {
+  return isNumber(item?.$key) ? item.$key : undefined;
+}
+
+/**
+ * What tells an item apart in its list: its `UUID`, else the client key it carries.
+ */
+export function identityOf(
+  item: Readonly<Record<string, unknown>> | undefined,
+): string | number | undefined {
+  return uuidOf(item) ?? keyOf(item);
+}
+
+/**
+ * The key a new list entry takes: the one `item` carries, else a fresh one.
+ * A carried key moves the counter past itself, so no entry built later collides with it.
+ */
+export function entryKey(item?: Readonly<Record<string, unknown>>): number {
+  const carried = keyOf(item);
+  if (isUndefined(carried)) return (nextItemKey += 1);
+  nextItemKey = Math.max(nextItemKey, carried);
+  return carried;
+}
 
 /**
  * The block type `name` describes, or `undefined` when the discovery read does not list it.

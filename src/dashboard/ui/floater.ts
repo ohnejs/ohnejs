@@ -204,6 +204,11 @@ css`
     transition-property: opacity, visibility, transform;
   }
 
+  /* Visible at once on open, so focus can land inside before the fade-in ends. */
+  .ohne-floater-visible .ohne-floater-container {
+    transition-property: opacity, transform;
+  }
+
   .ohne-floater:not(.ohne-floater-visible) .ohne-floater-container {
     opacity: 0;
     visibility: hidden;

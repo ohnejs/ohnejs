@@ -5,6 +5,7 @@ import { isInteger } from '../../../utils/is/is-integer.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
+import { clamp } from '../../../utils/number/clamp.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { checkRange } from '../../../utils/validate/check-range.ts';
 import { h } from '../../render/h.ts';
@@ -22,7 +23,7 @@ import { parseIntegerValue } from '../parse.ts';
  * The editor and control take any decimal notation of a safe integer, like `1e3`, and refuse fractions.
  * An emptied editor or control writes `null` on a nullable field; a non-nullable one omits.
  * The control validates on blur and on read, and steps by 1 on the arrow keys, by 10 with Shift.
- * A changed value is checked against `min` and `max`, with the server's messages.
+ * The arrows stop at `min` and `max`; a changed value is checked against them, with the server's messages.
  */
 export const integerType: FieldType<NumberFieldOptions> = {
   display({ value }) {
@@ -75,7 +76,8 @@ export const integerType: FieldType<NumberFieldOptions> = {
       if (!isInteger(parsed.value)) return;
       event.preventDefault();
       const step = (event.shiftKey ? 10 : 1) * (event.key === 'ArrowUp' ? 1 : -1);
-      raw.value = String(parsed.value + step);
+      const { min = -Infinity, max = Infinity } = field.options ?? {};
+      raw.value = String(clamp(parsed.value + step, min, max));
       touch();
     });
     describeControl(input, field, path, error);
@@ -84,6 +86,11 @@ export const integerType: FieldType<NumberFieldOptions> = {
       if (isUndefined(base.value)) return raw.value.trim() !== '';
       const parsed = parseIntegerValue(field, raw.value);
       return !isUndefined(parsed.error) || parsed.value !== base.value;
+    };
+    const show = (value: unknown): void => {
+      raw.value = isNullish(value) ? '' : String(value as string | number);
+      local.value = '';
+      routed.value = '';
     };
 
     return {
@@ -100,6 +107,11 @@ export const integerType: FieldType<NumberFieldOptions> = {
             : undefined,
         );
       },
+      draft() {
+        if (isUndefined(base.value) && raw.value.trim() === '') return undefined;
+        const parsed = parseIntegerValue(field, raw.value);
+        return isUndefined(parsed.error) ? parsed.value : raw.value;
+      },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         for (const [key, message] of Object.entries(errors)) {
@@ -113,14 +125,13 @@ export const integerType: FieldType<NumberFieldOptions> = {
         input.focus();
       },
       revert() {
-        raw.value = isNullish(base.value) ? '' : String(base.value as number);
-        local.value = '';
-        routed.value = '';
+        show(base.value);
       },
       rebase(value) {
         base.value = value;
         routed.value = '';
       },
+      restore: show,
     };
   },
   filter: {

@@ -70,13 +70,13 @@ export function isClipboardData(value: unknown): value is ClipboardData {
 }
 
 /**
- * A deep copy of a wire value with every `UUID` key removed, at every depth.
- * Copies, duplicates, and cross-structure transfers shed row identity through it.
+ * A deep copy of a drafted value with every `UUID` and every client `$key` removed, at every depth.
+ * Copies, duplicates, and cross-structure transfers shed item identity through it.
  * A pasted or duplicated item therefore inserts as a new row instead of claiming an existing one.
- * `UUID` never names a regular field, since forms reserve it for row identity.
+ * Neither name ever belongs to a regular field, since forms reserve both for item identity.
  */
-export function stripUUIDs(value: unknown): unknown {
-  return deepOmit(value, ['UUID']);
+export function stripIdentities(value: unknown): unknown {
+  return deepOmit(value, ['UUID', '$key']);
 }
 
 /**

@@ -104,6 +104,12 @@ export const textType: FieldType<TextFieldOptions> = {
       if (isUndefined(base.value)) return raw.value !== '';
       return wire() !== (isNull(base.value) ? null : String(base.value as string));
     };
+    const draft = (): unknown => (isUndefined(base.value) && raw.value === '' ? undefined : wire());
+    const show = (value: unknown): void => {
+      raw.value = isNullish(value) ? '' : String(value as string);
+      multiline.value ||= raw.value.includes('\n');
+      routed.value = '';
+    };
 
     return {
       element: h(
@@ -112,13 +118,14 @@ export const textType: FieldType<TextFieldOptions> = {
         when(() => multiline.value, multiLine, singleLine),
       ),
       read() {
-        if (isUndefined(base.value) && raw.value === '') return {};
-        const value = wire();
+        const value = draft();
+        if (isUndefined(value)) return {};
         return checkedReading(
           value,
           isString(value) && dirty() ? checkText(value, field.options) : undefined,
         );
       },
+      draft,
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         for (const [key, message] of Object.entries(errors)) {
@@ -132,13 +139,13 @@ export const textType: FieldType<TextFieldOptions> = {
         element?.focus();
       },
       revert() {
-        raw.value = isNullish(base.value) ? '' : String(base.value as string);
-        routed.value = '';
+        show(base.value);
       },
       rebase(value) {
         base.value = value;
         routed.value = '';
       },
+      restore: show,
     };
   },
   filter: {

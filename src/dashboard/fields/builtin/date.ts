@@ -93,7 +93,7 @@ export const dateType: FieldType<DateFieldOptions> = {
         stamp.value = next;
         touched.value = true;
         routed.value = '';
-        onInput();
+        onInput(true);
       },
     };
 
@@ -151,6 +151,11 @@ export const dateType: FieldType<DateFieldOptions> = {
         base = value;
         stamp.value = storedTimestamp(value);
         touched.value = false;
+        routed.value = '';
+      },
+      restore(value) {
+        stamp.value = storedTimestamp(value);
+        touched.value = !isUndefined(value);
         routed.value = '';
       },
     };

@@ -23,6 +23,7 @@ export type {
   FieldEditorContext,
   FieldFilter,
   FieldFilterContext,
+  FieldFolds,
   FieldType,
 } from './fields/field-type.ts';
 export { filterFromWhere, filterKey, filterToWhere } from './fields/filter.ts';
@@ -205,6 +206,8 @@ export { checkbox } from './ui/checkbox.ts';
 export type { CheckboxOptions } from './ui/checkbox.ts';
 export { chips } from './ui/chips.ts';
 export type { ChipsChoice, ChipsOptions } from './ui/chips.ts';
+export { codeEditor } from './ui/code-editor.ts';
+export type { CodeEditorOptions } from './ui/code-editor.ts';
 export { colorInput } from './ui/color-input.ts';
 export type { ColorInputLabels, ColorInputOptions } from './ui/color-input.ts';
 export { colorMode, resolvedColorMode, setColorMode } from './ui/color-mode.ts';

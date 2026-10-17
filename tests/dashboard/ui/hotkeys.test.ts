@@ -6,6 +6,9 @@ import {
   hotkeyLabels,
   matchHotkey,
 } from '../../../src/dashboard/ui/hotkey-match.ts';
+import '../_fake-dom.ts';
+
+const { isHistoryHotkey, isMac } = await import('../../../src/dashboard/ui/hotkeys.ts');
 
 function stroke(
   key: string,
@@ -57,7 +60,7 @@ describe('hotkey matching', () => {
     strictEqual(matchHotkey(stroke('z', { meta: true, shift: true }), mac), 'redo');
     strictEqual(matchHotkey(stroke('y', { meta: true }), mac), 'redo');
     strictEqual(matchHotkey(stroke('z', { ctrl: true }), win), 'undo');
-    strictEqual(matchHotkey(stroke('z', { ctrl: true, shift: true }), win), null);
+    strictEqual(matchHotkey(stroke('z', { ctrl: true, shift: true }), win), 'redo');
     strictEqual(matchHotkey(stroke('y', { ctrl: true }), win), 'redo');
     strictEqual(matchHotkey(stroke('y', { ctrl: true, shift: true }), win), null);
   });
@@ -156,5 +159,22 @@ describe('hotkeys while typing', () => {
     strictEqual(matchHotkey(stroke('a', { ctrl: true }), allowed), null);
     strictEqual(matchHotkey(stroke('Backspace'), allowed), null);
     strictEqual(matchHotkey(stroke('z', { ctrl: true }), { ...allowed, disabled: true }), null);
+  });
+});
+
+describe('isHistoryHotkey', () => {
+  const keydown = (key: string, shift = false): KeyboardEvent => {
+    const mac = isMac();
+    return { key, ctrlKey: !mac, metaKey: mac, altKey: false, shiftKey: shift } as KeyboardEvent;
+  };
+
+  it('answers the platform undo and redo, even while typing', () => {
+    strictEqual(isHistoryHotkey(keydown('z')), true);
+    strictEqual(isHistoryHotkey(keydown('z', true)), true);
+  });
+
+  it('ignores every other stroke', () => {
+    strictEqual(isHistoryHotkey(keydown('s')), false);
+    strictEqual(isHistoryHotkey({ ...keydown('z'), ctrlKey: false, metaKey: false }), false);
   });
 });

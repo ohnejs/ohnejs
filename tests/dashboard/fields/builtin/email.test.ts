@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import type { DashboardField } from '../../../../src/dashboard/runtime/meta-types.ts';
 
+import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
 import { ref } from '../../../../src/utils/reactive/ref.ts';
 import { type FakeElement, findElement, hasClass } from '../../_fake-dom.ts';
@@ -36,12 +37,12 @@ function control(initial: unknown = 'thrall@orgrimmar.example', nullable = false
   })!;
 }
 
-const hrefOf = (root: unknown) =>
-  (
-    findElement(root as FakeElement, (element) => element.getAttribute('href') !== null) as
-      | FakeElement
-      | undefined
-  )?.getAttribute('href');
+const linkOf = (root: unknown) =>
+  findElement(root as FakeElement, (element) => element.getAttribute('href') !== null) as
+    | FakeElement
+    | undefined;
+
+const hrefOf = (root: unknown) => linkOf(root)?.getAttribute('href');
 
 describe('emailType control', () => {
   it('writes the stored form and checks it with the server rule', () => {
@@ -51,6 +52,35 @@ describe('emailType control', () => {
       deepStrictEqual(inbox.read(), { value: 'jaina@dalaran.example' });
       type(inputOf(inbox.element), 'jaina');
       deepStrictEqual(inbox.read(), { errors: { '': 'validation.invalidEmail' } });
+    });
+  });
+
+  it('drafts the text as typed, valid or not, while `read` writes the stored form', () => {
+    effectScope().run(() => {
+      const inbox = control();
+      type(inputOf(inbox.element), 'Thrall@Orgrimmar.Example');
+      strictEqual(inbox.draft?.(), 'Thrall@Orgrimmar.Example');
+      deepStrictEqual(inbox.read(), { value: 'thrall@orgrimmar.example' });
+      type(inputOf(inbox.element), 'jaina');
+      strictEqual(inbox.draft?.(), 'jaina');
+      deepStrictEqual(inbox.read(), { errors: { '': 'validation.invalidEmail' } });
+    });
+  });
+
+  it('drafts nothing for a pristine control over none, and `null` for an emptied nullable one', () => {
+    effectScope().run(() => {
+      const fresh = emailType.control!({
+        field: field(),
+        initial: undefined,
+        mode: 'create',
+        path: 'inbox',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      strictEqual(fresh.draft?.(), undefined);
+      const inbox = control('thrall@orgrimmar.example', true);
+      type(inputOf(inbox.element), '  ');
+      strictEqual(inbox.draft?.(), null);
     });
   });
 
@@ -89,12 +119,20 @@ describe('emailType control', () => {
     });
   });
 
-  it('offers an encoded `mailto:` only for a valid address', () => {
+  it('keeps one button mounted, encoded `mailto:` while valid and disabled while not', () => {
     effectScope().run(() => {
       const inbox = control('a?b@x.example');
-      strictEqual(hrefOf(inbox.element), 'mailto:a%3Fb@x.example');
+      const link = linkOf(inbox.element) as FakeElement;
+      strictEqual(link.getAttribute('href'), 'mailto:a%3Fb@x.example');
+      strictEqual(link.getAttribute('aria-disabled'), null);
       type(inputOf(inbox.element), 'nope');
-      strictEqual(hrefOf(inbox.element), undefined);
+      strictEqual(linkOf(inbox.element), link);
+      strictEqual(link.getAttribute('href'), '');
+      strictEqual(link.getAttribute('aria-disabled'), 'true');
+      type(inputOf(inbox.element), 'ok@x.example');
+      strictEqual(linkOf(inbox.element), link);
+      strictEqual(link.getAttribute('href'), 'mailto:ok@x.example');
+      strictEqual(link.getAttribute('aria-disabled'), null);
     });
   });
 });
@@ -111,6 +149,24 @@ describe('emailType display', () => {
       strictEqual(cell.tagName, 'SPAN');
       strictEqual(cell.getAttribute('title'), 'thrall@orgrimmar.example');
       strictEqual(hrefOf(cell), undefined);
+    });
+  });
+
+  it('restores the text as typed into its input, dirty against the stored value', () => {
+    effectScope().run(() => {
+      const inbox = control();
+      const input = inputOf(inbox.element);
+      inbox.restore?.('Jaina@Dalaran.Example');
+      flush();
+      strictEqual(inputOf(inbox.element), input);
+      strictEqual((input as unknown as { value: string }).value, 'Jaina@Dalaran.Example');
+      strictEqual(inbox.draft?.(), 'Jaina@Dalaran.Example');
+      deepStrictEqual(inbox.read(), { value: 'jaina@dalaran.example' });
+      strictEqual(inbox.dirty(), true);
+      inbox.restore?.('bob@');
+      deepStrictEqual(inbox.read(), { errors: { '': 'validation.invalidEmail' } });
+      inbox.restore?.('thrall@orgrimmar.example');
+      strictEqual(inbox.dirty(), false);
     });
   });
 });

@@ -5,6 +5,7 @@ import {
   type ZonedDate,
   addZonedMonths,
   addZonedYears,
+  calendarKeyTarget,
   clampZoned,
   daysInMonth,
   parseDateInput,
@@ -381,5 +382,31 @@ describe('timezones', () => {
     strictEqual(timezones.includes('Europe/Berlin'), true);
     strictEqual(timezones.includes('UTC'), true);
     strictEqual(timezones.includes('America/New_York'), true);
+  });
+});
+
+describe('calendarKeyTarget', () => {
+  const jan31 = zonedFromWallClock('UTC', 2024, 1, 31);
+  const wall = (date: ZonedDate | undefined): string =>
+    date ? `${date.year}-${date.month}-${date.day}` : 'none';
+
+  it('steps a day on Left and Right, rolling into the adjacent month', () => {
+    strictEqual(wall(calendarKeyTarget(jan31, 'ArrowRight', false)), '2024-2-1');
+    strictEqual(wall(calendarKeyTarget(jan31, 'ArrowLeft', false)), '2024-1-30');
+  });
+
+  it('steps a week on Up and Down', () => {
+    strictEqual(wall(calendarKeyTarget(jan31, 'ArrowDown', false)), '2024-2-7');
+    strictEqual(wall(calendarKeyTarget(jan31, 'ArrowUp', false)), '2024-1-24');
+  });
+
+  it('steps a month on the page keys, a year with Shift, clamping the day', () => {
+    strictEqual(wall(calendarKeyTarget(jan31, 'PageDown', false)), '2024-2-29');
+    strictEqual(wall(calendarKeyTarget(jan31, 'PageUp', false)), '2023-12-31');
+    strictEqual(wall(calendarKeyTarget(jan31, 'PageDown', true)), '2025-1-31');
+  });
+
+  it('ignores a key the grid does not take', () => {
+    strictEqual(calendarKeyTarget(jan31, 'Enter', false), undefined);
   });
 });

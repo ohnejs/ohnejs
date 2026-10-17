@@ -31,7 +31,7 @@ import { targetOf } from '../_search.ts';
 import { cellEditor } from '../cell-editor.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
-import { fallbackLabel, joinLabel, labelOf, seedLabel } from '../labels.ts';
+import { fallbackLabel, joinLabel, knownLabel, labelOf, seedLabel } from '../labels.ts';
 import { pickerTrigger } from '../record-picker.ts';
 
 const PER_PAGE = 50;
@@ -71,6 +71,7 @@ export interface RecordChoiceSource {
  * Creates a `RecordChoiceSource` over `target`, labeling and searching by its `labelFields`.
  * The fetcher is the collections query `POST`, paged by `page`/`perPage` and ordered by the label parts.
  * Resolved choices are kept in a per-source cache, so re-resolving linked values never refetches.
+ * A label the shared label cache already knows answers at once, so a rebuilt control never flashes empty.
  */
 export function recordChoiceSource(target: DashboardCollection): RecordChoiceSource {
   const names = target.labelFields;
@@ -84,6 +85,13 @@ export function recordChoiceSource(target: DashboardCollection): RecordChoiceSou
     const choice = { value: uuid, label: resolved };
     cache.set(uuid, choice);
     return choice;
+  };
+
+  const known = (uuid: string): DynamicSelectChoice | undefined => {
+    const kept = cache.get(uuid);
+    if (!isUndefined(kept)) return kept;
+    const label = knownLabel(target.name, uuid);
+    return isUndefined(label) ? undefined : { value: uuid, label };
   };
 
   const notFound = (uuid: string): DynamicSelectChoice => ({
@@ -141,19 +149,19 @@ export function recordChoiceSource(target: DashboardCollection): RecordChoiceSou
       }
     },
     async choiceOf(uuid) {
-      const kept = cache.get(uuid);
+      const kept = known(uuid);
       if (!isUndefined(kept)) return kept;
       const rows = await query({ where: { UUID: uuid }, limit: 1 });
       const row = rows?.[0];
       return isUndefined(row) ? notFound(uuid) : keep(row);
     },
     async choicesOf(uuids) {
-      const unseen = uuids.filter((uuid) => !cache.has(uuid));
+      const unseen = uuids.filter((uuid) => isUndefined(known(uuid)));
       if (!isEmpty(unseen)) {
         const rows = await query({ where: { UUID: { in: unseen } }, limit: unseen.length });
         for (const row of rows ?? []) keep(row);
       }
-      return uuids.map((uuid) => cache.get(uuid) ?? notFound(uuid));
+      return uuids.map((uuid) => known(uuid) ?? notFound(uuid));
     },
     async missing(uuids) {
       const unseen = uuids.filter((uuid) => !cache.has(uuid));
@@ -227,10 +235,10 @@ export const recordType: FieldType<RecordFieldOptions> = {
 
     const baseUUID = (): string | null => (isString(base) ? base : null);
     const current = (): string | null => (isString(model.value) ? model.value : null);
-    const change = (): void => {
+    const change = (discrete: boolean): void => {
       touched.value = true;
       routed.value = '';
-      context.onInput();
+      context.onInput(discrete);
     };
 
     let element: Child;
@@ -238,7 +246,14 @@ export const recordType: FieldType<RecordFieldOptions> = {
     let sync: (() => void) | undefined;
 
     if (isUndefined(target) || isEmpty(target.labelFields)) {
-      const fallback = fallbackInput(context, model, current, change, () => routed.value, off);
+      const fallback = fallbackInput(
+        context,
+        model,
+        current,
+        () => change(false),
+        () => routed.value,
+        off,
+      );
       element = fallback.element;
       focusControl = fallback.focus;
       sync = fallback.sync;
@@ -255,7 +270,7 @@ export const recordType: FieldType<RecordFieldOptions> = {
         // `onCommit` runs before the select writes the model; writing here lets the history push see it.
         onCommit: (value) => {
           model.value = isString(value) ? value : null;
-          change();
+          change(true);
         },
       });
       const combobox = select.querySelector<HTMLElement>('[role="combobox"]');
@@ -273,7 +288,7 @@ export const recordType: FieldType<RecordFieldOptions> = {
         disabled: off ? (): boolean => true : undefined,
         onApply: (uuids) => {
           model.value = uuids[0] ?? null;
-          change();
+          change(true);
         },
       });
       const updatable = ref<ReadonlySet<string>>(new Set());
@@ -304,7 +319,7 @@ export const recordType: FieldType<RecordFieldOptions> = {
           disabled: off ? (): boolean => true : undefined,
           onClick: () => {
             model.value = null;
-            change();
+            change(true);
           },
         });
         return [open, clear];
@@ -339,6 +354,12 @@ export const recordType: FieldType<RecordFieldOptions> = {
         base = value;
         model.value = baseUUID();
         touched.value = false;
+        routed.value = '';
+        sync?.();
+      },
+      restore(value) {
+        model.value = isString(value) ? value : null;
+        touched.value = !isUndefined(value);
         routed.value = '';
         sync?.();
       },

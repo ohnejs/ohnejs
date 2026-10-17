@@ -8,6 +8,7 @@ import { isPlainObject } from '../../../utils/is/is-plain-object.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { effectScope } from '../../../utils/reactive/effect-scope.ts';
 import { effect } from '../../../utils/reactive/effect.ts';
+import { nextTick } from '../../../utils/reactive/next-tick.ts';
 import { type Ref, ref } from '../../../utils/reactive/ref.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
@@ -18,7 +19,8 @@ import { blocksOf } from '../_blocks.ts';
 import { itemFormSupports } from '../_items.ts';
 import { summaryParts, summarySpan, summaryTitle } from '../_summary.ts';
 import { createFieldForm } from '../field-form.ts';
-import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
+import { describeControl } from '../field-row.ts';
+import { controlIDs, dimMark, type FieldType, registerFieldType } from '../field-type.ts';
 
 css`
   /* Floated so the header's ellipsis trims the label text rather than the mark. */
@@ -68,6 +70,10 @@ css`
  * The card header carries the field label and the row's marks.
  * A non-nullable child always renders its subform.
  * A nullable child toggles through the header switch, which keeps the discarded values for re-enable.
+ * The switch is the field's input, named by the field label.
+ * An undo that brings the subform back therefore leaves the switch focused.
+ * One that drops the subform while focus is inside it hands the focus to the switch.
+ * A subform the switch or an undo drops hands its folds to the one built in its place.
  * An object-level error paints the card border destructive, with the message under the card.
  * The child writes whole with the record's one save.
  */
@@ -100,8 +106,15 @@ export const objectType: FieldType<ObjectFieldOptions> = {
     const baseObject = (): Record<string, unknown> | undefined =>
       isPlainObject<Record<string, unknown>>(base) ? base : undefined;
 
-    const formOf = (item: Readonly<Record<string, unknown>> | undefined): FieldForm =>
-      owner.run(() =>
+    // `seed` is the object the current form was built from; identity with the base marks it pristine.
+    let seed: Record<string, unknown> | undefined;
+    let stash: Record<string, unknown> | undefined;
+    // The folds of the last form dropped, so the one built in its place opens the same items.
+    let folds = context.folds;
+
+    const buildForm = (item: Record<string, unknown> | undefined): FieldForm => {
+      seed = item;
+      return owner.run(() =>
         createFieldForm(subfields, item, {
           mode: context.mode,
           path: context.path,
@@ -109,17 +122,10 @@ export const objectType: FieldType<ObjectFieldOptions> = {
           layout: context.field.layout,
           language: context.language,
           ancestors: context.ancestors,
+          folds,
           onInput: context.onInput,
         }),
       );
-
-    // `seed` is the object the current form was built from; identity with the base marks it pristine.
-    let seed: Record<string, unknown> | undefined;
-    let stash: Record<string, unknown> | undefined;
-
-    const buildForm = (item: Record<string, unknown> | undefined): FieldForm => {
-      seed = item;
-      return formOf(item);
     };
     const { field } = context;
     const baseForm = (): FieldForm | null => {
@@ -133,12 +139,18 @@ export const objectType: FieldType<ObjectFieldOptions> = {
     const touched = ref(false);
     const routed = ref('');
 
+    const drop = (form: FieldForm | null): void => {
+      if (isNull(form)) return;
+      folds = form.folds();
+      form.dispose();
+    };
+
     const setForm = (next: FieldForm | null): void => {
-      entry.value?.dispose();
+      drop(entry.value);
       entry.value = next;
       touched.value = true;
       routed.value = '';
-      context.onInput();
+      context.onInput(true);
     };
 
     const toggleModel: Ref<boolean> = {
@@ -154,69 +166,81 @@ export const objectType: FieldType<ObjectFieldOptions> = {
         }
         // A pristine base form stashes the base itself, so toggling back reads clean.
         const pristine = seed === baseObject() && !isUndefined(seed) && !form.dirty();
-        stash = pristine ? baseObject() : form.snapshot();
+        stash = pristine ? baseObject() : form.draft();
         seed = undefined;
         setForm(null);
       },
     };
 
-    const label = (): HTMLElement =>
-      h(
-        'span',
-        {
-          class: `ohne-block ohne-medium ohne-truncate${
-            field.required ? ' ohne-object-required' : ''
-          }`,
-        },
-        () => translateMessage(field.label),
-      );
+    const label = h(
+      'span',
+      {
+        id: controlIDs(context.path).label,
+        class: `ohne-block ohne-medium ohne-truncate${
+          field.required ? ' ohne-object-required' : ''
+        }`,
+      },
+      () => translateMessage(field.label),
+    );
 
-    // Built once and re-parented across card rebuilds, so a click never unmounts the focused knob.
     const toggle = field.nullable
       ? switchInput(toggleModel, undefined, { disabled: off ? (): boolean => true : undefined })
       : null;
-    if (!isNull(toggle)) {
+    const knob = toggle?.querySelector('button') ?? null;
+    if (!isNull(toggle) && !isNull(knob)) {
       toggle.classList.add('ohne-object-toggle');
-      const knob = toggle.querySelector('button') as HTMLElement;
+      describeControl(knob, field, context.path, () => routed.value);
       effect(() => {
-        const caption = t(isNull(entry.value) ? 'dashboard.enable' : 'dashboard.disable');
-        knob.title = caption;
-        knob.setAttribute('aria-label', caption);
+        knob.title = t(isNull(entry.value) ? 'dashboard.enable' : 'dashboard.disable');
       });
     }
 
-    // Built once like the toggle, so a card rebuild keeps the marks and their tooltips.
     const marks = h('span', { class: 'ohne-object-marks' });
 
-    const header = (): Child => h('div', { class: 'ohne-object-header' }, label(), marks, toggle);
-
+    // The body alone follows the toggle, so the header keeps the focused knob mounted through a click.
+    const body = (): Child => {
+      const form = entry.value;
+      if (isNull(form)) return null;
+      if (subfields.length === 0) {
+        return h('span', { class: 'ohne-muted' }, () => t('dashboard.noFieldsToDisplay'));
+      }
+      return form.render();
+    };
     const element = h(
       'div',
       { class: () => `ohne-object${routed.value === '' ? '' : ' ohne-object-has-error'}` },
-      () => {
-        const form = entry.value;
-        return card(
-          isNull(form)
-            ? undefined
-            : subfields.length === 0
-              ? h('span', { class: 'ohne-muted' }, () => t('dashboard.noFieldsToDisplay'))
-              : form.render(),
-          { header: header() },
-        );
-      },
+      card(body, { header: h('div', { class: 'ohne-object-header' }, label, marks, toggle) }),
     );
+    // The dropped subform unmounts on the flush, so the hand-off waits until focus has really left.
+    const keepFocus = (write: () => void): void => {
+      const inside = element.contains(document.activeElement);
+      write();
+      if (!inside || isNull(knob)) return;
+      void nextTick().then(() => {
+        if (!element.contains(document.activeElement)) knob.focus();
+      });
+    };
+
+    // The form a reading covers: `undefined` for a pristine control over none, `null` when toggled off.
+    const live = (): FieldForm | null | undefined => {
+      const form = entry.value;
+      if (isNull(form)) return !touched.value && isUndefined(base) ? undefined : null;
+      if (field.nullable && !touched.value && isUndefined(base) && !form.dirty()) return undefined;
+      return form;
+    };
 
     return {
       element,
       marks,
       read() {
-        const form = entry.value;
-        if (isNull(form)) {
-          if (!touched.value && isUndefined(base)) return {};
-          return { value: null };
-        }
-        if (field.nullable && !touched.value && isUndefined(base) && !form.dirty()) return {};
-        return form.read();
+        const form = live();
+        if (isUndefined(form)) return {};
+        return isNull(form) ? { value: null } : form.read();
+      },
+      draft() {
+        const form = live();
+        if (isUndefined(form)) return undefined;
+        return isNull(form) ? null : form.draft();
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -227,6 +251,7 @@ export const objectType: FieldType<ObjectFieldOptions> = {
       },
       error: () => routed.value,
       errored: () => entry.value?.errored() === true,
+      folds: () => entry.value?.folds() ?? {},
       dirty: () => {
         const form = entry.value;
         const stored = baseObject();
@@ -239,7 +264,7 @@ export const objectType: FieldType<ObjectFieldOptions> = {
         if (!isNull(form) && !form.focusError()) form.focus();
       },
       revert() {
-        entry.value?.dispose();
+        drop(entry.value);
         entry.value = baseForm();
         stash = undefined;
         touched.value = false;
@@ -254,11 +279,32 @@ export const objectType: FieldType<ObjectFieldOptions> = {
           form.rebase(value);
           seed = baseObject();
         } else {
-          entry.value?.dispose();
+          drop(form);
           entry.value = baseForm();
         }
         touched.value = false;
         routed.value = '';
+      },
+      restore(value) {
+        stash = undefined;
+        touched.value = !isUndefined(value);
+        routed.value = '';
+        if (!isPlainObject<Record<string, unknown>>(value)) {
+          keepFocus(() => {
+            drop(entry.value);
+            entry.value = isUndefined(value) ? baseForm() : null;
+          });
+          return;
+        }
+        const stored = baseObject();
+        let form = entry.value;
+        // A form over a stash has that stash as its baseline, so only one over the base keeps honest dirt.
+        if (isNull(form) || seed !== stored) {
+          drop(form);
+          form = buildForm(stored);
+          entry.value = form;
+        }
+        form.restore(value);
       },
     };
   },

@@ -64,8 +64,8 @@ export const timeType: FieldType<DateFieldOptions> = {
   },
   control({ field, initial, path, disabled, onInput }) {
     let base = initial;
-    const clock = ref(storedClock(base) ?? 0);
-    const touched = ref(false);
+    const held = ref(initial);
+    const clock = ref(storedClock(initial) ?? 0);
     const routed = ref('');
 
     const error = (): string => routed.value;
@@ -75,7 +75,7 @@ export const timeType: FieldType<DateFieldOptions> = {
       },
       set value(next) {
         clock.value = next;
-        touched.value = true;
+        held.value = clockValue(next);
         routed.value = '';
         onInput();
       },
@@ -91,15 +91,19 @@ export const timeType: FieldType<DateFieldOptions> = {
     describeControl(input, field, path, error);
 
     const wire = (): unknown => {
-      if (touched.value) return clockValue(clock.value);
-      return isNullish(base) ? (field.nullable ? null : clockValue(clock.value)) : base;
+      if (isNullish(held.value)) return field.nullable ? null : clockValue(clock.value);
+      return held.value;
+    };
+    const show = (value: unknown): void => {
+      held.value = value;
+      clock.value = storedClock(value) ?? 0;
+      routed.value = '';
     };
 
     return {
       element,
       read() {
-        if (!touched.value && isUndefined(base)) return {};
-        return { value: wire() };
+        return isUndefined(held.value) ? {} : { value: wire() };
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
@@ -110,22 +114,19 @@ export const timeType: FieldType<DateFieldOptions> = {
       },
       error,
       dirty() {
-        return touched.value && wire() !== (isUndefined(base) ? undefined : (base ?? null));
+        return !isUndefined(held.value) && held.value !== (base ?? null);
       },
       focus() {
         input.focus();
       },
       revert() {
-        clock.value = storedClock(base) ?? 0;
-        touched.value = false;
-        routed.value = '';
+        show(base);
       },
       rebase(value) {
         base = value;
-        clock.value = storedClock(value) ?? 0;
-        touched.value = false;
-        routed.value = '';
+        show(value);
       },
+      restore: show,
     };
   },
   filter: {

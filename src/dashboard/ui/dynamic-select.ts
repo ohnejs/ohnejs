@@ -18,6 +18,7 @@ import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { type Primitive } from './button-group.ts';
 import { nearestContainer } from './container.ts';
+import { isHistoryHotkey } from './hotkeys.ts';
 import { icon } from './icon.ts';
 import { listenClickOutside } from './overlay.ts';
 import { type ScrollableHandle, scrollable } from './scrollable.ts';
@@ -419,6 +420,7 @@ function labelOf(choice: DynamicSelectChoice<Primitive>): string | undefined {
  * The async single-select combobox.
  *
  * The same in-place overlay as `select`, plus a sticky search input and a 250ms-debounced remote search.
+ * While the search holds a keyword, undo and redo take back that typing, never an app history step.
  * Results paginate on infinite scroll; every open refetches page 1 through `choicesResolver`.
  * The overlay caps at the search row plus 11 choice rows and grows or shrinks with the results.
  * The selected choice resolves asynchronously through `selectedChoiceResolver`.
@@ -513,6 +515,7 @@ export function dynamicSelect<T extends Primitive>(
     mousePaused.value = true;
 
     setTimeout(() => {
+      if (!isExpanded.value) return;
       keywordInput.focus();
       keywordInput.select();
     }, transitionDuration);
@@ -520,6 +523,9 @@ export function dynamicSelect<T extends Primitive>(
 
   const close = (event?: Event): void => {
     if (!isExpanded.value) return;
+    if (combobox.contains(document.activeElement) && document.activeElement !== combobox) {
+      combobox.focus({ preventScroll: true });
+    }
     isExpanded.value = false;
     highlightedChoice.value = undefined;
     stopOutsideClick?.();
@@ -779,6 +785,9 @@ export function dynamicSelect<T extends Primitive>(
     spellcheck: 'false',
     type: 'text',
     class: 'ohne-dynamic-select-keyword-input',
+    onKeydown: (event: KeyboardEvent) => {
+      if (keyword.value !== '' && isHistoryHotkey(event)) event.stopPropagation();
+    },
     onInput: () => {
       keyword.value = keywordInput.value;
       onKeywordInput();
@@ -853,12 +862,12 @@ export function dynamicSelect<T extends Primitive>(
         } else if (event.key === 'Enter') {
           event.preventDefault();
           event.stopPropagation();
-          void selectHighlightedOrClose(event);
-        } else if (event.key === 'Escape') {
+          if (isExpanded.value) void selectHighlightedOrClose(event);
+          else void open(event);
+        } else if (event.key === 'Escape' && isExpanded.value) {
           event.preventDefault();
           event.stopPropagation();
-          if (isExpanded.value) close(event);
-          else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          close(event);
         } else if (event.key === ' ') {
           selectHighlightedOrToggle(event);
         } else if (event.key === 'Tab') {

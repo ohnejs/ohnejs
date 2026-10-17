@@ -62,15 +62,12 @@ export function each<T, K>(
     return { scope, start: rowStart, end: rowEnd, item, index };
   };
 
-  batchedEffect(() => {
-    const list = items();
-    const keys = list.map((value, i) => key(value, i));
+  const patch = (list: readonly T[], keys: K[]): void => {
     const next = new Set(keys);
 
     for (const [k, row] of rows) {
       if (next.has(k)) continue;
-      // Untracked, so a leaving row's cleanups cannot subscribe this region to what they read.
-      untracked(() => row.scope.dispose());
+      row.scope.dispose();
       clearRange(row.start, row.end);
       row.start.remove();
       row.end.remove();
@@ -88,14 +85,21 @@ export function each<T, K>(
       }
     }
 
-    for (const patch of reconcile(order, keys)) {
-      if (patch.op === 'remove') continue;
-      const before = isNull(patch.before) ? end : (rows.get(patch.before) as Row<T>).start;
-      const row = rows.get(patch.key) as Row<T>;
+    for (const step of reconcile(order, keys)) {
+      if (step.op === 'remove') continue;
+      const before = isNull(step.before) ? end : (rows.get(step.before) as Row<T>).start;
+      const row = rows.get(step.key) as Row<T>;
       moveRange(row.start, row.end, before);
     }
 
     order = keys;
+  };
+
+  batchedEffect(() => {
+    const list = items();
+    const keys = list.map((value, i) => key(value, i));
+    // Removing a focused node fires `blur` at once, so the patch must not subscribe to what a handler reads.
+    untracked(() => patch(list, keys));
   });
 
   return fragment;
@@ -103,15 +107,18 @@ export function each<T, K>(
 
 /**
  * Moves the nodes from `start` through `end` in front of `before`, or nothing when `before` is detached.
+ * A row already in the document moves with `moveBefore` where the browser has it, so focus inside it stays.
  */
 function moveRange(start: ChildNode, end: ChildNode, before: ChildNode): void {
   const parent = before.parentNode;
   if (isNull(parent)) return;
+  const preserve = parent.isConnected && start.isConnected && 'moveBefore' in parent;
   let node: ChildNode | null = start;
   while (node) {
     const next: ChildNode | null = node.nextSibling;
     const last = node === end;
-    parent.insertBefore(node, before);
+    if (preserve) parent.moveBefore(node, before);
+    else parent.insertBefore(node, before);
     if (last) break;
     node = next;
   }

@@ -79,6 +79,30 @@ describe('colorType control', () => {
     });
   });
 
+  it('drafts the text as typed, whole or partial, where `read` writes the stored form', () => {
+    effectScope().run(() => {
+      const tint = control();
+      type(byClass(tint.element, 'ohne-input-control'), '#F80');
+      strictEqual(tint.draft?.(), '#F80');
+      deepStrictEqual(tint.read(), { value: '#ff8800' });
+      type(byClass(tint.element, 'ohne-input-control'), '#12');
+      strictEqual(tint.draft?.(), '#12');
+      deepStrictEqual(tint.read(), { errors: { '': 'validation.invalidColor' } });
+      const nullable = control({}, '#336699', true);
+      type(byClass(nullable.element, 'ohne-input-control'), '');
+      strictEqual(nullable.draft?.(), null);
+      const fresh = colorType.control!({
+        field: field(),
+        initial: undefined,
+        mode: 'create',
+        path: 'tint',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      strictEqual(fresh.draft?.(), undefined);
+    });
+  });
+
   it('sets the alpha channel from the opacity input', () => {
     effectScope().run(() => {
       const tint = control({ alpha: true });
@@ -106,6 +130,68 @@ describe('colorType control', () => {
       fire(swatches[0], 'click');
       flush();
       deepStrictEqual(tint.read(), { value: '#ff8800' });
+    });
+  });
+
+  it('names each swatch by the field label and its hex, a labelled control of the field like the input', () => {
+    effectScope().run(() => {
+      const tint = control({ swatches: ['#0070dd', '#a335ee'] });
+      const swatches: FakeElement[] = [];
+      findElement(tint.element as unknown as FakeElement, (element) => {
+        if (hasClass(element, 'ohne-color-swatch')) swatches.push(element);
+        return false;
+      });
+      deepStrictEqual(
+        swatches.map((swatch) => [
+          (swatch as unknown as { id: string }).id,
+          swatch.getAttribute('aria-labelledby'),
+          swatch.getAttribute('aria-label'),
+        ]),
+        [
+          ['field-tint-input-swatch-0', 'field-tint-label field-tint-input-swatch-0', '#0070dd'],
+          ['field-tint-input-swatch-1', 'field-tint-label field-tint-input-swatch-1', '#a335ee'],
+        ],
+      );
+    });
+  });
+
+  it('restores the text as typed into its input, dirty against the stored value', () => {
+    effectScope().run(() => {
+      const tint = control();
+      const input = byClass(tint.element, 'ohne-input-control');
+      tint.restore?.('#F80');
+      flush();
+      strictEqual(byClass(tint.element, 'ohne-input-control'), input);
+      strictEqual((input as unknown as { value: string }).value, '#F80');
+      deepStrictEqual(tint.read(), { value: '#ff8800' });
+      strictEqual(tint.dirty(), true);
+      tint.restore?.('#12');
+      deepStrictEqual(tint.read(), { errors: { '': 'validation.invalidColor' } });
+      tint.restore?.('#336699');
+      strictEqual(tint.dirty(), false);
+    });
+  });
+
+  it('lands a swatch click as a discrete change, and typing as a burst', () => {
+    effectScope().run(() => {
+      const seen: (boolean | undefined)[] = [];
+      const tint = colorType.control!({
+        field: field({ swatches: ['#F80'] }),
+        initial: '#336699',
+        mode: 'edit',
+        path: 'tint',
+        language: () => 'en',
+        onInput: (discrete) => seen.push(discrete),
+      })!;
+      const swatch = byClass(tint.element, 'ohne-color-swatches').childNodes[0] as FakeElement;
+      Object.assign(swatch, {
+        closest: (selector: string) => (selector === '.ohne-color-swatch' ? swatch : null),
+      });
+      // The click reaches the root in the capture phase before the swatch handles it.
+      fire(tint.element as unknown as FakeElement, 'click', { target: swatch });
+      fire(swatch, 'click');
+      type(byClass(tint.element, 'ohne-input-control'), '#123');
+      deepStrictEqual(seen, [true, false]);
     });
   });
 });

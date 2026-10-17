@@ -37,7 +37,7 @@ export interface AddressSpec {
   check(value: string): ValidationFailure | undefined;
 
   /**
-   * Where the control's button leads for `value`, or `undefined` to hide the button.
+   * Where the control's button leads for `value`, or `undefined` to disable the button.
    */
   href(value: string): string | undefined;
 
@@ -61,8 +61,9 @@ export interface AddressSpec {
 /**
  * The field type of a text address such as an email or a web address.
  * The cell is plain text, so a row click still opens the record.
- * The editor and control store the canonical form and check it with the server's rule.
- * A button beside the input opens the address while it is valid.
+ * The editor and control write the canonical form and check it with the server's rule.
+ * The control drafts the text as typed, so an undo step gives back the case and the scheme as entered.
+ * A button beside the input opens the address, disabled while the address is invalid.
  * The filter keeps the text as typed but holds the canonical form, so a typed case variant still matches.
  */
 export function addressType(spec: AddressSpec): FieldType<Record<never, never>> {
@@ -109,35 +110,47 @@ export function addressType(spec: AddressSpec): FieldType<Record<never, never>> 
         disabled: () => disabled === true,
         placeholder: fieldPlaceholder(field),
       });
-      const element = h('div', { class: 'ohne-row' }, input, () => {
-        const href = spec.href(parse(raw.value));
-        if (isUndefined(href)) return null;
-        return button(spec.action, {
+      const href = (): string | undefined => spec.href(parse(raw.value));
+      const element = h(
+        'div',
+        { class: 'ohne-row' },
+        input,
+        button(spec.action, {
           icon: spec.icon,
           iconOnly: true,
           variant: 'outline',
-          href,
+          href: () => href() ?? '',
+          disabled: () => isUndefined(href()),
           target: '_blank',
-        });
-      });
+        }),
+      );
       const control = input.querySelector('input') as HTMLInputElement;
       control.setAttribute('inputmode', spec.inputMode);
       control.setAttribute('autocapitalize', 'off');
       describeControl(control, field, path, error);
 
-      const wire = (): unknown =>
-        raw.value.trim() === '' ? parseTextValue(field, '') : parse(raw.value);
+      const blank = (): boolean => raw.value.trim() === '';
+      const pristine = (): boolean => isUndefined(base.value) && blank();
+      const wire = (): unknown => (blank() ? parseTextValue(field, '') : parse(raw.value));
       const dirty = (): boolean => {
-        if (isUndefined(base.value)) return raw.value.trim() !== '';
+        if (isUndefined(base.value)) return !blank();
         return wire() !== (isNull(base.value) ? null : parse(String(base.value as string)));
+      };
+      const show = (value: unknown): void => {
+        raw.value = isNullish(value) ? '' : String(value as string);
+        routed.value = '';
       };
 
       return {
         element,
         read() {
-          if (isUndefined(base.value) && raw.value.trim() === '') return {};
+          if (pristine()) return {};
           const value = wire();
           return checkedReading(value, isString(value) && dirty() ? spec.check(value) : undefined);
+        },
+        draft() {
+          if (pristine()) return undefined;
+          return blank() ? parseTextValue(field, '') : raw.value;
         },
         setErrors(errors) {
           routed.value = errors[''] ?? '';
@@ -152,13 +165,13 @@ export function addressType(spec: AddressSpec): FieldType<Record<never, never>> 
           control.focus();
         },
         revert() {
-          raw.value = isNullish(base.value) ? '' : String(base.value as string);
-          routed.value = '';
+          show(base.value);
         },
         rebase(value) {
           base.value = value;
           routed.value = '';
         },
+        restore: show,
       };
     },
     filter: {

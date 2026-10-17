@@ -141,6 +141,56 @@ export interface TextFieldOptions {
 }
 
 /**
+ * The options of a `code` field.
+ */
+export interface CodeFieldOptions {
+  /**
+   * Whether the empty string is a legal value.
+   *
+   * @default
+   * false
+   */
+  allowEmpty?: boolean;
+
+  /**
+   * The fewest characters the value may hold.
+   */
+  min?: number;
+
+  /**
+   * The most characters the value may hold.
+   */
+  max?: number;
+
+  /**
+   * The highlighting language, as a name, an alias or a file extension.
+   * `json` also rejects a value that does not parse.
+   */
+  language?: string;
+
+  /**
+   * A sibling field path, in `when` syntax, whose value names the language or a file path.
+   */
+  languageFrom?: string;
+
+  /**
+   * What Tab inserts: that many spaces, or a tab rendered four columns wide.
+   *
+   * @default
+   * 2
+   */
+  indent?: number | 'tab';
+
+  /**
+   * Whether the editor soft-wraps long lines.
+   *
+   * @default
+   * false
+   */
+  wrap?: boolean;
+}
+
+/**
  * The options of a `color` field.
  */
 export interface ColorFieldOptions {
@@ -491,6 +541,11 @@ export interface KnownFieldTypes {
    * A hex color as lowercase `#rrggbb`, or `#rrggbbaa` when the field takes `alpha`.
    */
   color: { options: ColorFieldOptions; value: string };
+
+  /**
+   * Source text with its line endings stored as `\n`.
+   */
+  code: { options: CodeFieldOptions; value: string };
 
   /**
    * An email address, trimmed with its local part and domain lowercased.

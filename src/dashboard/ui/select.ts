@@ -305,7 +305,8 @@ function labelOf(choice: SelectChoice): string | undefined {
  *
  * The choices expand in place: an absolutely positioned overlay grows over the field, capped at 12 rows.
  * It translates upward just enough to fit, clamped to the window or `scrollContainer`.
- * Arrows highlight with clamped ends, Enter selects, Space selects or toggles.
+ * Arrows highlight with clamped ends, Enter opens or selects, Space selects or toggles.
+ * Closing returns focus to the combobox, as a native select does; Escape on a closed one leaves it alone.
  * Tab highlights the first choice while open; typing runs a 750ms-windowed typeahead underlining the match.
  * Hover highlighting pauses after keyboard moves until the mouse really travels again.
  * A trailing hidden input carries `id` and `name` for label linkage and form serialization.
@@ -427,6 +428,9 @@ export function select<T extends Primitive>(
 
   const close = (event?: Event): void => {
     if (!isExpanded.value) return;
+    if (combobox.contains(document.activeElement) && document.activeElement !== combobox) {
+      combobox.focus({ preventScroll: true });
+    }
     isExpanded.value = false;
     highlightedChoice.value = undefined;
     combobox.removeEventListener('keydown', search);
@@ -706,12 +710,12 @@ export function select<T extends Primitive>(
         } else if (event.key === 'Enter') {
           event.preventDefault();
           event.stopPropagation();
-          selectHighlightedOrClose(event);
-        } else if (event.key === 'Escape') {
+          if (isExpanded.value) selectHighlightedOrClose(event);
+          else open(event);
+        } else if (event.key === 'Escape' && isExpanded.value) {
           event.preventDefault();
           event.stopPropagation();
-          if (isExpanded.value) close(event);
-          else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          close(event);
         } else if (event.key === ' ') {
           selectHighlightedOrToggle(event);
         } else if (event.key === 'Tab') {

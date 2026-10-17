@@ -79,7 +79,7 @@ export const recordsType: FieldType<RecordsFieldOptions> = {
         touched.value = true;
         routed.value = '';
         erroredIndices.value = [];
-        context.onInput();
+        context.onInput(true);
       });
     });
     silent = false;
@@ -136,6 +136,9 @@ export const recordsType: FieldType<RecordsFieldOptions> = {
           : undefined;
         return checkedReading(model.value, count);
       },
+      draft() {
+        return !touched.value && isUndefined(context.initial) ? undefined : model.value;
+      },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         const marked: number[] = [];
@@ -162,6 +165,10 @@ export const recordsType: FieldType<RecordsFieldOptions> = {
       rebase(value) {
         base = listOf(value);
         reset(base);
+      },
+      restore(value) {
+        reset(listOf(value));
+        touched.value = !isUndefined(value);
       },
     };
   },

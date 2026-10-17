@@ -5,6 +5,7 @@ import { css } from '../../render/css.ts';
  * Every color token is a raw HSL triplet, composed at use sites as `hsl(var(--ohne-x))`.
  * An alpha composes as `hsl(var(--ohne-x) / 0.25)`.
  * The chart slots run in a fixed order, checked as a set for color-vision deficiency.
+ * The syntax slots name every `HighlightKind`, each at 4.5:1 or better on `--ohne-card`.
  * Light values live on `:root`; `.dark` on `<html>` overrides colors only.
  *
  * `--ohne-size` and `--ohne-spacing` are unitless knobs.
@@ -49,6 +50,17 @@ css`
     --ohne-chart-6: 120 100% 25.7%;
     --ohne-chart-7: 248.1 62% 57.6%;
     --ohne-chart-8: 0.4 73.5% 58.6%;
+
+    --ohne-syntax-comment: 220 9% 46%;
+    --ohne-syntax-string: 152 60% 28%;
+    --ohne-syntax-number: 24 85% 34%;
+    --ohne-syntax-keyword: 292 62% 40%;
+    --ohne-syntax-property: 211 80% 38%;
+    --ohne-syntax-type: 190 75% 26%;
+    --ohne-syntax-function: 221 72% 44%;
+    --ohne-syntax-variable: 5 68% 40%;
+    --ohne-syntax-tag: 340 70% 38%;
+    --ohne-syntax-attribute: 36 90% 28%;
 
     --ohne-radius: 0.5rem;
     --ohne-font: 'Inter', sans-serif;
@@ -101,5 +113,16 @@ css`
     --ohne-chart-6: 120 100% 25.7%;
     --ohne-chart-7: 246.6 69.4% 71.8%;
     --ohne-chart-8: 0 71.8% 65.3%;
+
+    --ohne-syntax-comment: 222 10% 62%;
+    --ohne-syntax-string: 95 38% 62%;
+    --ohne-syntax-number: 29 54% 61%;
+    --ohne-syntax-keyword: 286 60% 70%;
+    --ohne-syntax-property: 207 82% 66%;
+    --ohne-syntax-type: 39 67% 69%;
+    --ohne-syntax-function: 187 47% 58%;
+    --ohne-syntax-variable: 355 65% 68%;
+    --ohne-syntax-tag: 340 70% 72%;
+    --ohne-syntax-attribute: 45 70% 62%;
   }
 `;

@@ -1,3 +1,4 @@
+import { detectPlatform } from '../../../src/utils/keys/platform.ts';
 import { FakeElement } from '../_fake-dom.ts';
 
 const listeners = new WeakMap<FakeElement, Map<string, ((event: unknown) => void)[]>>();
@@ -18,6 +19,8 @@ Object.assign(FakeElement.prototype, {
   matches: () => false,
   contains: () => false,
   focus() {},
+  blur() {},
+  select() {},
   scrollTo() {},
   showPopover() {},
   hidePopover() {},
@@ -79,16 +82,27 @@ export function fire(
   element: FakeElement,
   type: string,
   init: Record<string, unknown> = {},
-): { defaultPrevented: boolean } {
+): { defaultPrevented: boolean; propagationStopped: boolean } {
   const event = {
     ...init,
     type,
     defaultPrevented: false,
+    propagationStopped: false,
     preventDefault() {
       event.defaultPrevented = true;
     },
-    stopPropagation() {},
+    stopPropagation() {
+      event.propagationStopped = true;
+    },
   };
   for (const listener of listeners.get(element)?.get(type) ?? []) listener(event);
   return event;
+}
+
+/**
+ * The keydown fields of the platform's undo hotkey, Command+Z on mac and Control+Z elsewhere.
+ */
+export function undoKeydown(): Record<string, unknown> {
+  const mac = detectPlatform() === 'mac';
+  return { key: 'z', ctrlKey: !mac, metaKey: mac, altKey: false, shiftKey: false };
 }

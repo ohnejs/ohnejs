@@ -184,15 +184,27 @@ export const richTextType: FieldType<RichTextFieldOptions> = {
     });
 
     const dirty = (): boolean => !deepEqual(canonical.value, baseline.value);
+    const drafted = (): RichText | null | undefined => {
+      if (!touched.value && isUndefined(initial)) return undefined;
+      const value = canonical.value;
+      return value.length === 0 && field.nullable ? null : value;
+    };
+    const show = (value: unknown): void => {
+      doc.value = docOf(value);
+      editor.setDoc(doc.value);
+      editor.markErrors([]);
+      routed.value = '';
+    };
 
     return {
       element: editor.element,
       read() {
-        if (!touched.value && isUndefined(initial)) return {};
-        const value = canonical.value;
-        if (value.length === 0 && field.nullable) return { value: null };
+        const value = drafted();
+        if (isUndefined(value)) return {};
+        if (isNull(value)) return { value };
         return checkedReading(value, dirty() ? checkTree(value, field.options ?? {}) : undefined);
       },
+      draft: drafted,
       setErrors(errors) {
         let first = '';
         const paths: number[][] = [];
@@ -212,15 +224,16 @@ export const richTextType: FieldType<RichTextFieldOptions> = {
       dirty,
       focus: () => editor.focus(),
       revert() {
-        doc.value = docOf(base.value);
-        editor.setDoc(doc.value);
-        editor.markErrors([]);
+        show(base.value);
         touched.value = false;
-        routed.value = '';
       },
       rebase(value) {
         base.value = value;
         routed.value = '';
+      },
+      restore(value) {
+        show(value);
+        touched.value = !isUndefined(value);
       },
     };
   },

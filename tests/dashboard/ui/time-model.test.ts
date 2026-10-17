@@ -34,6 +34,12 @@ describe('composeTime', () => {
     strictEqual(composeTime(0, 0, 0, 3600000, 86399000), 3600000);
     strictEqual(composeTime(23, 59, 59, 0, 7200000), 7200000);
   });
+
+  it('clamps each segment into its unit and keeps the others', () => {
+    strictEqual(composeTime(25, 30, 15, 0, 86399000), 84615000);
+    strictEqual(composeTime(10, 75, 15, 0, 86399000), 39555000);
+    strictEqual(composeTime(10, 30, -4, 0, 86399000), 37800000);
+  });
 });
 
 describe('timeSegmentBounds', () => {

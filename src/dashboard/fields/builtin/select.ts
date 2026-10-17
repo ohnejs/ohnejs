@@ -56,7 +56,7 @@ export const selectType: FieldType<SelectFieldOptions> = {
       model.value = isString(next) ? next : null;
       touched.value = true;
       routed.value = '';
-      onInput();
+      onInput(true);
     };
 
     let element: HTMLElement;
@@ -129,6 +129,11 @@ export const selectType: FieldType<SelectFieldOptions> = {
         base = value;
         model.value = isString(value) ? value : null;
         touched.value = false;
+        routed.value = '';
+      },
+      restore(value) {
+        model.value = isString(value) ? value : null;
+        touched.value = !isUndefined(value);
         routed.value = '';
       },
     };

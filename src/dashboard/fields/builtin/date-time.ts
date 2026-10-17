@@ -76,7 +76,7 @@ export const dateTimeType: FieldType<DateTimeFieldOptions> = {
         stamp.value = next;
         touched.value = true;
         routed.value = '';
-        onInput();
+        onInput(true);
       },
     };
 
@@ -126,6 +126,11 @@ export const dateTimeType: FieldType<DateTimeFieldOptions> = {
         base = value;
         stamp.value = isNumber(value) ? value : null;
         touched.value = false;
+        routed.value = '';
+      },
+      restore(value) {
+        stamp.value = isNumber(value) ? value : null;
+        touched.value = !isUndefined(value);
         routed.value = '';
       },
     };

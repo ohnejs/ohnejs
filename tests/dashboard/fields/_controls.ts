@@ -21,6 +21,14 @@ Object.assign(FakeElement.prototype, {
   querySelector(this: FakeElement, selector: string) {
     return findElement(this, (element) => matches(element, selector)) ?? null;
   },
+  querySelectorAll(this: FakeElement, selector: string) {
+    const found: FakeElement[] = [];
+    findElement(this, (element) => {
+      if (matches(element, selector)) found.push(element);
+      return false;
+    });
+    return found;
+  },
 });
 
 /**
