@@ -316,6 +316,22 @@ export function writeLocale(meta: CollectionQueryMeta): string | null {
 }
 
 /**
+ * Reads a write's `locale` param as `writeLocale` does, deferring a failure until the verdict is known.
+ * A write that needs its locale before it can ask its `access` resolver reads it this way.
+ * A refused caller then answers the identical `404` whatever params they sent.
+ */
+export function deferredWriteLocale(meta: CollectionQueryMeta): {
+  locale: string | null;
+  failure: unknown;
+} {
+  try {
+    return { locale: writeLocale(meta), failure: undefined };
+  } catch (failure) {
+    return { locale: null, failure };
+  }
+}
+
+/**
  * Reads a by-`UUID` read's params: `select`, `populate`, and `locale` shape one record.
  * A windowing, ordering, or filtering param rejects `400` - the `UUID` already pins the row.
  */

@@ -95,6 +95,7 @@ import {
 } from './collection-table-state.ts';
 import { columnsPopup } from './columns-popup.ts';
 import { activeContentLocale } from './content-language-switcher.ts';
+import { canDuplicate, duplicateAction } from './duplicate-action.ts';
 import { editableFieldCell } from './editable-field-cell.ts';
 import { filterPopup } from './filter-popup.ts';
 import { sortingPopup } from './sorting-popup.ts';
@@ -204,6 +205,12 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
   const meta = untracked(dashboardMeta);
   const canTranslate = collection.translatable && (meta?.locales.length ?? 0) > 1;
   const canBookmark = hasRoute(meta?.routes ?? [], 'GET /dashboard/bookmarks/[collection]');
+  const duplicate = canDuplicate(collection)
+    ? duplicateAction(collection, () => {
+        queueToast(t('dashboard.duplicated'), { type: 'success' });
+        refresh();
+      })
+    : undefined;
 
   rememberView(segment, search);
 
@@ -555,6 +562,13 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
         onSelect: () => {
           translationsUUID.value = uuid;
         },
+      });
+    }
+    if (!isUndefined(duplicate)) {
+      items.push({
+        label: 'dashboard.duplicate',
+        icon: 'copy',
+        onSelect: () => void duplicate(uuid),
       });
     }
     if (canDelete) {

@@ -1,6 +1,8 @@
 import type {
+  AnyCollectionDefinition,
   Capability,
   CollectionAPI,
+  CollectionQueryMeta,
   FieldLayout,
   FieldQueryMeta,
   LogicalType,
@@ -35,6 +37,7 @@ import {
 import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { User } from '../auth/types.ts';
 
+import { isTranslatableEntry } from '../../ohne/query/metadata.ts';
 import { landsWithoutInput } from '../../ohne/query/validate-when.ts';
 import { userCan } from '../auth/capabilities.ts';
 
@@ -296,6 +299,15 @@ export interface DashboardCollection {
   singleton: boolean;
 
   /**
+   * Whether a duplicate can succeed as is, so the dashboard offers it.
+   * Never on a collection that declares `duplicate: false`.
+   * It can when the collection shapes its copies with a `duplicate` function.
+   * Otherwise no required field may be one a copy leaves out.
+   * A copy leaves out top-level `unique` fields, unreadable ones, and `copy: false` types.
+   */
+  duplicable: boolean;
+
+  /**
    * The collection's operations, each `null` when closed.
    */
   operations: DashboardOperations;
@@ -366,6 +378,7 @@ export function describeCollections(user: User): DashboardCollection[] {
       label: toSentenceCase(meta.name),
       translatable: query.translatable === true,
       singleton: query.singleton === true,
+      duplicable: duplicableOf(meta.collection, query),
       operations,
       fields,
       labelFields: labelFieldsOf(dashboard?.recordLabel, fields),
@@ -467,7 +480,7 @@ function describeField(name: string, meta: FieldQueryMeta): DashboardField {
     nullable: meta.nullable,
     required: requiredOf(meta),
     unique: options.unique === true,
-    translatable: meta.companion === true || meta.localeScoped === true,
+    translatable: isTranslatableEntry(meta),
     readable: meta.readable !== false,
     writable: !isUndefined(meta.fieldType) && meta.writable !== false,
     immutable: meta.immutable === true,
@@ -532,6 +545,21 @@ function labelOf(name: string, label: unknown): Message {
   if (name === '_updatedAt') return 'dashboard.fields.updatedAt.label';
   if (name === '_translations') return 'dashboard.fields.translations.label';
   return toSentenceCase(name);
+}
+
+/**
+ * Whether a duplicate can succeed without input, as `DashboardCollection.duplicable` states.
+ */
+function duplicableOf(collection: AnyCollectionDefinition, query: CollectionQueryMeta): boolean {
+  if (query.singleton === true || query.duplicate === false) return false;
+  if (!isUndefined(collection.duplicate)) return true;
+  return !Object.values(query.fields).some(
+    (field) =>
+      requiredOf(field) &&
+      (field.options?.unique === true ||
+        field.readable === false ||
+        field.fieldType?.copy === false),
+  );
 }
 
 /**

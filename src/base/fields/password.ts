@@ -11,9 +11,11 @@ import { useAuthConfig } from '../auth/config.ts';
  * The plaintext therefore never lands anywhere; a read returns the stored hash.
  * `verifyPassword` checks a sign-in attempt against that hash, as the `login` route does.
  * Search is locked out, so no field of it is ever matched.
+ * A copy leaves it out, since the stored hash would hash again into a dead credential.
  */
 export default defineField({
   columnType: 'text',
   serialize: (value) => hashPassword(value as string, useAuthConfig().password),
   search: false,
+  copy: false,
 });

@@ -70,6 +70,44 @@ useCollections().register('DescPublic', {
     },
   },
 });
+useFields().register('descSecret', {
+  name: 'descSecret' as FieldTypeName,
+  fieldType: defineField({ columnType: 'text', copy: false }),
+});
+useCollections().register('DescSlugs', {
+  name: 'DescSlugs',
+  collection: { api: { read: 'public' }, fields: { slug: field('text', { unique: true }) } },
+});
+useCollections().register('DescShapedSlugs', {
+  name: 'DescShapedSlugs',
+  collection: {
+    api: { read: 'public' },
+    fields: { slug: field('text', { unique: true }) },
+    duplicate: ({ input, source }) => ({ ...input, slug: `${source.slug as string}-copy` }),
+  },
+});
+useCollections().register('DescOptionalSlugs', {
+  name: 'DescOptionalSlugs',
+  collection: {
+    api: { read: 'public' },
+    fields: { slug: field('text', { unique: true, nullable: true }) },
+  },
+});
+useCollections().register('DescSecrets', {
+  name: 'DescSecrets',
+  collection: {
+    api: { read: 'public' },
+    fields: { secret: { type: 'descSecret', options: {} } as unknown as FieldInstance },
+  },
+});
+useCollections().register('DescFiles', {
+  name: 'DescFiles',
+  collection: {
+    api: { read: 'public' },
+    duplicate: false,
+    fields: { title: field('text', { nullable: true }) },
+  },
+});
 useCollections().register('DescClosed', {
   name: 'DescClosed',
   collection: { fields: { title: field('text') } },
@@ -106,6 +144,14 @@ function userWith(roles: string[]): User {
   };
 }
 
+const DUPLICABLES = [
+  'DescSlugs',
+  'DescShapedSlugs',
+  'DescOptionalSlugs',
+  'DescSecrets',
+  'DescFiles',
+];
+
 const editor = userWith(['desc-editor']);
 const guest = userWith([]);
 
@@ -119,11 +165,11 @@ describe('describeCollections', () => {
   it('lists the collections the user may work with, in registry order', () => {
     deepStrictEqual(
       describeCollections(editor).map((collection) => collection.name),
-      ['DescNotes', 'DescOwners', 'DescPublic'],
+      ['DescNotes', 'DescOwners', 'DescPublic', ...DUPLICABLES],
     );
     deepStrictEqual(
       describeCollections(guest).map((collection) => collection.name),
-      ['DescPublic'],
+      ['DescPublic', ...DUPLICABLES],
     );
   });
 
@@ -162,6 +208,15 @@ describe('describeCollections', () => {
       ['UUID', '_updatedAt', 'title', 'note', 'owner', 'steps'],
     );
     deepStrictEqual(notes.labelFields, ['title']);
+  });
+
+  it('offers a duplicate only where a copy can succeed without input', () => {
+    strictEqual(collectionOf(editor, 'DescNotes').duplicable, true);
+    strictEqual(collectionOf(guest, 'DescSlugs').duplicable, false);
+    strictEqual(collectionOf(guest, 'DescShapedSlugs').duplicable, true);
+    strictEqual(collectionOf(guest, 'DescOptionalSlugs').duplicable, true);
+    strictEqual(collectionOf(guest, 'DescSecrets').duplicable, false);
+    strictEqual(collectionOf(guest, 'DescFiles').duplicable, false);
   });
 
   it('ships a `when` gate in its condition object form, and none on an ungated field', () => {

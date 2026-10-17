@@ -14,7 +14,7 @@ import { first, isEmpty, isNull, isUndefined, pick } from 'ohnejs/utils';
 import { notFound } from '../../../../../../ohne/http/http-error.ts';
 import { queryLocales } from '../../../../../../ohne/query/locale.ts';
 import { sameLocaleError, unknownParamError } from '../../../../../../ohne/query/wire/errors.ts';
-import { copyTranslationInput } from '../../../../../../ohne/query/write/copy-translation.ts';
+import { copyInput, type CopyInputOptions } from '../../../../../../ohne/query/write/copy-input.ts';
 import {
   accessScope,
   admitCollection,
@@ -23,13 +23,23 @@ import {
 } from '../../../../../collections-api/gate.ts';
 
 /**
+ * A translation copy writes the translatable fields onto an existing record, uniques and all.
+ */
+const TRANSLATION: CopyInputOptions = {
+  only: 'translatable',
+  uniques: 'keep',
+  operation: 'update',
+  values: 'read',
+};
+
+/**
  * `POST /collections/[collection]/[uuid]/translations/copy`
  *
  * Copies one record's translation onto another locale and answers the record's state there.
  * `?locale=` names the target, defaulting to the default locale, as every write's `locale` does.
  * The JSON body's only key is an optional `source`, the locale to copy from, defaulting the same way.
  * Any other body key is a `400`, as is a `source` equal to the target - a copy needs two locales.
- * Only translatable, writable, mutable fields ever write, whatever a `copyTranslation` hook returns.
+ * Only the translatable fields a copy may write ever write, whatever a `copyTranslation` hook returns.
  * The `update` resolver runs twice: with an empty input to reach the source, then with the copy it writes.
  * The first runs before any param or body check, so a refused caller answers `404` before any `400`.
  * Each scope's `where` ANDs in, so an out-of-scope record answers the same `404`.
@@ -60,12 +70,13 @@ export default defineHandler(async ({ params }) => {
   const record = await (isNull(source) ? reader : reader.locale(source)).findFirst();
   if (isUndefined(record)) throw notFound();
 
-  let input = copyTranslationInput(meta.fields, record);
+  let input = copyInput(meta.fields, record, TRANSLATION);
   const hook = useCollections().get(admitted.collection)?.collection.copyTranslation;
   if (!isUndefined(hook)) {
-    input = copyTranslationInput(
+    input = copyInput(
       meta.fields,
       await hook({ source: record, input, sourceLocale, targetLocale }),
+      { ...TRANSLATION, values: 'given' },
     );
   }
   const scope = await accessScope(admitted.endpoint, { operation: 'update', input });

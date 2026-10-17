@@ -56,6 +56,7 @@ import {
   contentLocale,
   effectiveContentLocale,
 } from './content-language-switcher.ts';
+import { canDuplicate, duplicateAction } from './duplicate-action.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History } from './history.ts';
@@ -628,10 +629,22 @@ export function recordEditorFooter(editor: RecordEditor): Child {
 /**
  * The record actions menu of the edit page: the trigger turns primary while the dropdown is open.
  * New links to the create page, Translate opens the translations popup, Delete confirms first.
+ * Duplicate copies the saved record and stays, its toast opening the copy.
  */
 function recordMenu(editor: RecordEditor): Child {
   const t = useT();
   const { collection, canCreate, canTranslate, canDelete } = editor;
+  const duplicate = canDuplicate(collection)
+    ? duplicateAction(collection, (copy) => {
+        const uuid = copy.UUID;
+        toast(t('dashboard.duplicated'), {
+          type: 'success',
+          action: isString(uuid)
+            ? { label: t('dashboard.open'), onClick: () => navigate(recordHref(collection, uuid)) }
+            : undefined,
+        });
+      })
+    : undefined;
   const open = ref(false);
   const translationsOpen = ref(false);
   const close = (): void => {
@@ -667,7 +680,9 @@ function recordMenu(editor: RecordEditor): Child {
           });
           items.push(item);
         }
-        if (canCreate && (canTranslate || canDelete())) items.push(h('hr'));
+        if (canCreate && (canTranslate || !isUndefined(duplicate) || canDelete())) {
+          items.push(h('hr'));
+        }
         if (canTranslate) {
           const item = dropdownItem(
             [icon('language'), h('span', null, () => t('dashboard.translations.translate'))],
@@ -680,6 +695,21 @@ function recordMenu(editor: RecordEditor): Child {
           );
           effect(() => {
             item.title = t('dashboard.translations.translate');
+          });
+          items.push(item);
+        }
+        if (!isUndefined(duplicate)) {
+          const item = dropdownItem(
+            [icon('copy'), h('span', null, () => t('dashboard.duplicate'))],
+            {
+              onClick: () => {
+                close();
+                void duplicate(editor.id());
+              },
+            },
+          );
+          effect(() => {
+            item.title = t('dashboard.duplicate');
           });
           items.push(item);
         }

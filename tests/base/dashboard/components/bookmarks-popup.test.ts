@@ -32,6 +32,7 @@ const POSTS: DashboardCollection = {
   label: 'Posts',
   translatable: false,
   singleton: false,
+  duplicable: false,
   operations: {
     read: { allowed: true, public: false, scoped: false },
     create: null,

@@ -117,6 +117,7 @@ const POSTS: DashboardCollection = {
   label: 'Posts',
   translatable: false,
   singleton: false,
+  duplicable: false,
   operations: {
     read: { allowed: true, public: false, scoped: false },
     create: null,
@@ -219,6 +220,7 @@ describe('collectionTable sheet', () => {
     label: 'Raiders',
     translatable: false,
     singleton: false,
+    duplicable: false,
     operations: { read: allowed, create: null, update: allowed, delete: allowed },
     fields: [field('name', 'Name'), field('role', 'Role')],
     labelFields: ['name'],
@@ -727,5 +729,141 @@ describe('collectionTable bookmarks', () => {
     scope?.dispose();
     await navigate('/collections/posts');
     await idle();
+  });
+});
+
+describe('collectionTable duplicate', () => {
+  const ROUTE = 'POST /collections/[collection]/[uuid]/duplicate';
+  const allowed = { allowed: true, public: false, scoped: false };
+  const META: Omit<DashboardMeta, 'routes'> = {
+    menu: [],
+    collections: [],
+    blocks: [],
+    roles: [],
+    capabilities: [],
+    locales: ['en'],
+    defaultLocale: 'en',
+    languages: ['en'],
+    accountFields: [],
+    accountLayout: [],
+    defaultViews: {},
+  };
+  const HEROES: DashboardCollection = {
+    name: 'Heroes',
+    segment: 'heroes',
+    label: 'Heroes',
+    translatable: false,
+    singleton: false,
+    duplicable: true,
+    operations: { read: allowed, create: allowed, update: null, delete: null },
+    fields: [
+      {
+        name: 'name',
+        type: 'text',
+        kind: 'column',
+        logicalType: 'text',
+        label: 'Name',
+        nullable: false,
+        required: false,
+        unique: false,
+        translatable: false,
+        readable: true,
+        writable: true,
+        immutable: false,
+      },
+    ],
+    labelFields: ['name'],
+    table: { columns: ['name'] },
+  };
+  const PAGE = {
+    records: [{ UUID: 'u-thrall', name: 'Thrall' }],
+    page: 1,
+    lastPage: 1,
+    perPage: 50,
+  };
+  const posts: { path: string; body: string }[] = [];
+  let reads = 0;
+  let routes: string[] = [];
+  let scope: ReturnType<typeof effectScope> | undefined;
+  let collectionTable!: (collection: DashboardCollection) => unknown;
+
+  const findAll = (root: FakeNode, match: (element: FakeElement) => boolean): FakeElement[] =>
+    root.childNodes.flatMap((child) => [
+      ...(child instanceof FakeElement && match(child) ? [child] : []),
+      ...findAll(child, match),
+    ]);
+  const body = (): FakeElement => document.body as unknown as FakeElement;
+
+  /**
+   * Serves `next` as the app's routes, mounts the heroes table, and opens Thrall's row menu.
+   * Resolves the labels of its menu rows; without catalogs a label reads as its key.
+   */
+  const menuOf = async (
+    collection: DashboardCollection,
+    next: string[],
+  ): Promise<FakeElement[]> => {
+    routes = next;
+    invalidateDashboardMeta();
+    dashboardMeta();
+    await idle();
+    scope?.dispose();
+    scope = effectScope();
+    const root = scope.run(() => h('div', null, collectionTable(collection) as Node))!;
+    await idle();
+    const kebab = findAll(root as unknown as FakeElement, (element) =>
+      hasClass(element, 'ohne-table-kebab'),
+    )[0]!;
+    dispatch(kebab, 'click');
+    flush();
+    const menu = findAll(body(), (element) => element.getAttribute('role') === 'menu').at(-1)!;
+    return findAll(menu, (element) => element.getAttribute('role') === 'menuitem');
+  };
+
+  before(async () => {
+    Object.assign(globalThis, {
+      fetch: async (url: string, init?: RequestInit) => {
+        const path = new URL(url).pathname;
+        if (path === '/dashboard') return Response.json({ ...META, routes });
+        if (path.endsWith('/query')) {
+          reads += 1;
+          return Response.json({ ...PAGE, total: 1 });
+        }
+        if (path.endsWith('/duplicate')) {
+          posts.push({ path, body: String(init?.body) });
+          return Response.json({ UUID: 'u-copy', name: 'Thrall' }, { status: 201 });
+        }
+        return new Response(null, { status: 404 });
+      },
+    });
+    ({ collectionTable } =
+      await import('../../../../src/base/dashboard/components/collection-table.ts'));
+  });
+
+  it('duplicates a row with an empty body, then reloads the page', async () => {
+    const items = await menuOf(HEROES, [ROUTE]);
+    const item = items.find((element) => element.textContent === 'dashboard.duplicate')!;
+    const before = reads;
+    dispatch(item, 'click');
+    await idle();
+    deepStrictEqual(posts, [{ path: '/collections/heroes/u-thrall/duplicate', body: '{}' }]);
+    strictEqual(reads, before + 1);
+    scope?.dispose();
+  });
+
+  it('offers no Duplicate where the route, the create, or a copy without input is missing', async () => {
+    const labels = async (collection: DashboardCollection, next: string[]): Promise<string[]> =>
+      (await menuOf(collection, next)).map((element) => element.textContent);
+    strictEqual((await labels(HEROES, [])).includes('dashboard.duplicate'), false);
+    strictEqual(
+      (await labels({ ...HEROES, duplicable: false }, [ROUTE])).includes('dashboard.duplicate'),
+      false,
+    );
+    strictEqual(
+      (
+        await labels({ ...HEROES, operations: { ...HEROES.operations, create: null } }, [ROUTE])
+      ).includes('dashboard.duplicate'),
+      false,
+    );
+    scope?.dispose();
   });
 });
