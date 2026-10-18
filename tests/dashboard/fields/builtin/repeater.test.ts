@@ -541,4 +541,33 @@ describe('repeaterType control', () => {
       strictEqual(document.activeElement, dots);
     });
   });
+
+  it('returns focus to the field the user was in when an undo drops a duplicate', async () => {
+    await effectScope().run(async () => {
+      const stored = {
+        quests: [
+          { UUID: 'q1', question: 'Ashes' },
+          { UUID: 'q2', question: 'Bone' },
+        ],
+      };
+      const form = createFieldForm([QUESTS], stored, { mode: 'edit', path: '', language });
+      const root = mount(h('div', null, form.render()) as unknown as FakeElement);
+      flush();
+      const [, bone] = inputsOf(root);
+      focusIn(bodyOf(root, 1), bone as FakeElement);
+      let seen = 0;
+      const dots = findElement(
+        root,
+        (el) => el.getAttribute('aria-label') === 'dashboard.record.moreActions' && seen++ === 1,
+      );
+      (dots as unknown as HTMLElement).focus();
+      await pick(root, 1, 'dashboard.duplicate');
+      const [, copy] = inputsOf(root);
+      strictEqual(document.activeElement, copy);
+      focusIn(bodyOf(root, 1), copy as FakeElement);
+      form.controlOf('quests')?.restore?.(stored.quests);
+      await settle();
+      strictEqual(document.activeElement, bone);
+    });
+  });
 });

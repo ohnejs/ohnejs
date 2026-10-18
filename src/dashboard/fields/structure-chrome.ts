@@ -400,13 +400,17 @@ export function trackItemFocus<T extends HTMLElement>(
 }
 
 /**
- * The way back to where focus stood when an item was added: `from` itself, else into `source`.
- * A menu trigger hides with its card's hover, so the item whose menu added the new one stands in for it.
+ * The way back to where focus stood when an item was added: the control `source` held, else `from`.
+ * Failing both, it goes into `source`, since a menu trigger hides with its card's hover.
  * It takes the control that held focus in `source` at the time, not one a later step moved it to.
  */
 export function focusOrigin(from: Element | null, source?: TrackedItem): () => void {
   const held = source?.focus.held;
   return () => {
+    if (source?.$expanded === true && held?.isConnected === true) {
+      held.focus();
+      return;
+    }
     if (from instanceof HTMLElement) from.focus();
     if (document.activeElement !== from && !isUndefined(source)) focusInto(source, held);
   };

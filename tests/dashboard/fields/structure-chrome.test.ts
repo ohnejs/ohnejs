@@ -208,6 +208,17 @@ describe('focusOrigin', () => {
     back();
     strictEqual(document.activeElement, held);
   });
+
+  it('prefers the control the source item held over the element focus came from', () => {
+    const source = item('source', true, []);
+    const held = connected();
+    source.focus.held = held as unknown as HTMLElement;
+    focusOrigin(new FakeElement('button') as unknown as HTMLElement, source)();
+    strictEqual(document.activeElement, held);
+    const from = new FakeElement('button');
+    focusOrigin(from as unknown as HTMLElement, { ...source, $expanded: false })();
+    strictEqual(document.activeElement, from);
+  });
 });
 
 describe('focusAfterRestore', () => {
