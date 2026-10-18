@@ -403,7 +403,7 @@ export function registerUntypedFieldType(type: string, fieldType: FieldType): vo
 /**
  * Resolves the dashboard behaviour for a field, falling back for an unregistered type name.
  * A plain column falls back to its storage primitive's registered behaviour.
- * An app-defined scalar type therefore edits as text, number, or boolean without registering anything.
+ * An app-defined column type therefore edits as text, number, boolean, or JSON without registering anything.
  * Everything else falls back to a generic type whose form control is a missing-component alert.
  * It renders primitives and string lists as text, other lists as counts, and objects as a dim mark.
  */
@@ -430,6 +430,7 @@ const PRIMITIVES: Readonly<Record<string, string>> = {
   integer: 'integer',
   real: 'number',
   boolean: 'boolean',
+  json: 'json',
 };
 
 /**

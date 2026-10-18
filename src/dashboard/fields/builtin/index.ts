@@ -6,6 +6,7 @@ import './date.ts';
 import './date-time.ts';
 import './email.ts';
 import './integer.ts';
+import './json.ts';
 import './link.ts';
 import './multi-select.ts';
 import './number.ts';

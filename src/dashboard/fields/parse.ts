@@ -17,7 +17,7 @@ export interface ScalarParse {
   /**
    * The message key of the parse failure that blocks the write.
    */
-  error?: 'dashboard.invalidInteger' | 'dashboard.invalidNumber';
+  error?: 'dashboard.invalidInteger' | 'dashboard.invalidNumber' | 'validation.invalidJSON';
 }
 
 /**
@@ -54,4 +54,18 @@ export function parseRealValue(field: DashboardField, raw: string): ScalarParse 
     return { error: 'dashboard.invalidNumber' };
   }
   return { value: Number(text) };
+}
+
+/**
+ * A JSON input parsed whole, so any JSON text is a value, a top-level string or number included.
+ * Emptied, a nullable field writes `null` and a non-nullable one is omitted.
+ */
+export function parseJSONValue(field: DashboardField, raw: string): ScalarParse {
+  const text = raw.trim();
+  if (text === '') return field.nullable ? { value: null } : {};
+  try {
+    return { value: JSON.parse(text) as unknown };
+  } catch {
+    return { error: 'validation.invalidJSON' };
+  }
 }

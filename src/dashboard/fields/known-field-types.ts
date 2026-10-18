@@ -209,6 +209,19 @@ export interface ColorFieldOptions {
 }
 
 /**
+ * The options of a `json` field.
+ */
+export interface JSONFieldOptions {
+  /**
+   * How deeply arrays and objects may nest inside the value; a scalar is depth 0.
+   *
+   * @default
+   * 32
+   */
+  maxDepth?: number;
+}
+
+/**
  * The options of a `number` or `integer` field.
  */
 export interface NumberFieldOptions {
@@ -566,6 +579,11 @@ export interface KnownFieldTypes {
    * A link to a record or to an address.
    */
   link: { options: LinkFieldOptions; value: Link };
+
+  /**
+   * Any plain JSON value, a top-level scalar included.
+   */
+  json: { options: JSONFieldOptions; value: string | number | boolean | object | null };
 
   /**
    * The `UUID` of one record of another collection.

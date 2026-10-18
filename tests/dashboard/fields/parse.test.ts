@@ -5,6 +5,7 @@ import type { DashboardField } from '../../../src/dashboard/runtime/meta-types.t
 
 import {
   parseIntegerValue,
+  parseJSONValue,
   parseRealValue,
   parseTextValue,
 } from '../../../src/dashboard/fields/parse.ts';
@@ -94,5 +95,27 @@ describe('parseRealValue', () => {
 
   it('omits an emptied non-nullable field', () => {
     deepStrictEqual(parseRealValue(field(), ''), {});
+  });
+});
+
+describe('parseJSONValue', () => {
+  it('parses any JSON text, a top-level scalar included', () => {
+    deepStrictEqual(parseJSONValue(field(), ' { "rank": [1, null] } '), {
+      value: { rank: [1, null] },
+    });
+    deepStrictEqual(parseJSONValue(field(), '"frost"'), { value: 'frost' });
+    deepStrictEqual(parseJSONValue(field(), 'null'), { value: null });
+  });
+
+  it('rejects text that does not parse', () => {
+    deepStrictEqual(parseJSONValue(field(), '{ rank: 1 }'), { error: 'validation.invalidJSON' });
+  });
+
+  it('resolves an emptied nullable field to null', () => {
+    deepStrictEqual(parseJSONValue(field({ nullable: true }), '  '), { value: null });
+  });
+
+  it('omits an emptied non-nullable field', () => {
+    deepStrictEqual(parseJSONValue(field(), ''), {});
   });
 });
