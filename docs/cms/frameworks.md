@@ -60,7 +60,8 @@ The `ohne` middleware resolves the path and its query once, on the server:
 - A miss answers `404` with your [`404` page](./setup.md#routes), and a failing API `502`.
 
 The module also fills the `<head>`, keeps a preview out of caches and search engines, joins the
-live preview, and serves `/sitemap.xml` and `/robots.txt`.
+live preview, and serves `/sitemap.xml` and `/robots.txt`. A `robots.txt` in `public/` wins, so
+delete the one Nuxt's starter ships.
 
 `OhneBlocks` renders each block with the component of the same name in `app/components/blocks/`. A
 block component takes the block's fields as `fields`:
@@ -129,7 +130,7 @@ export const config = { matcher: '/((?!_next/).*)' };
 It hands each page its path and query, keeps a preview out of caches and search engines, and serves
 the editor's script under `/_ohne/`, so keep the `matcher` covering that.
 
-One catch-all page renders every path:
+One catch-all page renders every path, `/` included, so delete `app/page.tsx`:
 
 ```tsx
 // app/[[...slug]]/page.tsx
@@ -154,6 +155,8 @@ export default async function Page() {
 
 - `ohne.page()` resolves the address. A permanent redirect answers `308`, a temporary one `307`, and
   a miss `404`.
+- Remove `cacheComponents` and `partialPrefetching` from `next.config.ts`: with them, redirects and
+  misses answer `200`.
 - `ohne.metadata` fills the title, description, share tags, robots, canonical and `hreflang` links.
 - `components` must name a component for every block, so a block the CMS adds fails the typecheck.
 
