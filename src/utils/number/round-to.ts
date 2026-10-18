@@ -1,4 +1,5 @@
 import { isRealNumber } from '../is/is-real-number.ts';
+import { alignDecimals } from './align-decimals.ts';
 
 /**
  * Rounds `value` to `places` decimal places, halves toward positive infinity as `Math.round` does.
@@ -17,12 +18,15 @@ import { isRealNumber } from '../is/is-real-number.ts';
  * ```
  */
 export function roundTo(value: number, places: number): number {
-  const [coefficient = '', exponent = '0'] = String(value).split('e');
-  const [integer = '', fraction = ''] = coefficient.split('.');
-  const dropped = fraction.length - Number(exponent) - places;
-  if (!isRealNumber(value) || dropped <= 0) return value;
+  if (!isRealNumber(value)) return value;
+  const {
+    coefficients: [digits = 0n],
+    scale,
+  } = alignDecimals([value]);
+  const dropped = scale - places;
+  if (dropped <= 0) return value;
   const unit = 10n ** BigInt(dropped);
-  const halfUp = BigInt(integer + fraction) + unit / 2n;
+  const halfUp = digits + unit / 2n;
   const floored = halfUp / unit - (halfUp % unit < 0n ? 1n : 0n);
   return Number(`${floored}e${-places}`);
 }

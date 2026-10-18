@@ -190,6 +190,7 @@ export * from './mime/sniff-media-type.ts';
 export * from './mutex/mutex.ts';
 export * from './negotiate/negotiate-language.ts';
 export * from './negotiate/negotiate-media-type.ts';
+export * from './number/align-decimals.ts';
 export * from './number/change-of.ts';
 export * from './number/clamp.ts';
 export * from './number/count-decimals.ts';

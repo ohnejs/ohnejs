@@ -1,3 +1,6 @@
+import { isRealNumber } from '../is/is-real-number.ts';
+import { alignDecimals } from './align-decimals.ts';
+
 /**
  * Counts the decimal places of the shortest decimal a number prints as.
  * Exponent notation counts too, so `1e-7` has 7.
@@ -14,6 +17,5 @@
  * ```
  */
 export function countDecimals(value: number): number {
-  const [coefficient = '', exponent = '0'] = String(value).split('e');
-  return Math.max(0, (coefficient.split('.')[1]?.length ?? 0) - Number(exponent));
+  return isRealNumber(value) ? alignDecimals([value]).scale : 0;
 }
