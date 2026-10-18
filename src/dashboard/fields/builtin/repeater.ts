@@ -189,10 +189,8 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       context.onInput(true);
     };
 
-    const valueOf = (form: FieldForm): Record<string, unknown> => {
-      const value = stripIdentities(form.draft());
-      return isPlainObject<Record<string, unknown>>(value) ? value : {};
-    };
+    const valueOf = (form: FieldForm): Record<string, unknown> =>
+      stripIdentities(form.draft(), subfields);
 
     const draftOf = (entry: RepeaterEntry): unknown => {
       const draft = entry.form.draft();

@@ -256,10 +256,8 @@ export const blocksType: FieldType = {
       context.onInput(true);
     };
 
-    const valueOf = (form: FieldForm): Record<string, unknown> => {
-      const value = stripIdentities(form.draft());
-      return isPlainObject<Record<string, unknown>>(value) ? value : {};
-    };
+    const valueOf = (node: BlockNode): Record<string, unknown> =>
+      stripIdentities(node.form.draft(), blockNamed(blocks, node.block)?.fields ?? []);
 
     const move = (target: BlockNode, delta: -1 | 1): void => {
       const list = [...nodes.value];
@@ -300,7 +298,7 @@ export const blocksType: FieldType = {
     const duplicate = (target: BlockNode): BlockNode | undefined => {
       const at = nodes.value.indexOf(target);
       if (at < 0) return undefined;
-      const copy = nodeOf({ block: target.block, fields: valueOf(target.form) }, target.$expanded);
+      const copy = nodeOf({ block: target.block, fields: valueOf(target) }, target.$expanded);
       insert([copy], at, target);
       return copy;
     };
@@ -329,7 +327,7 @@ export const blocksType: FieldType = {
     const adopt = (item: BlockNode): BlockNode =>
       ownForms.has(item.form)
         ? item
-        : nodeOf({ block: item.block, fields: valueOf(item.form) }, item.$expanded);
+        : nodeOf({ block: item.block, fields: valueOf(item) }, item.$expanded);
 
     const settle = (items: BlockNode[]): void => {
       change(items.map(adopt));
@@ -351,7 +349,7 @@ export const blocksType: FieldType = {
       disabled: off,
       nodes: () => nodes.value,
       create: (name, fields) => nodeOf({ block: name, fields }, true),
-      copy: (node) => valueOf(node.form),
+      copy: (node) => valueOf(node),
       commit(next) {
         const placed = next.map(adopt);
         const kept = new Set(placed.map((node) => node.form));
@@ -416,7 +414,7 @@ export const blocksType: FieldType = {
                           },
                     copyPayload: () => ({
                       ohneClipboardDataType: 'blocks',
-                      data: [{ $key: node().block, ...valueOf(node().form) }],
+                      data: [{ $key: node().block, ...valueOf(node()) }],
                     }),
                     canPaste: () => {
                       const payload = clipboardData.value;

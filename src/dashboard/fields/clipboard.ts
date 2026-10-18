@@ -1,10 +1,15 @@
+import type { DashboardField } from '../runtime/meta-types.ts';
+
 import { isArray } from '../../utils/is/is-array.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { jsonClone } from '../../utils/json/json-clone.ts';
 import { deepOmit } from '../../utils/object/deep-omit.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { type Ref, ref } from '../../utils/reactive/ref.ts';
+import { blocksOf } from './_blocks.ts';
+import { blockNamed } from './_items.ts';
 
 /**
  * The dashboard's clipboard payload union.
@@ -32,6 +37,8 @@ export type ClipboardData =
        */
       data: { $type: string } & Record<string, unknown>;
     };
+
+const IDENTITIES: readonly string[] = ['UUID', '$key'];
 
 /**
  * The one live clipboard payload, shared by every field in the dashboard.
@@ -70,13 +77,48 @@ export function isClipboardData(value: unknown): value is ClipboardData {
 }
 
 /**
- * A deep copy of a drafted value with every `UUID` and every client `$key` removed, at every depth.
+ * A deep copy of an item form's draft with each item's `UUID` and client `$key` removed, at every depth.
+ * It follows `fields` into objects, repeaters, and blocks, so a field's own data, like JSON, keeps both keys.
+ * A key no field declares sheds both at every depth, so a mismatched shape never carries an identity.
  * Copies, duplicates, and cross-structure transfers shed item identity through it.
  * A pasted or duplicated item therefore inserts as a new row instead of claiming an existing one.
- * Neither name ever belongs to a regular field, since forms reserve both for item identity.
  */
-export function stripIdentities(value: unknown): unknown {
-  return deepOmit(value, ['UUID', '$key']);
+export function stripIdentities(
+  draft: Readonly<Record<string, unknown>>,
+  fields: readonly DashboardField[],
+): Record<string, unknown> {
+  const blocks = blocksOf();
+  const shed = (
+    item: Readonly<Record<string, unknown>>,
+    known: readonly DashboardField[],
+  ): Record<string, unknown> => {
+    const copy: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(item)) {
+      if (IDENTITIES.includes(key)) continue;
+      const field = known.find((candidate) => candidate.name === key);
+      copy[key] = isUndefined(field) ? deepOmit(entry, IDENTITIES) : within(entry, field);
+    }
+    return copy;
+  };
+  const block = (node: Readonly<Record<string, unknown>>): Record<string, unknown> => {
+    const { fields: data, ...rest } = node;
+    if (!isPlainObject<Record<string, unknown>>(data) || !isString(node.block)) {
+      return shed(node, []);
+    }
+    return { ...shed(rest, []), fields: shed(data, blockNamed(blocks, node.block)?.fields ?? []) };
+  };
+  const within = (value: unknown, field: DashboardField): unknown => {
+    const subfields = field.subfields ?? [];
+    if (isPlainObject<Record<string, unknown>>(value)) {
+      return field.kind === 'childOne' ? shed(value, subfields) : value;
+    }
+    if (!isArray(value) || (field.kind !== 'childMany' && field.kind !== 'blocks')) return value;
+    return value.map((item) => {
+      if (!isPlainObject<Record<string, unknown>>(item)) return item;
+      return field.kind === 'blocks' ? block(item) : shed(item, subfields);
+    });
+  };
+  return shed(jsonClone(draft), fields);
 }
 
 /**
