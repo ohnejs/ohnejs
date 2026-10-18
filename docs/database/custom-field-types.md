@@ -2,21 +2,16 @@
 
 A field type is the contract behind `field(...)`: how a value is stored, which options a field
 takes, and how every write cleans and checks the value. Define your own when a value has rules that
-you would otherwise repeat on every field that holds it: a slug, a color, a currency code.
+you would otherwise repeat on every field that holds it: a product code, a postal code, a tax ID.
 
 ```ts
-// fields/slug.ts
+// fields/sku.ts
 import { defineField } from 'ohnejs';
 
 export default defineField({
   columnType: 'text',
-  sanitizers: [(value) => value.trim().toLowerCase().replace(/\s+/g, '-')],
-  validators: [
-    (value) =>
-      /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
-        ? undefined
-        : 'Must be lowercase words joined by hyphens',
-  ],
+  sanitizers: [(value) => value.trim().toUpperCase()],
+  validators: [(value) => (/^[A-Z]+-\d{4}$/.test(value) ? undefined : 'Must be a code like WOW-0042')],
 });
 ```
 
@@ -27,21 +22,21 @@ import { defineCollection, field } from 'ohnejs';
 export default defineCollection({
   fields: {
     title: field('text'),
-    slug: field('slug', { unique: true }),
+    sku: field('sku', { unique: true }),
   },
 });
 ```
 
-Every `slug` field now cleans and checks its value the same way, in whichever collection declares
+Every `sku` field now cleans and checks its value the same way, in whichever collection declares
 it.
 
 ## Where field types live
 
 A field type lives in one file under `fields/`. That is each layer's `dirs.fields` directory, set in
-[config](../project/config.md#directories). The file name gives the type its name: `fields/slug.ts`
-defines `slug`, `fields/hex-color.ts` defines `hexColor`. Codegen registers every type, so once
+[config](../project/config.md#directories). The file name gives the type its name: `fields/sku.ts`
+defines `sku`, `fields/hex-color.ts` defines `hexColor`. Codegen registers every type, so once
 [`ohne prepare`](../project/cli.md#ohne-prepare) or [`ohne dev`](../project/cli.md#ohne-dev) has
-run, `field('slug')` autocompletes and its options type-check.
+run, `field('sku')` autocompletes and its options type-check.
 
 A file whose name starts with `_` is a helper that the scan skips, so code that your types share can
 sit beside them.

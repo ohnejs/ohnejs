@@ -294,7 +294,7 @@ import { defineCollection, field } from 'ohnejs';
 export default defineCollection({
   fields: {
     title: field('text', { translatable: true }),
-    slug: field('text', { unique: true }),
+    slug: field('slug', { unique: true }),
   },
   duplicate: ({ source, input }) => ({
     ...input,

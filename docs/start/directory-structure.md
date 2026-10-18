@@ -42,7 +42,7 @@ The rest of this page walks through them, one part of the app at a time.
 - `collections/` - one file per [collection](../database/collections.md#files-and-names). The file
   names the collection, so `collections/Posts.ts` is `Posts`, and ohne creates its table for you.
 - `fields/` - [custom field types](../database/custom-field-types.md#where-field-types-live).
-  `fields/slug.ts` defines a `slug` type, which any collection uses as `field('slug')`.
+  `fields/sku.ts` defines a `sku` type, which any collection uses as `field('sku')`.
 - `blocks/` - [blocks](../database/blocks.md#defining-a-block), reusable content shapes like a hero
   or a quote. `blocks/Hero.ts` defines `Hero`.
 - `migrations/` - [migrations](../database/migrations.md#a-migration-file). Each file describes one

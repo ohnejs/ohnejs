@@ -17,7 +17,7 @@ export default defineCollection({
   },
   fields: {
     title: field('text'),
-    slug: field('text'),
+    slug: field('slug'),
     body: field('text', { multiline: true }),
     metaTitle: field('text', { nullable: true }),
     metaDescription: field('text', { nullable: true }),

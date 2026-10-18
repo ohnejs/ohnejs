@@ -11,7 +11,7 @@ import { defineCollection, field } from 'ohnejs';
 export default defineCollection({
   fields: {
     title: field('text', { translatable: true }),
-    slug: field('text'),
+    slug: field('slug'),
   },
 });
 ```
@@ -242,7 +242,7 @@ import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
-    slug: field('text', { translatable: true, unique: true, uniquePerLocale: true }),
+    slug: field('slug', { translatable: true, unique: true, uniquePerLocale: true }),
   },
 });
 ```

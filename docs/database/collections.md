@@ -519,7 +519,7 @@ import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
-    slug: field('text', {
+    slug: field('slug', {
       label: 'app.slug.label',
       description: 'Lowercase words joined by hyphens.',
       placeholder: 'my-first-post',
@@ -538,7 +538,7 @@ import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
-    slug: field('text', {
+    slug: field('slug', {
       description: {
         text: 'app.slug.help',
         showLabel: 'Show examples',
