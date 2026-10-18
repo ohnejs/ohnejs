@@ -350,6 +350,7 @@ export * from './uuid/is-uuid.ts';
 export * from './uuid/short-uuid.ts';
 export * from './uuid/uuidv7-time.ts';
 export * from './uuid/uuidv7.ts';
+export * from './validate/check-amount.ts';
 export * from './validate/check-choice.ts';
 export * from './validate/check-color.ts';
 export * from './validate/check-count.ts';
