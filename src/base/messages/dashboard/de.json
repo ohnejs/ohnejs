@@ -234,6 +234,7 @@
     "title": "Installation",
     "welcomeMessage": "Willkommen bei ohne! Gib deine Daten ein, um das primäre Administratorkonto zu erstellen."
   },
+  "invalidAmount": "Betrag wie `{example}` eingeben",
   "invalidInteger": "Ganze Zahl eingeben",
   "invalidNumber": "Zahl eingeben",
   "layout": {

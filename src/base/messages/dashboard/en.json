@@ -234,6 +234,7 @@
     "title": "Installation",
     "welcomeMessage": "Welcome to ohne! Enter your details to create your primary administrator account."
   },
+  "invalidAmount": "Enter an amount like `{example}`",
   "invalidInteger": "Enter a whole number",
   "invalidNumber": "Enter a number",
   "layout": {
