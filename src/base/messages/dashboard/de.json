@@ -373,6 +373,9 @@
   "showAll": "Alle anzeigen",
   "showFewer": "Weniger anzeigen",
   "signOut": "Abmelden",
+  "slug": {
+    "follow": "Synchron halten"
+  },
   "sort": {
     "addAfter": "Danach einfügen",
     "addBefore": "Davor einfügen",

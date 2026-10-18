@@ -373,6 +373,9 @@
   "showAll": "Show all",
   "showFewer": "Show fewer",
   "signOut": "Sign out",
+  "slug": {
+    "follow": "Keep in sync"
+  },
   "sort": {
     "addAfter": "Add after",
     "addBefore": "Add before",

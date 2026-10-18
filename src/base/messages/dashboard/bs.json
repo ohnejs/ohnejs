@@ -373,6 +373,9 @@
   "showAll": "Prikaži sve",
   "showFewer": "Prikaži manje",
   "signOut": "Odjava",
+  "slug": {
+    "follow": "Drži usklađeno"
+  },
   "sort": {
     "addAfter": "Dodaj poslije",
     "addBefore": "Dodaj prije",
