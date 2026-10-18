@@ -5,8 +5,18 @@ import type { DashboardField } from '../../../../src/dashboard/runtime/meta-type
 
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
+import { type FakeElement, findElement, hasClass } from '../../_fake-dom.ts';
 import { fire } from '../../ui/_events.ts';
 import { inputOf, type } from '../_controls.ts';
+
+/**
+ * The first `input` under `root` whose `type` is `kind`.
+ */
+const byType = (root: unknown, kind: string) =>
+  findElement(
+    root as FakeElement,
+    (element) => element.tagName === 'INPUT' && (element.getAttribute('type') ?? 'text') === kind,
+  ) as FakeElement;
 
 const { numberType } = await import('../../../../src/dashboard/fields/builtin/number.ts');
 
@@ -163,5 +173,130 @@ describe('numberType control', () => {
       strictEqual(mode({ min: -10 }), null);
       strictEqual(mode({}), null);
     });
+  });
+
+  it('steps along the `step` grid and stops on its last point within bounds', () => {
+    effectScope().run(() => {
+      const control = numberType.control!({
+        field: { ...GOLD, options: { min: 0, max: 1, step: 0.3 } },
+        initial: 0.1,
+        mode: 'edit',
+        path: 'gold',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      const input = inputOf(control.element);
+      const press = (key: string, shiftKey = false): void => {
+        fire(input, 'keydown', { key, shiftKey });
+        flush();
+      };
+      press('ArrowUp');
+      deepStrictEqual(control.read(), { value: 0.3 });
+      press('ArrowUp', true);
+      deepStrictEqual(control.read(), { value: 0.9 });
+      press('ArrowDown');
+      deepStrictEqual(control.read(), { value: 0.6 });
+    });
+  });
+
+  it('checks a changed value against the grid, and leaves a stored one alone', () => {
+    effectScope().run(() => {
+      const control = numberType.control!({
+        field: { ...GOLD, options: { step: 0.25 } },
+        initial: 0.1,
+        mode: 'edit',
+        path: 'gold',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      deepStrictEqual(control.read(), { value: 0.1 });
+      type(inputOf(control.element), '0.3');
+      deepStrictEqual(control.read(), { errors: { '': 'validation.invalidStep' } });
+      type(inputOf(control.element), '0.75');
+      deepStrictEqual(control.read(), { value: 0.75 });
+    });
+  });
+
+  it('shows the suffix inside the input', () => {
+    effectScope().run(() => {
+      const control = numberType.control!({
+        field: { ...GOLD, options: { suffix: 'kg' } },
+        initial: 2,
+        mode: 'edit',
+        path: 'gold',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      flush();
+      const unit = findElement(control.element as unknown as FakeElement, (element) =>
+        hasClass(element, 'ohne-numeric-suffix'),
+      );
+      strictEqual(unit?.textContent, 'kg');
+    });
+  });
+
+  it('pairs a slider with the input under `display: slider`, both on one value', () => {
+    effectScope().run(() => {
+      const control = numberType.control!({
+        field: { ...GOLD, options: { min: 0, max: 5, step: 0.5, display: 'slider' } },
+        initial: 2,
+        mode: 'edit',
+        path: 'gold',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      flush();
+      const range = byType(control.element, 'range');
+      const text = byType(control.element, 'text');
+      strictEqual(range.getAttribute('aria-hidden'), 'true');
+      strictEqual((range as unknown as { value: string }).value, '2');
+      (range as unknown as { value: string }).value = '3.5';
+      fire(range, 'input');
+      flush();
+      strictEqual((text as unknown as { value: string }).value, '3.5');
+      deepStrictEqual(control.read(), { value: 3.5 });
+      type(text, '1');
+      flush();
+      strictEqual((range as unknown as { value: string }).value, '1');
+    });
+  });
+
+  it('renders the input alone when a slider has no range', () => {
+    effectScope().run(() => {
+      const control = numberType.control!({
+        field: { ...GOLD, options: { display: 'slider' } },
+        initial: 2,
+        mode: 'edit',
+        path: 'gold',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      strictEqual(byType(control.element, 'range'), undefined);
+    });
+  });
+});
+
+describe('numberType display', () => {
+  const cell = (value: unknown, options: DashboardField['options'] = {}) =>
+    (
+      numberType.display!({
+        field: { ...GOLD, options },
+        value: () => value,
+      } as never) as unknown as () => FakeElement | string
+    )() as FakeElement;
+
+  it('shows the suffix dim beside the value, and both in the title', () => {
+    const shown = cell(2.5, { suffix: 'kg' });
+    strictEqual(shown.getAttribute('title'), '2.5 kg');
+    strictEqual(shown.textContent, '2.5kg');
+  });
+
+  it('shows the value alone without a suffix', () => {
+    strictEqual(cell(2.5).getAttribute('title'), '2.5');
+  });
+
+  it('summarizes with the unit', () => {
+    strictEqual(numberType.summary!(2.5, { ...GOLD, options: { suffix: 'kg' } }), '2.5 kg');
+    strictEqual(numberType.summary!(null, GOLD), '');
   });
 });

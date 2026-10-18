@@ -1,161 +1,17 @@
-import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { NumberFieldOptions } from '../known-field-types.ts';
 
-import { numericInputMode } from '../../../utils/html/numeric-input-mode.ts';
-import { isInteger } from '../../../utils/is/is-integer.ts';
-import { isNullish } from '../../../utils/is/is-nullish.ts';
-import { isNumber } from '../../../utils/is/is-number.ts';
-import { isUndefined } from '../../../utils/is/is-undefined.ts';
-import { clamp } from '../../../utils/number/clamp.ts';
-import { ref } from '../../../utils/reactive/ref.ts';
-import { checkRange } from '../../../utils/validate/check-range.ts';
-import { h } from '../../render/h.ts';
-import { useT } from '../../runtime/use-t.ts';
-import { numberInput } from '../../ui/number-input.ts';
-import { textInput } from '../../ui/text-input.ts';
-import { checkedReading } from '../_checked-reading.ts';
-import { cellEditor } from '../cell-editor.ts';
-import { describeControl, fieldPlaceholder } from '../field-row.ts';
-import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
+import { type FieldType, registerFieldType } from '../field-type.ts';
 import { parseIntegerValue } from '../parse.ts';
+import { numericFieldType } from './_numeric.ts';
 
 /**
- * The `integer` field type: cell display, inline cell editor, form control, and filter.
+ * The `integer` field type: cell display, inline cell editor, form control, summary, and filter.
  * The editor and control take any decimal notation of a safe integer, like `1e3`, and refuse fractions.
- * An emptied editor or control writes `null` on a nullable field; a non-nullable one omits.
- * The control validates on blur and on read, and steps by 1 on the arrow keys, by 10 with Shift.
- * The arrows stop at `min` and `max`; a changed value is checked against them, with the server's messages.
+ * The control validates on blur and on read, and steps on the arrow keys as `numericFieldType` describes.
  */
-export const integerType: FieldType<NumberFieldOptions> = {
-  display({ value }) {
-    return () => {
-      const current = value();
-      if (isNullish(current)) return dimMark('-');
-      const text = String(current as number);
-      return h('span', { class: 'ohne-truncate', title: text }, text);
-    };
-  },
-  editor({ field, value, commit, cancel }) {
-    const current = value();
-    return cellEditor({
-      initial: isNullish(current) ? '' : String(current as number),
-      commit(text) {
-        const parsed = parseIntegerValue(field, text);
-        if (!isUndefined(parsed.error) || isUndefined(parsed.value)) return false;
-        return commit(parsed.value);
-      },
-      cancel,
-    });
-  },
-  control({ field, initial, path, disabled, onInput }) {
-    const t = useT();
-    const off = disabled === true;
-    const base = ref(initial);
-    const raw = ref(isNullish(initial) ? '' : String(initial as number));
-    const local = ref('');
-    const routed = ref('');
-
-    const error = (): string => (routed.value !== '' ? routed.value : local.value);
-    const touch = (): void => {
-      local.value = '';
-      routed.value = '';
-      onInput();
-    };
-
-    const control = textInput(raw, { disabled: () => off, placeholder: fieldPlaceholder(field) });
-    const input = control.querySelector('input') as HTMLInputElement;
-    control.classList.add('ohne-input-numeric');
-    const inputMode = numericInputMode(field.options?.min);
-    if (inputMode) input.setAttribute('inputmode', inputMode);
-    input.addEventListener('input', touch);
-    input.addEventListener('blur', () => {
-      const parsed = parseIntegerValue(field, raw.value);
-      local.value = isUndefined(parsed.error) ? '' : t(parsed.error);
-    });
-    input.addEventListener('keydown', (event) => {
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-      const parsed = parseIntegerValue(field, raw.value);
-      if (!isInteger(parsed.value)) return;
-      event.preventDefault();
-      const step = (event.shiftKey ? 10 : 1) * (event.key === 'ArrowUp' ? 1 : -1);
-      const { min = -Infinity, max = Infinity } = field.options ?? {};
-      raw.value = String(clamp(parsed.value + step, min, max));
-      touch();
-    });
-    describeControl(input, field, path, error);
-
-    const dirty = (): boolean => {
-      if (isUndefined(base.value)) return raw.value.trim() !== '';
-      const parsed = parseIntegerValue(field, raw.value);
-      return !isUndefined(parsed.error) || parsed.value !== base.value;
-    };
-    const show = (value: unknown): void => {
-      raw.value = isNullish(value) ? '' : String(value as string | number);
-      local.value = '';
-      routed.value = '';
-    };
-
-    return {
-      element: control,
-      read() {
-        if (isUndefined(base.value) && raw.value.trim() === '') return {};
-        const parsed = parseIntegerValue(field, raw.value);
-        if (!isUndefined(parsed.error)) return { errors: { '': t(parsed.error) } };
-        if (isUndefined(parsed.value)) return {};
-        return checkedReading(
-          parsed.value,
-          isNumber(parsed.value) && dirty()
-            ? checkRange(parsed.value, field.options ?? {})
-            : undefined,
-        );
-      },
-      draft() {
-        if (isUndefined(base.value) && raw.value.trim() === '') return undefined;
-        const parsed = parseIntegerValue(field, raw.value);
-        return isUndefined(parsed.error) ? parsed.value : raw.value;
-      },
-      setErrors(errors) {
-        routed.value = errors[''] ?? '';
-        for (const [key, message] of Object.entries(errors)) {
-          if (key !== '') return message;
-        }
-        return '';
-      },
-      error,
-      dirty,
-      focus() {
-        input.focus();
-      },
-      revert() {
-        show(base.value);
-      },
-      rebase(value) {
-        base.value = value;
-        routed.value = '';
-      },
-      restore: show,
-    };
-  },
-  filter: {
-    operators: () => ['eq', 'ne', 'lt', 'lte', 'gt', 'gte'],
-    seed: () => 0,
-    input({ value, set, commit, inputID }) {
-      const bridged: Ref<number> = {
-        get value() {
-          return Number(value());
-        },
-        set value(next) {
-          set(next);
-        },
-      };
-      return numberInput(bridged, {
-        id: inputID,
-        name: inputID,
-        showSteppers: true,
-        onCommit: (next) => commit(next),
-      });
-    },
-  },
-};
+export const integerType: FieldType<NumberFieldOptions> = numericFieldType({
+  parse: parseIntegerValue,
+  decimal: false,
+});
 
 registerFieldType('integer', integerType);

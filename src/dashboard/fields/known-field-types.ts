@@ -234,6 +234,25 @@ export interface NumberFieldOptions {
    * The largest legal value.
    */
   max?: number;
+
+  /**
+   * The grid values must lie on: `min + k * step`, or `k * step` without `min`.
+   * The arrow keys and the slider move by it.
+   */
+  step?: number;
+
+  /**
+   * A fixed unit label shown after the value, like `'kg'` or a message key.
+   */
+  suffix?: Text;
+
+  /**
+   * The control: an input, or an input beside a range track spanning `min` to `max`.
+   *
+   * @default
+   * 'input'
+   */
+  display?: 'input' | 'slider';
 }
 
 /**
