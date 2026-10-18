@@ -321,6 +321,13 @@
     "via": "{collection} preko {target}"
   },
   "points": "{points} bod.",
+  "range": {
+    "between": "{start} - {end}",
+    "end": "Kraj",
+    "from": "Od {start}",
+    "noEnd": "Bez kraja",
+    "start": "Početak"
+  },
   "record": {
     "collectionOverview": "Pregled `{collection}`",
     "confirmDelete": "Da li zaista želite obrisati ovaj unos?",

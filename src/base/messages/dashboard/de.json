@@ -321,6 +321,13 @@
     "via": "{collection} über {target}"
   },
   "points": "{points} Pkt.",
+  "range": {
+    "between": "{start} - {end}",
+    "end": "Ende",
+    "from": "Ab {start}",
+    "noEnd": "Kein Ende",
+    "start": "Beginn"
+  },
   "record": {
     "collectionOverview": "`{collection}`-Übersicht",
     "confirmDelete": "Diesen Eintrag wirklich löschen?",
