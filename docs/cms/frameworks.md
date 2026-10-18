@@ -138,6 +138,7 @@ defineProps<Blocks['Hero']>();
 ```
 
 `defineProps` cannot resolve `Block<'Hero'>['fields']`, so name the block in `Blocks` instead.
+`Text.vue` is the same with `Blocks['Text']`, rendering only `<RichText :value="body" />`.
 
 ## Next
 
@@ -171,7 +172,7 @@ import type { Block, CMS } from '../../ohne';
 import { Preview } from '../../components/preview';
 import { RichText } from '../../components/rich-text';
 
-const api = process.env.NEXT_PUBLIC_OHNE_API!;
+const api = process.env.OHNE_API ?? 'http://localhost:9001';
 const ohne = createOhne<CMS>({ api, fetchInit: { cache: 'no-store' } });
 
 type Props = {
@@ -234,6 +235,9 @@ export default async function Page(props: Props) {
   );
 }
 ```
+
+`OHNE_API` is your API's URL. The server reads it when it runs, so one build serves every
+environment.
 
 The `switch` on `block.block` narrows `fields` to that block's. Narrow on `page.collection` the same
 way to render another collection.

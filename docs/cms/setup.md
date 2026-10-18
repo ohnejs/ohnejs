@@ -74,8 +74,9 @@ import { defineBlock, field } from 'ohnejs';
 
 export default defineBlock({
   fields: {
-    title: field('text'),
-    subtitle: field('text', { nullable: true }),
+    heading: field('text'),
+    image: field('image'),
+    body: field('richText'),
   },
 });
 ```
@@ -86,7 +87,7 @@ import { defineBlock, field } from 'ohnejs';
 
 export default defineBlock({
   fields: {
-    text: field('text'),
+    body: field('richText'),
   },
 });
 ```
