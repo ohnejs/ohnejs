@@ -376,6 +376,7 @@ export * from './validate/check-json.ts';
 export * from './validate/check-length.ts';
 export * from './validate/check-range.ts';
 export * from './validate/check-required.ts';
+export * from './validate/check-span.ts';
 export * from './validate/check-step.ts';
 export * from './validate/check-text.ts';
 export * from './validate/check-url.ts';
