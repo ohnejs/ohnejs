@@ -130,7 +130,7 @@ describe('richText through the write pipeline', () => {
     const five = list([item(list([item(list([item(list([item(list([item()]))]))]))]))]);
     deepStrictEqual(await failed({ body: [five] }), {
       'body[0].items[0].list.items[0].list.items[0].list.items[0].list': {
-        key: 'validation.maxDepth',
+        key: 'validation.maxListDepth',
         params: { max: 4 },
       },
     });

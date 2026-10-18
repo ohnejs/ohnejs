@@ -742,7 +742,7 @@ describe('htmlToRichText', () => {
     deepStrictEqual(checkRichText(value, PERMISSIVE), [
       {
         path: '[0].items[0].list.items[0].list.items[0].list.items[0].list',
-        key: 'validation.maxDepth',
+        key: 'validation.maxListDepth',
         params: { max: 4 },
       },
     ]);

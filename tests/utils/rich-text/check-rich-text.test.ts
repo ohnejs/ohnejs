@@ -244,7 +244,7 @@ describe('checkRichText', () => {
 
   it('refuses a fifth level at that list', () => {
     deepStrictEqual(checkRichText([nested(5)]), [
-      { path: FIFTH, key: 'validation.maxDepth', params: { max: 4 } },
+      { path: FIFTH, key: 'validation.maxListDepth', params: { max: 4 } },
     ]);
   });
 

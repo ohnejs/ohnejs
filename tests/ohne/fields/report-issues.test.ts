@@ -36,11 +36,11 @@ describe('reportIssues', () => {
   it('carries params as a `{ key, params }` message', () => {
     const errors: Record<string, Message> = {};
     reportIssues(
-      [{ path: '[0].items[0].list', key: 'validation.maxDepth', params: { max: 4 } }],
+      [{ path: '[0].items[0].list', key: 'validation.maxListDepth', params: { max: 4 } }],
       errors,
     );
     deepStrictEqual(errors, {
-      '[0].items[0].list': { key: 'validation.maxDepth', params: { max: 4 } },
+      '[0].items[0].list': { key: 'validation.maxListDepth', params: { max: 4 } },
     });
   });
 

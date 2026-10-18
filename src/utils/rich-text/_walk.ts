@@ -194,7 +194,7 @@ function walkURLTarget(
 function walkBlock(node: unknown, path: string, depth: number, walk: Walk): void {
   if (!isPlainObject(node)) return walk.report(path, INVALID);
   if (depth >= RICH_TEXT_MAX_LIST_DEPTH) {
-    return walk.report(path, 'validation.maxDepth', { max: RICH_TEXT_MAX_LIST_DEPTH });
+    return walk.report(path, 'validation.maxListDepth', { max: RICH_TEXT_MAX_LIST_DEPTH });
   }
   const { kind } = node;
   const keys = depth === 0 || kind === 'list' ? BLOCK_KEYS.get(kind) : undefined;
