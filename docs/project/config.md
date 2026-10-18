@@ -254,8 +254,8 @@ export default defineConfig({
 });
 ```
 
-- `dialect: 'sqlite'` - ohne ships SQLite. Layers can add
-  [other dialects](../database/engine.md#other-dialects).
+- `dialect` - which [dialect](../database/engine.md#other-dialects) opens the database. Unset, the
+  URL decides, so a `postgres://` URL picks [Postgres](../database/engine.md#postgres).
 - `url: '.data/ohne.db'` - where the main database lives, as a URL the dialect understands. For
   SQLite this is a file path, created if missing, or `':memory:'` for a temporary database.
 - `helpers: {}` - additional databases keyed by name, reached with

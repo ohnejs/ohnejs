@@ -147,6 +147,9 @@ UPLOADS_SECRET=frostmourne-hungers
 When you store files with [`@ohnejs/s3`](../uploads/storage.md#storing-files-in-s3), also set
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 
+A [Postgres](../database/engine.md#postgres) URL with a password is a secret too, so set it as
+`DATABASE`.
+
 Set them in the process environment, or in a [`.env`](../project/env.md#the-env-file) at the project
 root on a single-host deploy. The file only sets variables the environment does not have and never
 overrides it, so a value set by the platform always wins.

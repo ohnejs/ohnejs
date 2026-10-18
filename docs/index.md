@@ -48,7 +48,7 @@ you a typed query builder for reads and writes.
 - [Writing records](./database/writing.md) - create, update, and delete.
 - [Schema sync](./database/sync.md) - how your collections become tables, safely.
 - [Migrations](./database/migrations.md) - intentional data changes the sync guard would refuse.
-- [The database engine](./database/engine.md) - the SQLite engine, connections, and raw SQL.
+- [The database engine](./database/engine.md) - SQLite, Postgres, connections, and raw SQL.
 - [Cluster locks](./database/locks.md) - run work exactly once across instances.
 
 ## HTTP API

@@ -124,10 +124,11 @@ await useDatabase().transaction(async (tx) => {
 If the second create fails, the first rolls back with it, so the author never exists without the
 post.
 
-The app holds one connection per database, and transactions on it run one after another. A second
-`transaction` call waits until the first has finished, so writes that arrive at the same time wait
-in a queue instead of colliding. When another process holds the database locked, a write waits up to
-five seconds instead of failing at once.
+On SQLite, the app holds one connection per database, and transactions on it run one after another.
+A second `transaction` call waits until the first has finished, so writes that arrive at the same
+time wait in a queue instead of colliding. When another process holds the database locked, a write
+waits up to five seconds instead of failing at once. On [Postgres](#postgres), transactions run side
+by side on a pool of connections.
 
 If your own transaction writes, pass `'immediate'` as the second argument. It takes the write lock
 at `BEGIN` and waits there, instead of failing in the middle of the transaction. The builder's own
@@ -176,6 +177,35 @@ them itself, so do not use the prefix in your own SQL:
 - `ohne_migrations` records which [migrations](./migrations.md#each-migration-runs-once) ran.
 - `ohne_schema` holds the sync's schema snapshot.
 
+## Postgres
+
+For Postgres, install [`@ohnejs/pg`](https://github.com/ohnejs/pg):
+
+```sh
+pnpm add @ohnejs/pg
+```
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', '@ohnejs/pg'],
+  database: { url: 'postgres://localhost/app' },
+});
+```
+
+A `postgres://` or `postgresql://` URL selects the dialect, so `database.dialect` is optional.
+The URL carries the user, password, host, and database. When it holds a password, set it as
+`DATABASE` instead of writing it into config:
+
+```sh
+DATABASE=postgres://thrall:lok-tar@db.internal/app npx ohne dev
+```
+
+The [package README](https://github.com/ohnejs/pg#readme) covers the server requirements, the URL,
+and where Postgres behaves differently from SQLite.
+
 ## Other dialects
 
 SQLite is the built-in dialect. The engine uses the database only through the `Dialect` abstract
@@ -183,8 +213,25 @@ class. It is the only place that contains a driver and its SQL. To add another e
 
 1. A layer registers a `Dialect` instance with `useDialects()` from a
    [boot file](../project/boot.md#registering-a-dialect).
-2. It augments `KnownDialects` with the dialect's name.
-3. [`database.dialect`](../project/config.md#the-database) in config selects it.
+2. It augments `KnownDialects` with the dialect's name, in a file that imports no driver.
+3. A URL the dialect `accepts` selects it. [`database.dialect`](../project/config.md#the-database)
+   in config names it explicitly.
 
-The class's abstract members are the whole contract: connecting, quoting, type mapping, applying a
-schema diff. So an incomplete dialect fails to compile instead of failing at runtime.
+Without `database.dialect`, ohne asks each registered dialect in turn and picks the first that
+accepts the URL. SQLite is asked first and claims only file paths and `:memory:`. A URL the chosen
+dialect does not accept fails at boot, helpers included.
+
+The class's abstract members are the whole contract, so an incomplete dialect fails to compile
+instead of failing at runtime:
+
+- `name`, `maxParameters`, `accepts`, `connect` - the driver and the URLs it opens.
+- `quote`, `columnType`, `serialize`, `deserialize` - identifiers, column types, and values.
+- `textMatch`, `like`, `listMembership`, `paginate`, `sortTerm` - the SQL the query builder needs.
+- `listTables`, `describeTable`, `applyTableDiff`, `renameTable`, `schemaTransaction` - the
+  [schema sync](./sync.md).
+- `isUniqueViolation`, `uniqueViolationTarget`, `isForeignKeyViolation`, `isBusy` - driver errors.
+
+The other members work on any SQL database and a dialect overrides them only when its engine needs
+it. `ensureTable` creates the [reserved tables](#reserved-tables), and the lock and rate-limit
+methods keep their rows there. [`@ohnejs/pg`](https://github.com/ohnejs/pg) is a complete dialect to
+read alongside.

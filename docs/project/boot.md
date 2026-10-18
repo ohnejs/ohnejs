@@ -47,9 +47,7 @@ are in place when your boot files run, and its hooks fire before yours. Each lay
 
 ## Registering a dialect
 
-A boot file is where a layer adds a new dialect to the database: register the implementation and
-augment `KnownDialects` so [config](./config.md#the-database) accepts the name.
-[Other dialects](../database/engine.md#other-dialects) covers what a dialect does.
+A boot file is where a layer adds a new dialect to the database. It registers the implementation:
 
 ```ts
 // boot/dialect.ts
@@ -57,14 +55,25 @@ import { useDialects } from 'ohnejs';
 
 import { PostgresDialect } from '../database/postgres.ts';
 
+useDialects().register('postgres', new PostgresDialect());
+```
+
+A second file augments `KnownDialects`, so [config](./config.md#the-database) accepts the name:
+
+```ts
+// database/known-dialects.ts
+import type {} from 'ohnejs';
+
 declare module 'ohnejs' {
   interface KnownDialects {
     postgres: true;
   }
 }
-
-useDialects().register('postgres', new PostgresDialect());
 ```
+
+Keep the two apart. ohne imports every layer file that augments `ohnejs` into the app's types, so a
+driver import there would pull the driver's types into every app.
+[Other dialects](../database/engine.md#other-dialects) covers what a dialect does.
 
 Registering an existing name overrides it, so a dialect from a closer layer wins. This is the same
 furthest-first order that lets your app override a base layer.
