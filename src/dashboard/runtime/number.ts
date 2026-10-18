@@ -1,3 +1,6 @@
+import type { CurrencyCode } from '../../utils/i18n/currency-digits.ts';
+
+import { currencyDigits } from '../../utils/i18n/currency-digits.ts';
 import { formatNumberIn } from '../../utils/i18n/format-number-in.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { useDashboardLanguage } from './use-dashboard-language.ts';
@@ -16,8 +19,9 @@ export interface NumberFormatOptions {
 
   /**
    * An ISO 4217 code that formats the number as an amount of that currency, like `'EUR'`.
+   * The number is in major units, with the currency's ISO 4217 digits unless `decimals` is set.
    */
-  currency?: string;
+  currency?: CurrencyCode;
 
   /**
    * Reads the number as a ratio and writes it as a percentage, so `0.25` is `25%`.
@@ -58,7 +62,9 @@ export interface NumberFormatOptions {
  * ```
  */
 export function formatNumber(value: number, options: NumberFormatOptions = {}): string {
-  const { compact = false, currency, decimals, percent = false, signed = false } = options;
+  const { compact = false, currency, percent = false, signed = false } = options;
+  const decimals =
+    options.decimals ?? (isUndefined(currency) || compact ? undefined : currencyDigits[currency]);
   return formatNumberIn(value, useDashboardLanguage().value, {
     style: isUndefined(currency) ? (percent ? 'percent' : 'decimal') : 'currency',
     currency,

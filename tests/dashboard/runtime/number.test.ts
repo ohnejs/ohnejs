@@ -33,6 +33,12 @@ describe('formatNumber', () => {
     strictEqual(formatNumber(0.042, { percent: true, decimals: 1 }), '4.2%');
   });
 
+  it('takes the ISO 4217 digits of a currency unless `decimals` is set', () => {
+    strictEqual(formatNumber(12, { currency: 'HUF' }), 'HUF\u00a012.00');
+    strictEqual(formatNumber(1234, { currency: 'JPY' }), '¥1,234');
+    strictEqual(formatNumber(12.345, { currency: 'KWD', decimals: 1 }), 'KWD\u00a012.3');
+  });
+
   it('signs a change and leaves zero unsigned', () => {
     strictEqual(formatNumber(0.23, { percent: true, signed: true }), '+23%');
     strictEqual(formatNumber(0, { percent: true, signed: true }), '0%');
