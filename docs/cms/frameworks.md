@@ -1,268 +1,244 @@
 # Frameworks
 
 Each recipe is the whole loop for one framework: read the page, handle redirects and `404`s,
-fill the `<head>`, and join the [live preview](./website.md#live-preview). Replace the block markup
-with your own components.
+fill the `<head>`, and join the [live preview](./website.md#live-preview). Nuxt and Next have a
+package that runs it for you. React and any other server build it from `@ohnejs/client`.
 
 The TypeScript recipes read their [types](./website.md#types) from `ohne.ts`, for a `Pages`
 collection whose `content` holds `Hero` and `Text` blocks.
 
 ## Nuxt
 
-Put the API URL in the runtime config:
+[`@ohnejs/nuxt`](https://github.com/ohnejs/nuxt) is a Nuxt module that runs the whole loop. Install
+it with the client:
+
+```sh
+pnpm add @ohnejs/nuxt @ohnejs/client
+```
+
+List the module and name your API:
 
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
-  runtimeConfig: { public: { ohneAPI: 'https://api.example.com' } },
+  modules: ['@ohnejs/nuxt'],
+  ohne: { api: 'https://api.example.com' },
 });
 ```
 
-One catch-all page renders every route:
+- Only the server reads `ohne.api`, so it may be a private address. The browser reads through your
+  site's own `/_ohne` routes.
+- `NUXT_OHNE_API` replaces it when the server starts, so one build serves every environment.
+- The module types every page from the `ohne.ts` next to `nuxt.config.ts`.
+
+One catch-all page renders every path:
 
 ```vue
 <!-- app/pages/[...slug].vue -->
 <script setup lang="ts">
-import type { Component } from 'vue';
+definePageMeta({ middleware: 'ohne' });
 
-import { connect, createOhne } from '@ohnejs/client';
-import { Hero, Text } from '#components';
-
-import type { Block, CMS } from '~~/ohne';
-
-const blocks = { Hero, Text } satisfies Record<Block['block'], Component>;
-const api = useRuntimeConfig().public.ohneAPI;
-const ohne = createOhne<CMS>({ api });
-const route = useRoute();
-const token = useState('ohne-preview', () => route.query['ohne-preview'] as string | undefined);
-const address = route.fullPath.replace(/#.*/, '');
-
-const { data: page } = await useAsyncData(`ohne:${address}`, () =>
-  ohne.resolve(address, { token: token.value }),
-);
-if (page.value?.kind === 'redirect') {
-  await navigateTo(page.value.to, { redirectCode: page.value.code, external: true });
-}
-if (page.value?.kind !== 'page') throw createError({ status: 404 });
-
-if (import.meta.server && token.value) {
-  for (const [name, value] of Object.entries(ohne.previewHeaders())) {
-    useResponseHeader(name).value = value;
-  }
-}
-
-onMounted(() => {
-  if (!token.value) return;
-  const preview = connect<CMS>({ api, onData: (next) => (page.value = next) });
-  onBeforeUnmount(preview.dispose);
-});
-
-const seo = computed(() => (page.value?.kind === 'page' ? page.value.seo : undefined));
-useSeoMeta({
-  title: () => seo.value?.title,
-  description: () => seo.value?.description,
-  ogImage: () => seo.value?.image,
-  robots: () => (token.value ? 'noindex' : seo.value?.robots),
-});
-useHead({
-  link: () =>
-    page.value?.kind === 'page'
-      ? [
-          { rel: 'canonical', href: page.value.seo.canonical },
-          ...page.value.alternates.map((link) => ({ rel: 'alternate' as const, ...link })),
-        ]
-      : [],
-});
+const page = useOhnePage();
 </script>
 
 <template>
   <main v-if="page?.kind === 'page' && page.collection === 'Pages'">
     <h1>{{ page.record.title }}</h1>
-    <component
-      :is="blocks[block.block]"
-      v-for="block in page.record.content"
-      :key="block.UUID"
-      :data-ohne-block="block.UUID"
-      v-bind="block.fields"
-    />
+    <OhneBlocks :blocks="page.record.content" />
+  </main>
+  <main v-else-if="page?.kind === 'notFound' && page.page">
+    <h1>{{ page.page.title }}</h1>
+    <OhneBlocks :blocks="page.page.content" />
   </main>
 </template>
 ```
 
-`onData` swaps in each new page as the editor types, with no request. `useState` keeps the token
-across renders, since the client removes it from the address bar. When you add a block to the CMS,
-`satisfies` fails until `blocks` has a component for it.
+The `ohne` middleware resolves the path and its query once, on the server:
 
-`address` is the path with its query, which a redirect may keep. The hash stays out, so the key is
-the same on the server and in the browser.
+- A page fills `useOhnePage()`. Checking `collection` narrows `record` to that collection's fields.
+- A redirect answers with its own code, and renders nothing.
+- A miss answers `404` with your [`404` page](./setup.md#routes), and a failing API `502`.
 
-A [rich text](./website.md#rich-text-and-links) field renders through one component, which routes
-clicks on links to your pages through `navigateTo`:
+The module also fills the `<head>`, keeps a preview out of caches and search engines, joins the
+live preview, and serves `/sitemap.xml` and `/robots.txt`.
 
-```vue
-<!-- app/components/RichText.vue -->
-<script setup lang="ts">
-import { interceptLinks, richTextToHTML, type RichText } from '@ohnejs/client';
-
-const props = defineProps<{ value: RichText }>();
-const root = useTemplateRef('root');
-const html = computed(() => richTextToHTML(props.value));
-
-onMounted(() => {
-  const dispose = interceptLinks(root.value!, (path) => navigateTo(path));
-  onBeforeUnmount(dispose);
-});
-</script>
-
-<template>
-  <div ref="root" v-html="html" />
-</template>
-```
-
-Each block is a component that takes its fields as props. `Blocks['Hero']` types them:
+`OhneBlocks` renders each block with the component of the same name in `app/components/blocks/`. A
+block component takes the block's fields as `fields`:
 
 ```vue
-<!-- app/components/Hero.vue -->
+<!-- app/components/blocks/Hero.vue -->
 <script setup lang="ts">
 import type { Blocks } from '~~/ohne';
 
-defineProps<Blocks['Hero']>();
+defineProps<{ fields: Blocks['Hero'] }>();
 </script>
 
 <template>
   <section>
-    <h2>{{ heading }}</h2>
-    <RichText :value="body" />
+    <h2>{{ fields.heading }}</h2>
+    <OhneRichText :value="fields.body" />
   </section>
 </template>
 ```
 
-`defineProps` cannot resolve `Block<'Hero'>['fields']`, so name the block in `Blocks` instead.
-`Text.vue` is the same with `Blocks['Text']`, rendering only `<RichText :value="body" />`.
+`Text.vue` is the same with `Blocks['Text']`, rendering only
+`<OhneRichText :value="fields.body" />`.
+
+- The root element gets `data-ohne-block`, so the editor can select the block. Keep one root.
+- `OhneRichText` sends clicks on links to your pages through `navigateTo`. `OhneLink` renders a
+  `link` field as a `NuxtLink`.
+- `nuxt typecheck` names a block that has no component.
+
+`nuxt typecheck` runs `vue-tsc`, which needs TypeScript 6, so keep your Nuxt app on it. The module's
+[README](https://github.com/ohnejs/nuxt#readme) covers layouts and reading other paths.
 
 ## Next
 
-The page renders on the server. In preview, `router.refresh()` renders it again from the URL, so
-`keepToken` leaves the token there:
+[`@ohnejs/next`](https://github.com/ohnejs/next) runs the whole loop in the App Router. Install it
+with the client:
 
-```tsx
-// components/preview.tsx
-'use client';
-
-import { connect } from '@ohnejs/client';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-
-export function Preview({ api }: { api: string }) {
-  const router = useRouter();
-  useEffect(() => connect({ api, keepToken: true, onRefresh: router.refresh }).dispose, [api, router]);
-  return null;
-}
+```sh
+pnpm add @ohnejs/next @ohnejs/client
 ```
+
+Create the connection once:
+
+```ts
+// lib/ohne.ts
+import { createOhneNext } from '@ohnejs/next';
+
+import type { CMS } from '../ohne';
+
+export const ohne = createOhneNext<CMS>({ api: process.env.OHNE_API ?? 'http://localhost:9001' });
+```
+
+`OHNE_API` is your API's address. The server reads it when it runs, so one build serves every
+environment, and it may be a private address.
+
+Every page request passes through the proxy:
+
+```ts
+// proxy.ts
+import { ohne } from './lib/ohne';
+
+export const proxy = ohne.proxy;
+
+export const config = { matcher: '/((?!_next/).*)' };
+```
+
+It hands each page its path and query, keeps a preview out of caches and search engines, and serves
+the editor's script under `/_ohne/`, so keep the `matcher` covering that.
+
+One catch-all page renders every path:
 
 ```tsx
 // app/[[...slug]]/page.tsx
-import type { Metadata } from 'next';
+import { OhneBlocks } from '@ohnejs/next';
 
-import { createOhne } from '@ohnejs/client';
-import { notFound, permanentRedirect, redirect } from 'next/navigation';
+import { Hero } from '../../components/hero';
+import { Text } from '../../components/text';
+import { ohne } from '../../lib/ohne';
 
-import type { Block, CMS } from '../../ohne';
+export const generateMetadata = ohne.metadata;
 
-import { Preview } from '../../components/preview';
-import { RichText } from '../../components/rich-text';
-
-const api = process.env.OHNE_API ?? 'http://localhost:9001';
-const ohne = createOhne<CMS>({ api, fetchInit: { cache: 'no-store' } });
-
-type Props = {
-  params: Promise<{ slug?: string[] }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
-async function load({ params, searchParams }: Props) {
-  const { slug = [] } = await params;
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(await searchParams)) {
-    for (const each of [value].flat()) if (each !== undefined) query.append(key, each);
-  }
-  const token = query.get('ohne-preview') ?? undefined;
-  const page = await ohne.resolve(`/${slug.join('/')}${query.size ? `?${query}` : ''}`, { token });
-  if (page.kind === 'redirect') {
-    if (page.code === 301 || page.code === 308) permanentRedirect(page.to);
-    redirect(page.to);
-  }
-  if (page.kind === 'notFound') notFound();
-  return { page, token };
-}
-
-export async function generateMetadata(props: Props): Promise<Metadata> {
-  const { page, token } = await load(props);
-  return {
-    title: page.seo.title,
-    description: page.seo.description,
-    openGraph: { images: page.seo.image },
-    robots: token ? 'noindex' : page.seo.robots,
-    alternates: {
-      canonical: page.seo.canonical,
-      languages: Object.fromEntries(page.alternates.map((link) => [link.hreflang, link.href])),
-    },
-  };
-}
-
-function Content({ block }: { block: Block }) {
-  switch (block.block) {
-    case 'Hero':
-      return <h2>{block.fields.heading}</h2>;
-    case 'Text':
-      return <RichText value={block.fields.body} />;
-  }
-}
-
-export default async function Page(props: Props) {
-  const { page, token } = await load(props);
-  if (page.collection !== 'Pages') notFound();
+export default async function Page() {
+  const { page } = await ohne.page();
   return (
-    <main>
+    <main lang={page.locale}>
       <h1>{page.record.title}</h1>
-      {page.record.content.map((block) => (
-        <section key={block.UUID} data-ohne-block={block.UUID}>
-          <Content block={block} />
-        </section>
-      ))}
-      {token && <Preview api={api} />}
+      <OhneBlocks blocks={page.record.content} components={{ Hero, Text }} />
     </main>
   );
 }
 ```
 
-`OHNE_API` is your API's URL. The server reads it when it runs, so one build serves every
-environment.
+- `ohne.page()` resolves the address. A permanent redirect answers `308`, a temporary one `307`, and
+  a miss `404`.
+- `ohne.metadata` fills the title, description, share tags, robots, canonical and `hreflang` links.
+- `components` must name a component for every block, so a block the CMS adds fails the typecheck.
 
-The `switch` on `block.block` narrows `fields` to that block's. Narrow on `page.collection` the same
-way to render another collection.
-
-Next hands a page its query as an object, with a repeated key as an array, so `load` writes it back
-out for `resolve`, which a redirect may keep.
-
-A [rich text](./website.md#rich-text-and-links) field renders through one client component, which
-routes clicks on links to your pages through `router.push`:
+A miss renders the not-found page beside it, with your [`404` page](./setup.md#routes):
 
 ```tsx
-// components/rich-text.tsx
-'use client';
+// app/[[...slug]]/not-found.tsx
+import { OhneBlocks } from '@ohnejs/next';
 
-import { interceptLinks, richTextToHTML, type RichText as RichTextValue } from '@ohnejs/client';
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { Hero } from '../../components/hero';
+import { Text } from '../../components/text';
+import { ohne } from '../../lib/ohne';
 
-export function RichText({ value }: { value: RichTextValue }) {
-  const router = useRouter();
-  const root = useRef<HTMLDivElement>(null);
-  useEffect(() => interceptLinks(root.current!, router.push), [router]);
-  return <div ref={root} dangerouslySetInnerHTML={{ __html: richTextToHTML(value) }} />;
+export default async function NotFound() {
+  const { resolved } = await ohne.current();
+  const page = resolved.kind === 'notFound' ? resolved.page : undefined;
+  return (
+    <main>
+      <h1>{page?.title ?? 'Page not found'}</h1>
+      <OhneBlocks blocks={page?.content} components={{ Hero, Text }} />
+    </main>
+  );
 }
 ```
+
+The root layout joins the live preview. Outside the editor's frame, `OhnePreview` does nothing:
+
+```tsx
+// app/layout.tsx
+import { OhnePreview } from '@ohnejs/next/client';
+
+export default function Layout({ children }: LayoutProps<'/'>) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <OhnePreview />
+      </body>
+    </html>
+  );
+}
+```
+
+Each block component takes its block:
+
+```tsx
+// components/hero.tsx
+import { OhneRichText } from '@ohnejs/next/client';
+
+import type { Block } from '../ohne';
+
+export function Hero({ fields }: Block<'Hero'>) {
+  return (
+    <section>
+      <h2>{fields.heading}</h2>
+      <OhneRichText value={fields.body} />
+    </section>
+  );
+}
+```
+
+`text.tsx` is the same with `Block<'Text'>`, rendering only `<OhneRichText value={fields.body} />`.
+
+- `OhneBlocks` wraps each block in a `<div>` with `data-ohne-block`, so the editor can select it.
+- `OhneRichText` sends clicks on links to your pages through Next's router. `OhneLink` renders a
+  `link` field as Next's `Link`.
+
+Two route handlers serve the sitemap and `robots.txt` at your site's root:
+
+```ts
+// app/sitemap.xml/route.ts
+import { ohne } from '../../lib/ohne';
+
+export const GET = ohne.sitemap;
+```
+
+```ts
+// app/robots.txt/route.ts
+import { ohne } from '../../lib/ohne';
+
+export const GET = ohne.robots;
+```
+
+The package's [README](https://github.com/ohnejs/next#readme) covers caching, with a route for
+[webhooks](./webhooks.md) that drops the cache when content changes.
 
 ## React
 

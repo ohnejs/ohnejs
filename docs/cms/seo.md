@@ -91,23 +91,8 @@ The CMS builds both from every page a visitor may see:
 A hidden page and the `404` page stay out of the sitemap. A hidden site lists nothing, and its
 `robots.txt` closes everything.
 
-Search engines look for both at your website's root, so serve them from there. In Next, a rewrite
-does it:
-
-```ts
-// next.config.ts
-import type { NextConfig } from 'next';
-
-const api = process.env.OHNE_API;
-
-export default {
-  async rewrites() {
-    return [
-      { source: '/sitemap.xml', destination: `${api}/cms/sitemap.xml` },
-      { source: '/robots.txt', destination: `${api}/cms/robots.txt` },
-    ];
-  },
-} satisfies NextConfig;
-```
+Search engines look for both at your website's root. `@ohnejs/nuxt` serves them there, and
+`@ohnejs/next` gives you a route handler for each, as [Frameworks](./frameworks.md#next) shows. Any
+other site forwards both paths to the API.
 
 The URLs inside use `cms.site`, so they point at your website, not at the API.

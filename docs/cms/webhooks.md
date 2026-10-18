@@ -56,6 +56,9 @@ export async function POST(request: Request) {
 }
 ```
 
+With [`@ohnejs/next`](https://github.com/ohnejs/next#caching), `ohne.webhook` is this route, for a
+site that caches its reads with `revalidate`.
+
 To check it in another language: the `Ohne-Signature` header reads `t=<seconds>,v1=<signature>`.
 The signature is the HMAC-SHA256 of `<seconds>.<body>` under your secret, encoded as base64url
 without padding. Refuse a `t` more than five minutes off your clock, as `verifyWebhook` does.

@@ -282,13 +282,15 @@ const posts = await response.json();
 
 ## Adding the CMS
 
-When your backend is the CMS for this website, add the layer to it, and the client that reads its
-pages to the website:
+When your backend is the CMS for this website, add the layer to it, and your framework's package
+to the website:
 
 ```sh
 pnpm --filter backend add @ohnejs/cms
-pnpm --filter web add @ohnejs/client
+pnpm --filter web add @ohnejs/nuxt @ohnejs/client
 ```
+
+For a Next website, add `@ohnejs/next` instead of `@ohnejs/nuxt`.
 
 Set it up as in [The CMS](../cms/setup.md), with one more key, `types`:
 
@@ -312,9 +314,8 @@ rewrites the file while `ohne dev` runs, whenever you change a collection or a b
 
 - Commit `ohne.ts`. The website then builds without the backend, even on a host that installs
   `apps/web` alone.
-- The CMS allows `site` in its CORS policy, so you skip the CORS step above. Open the website at
-  `localhost`, as `site` spells it.
-- [Frameworks](../cms/frameworks.md) has the page and its components for Nuxt and Next.
+- The website reads the CMS through its own server, so the CMS needs no CORS step.
+- [Frameworks](../cms/frameworks.md) sets up the package, the page and its components.
 
 In CI, check that someone who changed a block also committed the new types:
 
@@ -330,7 +331,8 @@ Each app deploys on its own:
 - The backend deploys like [any ohne app](../production/deployment.md), from `apps/backend`. With
   the CMS, set `SITE_URL` to the website's public address.
 - A Nuxt website builds with `pnpm --filter web build` and runs as
-  `node apps/web/.output/server/index.mjs`, with `NUXT_PUBLIC_OHNE_API` set to your API.
+  `node apps/web/.output/server/index.mjs`, with `NUXT_PUBLIC_OHNE_API` set to your API. With the
+  CMS, set `NUXT_OHNE_API` too.
 - A Next website builds with `pnpm --filter web build` and runs as `pnpm --filter web start`, with
   `OHNE_API` set to your API.
 
