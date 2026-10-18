@@ -25,18 +25,26 @@ import {
   textInput,
   timezones,
   translateMessage,
+  useDashboardLanguage,
   useT,
 } from 'ohnejs/dashboard';
 import {
+  type CountryCode,
+  countryCodes,
+  type CurrencyCode,
+  currencyCodes,
   deepEqual,
+  displayName,
   effect,
   first,
+  foldCase,
   formatDatePattern,
   isArray,
   isEmpty,
   isNull,
   isString,
   isUndefined,
+  matchesCodeOrName,
   onCleanup,
   type Ref,
   ref,
@@ -44,7 +52,6 @@ import {
   untracked,
 } from 'ohnejs/utils';
 
-import { languageName } from '../components/content-language-switcher.ts';
 import '../components/data-table-popup.ts';
 
 declare module 'ohnejs/dashboard' {
@@ -78,6 +85,16 @@ declare module 'ohnejs/dashboard' {
      * A date format pattern, like `DD.MM.YYYY`.
      */
     datePattern: { options: {}; value: string };
+
+    /**
+     * An ISO 3166-1 alpha-2 country code, shown by its name.
+     */
+    country: { options: { only?: readonly CountryCode[] }; value: CountryCode };
+
+    /**
+     * An ISO 4217 currency code, shown by its name.
+     */
+    currency: { options: { only?: readonly CurrencyCode[] }; value: CurrencyCode };
   }
 }
 
@@ -339,12 +356,18 @@ registerFieldType('roles', {
 
 registerFieldType(
   'language',
-  codeType(() => dashboardMeta()?.languages ?? [], languageName),
+  codeType(
+    () => dashboardMeta()?.languages ?? [],
+    (code) => displayName(code, 'language', code),
+  ),
 );
 
 registerFieldType(
   'locale',
-  codeType(() => dashboardMeta()?.locales ?? [], languageName),
+  codeType(
+    () => dashboardMeta()?.locales ?? [],
+    (code) => displayName(code, 'language', code),
+  ),
 );
 
 registerFieldType('timezone', {
@@ -361,7 +384,12 @@ registerFieldType('timezone', {
     return codeControl(context, (model, commit, error) => {
       const picker = dynamicSelect(model, {
         choicesResolver: (page, keyword) =>
-          Promise.resolve(timezonePage(page, keyword, t('auth.timezone.auto'))),
+          choicePage(
+            isEmpty(keyword, { trim: true })
+              ? [{ value: null, label: t('auth.timezone.auto') }, ...TIMEZONE_CHOICES]
+              : searchByKeywords(TIMEZONE_CHOICES, keyword, 'value'),
+            page,
+          ),
         selectedChoiceResolver: (value) => Promise.resolve({ value, label: String(value) }),
         placeholder: () => t('auth.timezone.auto'),
         searchLabel: () => t('dashboard.searchPlaceholder'),
@@ -379,6 +407,10 @@ registerFieldType('timezone', {
     });
   },
 });
+
+registerFieldType('country', isoCodeType(countryCodes, 'region'));
+
+registerFieldType('currency', isoCodeType(currencyCodes, 'currency'));
 
 registerFieldType('datePattern', {
   display({ value }) {
@@ -542,7 +574,111 @@ function codeType(list: () => string[], label: (code: string) => string): FieldT
 }
 
 /**
- * A control over one nullable code, shared by the language, locale, and time zone types.
+ * A field type over a fixed list of ISO codes, each shown by its name in the dashboard language.
+ * The cell and summary show the name, the code its title; `only` narrows the list.
+ * The control picks from the names, sorted, matching a search on the exact code or a word start of the name.
+ * A search's exact code leads the matches.
+ * A nullable field leads its picker with a `-` row that clears the value.
+ */
+function isoCodeType(codes: readonly string[], kind: 'region' | 'currency'): FieldType {
+  const namedCodes = (
+    only: unknown,
+    language: string,
+    keyword = '',
+  ): { code: string; name: string }[] => {
+    const collator = new Intl.Collator(language);
+    const token = keyword.trim();
+    const exact = ({ code }: { code: string }): number =>
+      foldCase(code) === foldCase(token) ? 0 : 1;
+    return (isArray<string[]>(only) ? only : codes)
+      .map((code) => ({ code, name: displayName(code, kind, language) }))
+      .filter(({ code, name }) => token === '' || matchesCodeOrName(code, name, token))
+      .sort((a, b) => exact(a) - exact(b) || collator.compare(a.name, b.name));
+  };
+  const choicesOf = (only: unknown, language: string, keyword?: string): DynamicSelectChoice[] =>
+    namedCodes(only, language, keyword).map(({ code, name }) => ({
+      value: code,
+      label: () => name,
+      badge: code,
+    }));
+  const selected = (code: Primitive, language: () => string): DynamicSelectChoice => ({
+    value: code,
+    label: () => displayName(String(code), kind, language()),
+    badge: String(code),
+  });
+  return {
+    display({ value, language }) {
+      return () => {
+        const current = value();
+        if (!isString(current)) return dimMark('-');
+        return h(
+          'span',
+          { class: 'ohne-truncate', title: current },
+          displayName(current, kind, language()),
+        );
+      };
+    },
+    summary(value) {
+      return isString(value) ? displayName(value, kind, useDashboardLanguage().value) : '';
+    },
+    control(context) {
+      const t = useT();
+      const { field } = context;
+      let combobox: HTMLElement | null = null;
+      return codeControl(context, (model, commit, error) => {
+        const picker = dynamicSelect(model, {
+          choicesResolver: (page, keyword) => {
+            const lead =
+              field.nullable && isEmpty(keyword, { trim: true })
+                ? [{ value: null, label: () => '-' }]
+                : [];
+            return choicePage(
+              [...lead, ...choicesOf(field.options?.only, context.language(), keyword)],
+              page,
+            );
+          },
+          selectedChoiceResolver: (value) => Promise.resolve(selected(value, context.language)),
+          placeholder: fieldPlaceholder(field),
+          searchLabel: () => t('dashboard.searchPlaceholder'),
+          noResultsLabel: () => t('dashboard.noResultsFound'),
+          disabled: () => context.disabled === true,
+          name: context.path,
+          onCommit: commit,
+        });
+        combobox = picker.querySelector<HTMLElement>('[role="combobox"]');
+        if (!isNull(combobox)) describeControl(combobox, field, context.path, error);
+        return { element: picker, focus: () => combobox?.focus() };
+      });
+    },
+    filter: {
+      operators: () => ['eq', 'ne'],
+      seed: (field) =>
+        first(namedCodes(field.options?.only, useDashboardLanguage().value))?.code ?? '',
+      input({ field, value, commit, inputID, language }) {
+        const t = useT();
+        const bridged: Ref<Primitive> = {
+          get value() {
+            return value();
+          },
+          set value(next) {
+            commit(String(next));
+          },
+        };
+        return dynamicSelect(bridged, {
+          choicesResolver: (page, keyword) =>
+            choicePage(choicesOf(field.options?.only, language(), keyword), page),
+          selectedChoiceResolver: (code) => Promise.resolve(selected(code, language)),
+          searchLabel: () => t('dashboard.searchPlaceholder'),
+          noResultsLabel: () => t('dashboard.noResultsFound'),
+          name: inputID,
+        });
+      },
+    },
+  };
+}
+
+/**
+ * A control over one code, shared by every code type: language, locale, time zone, country, and currency.
  * `build` renders the picker over the model and routes its commits; the handle owns touch, dirt, and errors.
  * Untouched, the control reads back the stored value unchanged, as the builtin `select` does.
  */
@@ -613,22 +749,21 @@ function codeControl(
 
 const TIMEZONE_CHOICES: DynamicSelectChoice[] = timezones.map((value) => ({ value }));
 
-const TIMEZONES_PER_PAGE = 50;
+const CHOICES_PER_PAGE = 50;
 
 /**
- * One page of the time zone picker, from the zones matching `keyword`.
- * With no keyword, the `auto` row leads the full list.
+ * One page of a long picker's matching choices.
  */
-function timezonePage(page: number, keyword: string, auto: string): DynamicSelectPaginatedChoices {
-  const matches = isEmpty(keyword, { trim: true })
-    ? [{ value: null, label: auto }, ...TIMEZONE_CHOICES]
-    : searchByKeywords(TIMEZONE_CHOICES, keyword, 'value');
-  const start = (page - 1) * TIMEZONES_PER_PAGE;
-  return {
-    choices: matches.slice(start, start + TIMEZONES_PER_PAGE),
+function choicePage(
+  matches: readonly DynamicSelectChoice[],
+  page: number,
+): Promise<DynamicSelectPaginatedChoices> {
+  const start = (page - 1) * CHOICES_PER_PAGE;
+  return Promise.resolve({
+    choices: matches.slice(start, start + CHOICES_PER_PAGE),
     currentPage: page,
-    lastPage: Math.max(1, Math.ceil(matches.length / TIMEZONES_PER_PAGE)),
-    perPage: TIMEZONES_PER_PAGE,
+    lastPage: Math.max(1, Math.ceil(matches.length / CHOICES_PER_PAGE)),
+    perPage: CHOICES_PER_PAGE,
     total: matches.length,
-  };
+  });
 }

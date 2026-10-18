@@ -1,7 +1,7 @@
 import { attachTooltip, css, dashboardMeta, dimMark, h, useT } from 'ohnejs/dashboard';
-import { formatLocaleCode, isArray, isUndefined, onCleanup } from 'ohnejs/utils';
+import { displayName, formatLocaleCode, isArray, isUndefined, onCleanup } from 'ohnejs/utils';
 
-import { effectiveContentLocale, languageName } from './content-language-switcher.ts';
+import { effectiveContentLocale } from './content-language-switcher.ts';
 
 /**
  * Options for `translationsCell`.
@@ -92,7 +92,7 @@ export function translationsCell(
   const t = useT();
   const held = row._translations;
   const tooltip = (code: string, translated: boolean, linked: boolean): string => {
-    const locale = languageName(code);
+    const locale = displayName(code, 'language', code);
     if (!translated) {
       return t(
         linked ? 'dashboard.translations.newLocale' : 'dashboard.translations.missingLocale',

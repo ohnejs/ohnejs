@@ -20,6 +20,7 @@ import {
   when,
 } from 'ohnejs/dashboard';
 import {
+  displayName,
   formatLocaleCode,
   isUndefined,
   onCleanup,
@@ -34,7 +35,6 @@ import {
   activeContentLocale,
   contentLocale,
   effectiveContentLocale,
-  languageName,
 } from './content-language-switcher.ts';
 
 /**
@@ -300,7 +300,11 @@ export function translationsPopup(options: TranslationsPopupOptions): Popup {
           'div',
           { class: 'ohne-row o-translations-locale' },
           h('div', { class: 'ohne-shrink-0' }, formatLocaleCode(code)),
-          h('span', { class: 'ohne-muted ohne-truncate' }, `(${languageName(code)})`),
+          h(
+            'span',
+            { class: 'ohne-muted ohne-truncate' },
+            `(${displayName(code, 'language', code)})`,
+          ),
           code === current
             ? h(
                 'span',

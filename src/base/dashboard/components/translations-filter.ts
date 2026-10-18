@@ -7,8 +7,9 @@ import {
   select,
   type SelectChoice,
 } from 'ohnejs/dashboard';
+import { displayName } from 'ohnejs/utils';
 
-import { effectiveContentLocale, languageName } from './content-language-switcher.ts';
+import { effectiveContentLocale } from './content-language-switcher.ts';
 
 /**
  * The `_translations` filter: whether a record holds a translation at a chosen content locale.
@@ -31,7 +32,7 @@ export const translationsFilter: FieldFilter = {
       (): SelectChoice[] =>
         (dashboardMeta()?.locales ?? []).map((code) => ({
           value: code,
-          label: languageName(code),
+          label: displayName(code, 'language', code),
         })),
       { id: inputID, name: inputID },
     );

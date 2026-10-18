@@ -64,3 +64,48 @@ describe('the `password` control', () => {
     strictEqual(control?.draft?.(), '');
   });
 });
+
+describe('the `country` and `currency` types', () => {
+  let fieldTypeFor!: FieldTypes['fieldTypeFor'];
+
+  before(async () => {
+    ({ fieldTypeFor } = await import('../../../../src/dashboard/fields/field-type.ts'));
+  });
+
+  const cell = (type: string, value: unknown, language = 'de') => {
+    const field = { name: type, type, options: {} } as DashboardField;
+    return (
+      fieldTypeFor(field).display({ field, value: () => value, language: () => language }) as () =>
+        | FakeElement
+        | string
+    )() as FakeElement;
+  };
+
+  it('shows the name in the dashboard language, the code as its title', () => {
+    const shown = cell('country', 'DE');
+    strictEqual(shown.textContent, 'Deutschland');
+    strictEqual(shown.getAttribute('title'), 'DE');
+    strictEqual(cell('currency', 'JPY', 'en').textContent, 'Japanese Yen');
+  });
+
+  it('shows a dim mark without a value', () => {
+    strictEqual(cell('country', null).getAttribute('class'), 'cell-dim');
+  });
+
+  it('summarizes by the name', () => {
+    const field = { name: 'country', type: 'country', options: {} } as DashboardField;
+    strictEqual(fieldTypeFor(field).summary?.('DE', field), 'Germany');
+    strictEqual(fieldTypeFor(field).summary?.(null, field), '');
+  });
+
+  it('filters on equality, seeded with the first name in order', () => {
+    const field = {
+      name: 'country',
+      type: 'country',
+      options: { only: ['DE', 'AT', 'CH'] },
+    } as unknown as DashboardField;
+    const { filter } = fieldTypeFor(field);
+    strictEqual(filter?.operators(field).join(), 'eq,ne');
+    strictEqual(filter?.seed(field), 'AT');
+  });
+});

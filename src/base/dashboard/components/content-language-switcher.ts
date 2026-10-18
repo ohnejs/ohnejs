@@ -16,14 +16,14 @@ import {
   when,
 } from 'ohnejs/dashboard';
 import {
-  capitalize,
+  displayName,
   effect,
   formatLocaleCode,
   isNull,
   isUndefined,
   onCleanup,
-  ref,
   type Ref,
+  ref,
   untracked,
 } from 'ohnejs/utils';
 
@@ -153,7 +153,10 @@ function switcher(): HTMLElement {
             (dashboardMeta()?.locales ?? []).map((locale) => {
               const selected = effectiveContentLocale() === locale;
               return dropdownItem(
-                [selected ? icon('check') : null, h('span', null, languageName(locale))],
+                [
+                  selected ? icon('check') : null,
+                  h('span', null, displayName(locale, 'language', locale)),
+                ],
                 {
                   indent: !selected,
                   onClick: () => {
@@ -184,16 +187,4 @@ export function effectiveContentLocale(): string {
   const chosen = contentLocale.value;
   if (!isUndefined(chosen) && (meta?.locales.includes(chosen) ?? false)) return chosen;
   return meta?.defaultLocale ?? '';
-}
-
-/**
- * A language's name in itself, like `Deutsch` for `de`, falling back to the tag.
- * The name is capitalized, since some languages spell their own name lowercase.
- */
-export function languageName(code: string): string {
-  try {
-    return capitalize(new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code);
-  } catch {
-    return code;
-  }
 }
