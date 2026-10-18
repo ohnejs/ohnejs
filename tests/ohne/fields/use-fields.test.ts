@@ -20,6 +20,7 @@ describe('useFields', () => {
       'multiSelect',
       'number',
       'object',
+      'range',
       'record',
       'records',
       'repeater',

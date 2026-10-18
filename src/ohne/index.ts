@@ -91,6 +91,7 @@ export * from './fields/builtin/link.ts';
 export * from './fields/builtin/multi-select.ts';
 export * from './fields/builtin/number.ts';
 export * from './fields/builtin/object.ts';
+export * from './fields/builtin/range.ts';
 export * from './fields/builtin/record.ts';
 export * from './fields/builtin/records.ts';
 export * from './fields/builtin/repeater.ts';

@@ -12,6 +12,7 @@ import type { link } from './builtin/link.ts';
 import type { multiSelect } from './builtin/multi-select.ts';
 import type { number } from './builtin/number.ts';
 import type { object } from './builtin/object.ts';
+import type { range } from './builtin/range.ts';
 import type { record } from './builtin/record.ts';
 import type { records } from './builtin/records.ts';
 import type { repeater } from './builtin/repeater.ts';
@@ -143,6 +144,11 @@ export interface KnownFields {
    * A nested group of fields, stored at most once per parent row.
    */
   object: typeof object;
+
+  /**
+   * A start and an end of one temporal kind, stored at most once per parent row.
+   */
+  range: typeof range;
 
   /**
    * An ordered list of nested field groups.

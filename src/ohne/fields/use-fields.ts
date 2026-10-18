@@ -16,6 +16,7 @@ import { link } from './builtin/link.ts';
 import { multiSelect } from './builtin/multi-select.ts';
 import { number } from './builtin/number.ts';
 import { object } from './builtin/object.ts';
+import { range } from './builtin/range.ts';
 import { record } from './builtin/record.ts';
 import { records } from './builtin/records.ts';
 import { repeater } from './builtin/repeater.ts';
@@ -65,6 +66,7 @@ for (const [name, fieldType] of [
   ['link', link],
   ['json', json],
   ['object', object],
+  ['range', range],
   ['repeater', repeater],
   ['blocks', blocks],
 ] as const) {
