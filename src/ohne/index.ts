@@ -85,6 +85,7 @@ export * from './fields/builtin/date-time.ts';
 export * from './fields/builtin/date.ts';
 export * from './fields/builtin/email.ts';
 export * from './fields/builtin/integer.ts';
+export * from './fields/builtin/json.ts';
 export * from './fields/builtin/link.ts';
 export * from './fields/builtin/multi-select.ts';
 export * from './fields/builtin/number.ts';

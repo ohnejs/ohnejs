@@ -6,6 +6,7 @@ import type { dateTime } from './builtin/date-time.ts';
 import type { date } from './builtin/date.ts';
 import type { email } from './builtin/email.ts';
 import type { integer } from './builtin/integer.ts';
+import type { json } from './builtin/json.ts';
 import type { link } from './builtin/link.ts';
 import type { multiSelect } from './builtin/multi-select.ts';
 import type { number } from './builtin/number.ts';
@@ -120,6 +121,11 @@ export interface KnownFields {
    * A link to a record or to an address.
    */
   link: typeof link;
+
+  /**
+   * Any plain JSON value, stored as JSON and typed `unknown`.
+   */
+  json: typeof json;
 
   /**
    * A nested group of fields, stored at most once per parent row.

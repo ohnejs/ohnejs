@@ -253,6 +253,18 @@ export interface FieldType<
   copy?: false;
 
   /**
+   * Set `false` when one value of this type can be stored in more than one form, as JSON key order can.
+   * A unique index would then let equal values through, so no field of it takes `unique: true`.
+   * A unique composite index refuses a field of it too.
+   *
+   * @example
+   * ```ts
+   * defineField({ columnType: 'json', unique: false })
+   * ```
+   */
+  unique?: false;
+
+  /**
    * How word search matches a field of this type.
    *
    * - `false` locks the type out: a field of it never matches words and refuses `search: true`.

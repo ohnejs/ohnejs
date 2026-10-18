@@ -14,6 +14,7 @@ describe('useFields', () => {
       'dateTime',
       'email',
       'integer',
+      'json',
       'link',
       'multiSelect',
       'number',
@@ -33,6 +34,7 @@ describe('useFields', () => {
     strictEqual(useFields().get('text')?.fieldType.columnType, 'text');
     strictEqual(useFields().get('richText')?.fieldType.columnType, 'json');
     strictEqual(useFields().get('link')?.fieldType.columnType, 'json');
+    strictEqual(useFields().get('json')?.fieldType.columnType, 'json');
     strictEqual(useFields().get('integer')?.fieldType.columnType, 'integer');
     strictEqual(useFields().get('number')?.fieldType.columnType, 'real');
     strictEqual(useFields().get('boolean')?.fieldType.columnType, 'boolean');

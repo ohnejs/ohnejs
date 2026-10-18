@@ -123,6 +123,7 @@ export interface ValidateFieldArgs {
  * - A force-index type locks its index on the same terms: the field takes no `index`.
  * - `translatable` is a top-level collection field's flag: subfields and block fields reject it.
  * - An `inverse` field follows the owning side's junction, so it rejects `translatable` too.
+ * - A type that sets `unique: false` stores one value in several forms, so its field rejects `unique`.
  * - `uniquePerLocale` narrows a unique on a translatable field, so it requires both flags.
  * - `uniquePerLocale` is top-level only: a subfield or block field's unique spans every locale.
  * - `uniquePerParent` narrows a unique too, so it requires the flag; its placement is the schema's rule.
@@ -227,6 +228,15 @@ export function validateField(args: ValidateFieldArgs): void {
         ],
       });
     }
+  }
+  if (options.unique === true && fieldType.unique === false) {
+    throw ohneError({
+      title: `Field \`${name}\` cannot be unique`,
+      body: [
+        `${where} is \`${instance.type}\`, which can store one value in more than one form.`,
+        'A unique index would let equal values through, so drop `unique`.',
+      ],
+    });
   }
   if (options.translatable === true && owner.kind === 'block') {
     throw ohneError({

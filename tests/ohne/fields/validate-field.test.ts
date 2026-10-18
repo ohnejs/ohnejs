@@ -349,6 +349,18 @@ describe('validateFieldType emitJSONType', () => {
   });
 });
 
+describe('validateField unique lock', () => {
+  const locked: FieldType = defineField({ columnType: 'json', unique: false });
+
+  it('refuses `unique: true` on a type that sets `unique: false`', () => {
+    throwsTitled(() => check({ unique: true }, locked), 'Field `field` cannot be unique');
+  });
+
+  it('keeps `unique: false` and `index` on that type', () => {
+    doesNotThrow(() => check({ unique: false, index: true }, locked));
+  });
+});
+
 describe('validateField search', () => {
   const hook = () => ({ startsWith: 'x' });
   const locked: FieldType = defineField({ columnType: 'text', search: false });

@@ -35,6 +35,7 @@ const SAMPLE_UUID = '00000000-0000-0000-0000-000000000000';
  * - Field names must be camelCase, non-reserved, and case-insensitively unique.
  * - Each composite index must cover only declared fields, at least one, with no repeat.
  * - No two composite indexes may be identical.
+ * - A unique composite index may not cover a field whose type sets `unique: false`.
  * - `api` must be a boolean or a per-operation table of booleans and endpoint options.
  * - `singleton` must be a boolean; when `true`, `api` may name `read` and `update` only.
  * - `copyTranslation` must be a function, on a collection with at least one translatable field.
@@ -56,7 +57,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   const fieldNames = Object.keys(definition.fields);
   for (const name of fieldNames) validateFieldName(name, collection);
   validateUniqueNames(fieldNames, 'field', collection);
-  validateCompositeIndexes(definition.compositeIndexes ?? [], fieldNames, collection);
+  validateCompositeIndexes(definition.compositeIndexes ?? [], definition.fields, collection);
   validateAPI(definition.api, collection);
   validateSingleton(definition.singleton, definition.api, collection);
   validateCopyTranslation(definition.copyTranslation, definition.fields, collection);
@@ -495,14 +496,15 @@ function validateTable(
 /**
  * Rejects a malformed composite index.
  * A failure is an empty field list, an unknown or repeated field, or a duplicate of another entry.
+ * A unique entry also refuses a field whose type sets `unique: false`.
  */
 function validateCompositeIndexes(
   entries: readonly CompositeIndex[],
-  fieldNames: readonly string[],
+  fields: Readonly<Record<string, FieldInstance>>,
   collection?: string,
 ): void {
   const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
-  const known = new Set(fieldNames);
+  const known = new Set(Object.keys(fields));
   const seen = new Set<string>();
   for (const entry of entries) {
     if (isEmpty(entry.fields)) {
@@ -526,6 +528,16 @@ function validateCompositeIndexes(
         });
       }
       within.add(name);
+      const { type } = fields[name]!;
+      if (entry.unique === true && useFields().get(type)?.fieldType.unique === false) {
+        throw ohneError({
+          title: `A unique composite index includes \`${type}\` field \`${name}\``,
+          body: [
+            `Field \`${name}\`${scope} is \`${type}\`, which can store one value in more than one form.`,
+            'A unique index would let equal values through, so drop `unique` from the entry.',
+          ],
+        });
+      }
     }
     const signature = `${entry.unique === true ? 'U' : 'I'}:${entry.fields.join(',')}`;
     if (seen.has(signature)) {

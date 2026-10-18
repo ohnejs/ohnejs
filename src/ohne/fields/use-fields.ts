@@ -10,6 +10,7 @@ import { dateTime } from './builtin/date-time.ts';
 import { date } from './builtin/date.ts';
 import { email } from './builtin/email.ts';
 import { integer } from './builtin/integer.ts';
+import { json } from './builtin/json.ts';
 import { link } from './builtin/link.ts';
 import { multiSelect } from './builtin/multi-select.ts';
 import { number } from './builtin/number.ts';
@@ -58,6 +59,7 @@ for (const [name, fieldType] of [
   ['record', record],
   ['records', records],
   ['link', link],
+  ['json', json],
   ['object', object],
   ['repeater', repeater],
   ['blocks', blocks],
