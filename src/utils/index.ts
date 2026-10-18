@@ -99,6 +99,7 @@ export * from './highlight/tokenize.ts';
 export * from './html/is-safe-href.ts';
 export * from './html/json-for-script.ts';
 export * from './html/node-like.ts';
+export * from './html/numeric-input-mode.ts';
 export * from './html/sanitize-svg.ts';
 export * from './i18n/canonicalize-language.ts';
 export * from './i18n/date-options-from-skeleton.ts';
