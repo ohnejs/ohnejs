@@ -3,6 +3,8 @@
   "invalidChoice": "This value is not one of the available choices",
   "invalidColor": "This value must be an opaque hex color like `#ff8800`",
   "invalidColorAlpha": "This value must be a hex color like `#ff8800` or `#ff880080`",
+  "invalidCountry": "This value must be an ISO country code like `DE`",
+  "invalidCurrency": "This value must be an ISO currency code like `EUR`",
   "invalidDate": "This value must be a calendar date in `YYYY-MM-DD` form",
   "invalidEmail": "This value must be an email address like `thrall@orgrimmar.example`",
   "invalidJSON": "This value must be valid JSON",

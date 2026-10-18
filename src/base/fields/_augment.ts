@@ -8,6 +8,16 @@
 declare module 'ohnejs' {
   interface LayerFields {
     /**
+     * An ISO 3166-1 alpha-2 country code, like `DE`.
+     */
+    country: typeof import('./country.ts').default;
+
+    /**
+     * An ISO 4217 code of a circulating currency, like `EUR`.
+     */
+    currency: typeof import('./currency.ts').default;
+
+    /**
      * A date or time format pattern, like `YYYY-MM-DD`.
      */
     datePattern: typeof import('./date-pattern.ts').default;

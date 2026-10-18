@@ -3,6 +3,8 @@
   "invalidChoice": "Ova vrijednost nije jedna od dostupnih opcija",
   "invalidColor": "Ova vrijednost mora biti neprozirna heks boja poput `#ff8800`",
   "invalidColorAlpha": "Ova vrijednost mora biti heks boja poput `#ff8800` ili `#ff880080`",
+  "invalidCountry": "Ova vrijednost mora biti ISO kod države poput `DE`",
+  "invalidCurrency": "Ova vrijednost mora biti ISO kod valute poput `EUR`",
   "invalidDate": "Ova vrijednost mora biti kalendarski datum u obliku `YYYY-MM-DD`",
   "invalidEmail": "Ova vrijednost mora biti email adresa poput `thrall@orgrimmar.example`",
   "invalidJSON": "Ova vrijednost mora biti ispravan JSON",
