@@ -52,6 +52,11 @@ describe('parseAuthorization', () => {
     deepStrictEqual(parseAuthorization(`Basic ${token}`), { scheme: 'basic', token });
   });
 
+  it('omits credentials for a Basic token that decodes to a U+0000', () => {
+    const token = btoa('u\0:p');
+    deepStrictEqual(parseAuthorization(`Basic ${token}`), { scheme: 'basic', token });
+  });
+
   it('omits credentials for an invalid base64 Basic token', () => {
     deepStrictEqual(parseAuthorization('Basic @@@'), { scheme: 'basic', token: '@@@' });
   });

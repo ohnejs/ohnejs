@@ -28,7 +28,8 @@ export interface Authorization {
 }
 
 /**
- * Decodes a Basic token (base64, then UTF-8) and splits it at the first colon; `null` when either step fails.
+ * Decodes a Basic token (base64, then UTF-8) and splits it at the first colon.
+ * Returns `null` when either step fails or the result holds a U+0000.
  */
 function decodeBasic(token: string): Pick<Authorization, 'username' | 'password'> | null {
   let decoded: string;
@@ -39,7 +40,7 @@ function decodeBasic(token: string): Pick<Authorization, 'username' | 'password'
   }
 
   const colon = decoded.indexOf(':');
-  if (colon === -1) return null;
+  if (colon === -1 || decoded.includes('\0')) return null;
 
   return { username: decoded.slice(0, colon), password: decoded.slice(colon + 1) };
 }
@@ -50,7 +51,7 @@ function decodeBasic(token: string): Pick<Authorization, 'username' | 'password'
  * Returns `null` when the header is blank or carries no credentials.
  *
  * A `basic` token is base64-decoded (UTF-8) and split on the first colon into `username` and `password`.
- * Both are omitted when the token is not valid base64 or holds no colon.
+ * Both are omitted when the token is not valid base64, holds no colon, or decodes to a U+0000.
  *
  * @example
  * ```ts

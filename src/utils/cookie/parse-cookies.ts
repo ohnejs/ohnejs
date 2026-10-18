@@ -9,7 +9,7 @@ function assign(out: Record<string, string>, key: string, value: string): void {
 
 /**
  * Parses a `Cookie` request header into a map of name to value.
- * Names are trimmed; values are percent-decoded as UTF-8, kept raw when that fails.
+ * Names are trimmed; values are percent-decoded as UTF-8, kept raw when that fails or would yield a U+0000.
  * A single pair of surrounding double quotes is stripped.
  *
  * The first occurrence of a name wins; later duplicates are ignored.
@@ -37,7 +37,8 @@ export function parseCookies(header: string): Record<string, string> {
     let value = pair.slice(eq + 1).trim();
     if (value.length >= 2 && value.startsWith('"') && value.endsWith('"'))
       value = value.slice(1, -1);
-    assign(out, name, percentDecode(value) ?? value);
+    const decoded = percentDecode(value) ?? value;
+    assign(out, name, decoded.includes('\0') ? value : decoded);
   }
   return out;
 }
