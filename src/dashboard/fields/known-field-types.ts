@@ -1,6 +1,7 @@
 import type { FieldChoice } from '../../utils/choice/field-choice.ts';
 import type { ConditionObject } from '../../utils/condition/condition-object.ts';
 import type { FieldLayout } from '../../utils/field-layout/field-layout.ts';
+import type { CurrencyCode } from '../../utils/i18n/currency-digits.ts';
 import type { Link } from '../../utils/rich-text/link.ts';
 import type { RichText, RichTextElement, RichTextMark } from '../../utils/rich-text/rich-text.ts';
 import type { DeepPrettify } from '../../utils/types/deep-prettify.ts';
@@ -253,6 +254,16 @@ export interface NumberFieldOptions {
    * 'input'
    */
   display?: 'input' | 'slider';
+}
+
+/**
+ * The options of an `integer` field.
+ */
+export interface IntegerFieldOptions extends NumberFieldOptions {
+  /**
+   * The ISO 4217 currency the value counts in, as minor units: `1234` with `EUR` is 12.34 €.
+   */
+  currency?: CurrencyCode;
 }
 
 /**
@@ -537,7 +548,7 @@ export interface KnownFieldTypes {
   /**
    * A whole number.
    */
-  integer: { options: NumberFieldOptions; value: number };
+  integer: { options: IntegerFieldOptions; value: number };
 
   /**
    * A finite floating-point number.

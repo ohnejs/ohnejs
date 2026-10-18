@@ -1,8 +1,13 @@
+import type { CurrencyCode } from '../../utils/i18n/currency-digits.ts';
 import type { DashboardField } from '../runtime/meta-types.ts';
 
+import { amountEditText } from '../../utils/i18n/amount-edit-text.ts';
+import { currencyDigits } from '../../utils/i18n/currency-digits.ts';
 import { isDecimalString } from '../../utils/is/is-decimal-string.ts';
 import { isInteger } from '../../utils/is/is-integer.ts';
 import { isRealNumber } from '../../utils/is/is-real-number.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
+import { parseMinorUnits } from '../../utils/number/parse-minor-units.ts';
 
 /**
  * One scalar input parsed toward the wire.
@@ -15,9 +20,13 @@ export interface ScalarParse {
   value?: unknown;
 
   /**
-   * The message key of the parse failure that blocks the write.
+   * The message of the parse failure that blocks the write: a key, or a key with its params.
    */
-  error?: 'dashboard.invalidInteger' | 'dashboard.invalidNumber' | 'validation.invalidJSON';
+  error?:
+    | 'dashboard.invalidInteger'
+    | 'dashboard.invalidNumber'
+    | 'validation.invalidJSON'
+    | { key: 'dashboard.invalidAmount'; params: { example: string } };
 }
 
 /**
@@ -54,6 +63,29 @@ export function parseRealValue(field: DashboardField, raw: string): ScalarParse 
     return { error: 'dashboard.invalidNumber' };
   }
   return { value: Number(text) };
+}
+
+/**
+ * An amount input parsed into minor units of `currency`, exactly, with `.` or `,` as the decimal mark.
+ * A failure shows an example amount the way `language` writes one for editing.
+ * Emptied, a nullable field writes `null` and a non-nullable one is omitted.
+ */
+export function parseAmountValue(
+  field: DashboardField,
+  raw: string,
+  currency: CurrencyCode,
+  language: string,
+): ScalarParse {
+  if (raw.trim() === '') return field.nullable ? { value: null } : {};
+  const digits = currencyDigits[currency];
+  const value = parseMinorUnits(raw, digits);
+  if (!isUndefined(value)) return { value };
+  return {
+    error: {
+      key: 'dashboard.invalidAmount',
+      params: { example: amountEditText(123456, digits, language) },
+    },
+  };
 }
 
 /**

@@ -282,6 +282,7 @@ describe('numberType display', () => {
       numberType.display!({
         field: { ...GOLD, options },
         value: () => value,
+        language: () => 'en',
       } as never) as unknown as () => FakeElement | string
     )() as FakeElement;
 

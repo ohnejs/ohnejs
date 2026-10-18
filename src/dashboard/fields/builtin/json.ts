@@ -8,7 +8,7 @@ import { computed } from '../../../utils/reactive/computed.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { checkJSON } from '../../../utils/validate/check-json.ts';
 import { h } from '../../render/h.ts';
-import { useT } from '../../runtime/use-t.ts';
+import { translateMessage } from '../../runtime/use-t.ts';
 import { codeEditor } from '../../ui/code-editor.ts';
 import { checkedReading } from '../_checked-reading.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
@@ -33,7 +33,6 @@ export const jsonType: FieldType<JSONFieldOptions> = {
     };
   },
   control({ field, initial, path, disabled, onInput }) {
-    const t = useT();
     const base = ref(initial);
     const raw = ref(pretty(initial));
     const routed = ref('');
@@ -79,7 +78,7 @@ export const jsonType: FieldType<JSONFieldOptions> = {
       read() {
         if (pristine()) return {};
         const { value, error: failure } = parsed.value;
-        if (!isUndefined(failure)) return { errors: { '': t(failure) } };
+        if (!isUndefined(failure)) return { errors: { '': translateMessage(failure) } };
         if (isUndefined(value)) return {};
         return checkedReading(
           settled(),
