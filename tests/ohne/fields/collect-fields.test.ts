@@ -54,24 +54,24 @@ describe('collectFields', () => {
 
   it('imports each definition, a closer layer replacing a further one by name', async () => {
     await appWith('override', (app, dep) => {
-      writeFieldType(dep, 'fields/slug.ts', 'text');
+      writeFieldType(dep, 'fields/sku.ts', 'text');
       writeFieldType(dep, 'fields/money.ts', 'integer');
-      writeFieldType(app, 'fields/slug.ts', 'json');
+      writeFieldType(app, 'fields/sku.ts', 'json');
     });
     const collected = await collectFields(stackedLayers());
     deepStrictEqual(
       collected.map((fieldType) => fieldType.name),
-      ['money', 'slug'],
+      ['money', 'sku'],
     );
     strictEqual(collected[1]?.fieldType.columnType, 'json');
   });
 
   it('drops disabled names after the merge', async () => {
     await appWith('disabled', (app) => {
-      writeFieldType(app, 'fields/slug.ts');
+      writeFieldType(app, 'fields/sku.ts');
       writeFieldType(app, 'fields/money.ts');
     });
-    const collected = await collectFields(stackedLayers(), { disable: ['slug'] });
+    const collected = await collectFields(stackedLayers(), { disable: ['sku'] });
     deepStrictEqual(
       collected.map((fieldType) => fieldType.name),
       ['money'],
@@ -80,11 +80,11 @@ describe('collectFields', () => {
 
   it('rejects a file without a definition default export', async () => {
     await appWith('empty', (app) => {
-      const file = join(app, 'fields', 'slug.ts');
+      const file = join(app, 'fields', 'sku.ts');
       mkdirSync(join(file, '..'), { recursive: true });
-      writeFileSync(file, 'export const slug = 1;\n');
+      writeFileSync(file, 'export const sku = 1;\n');
     });
-    await rejects(collectFields(stackedLayers()), /`slug` has no definition/);
+    await rejects(collectFields(stackedLayers()), /`sku` has no definition/);
   });
 
   it('names the file of a field type whose definition throws on import', async () => {

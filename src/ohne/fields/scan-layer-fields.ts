@@ -34,7 +34,7 @@ export interface ScannedFieldType {
  * Each `.ts` file under `<layer.dir>/<fields>` is one field type named by its relative path.
  * The path's segments convert to camelCase and join: `geo/point.ts` names `geoPoint`.
  * So does `geo point.ts` - a loose stem normalizes into the name instead of erroring.
- * A trailing `index` segment collapses into its parent: `slug/index.ts` names `slug`.
+ * A trailing `index` segment collapses into its parent: `sku/index.ts` names `sku`.
  * Two files resolving to the same name collide and throw, naming both.
  * A `_`-prefixed file or directory is a helper and is skipped, so shared types can live beside a type.
  * Names are validated as they are read, so an unnameable file fails here, naming the file.
@@ -43,7 +43,7 @@ export interface ScannedFieldType {
  * @example
  * ```ts
  * await scanLayerFields({ name: 'app', dir: '/app' }, 'fields')
- * // -> [{ name: 'slug', file: '/app/fields/slug.ts' }]
+ * // -> [{ name: 'sku', file: '/app/fields/sku.ts' }]
  * ```
  */
 export async function scanLayerFields(

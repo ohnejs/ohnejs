@@ -95,6 +95,7 @@ export * from './fields/builtin/records.ts';
 export * from './fields/builtin/repeater.ts';
 export * from './fields/builtin/rich-text.ts';
 export * from './fields/builtin/select.ts';
+export * from './fields/builtin/slug.ts';
 export * from './fields/builtin/text.ts';
 export * from './fields/builtin/time.ts';
 export * from './fields/builtin/url.ts';

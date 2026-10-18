@@ -16,6 +16,7 @@ import type { records } from './builtin/records.ts';
 import type { repeater } from './builtin/repeater.ts';
 import type { richText } from './builtin/rich-text.ts';
 import type { select } from './builtin/select.ts';
+import type { slug } from './builtin/slug.ts';
 import type { text } from './builtin/text.ts';
 import type { time } from './builtin/time.ts';
 import type { url } from './builtin/url.ts';
@@ -31,7 +32,7 @@ import type { url } from './builtin/url.ts';
  * ```ts
  * declare module 'ohnejs' {
  *   interface KnownFields {
- *     slug: typeof import('./fields/slug.ts').default
+ *     sku: typeof import('./fields/sku.ts').default
  *   }
  * }
  * ```
@@ -96,6 +97,11 @@ export interface KnownFields {
    * An email address, stored trimmed with its local part and domain lowercased.
    */
   email: typeof email;
+
+  /**
+   * The URL-safe name of a record, stored as lowercase words joined by `-`.
+   */
+  slug: typeof slug;
 
   /**
    * An absolute `http:` or `https:` address, stored with its scheme and host lowercased.

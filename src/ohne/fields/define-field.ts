@@ -367,21 +367,18 @@ export type FieldSearch<
  * Defines a field type.
  *
  * Default-export the result from a file under a layer's `dirs.fields`.
- * The file names the field type: `fields/slug.ts` becomes `slug`.
+ * The file names the field type: `fields/sku.ts` becomes `sku`.
  *
  * @example
  * ```ts
- * // fields/slug.ts
+ * // fields/sku.ts
  * import { defineField } from 'ohnejs'
  *
  * export default defineField({
  *   columnType: 'text',
- *   sanitizers: [(value) => value.trim().toLowerCase().replace(/\s+/g, '-')],
+ *   sanitizers: [(value) => value.trim().toUpperCase()],
  *   validators: [
- *     (value) =>
- *       /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
- *         ? undefined
- *         : 'Must be lowercase words joined by hyphens',
+ *     (value) => (/^[A-Z]+-\d{4}$/.test(value) ? undefined : 'Must be a code like WOW-0042'),
  *   ],
  * })
  * ```

@@ -153,7 +153,7 @@ describe('generateDatabase', () => {
     symlinkSync(dep, join(app, 'node_modules', 'dep'), 'dir');
 
     write(dep, 'collections/Posts.ts', 'export default { fields: {} };\n');
-    write(dep, 'fields/slug.ts', "export default { columnType: 'text' };\n");
+    write(dep, 'fields/sku.ts', "export default { columnType: 'text' };\n");
     write(app, 'collections/Posts.ts', 'export default { fields: {} };\n');
 
     await loadLayers(app);
@@ -172,8 +172,8 @@ describe('generateDatabase', () => {
           '});',
       ),
     );
-    ok(out.includes("fields.register('slug', { name: 'slug', fieldType: f0 });"));
-    ok(out.includes("slug: typeof import('../../packages/dep/fields/slug.ts').default;"));
+    ok(out.includes("fields.register('sku', { name: 'sku', fieldType: f0 });"));
+    ok(out.includes("sku: typeof import('../../packages/dep/fields/sku.ts').default;"));
   });
 
   it('types every collection record shape in the shared bucket', async () => {
@@ -857,11 +857,11 @@ describe('generateDatabase', () => {
       app,
       'disabled',
       undefined,
-      "export default { disable: { collections: ['Posts'], fields: ['slug', 'boolean'] } };\n",
+      "export default { disable: { collections: ['Posts'], fields: ['sku', 'boolean'] } };\n",
     );
     write(app, 'collections/Posts.ts', 'export default { fields: {} };\n');
     write(app, 'collections/Authors.ts', 'export default { fields: {} };\n');
-    write(app, 'fields/slug.ts', "export default { columnType: 'text' };\n");
+    write(app, 'fields/sku.ts', "export default { columnType: 'text' };\n");
 
     await loadLayers(app);
     const paths = await generateDatabase(app);
@@ -870,7 +870,7 @@ describe('generateDatabase', () => {
 
     ok(node.includes("collections.register('Authors'"));
     ok(!node.includes("collections.register('Posts'"));
-    ok(!node.includes('slug'));
+    ok(!node.includes('sku'));
     ok(node.includes("fields.delete('boolean');"));
     ok(shared.includes('Authors: {\n    UUID: string;\n    _updatedAt: number;\n  };'));
     ok(!shared.includes('Posts'));

@@ -20,6 +20,7 @@ import { records } from './builtin/records.ts';
 import { repeater } from './builtin/repeater.ts';
 import { richText } from './builtin/rich-text.ts';
 import { select } from './builtin/select.ts';
+import { slug } from './builtin/slug.ts';
 import { text } from './builtin/text.ts';
 import { time } from './builtin/time.ts';
 import { url } from './builtin/url.ts';
@@ -55,6 +56,7 @@ for (const [name, fieldType] of [
   ['code', code],
   ['email', email],
   ['url', url],
+  ['slug', slug],
   ['dateTime', dateTime],
   ['record', record],
   ['records', records],

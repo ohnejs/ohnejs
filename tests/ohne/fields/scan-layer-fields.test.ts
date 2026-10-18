@@ -26,7 +26,7 @@ describe('scanLayerFields', () => {
 
   it('names each file by its relative path, segments camelCased and joined', async () => {
     const dir = join(root, 'ordered');
-    writeFieldType(dir, 'slug.ts');
+    writeFieldType(dir, 'sku.ts');
     writeFieldType(dir, 'money.ts');
     writeFieldType(dir, 'geo/latLng.ts');
     writeFieldType(dir, 'my rating.ts');
@@ -34,7 +34,7 @@ describe('scanLayerFields', () => {
     const scanned = await scanLayerFields({ name: 'app', dir }, 'fields');
     deepStrictEqual(
       scanned.map((fieldType) => fieldType.name),
-      ['color', 'geoLatLng', 'money', 'myRating', 'slug'],
+      ['color', 'geoLatLng', 'money', 'myRating', 'sku'],
     );
     deepStrictEqual(scanned[1]?.file, join(dir, 'fields', 'geo/latLng.ts'));
   });
@@ -45,13 +45,13 @@ describe('scanLayerFields', () => {
 
   it('skips underscore-prefixed helper files and directories', async () => {
     const dir = join(root, 'helpers');
-    writeFieldType(dir, 'slug.ts');
+    writeFieldType(dir, 'sku.ts');
     writeFieldType(dir, '_geo.ts');
     writeFieldType(dir, '_lib/shared.ts');
     const scanned = await scanLayerFields({ name: 'app', dir }, 'fields');
     deepStrictEqual(
       scanned.map((fieldType) => fieldType.name),
-      ['slug'],
+      ['sku'],
     );
   });
 

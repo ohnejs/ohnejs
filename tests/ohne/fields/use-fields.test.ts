@@ -24,6 +24,7 @@ describe('useFields', () => {
       'repeater',
       'richText',
       'select',
+      'slug',
       'text',
       'time',
       'url',
