@@ -17,6 +17,7 @@ import {
   zonedFromTimestamp,
   zonedFromWallClock,
 } from '../../../src/dashboard/ui/calendar-date.ts';
+import { isTimezone } from '../../../src/utils/is/is-timezone.ts';
 
 const NY = 'America/New_York';
 const BERLIN = 'Europe/Berlin';
@@ -377,8 +378,9 @@ describe('resolveTimezone', () => {
 });
 
 describe('timezones', () => {
-  it('carries the full IANA zone list', () => {
-    strictEqual(timezones.length, 598);
+  it('carries the IANA zones, each once and each one `Intl` resolves', () => {
+    strictEqual(new Set(timezones).size, timezones.length);
+    for (const zone of timezones) strictEqual(isTimezone(zone), true, zone);
     strictEqual(timezones.includes('Europe/Berlin'), true);
     strictEqual(timezones.includes('UTC'), true);
     strictEqual(timezones.includes('America/New_York'), true);

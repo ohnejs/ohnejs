@@ -1014,7 +1014,6 @@ export const timezones = [
   'Europe/Zagreb',
   'Europe/Zaporozhye',
   'Europe/Zurich',
-  'Factory',
   'GB',
   'GB-Eire',
   'GMT',
