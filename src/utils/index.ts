@@ -345,6 +345,7 @@ export * from './validate/check-color.ts';
 export * from './validate/check-count.ts';
 export * from './validate/check-email.ts';
 export * from './validate/check-json-text.ts';
+export * from './validate/check-json.ts';
 export * from './validate/check-length.ts';
 export * from './validate/check-range.ts';
 export * from './validate/check-required.ts';
