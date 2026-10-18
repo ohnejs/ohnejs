@@ -1,38 +1,18 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { DateFieldOptions } from '../known-field-types.ts';
 
+import { msToISOTime } from '../../../utils/date/ms-to-iso-time.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { h } from '../../render/h.ts';
 import { formatTime } from '../../runtime/date-time.ts';
-import { useT } from '../../runtime/use-t.ts';
 import { parseTime } from '../../ui/time-model.ts';
-import { type TimeLabels, time as timeInput } from '../../ui/time.ts';
+import { time as timeInput } from '../../ui/time.ts';
+import { timeLabels } from '../_temporal.ts';
 import { describeControl } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
-
-/**
- * The segment suffixes of a time input, live in the dashboard language.
- */
-function timeLabels(): TimeLabels {
-  const t = useT();
-  return {
-    hoursSuffix: () => t('dashboard.time.hours'),
-    minutesSuffix: () => t('dashboard.time.minutes'),
-    secondsSuffix: () => t('dashboard.time.seconds'),
-  };
-}
-
-/**
- * A time-of-day in ms back in its stored `HH:MM:SS` form.
- */
-function clockValue(value: number): string {
-  const total = Math.floor(value / 1000);
-  const pad = (part: number): string => String(part).padStart(2, '0');
-  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor(total / 60) % 60)}:${pad(total % 60)}`;
-}
 
 /**
  * A stored value as the time input's ms model, `null` when absent or malformed.
@@ -75,7 +55,7 @@ export const timeType: FieldType<DateFieldOptions> = {
       },
       set value(next) {
         clock.value = next;
-        held.value = clockValue(next);
+        held.value = msToISOTime(next);
         routed.value = '';
         onInput();
       },
@@ -91,7 +71,7 @@ export const timeType: FieldType<DateFieldOptions> = {
     describeControl(input, field, path, error);
 
     const wire = (): unknown => {
-      if (isNullish(held.value)) return field.nullable ? null : clockValue(clock.value);
+      if (isNullish(held.value)) return field.nullable ? null : msToISOTime(clock.value);
       return held.value;
     };
     const show = (value: unknown): void => {
@@ -138,7 +118,7 @@ export const timeType: FieldType<DateFieldOptions> = {
           return storedClock(value()) ?? 0;
         },
         set value(next) {
-          commit(clockValue(next));
+          commit(msToISOTime(next));
         },
       };
       return timeInput(model, { id: inputID, name: inputID, labels: timeLabels() });

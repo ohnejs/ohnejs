@@ -1,61 +1,29 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { DateFieldOptions } from '../known-field-types.ts';
 
+import { isoDayToMs } from '../../../utils/date/iso-day-to-ms.ts';
+import { msToISODay } from '../../../utils/date/ms-to-iso-day.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
-import { untracked } from '../../../utils/reactive/untracked.ts';
 import { checkRange } from '../../../utils/validate/check-range.ts';
 import { h } from '../../render/h.ts';
-import { dateTimePreferences, formatDate } from '../../runtime/date-time.ts';
-import { resolveTimezone, zonedFromTimestamp, zonedFromWallClock } from '../../ui/calendar-date.ts';
+import { formatDate } from '../../runtime/date-time.ts';
 import { calendar } from '../../ui/calendar.ts';
 import { calendarLabels } from '../_calendar-labels.ts';
 import { checkedReading } from '../_checked-reading.ts';
+import { todayStamp } from '../_temporal.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
-
-/**
- * A stored `YYYY-MM-DD` day as its UTC-midnight timestamp, `NaN` when malformed.
- * `setUTCFullYear` keeps years 00-99 literal, where `Date.UTC` would remap them to 19xx.
- */
-function dayTimestamp(value: string): number {
-  const [year, month, day] = value.split('-');
-  const date = new Date(0);
-  date.setUTCFullYear(Number(year), Number(month) - 1, Number(day));
-  return date.getTime();
-}
-
-/**
- * A UTC-midnight timestamp back in its stored `YYYY-MM-DD` form.
- */
-function dayValue(timestamp: number): string {
-  const date = new Date(timestamp);
-  const year = String(date.getUTCFullYear()).padStart(4, '0');
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 /**
  * A stored value as the calendar's timestamp model, `null` when absent or malformed.
  */
 function storedTimestamp(value: unknown): number | null {
   if (!isString(value)) return null;
-  const timestamp = dayTimestamp(value);
-  return Number.isNaN(timestamp) ? null : timestamp;
-}
-
-/**
- * The user's current day as its UTC-midnight timestamp, the encoding the calendar edits.
- * The user's zone is read untracked, as in the `dateTime` control, so an account save never rebuilds it.
- */
-function todayStamp(): number {
-  const zone = resolveTimezone(untracked(() => dateTimePreferences().timeZone));
-  const now = zonedFromTimestamp(Date.now(), zone);
-  return zonedFromWallClock('UTC', now.year, now.month, now.day).timestamp;
+  return isoDayToMs(value) ?? null;
 }
 
 /**
@@ -72,8 +40,8 @@ export const dateType: FieldType<DateFieldOptions> = {
       const current = value();
       if (isNullish(current)) return dimMark('-');
       const raw = String(current as string);
-      const timestamp = dayTimestamp(raw);
-      if (Number.isNaN(timestamp)) return dimMark(raw);
+      const timestamp = isoDayToMs(raw);
+      if (isUndefined(timestamp)) return dimMark(raw);
       const text = formatDate(timestamp);
       return h('span', { class: 'ohne-truncate', title: text }, text);
     };
@@ -113,7 +81,7 @@ export const dateType: FieldType<DateFieldOptions> = {
 
     const wire = (): unknown => {
       if (!touched.value) return base ?? null;
-      return isNull(stamp.value) ? null : dayValue(stamp.value);
+      return isNull(stamp.value) ? null : msToISODay(stamp.value);
     };
 
     const dirty = (): boolean =>
@@ -162,14 +130,14 @@ export const dateType: FieldType<DateFieldOptions> = {
   },
   filter: {
     operators: () => ['eq', 'ne', 'lt', 'lte', 'gt', 'gte'],
-    seed: () => dayValue(todayStamp()),
+    seed: () => msToISODay(todayStamp()),
     input({ value, commit, language, inputID }) {
       const model: Ref<number | null> = {
         get value() {
           return storedTimestamp(value());
         },
         set value(next) {
-          if (!isNull(next)) commit(dayValue(next));
+          if (!isNull(next)) commit(msToISODay(next));
         },
       };
       return calendar(model, {

@@ -4,35 +4,17 @@ import type { DateTimeFieldOptions } from '../known-field-types.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
-import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../../utils/reactive/effect-scope.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
-import { untracked } from '../../../utils/reactive/untracked.ts';
 import { h } from '../../render/h.ts';
-import { dateTimePreferences, formatDateTime, formatRelative } from '../../runtime/date-time.ts';
-import { parseDateTime } from '../../ui/calendar-date.ts';
+import { formatDateTime, formatRelative } from '../../runtime/date-time.ts';
 import { calendar } from '../../ui/calendar.ts';
 import { attachTooltip } from '../../ui/tooltip.ts';
 import { calendarLabels } from '../_calendar-labels.ts';
+import { boundInstant, calendarZone } from '../_temporal.ts';
 import { describeControl, fieldPlaceholder } from '../field-row.ts';
 import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
-
-/**
- * The zone a calendar opens in: the field's pinned zone, else the user's, else the device's.
- * The user's zone is read untracked, since every account save rewrites the user record.
- * A tracked read would rebuild the control on each save and drop its edits.
- */
-function calendarZone(pinned: string | undefined): string {
-  return pinned ?? untracked(() => dateTimePreferences().timeZone) ?? 'local';
-}
-
-/**
- * A `min` or `max` bound as the instant the server validates against, or `undefined` when unset.
- */
-function instant(bound: unknown): number | undefined {
-  return isNumber(bound) || isString(bound) ? parseDateTime(bound) : undefined;
-}
 
 /**
  * The `dateTime` field type: cell display, form control, and filter.
@@ -86,8 +68,8 @@ export const dateTimeType: FieldType<DateTimeFieldOptions> = {
       formatter: (timestamp) => formatDateTime(timestamp, zone),
       labels: () => calendarLabels(language()),
       placeholder: fieldPlaceholder(field),
-      min: instant(field.options?.min),
-      max: instant(field.options?.max),
+      min: boundInstant(field.options?.min),
+      max: boundInstant(field.options?.max),
       clearable: field.nullable,
       disabled: () => disabled === true,
     });
