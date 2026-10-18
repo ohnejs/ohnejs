@@ -8,6 +8,13 @@ getter, where `undefined` means loading and `[]` means empty, and a
 a [tone](./display.md#tones) named by its meaning, never a hex value. Spacing is a
 [gap step](./layout.md#gap-steps) from `-2` to `2`, never a length.
 
+Try every component live in the [kit](https://kit.ohne.dev).
+
+<picture data-live="/">
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/catalog-dark.png">
+  <img alt="The kit catalog, one card per component family" src="../images/kit/catalog-light.png">
+</picture>
+
 ## Layout
 
 <picture>
