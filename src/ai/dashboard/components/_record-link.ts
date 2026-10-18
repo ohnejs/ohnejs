@@ -13,9 +13,18 @@ css`
     white-space: nowrap;
   }
 
-  .o-record-link:hover {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
+  /* A table cell wraps the name, since touch never shows the title that reveals a cut one. */
+  .o-approval .o-record-link,
+  .o-transform-cell .o-record-link {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  @media (hover: hover) {
+    .o-record-link:hover {
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
   }
 
   /* Restores the base focus ring, which ohne-raw opts out of. */

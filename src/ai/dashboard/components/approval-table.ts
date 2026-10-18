@@ -266,7 +266,7 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
       record: {
         label: () => t('ai.dashboard.batch.record'),
         width: '30%',
-        render: (row) => h('div', { class: `ohne-truncate${foreign(row)}` }, recordName(row, t)),
+        render: (row) => h('div', { class: foreign(row).trim() }, recordName(row, t)),
       },
       action: {
         label: () => t('ai.dashboard.batch.action'),

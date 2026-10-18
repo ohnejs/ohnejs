@@ -250,9 +250,11 @@ css`
     white-space: nowrap;
   }
 
-  .o-turn-action:hover {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
+  @media (hover: hover) {
+    .o-turn-action:hover {
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
   }
 
   /* Restores the base focus ring, which ohne-raw opts out of. */
