@@ -1,5 +1,6 @@
 import type { FieldLayout } from '../../utils/field-layout/field-layout.ts';
 import type { Ref } from '../../utils/reactive/ref.ts';
+import type { Child } from '../render/insert.ts';
 import type { Text } from '../runtime/text-type.ts';
 import type { FieldForm } from './field-form.ts';
 import type {
@@ -24,10 +25,12 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { when } from '../render/when.ts';
 import { useUnsavedChanges } from '../router/unsaved-changes.ts';
 import { useDashboardLanguage } from '../runtime/use-dashboard-language.ts';
 import { formField } from '../ui/form-field.ts';
 import { skeleton } from '../ui/states.ts';
+import { discovered } from './_discovered.ts';
 import { createFieldForm } from './field-form.ts';
 import { controlIDs } from './field-type.ts';
 import { specField } from './spec-field.ts';
@@ -187,6 +190,7 @@ let sequence = 0;
  * An emptied nullable field writes `null`.
  * Writing `model` from outside shows the new value, unless it is the value the field just wrote.
  * The ref's owner owns the state, so the field never guards navigation.
+ * Signed in, a placeholder stands in until `GET /dashboard` answers, so a relation finds its target.
  *
  * @example
  * ```ts
@@ -200,6 +204,26 @@ export function fieldInput<K extends FieldTypeName, O>(
   field: FieldSpec<K, O>,
   options: FieldInputOptions = {},
 ): HTMLElement {
+  const ready = computed(discovered);
+  return h(
+    'fieldset',
+    { class: 'ohne-form ohne-field', disabled: () => options.disabled?.() === true },
+    when(
+      () => ready.value,
+      () => buildInput(model, field, options),
+      () => formField([skeleton({ width: '6rem' }), skeleton({ height: 'calc(2em + 0.25rem)' })]),
+    ),
+  );
+}
+
+/**
+ * Builds `fieldInput`'s control, label, and messages, once the field may resolve its targets.
+ */
+function buildInput<K extends FieldTypeName, O>(
+  model: Ref<NoInfer<FieldValue<K, O>>>,
+  field: FieldSpec<K, O>,
+  options: FieldInputOptions,
+): Child {
   const name = `input-${++sequence}`;
   const described = specField(name, field, '');
   let written: unknown = untracked(() => model.value);
@@ -231,26 +255,20 @@ export function fieldInput<K extends FieldTypeName, O>(
   });
 
   const control = inner.controlOf(name);
+  if (isUndefined(control)) return inner.render();
   const { label } = field.options as CommonFieldOptions;
-  const own = (): string => control?.error() ?? '';
-  const root = h(
-    'fieldset',
-    { class: 'ohne-form ohne-field', disabled: () => options.disabled?.() === true },
-    isUndefined(control)
-      ? inner.render()
-      : formField(control.element, {
-          label: isUndefined(control.marks) ? label : undefined,
-          description: described.description ?? described.expandable?.text,
-          required: described.required,
-          error: () => own() || options.error?.() || '',
-          size: options.size,
-        }),
-  );
-  if (isUndefined(label) && isUndefined(control?.marks)) {
+  const element = formField(control.element, {
+    label: isUndefined(control.marks) ? label : undefined,
+    description: described.description ?? described.expandable?.text,
+    required: described.required,
+    error: () => control.error() || options.error?.() || '',
+    size: options.size,
+  });
+  if (isUndefined(label) && isUndefined(control.marks)) {
     // The control points at a form row's label, which an unlabeled input never renders.
-    root.querySelector(`#${controlIDs(name).input}`)?.removeAttribute('aria-labelledby');
+    element.querySelector(`#${controlIDs(name).input}`)?.removeAttribute('aria-labelledby');
   }
-  return root;
+  return element;
 }
 
 /**
@@ -260,6 +278,7 @@ export function fieldInput<K extends FieldTypeName, O>(
  * A required field left empty reads as `validation.required`, exactly as the server answers it.
  * An ungated field with a `default` left empty reads as that default, the value the server would store.
  * Unsaved changes guard navigation for the page's lifetime, unless `guard` is `false`.
+ * Signed in, the fields build once `GET /dashboard` answers, so a relation finds its target.
  * A repeated or unknown `layout` name throws when the form is built.
  *
  * @example
@@ -315,14 +334,11 @@ export function form<const F extends FieldSpecs>(options: FormOptions<F>): Form<
     }
   };
 
-  if (isUndefined(options.data)) receive({});
-  else {
-    const { data } = options;
-    effect(() => {
-      const answer = data();
-      if (!isUndefined(answer)) untracked(() => receive(answer));
-    });
-  }
+  const ready = computed(discovered);
+  effect(() => {
+    const answer = isUndefined(options.data) ? {} : options.data();
+    if (ready.value && !isUndefined(answer)) untracked(() => receive(answer));
+  });
 
   let last: Record<string, unknown> = {};
   const value = computed(() => (last = live.value?.snapshot(last) ?? last));
