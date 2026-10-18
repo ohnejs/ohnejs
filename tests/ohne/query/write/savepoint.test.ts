@@ -2,7 +2,6 @@ import { ok, rejects, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import {
@@ -16,6 +15,7 @@ import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runDelete } from '../../../../src/ohne/query/write/delete.ts';
 import { isReferenceViolation } from '../../../../src/ohne/query/write/errors.ts';
 import { runUpdate } from '../../../../src/ohne/query/write/update.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useCollections().register('SPDoc', {
   name: 'SPDoc',
@@ -41,8 +41,7 @@ useCollections().register('SPHold', {
   collection: { fields: { doc: field('record', { collection: 'SPDoc', onDelete: 'restrict' }) } },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

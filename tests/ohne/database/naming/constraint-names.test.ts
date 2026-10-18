@@ -48,8 +48,15 @@ describe('truncation', () => {
     strictEqual(uniqueName(table, ['email']).length, 63);
   });
 
-  it('rejects an already-truncated table name', () => {
+  it('rejects an already-truncated table name in a logical composition', () => {
     const truncated = truncateWithHash('A'.repeat(80));
-    throws(() => primaryKeyName(truncated), /already-truncated/);
+    throws(() => uniqueName(truncated, ['email']), /already-truncated/);
+  });
+
+  it('keys a physical table capped at the boundary', () => {
+    const truncated = truncateWithHash('A'.repeat(80));
+    strictEqual(primaryKeyName(truncated), truncateWithHash(`PK__${truncated}`));
+    strictEqual(foreignKeyName(truncated, 'author'), truncateWithHash(`FK__${truncated}__author`));
+    strictEqual(foreignKeyName(truncated, 'author').length, 63);
   });
 });

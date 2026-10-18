@@ -4,7 +4,6 @@ import { describe, it } from 'node:test';
 import type { UniqueProbe } from '../../../../src/ohne/query/pipeline/run-record.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
@@ -16,6 +15,7 @@ import {
   checkUnique,
   uniqueRaceErrors,
 } from '../../../../src/ohne/query/write/unique.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useCollections().register('URUnique', {
   name: 'URUnique',
@@ -84,8 +84,7 @@ describe('uniqueRaceErrors', () => {
   });
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never),
 });

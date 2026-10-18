@@ -1,4 +1,4 @@
-import { jsonDepthWithin, parseMediaType } from '../../utils/index.ts';
+import { jsonDepthWithin, jsonHasNUL, parseMediaType } from '../../utils/index.ts';
 import { badRequest, unsupportedMediaType } from './http-error.ts';
 import { readTextBody } from './read-text-body.ts';
 import { translate } from './translate.ts';
@@ -22,6 +22,7 @@ export interface ReadJSONBodyOptions {
  * Reads and parses a JSON request body.
  * Rejects with `415` unless the `Content-Type` is `application/json` or a `+json` suffix.
  * An empty, malformed, or too-nested body rejects with `400`.
+ * So does a U+0000 (NUL) in any key or value, which some database engines cannot store.
  * Valid only within a request.
  *
  * The result is typed as `T` but unverified; validate it before you trust it.
@@ -41,9 +42,12 @@ export async function readJSONBody<T = unknown>({
   if (text === '') throw badRequest(translate('api.body.empty'));
   if (!jsonDepthWithin(text, maxDepth)) throw badRequest(translate('api.body.tooNested'));
 
+  let parsed: T;
   try {
-    return JSON.parse(text) as T;
+    parsed = JSON.parse(text) as T;
   } catch {
     throw badRequest(translate('api.body.invalidJSON'));
   }
+  if (jsonHasNUL(text)) throw badRequest(translate('api.body.containsNUL'));
+  return parsed;
 }

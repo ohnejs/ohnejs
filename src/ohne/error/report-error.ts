@@ -25,7 +25,7 @@ import { isOhneError } from './ohne-error.ts';
  * A validation error becomes a block with one translated row per failing field.
  * A busy error or a reference violation becomes a block titled by its message.
  * Any other throw becomes a block titled by its error name, with the message as the body.
- * An `ohneError` names its own corner; the others take the first stack frame outside the framework `src`.
+ * An `ohneError` names its own corner; the others take the first stack frame of the project's own code.
  * The column is included when the stack carries one.
  * The full error, with its `cause` and own fields, shows only under `DEBUG`.
  */
@@ -69,14 +69,15 @@ function relativize(path: string | undefined): string | undefined {
 }
 
 /**
- * Pulls the first `file://` location outside the framework `src` from the stack as `file:line[:col]`.
+ * Pulls the first `file://` location outside the framework `src` and `node_modules` as `file:line[:col]`.
  * A framework frame never stands in, so a factory like `notFound` points at the line that called it.
+ * Nor does an installed package's, so a dialect's driver error points at the query that failed.
  */
 function errorLocation(error: unknown): string | undefined {
   if (!(error instanceof Error) || isUndefined(error.stack)) return undefined;
   for (const [, url, line, column] of error.stack.matchAll(/(file:\/\/\/\S*?):(\d+)(?::(\d+))?/g)) {
     const file = fileURLToPath(url!);
-    if (isPathInside(file, SRC_ROOT)) continue;
+    if (isPathInside(file, SRC_ROOT) || url!.includes('/node_modules/')) continue;
     return isUndefined(column) ? `${file}:${line}` : `${file}:${line}:${column}`;
   }
   return undefined;

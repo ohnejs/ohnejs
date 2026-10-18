@@ -12,7 +12,6 @@ import type { FieldTypeMeta } from '../../../../src/ohne/fields/use-fields.ts';
 import type { Registry } from '../../../../src/utils/index.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { useMigrations } from '../../../../src/ohne/database/migrations/use-migrations.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
@@ -25,12 +24,7 @@ import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { createRegistry } from '../../../../src/utils/index.ts';
-
-const dialect = new SQLiteDialect();
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
+import { connectTest, dialect, memoryURL } from '../../../_dialect.ts';
 
 function bodyOf(error: unknown): string {
   ok(isOhneError(error));
@@ -86,7 +80,7 @@ function stamps(db: DatabaseAdapter): Promise<{ name: string; status: string; re
 
 describe('syncDatabase with a fill migration', () => {
   it('refuses a new required field over live rows, pointing at a fill', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: before });
     await insertSite(db, 's1');
     await rejects(syncDatabase(db, dialect, { desired: after }), (error: unknown) => {
@@ -106,7 +100,7 @@ describe('syncDatabase with a fill migration', () => {
   });
 
   it('boots in one sync with the fill, stamping it applied', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: before });
     await insertSite(db, 's1');
     const migrations = [fill(() => true)];
@@ -133,7 +127,7 @@ describe('syncDatabase with a fill migration', () => {
   });
 
   it('rolls the fill and its stamp back when a row stays NULL', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: before });
     await insertSite(db, 's1');
     await insertSite(db, 's2');
@@ -144,14 +138,14 @@ describe('syncDatabase with a fill migration', () => {
       }),
       refusalMatching(/`Site.autoRedirect` becomes NOT NULL over `1` NULL row/),
     );
-    deepStrictEqual(await stamps(db), []);
+    ok(!(await dialect.listTables(db)).includes('ohne_migrations'));
     const live = await dialect.describeTable(db, 'Site');
     ok(live.columns.every((column) => column.name !== 'autoRedirect'));
     await db.close();
   });
 
   it('refuses a constant fill under a new unique, the duplicate group named', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = desiredOf({ name: 'Posts', collection: { fields: {} } } as CollectionMeta);
     await syncDatabase(db, dialect, { desired: posts });
     await db.run('INSERT INTO "Posts" ("UUID", "_updatedAt") VALUES (?, ?), (?, ?)', [
@@ -195,13 +189,13 @@ describe('syncDatabase with a fill migration', () => {
   });
 
   it('rolls a dry run back, the live schema and the stamps untouched', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: before });
     await insertSite(db, 's1');
     const migrations = [fill(() => true)];
     const report = await syncDatabase(db, dialect, { desired: after, migrations, dryRun: true });
     deepStrictEqual(report, { deletions: [], warnings: [] });
-    deepStrictEqual(await stamps(db), []);
+    ok(!(await dialect.listTables(db)).includes('ohne_migrations'));
     const live = await dialect.describeTable(db, 'Site');
     ok(live.columns.every((column) => column.name !== 'autoRedirect'));
     await syncDatabase(db, dialect, { desired: after, migrations });
@@ -221,7 +215,7 @@ describe('syncProjectDatabase with a fill migration', () => {
   });
 
   it('skips on a fresh database, the seed then creating the record from the default', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     useCollections().register('FillSite', {
       name: 'FillSite',
       collection: {

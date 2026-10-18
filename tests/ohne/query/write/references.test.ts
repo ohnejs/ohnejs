@@ -5,7 +5,6 @@ import type { RelationRef } from '../../../../src/ohne/query/pipeline/run-record
 import type { QueryScope } from '../../../../src/ohne/query/wire/apply.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -13,14 +12,14 @@ import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { checkReferences, linkReachable } from '../../../../src/ohne/query/write/references.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useCollections().register('RFTargets', {
   name: 'RFTargets',
   collection: { fields: { owner: field('text') } },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

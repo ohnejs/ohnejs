@@ -70,10 +70,11 @@ export interface SchemaSnapshot {
  * Ensures the `ohne_schema` table exists, tolerating a concurrent create.
  */
 export async function ensureSchemaTable(db: Transaction, dialect: Dialect): Promise<void> {
-  await db.exec(
-    `CREATE TABLE IF NOT EXISTS ${dialect.quote(OHNE_SCHEMA)} (` +
-      `${dialect.quote('key')} ${dialect.columnType('text')} PRIMARY KEY, ` +
-      `${dialect.quote('data')} ${dialect.columnType('text')} NOT NULL)`,
+  await dialect.ensureTable(
+    db,
+    OHNE_SCHEMA,
+    `${dialect.quote('key')} ${dialect.columnType('text')} PRIMARY KEY, ` +
+      `${dialect.quote('data')} ${dialect.columnType('text')} NOT NULL`,
   );
 }
 

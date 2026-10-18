@@ -80,6 +80,15 @@ describe('SQLiteDialect', () => {
       await db.close();
     });
 
+    it('hands each transaction its own `tx`, never the adapter', async () => {
+      const db = await open();
+      const first = await db.transaction(async (tx) => tx);
+      const second = await db.transaction(async (tx) => tx);
+      ok(first !== second);
+      ok(first !== db);
+      await db.close();
+    });
+
     it('rolls back every write on a throw and re-throws', async () => {
       const db = await open();
       await db.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
@@ -347,17 +356,13 @@ describe('SQLiteDialect', () => {
       pattern: string,
       fold = false,
     ): Promise<{ name: string }[]> {
-      const where = dialect.textMatch('"name"', fold);
+      const where = fold ? dialect.textMatch('"name"') : dialect.like('"name"', true);
       return db.query(`SELECT name FROM t WHERE ${where} ORDER BY name`, [pattern]);
     }
 
-    it('emits LIKE with a backslash escape and one placeholder', () => {
-      strictEqual(dialect.textMatch('"name"', false), `"name" LIKE ? ESCAPE '\\'`);
-    });
-
-    it('folds only a non-ASCII row through `ohne_fold` when asked', () => {
+    it('folds only a non-ASCII row through `ohne_fold`', () => {
       strictEqual(
-        dialect.textMatch('"name"', true),
+        dialect.textMatch('"name"'),
         `(CASE WHEN length("name") = octet_length("name") THEN "name" ELSE ohne_fold("name") END) ` +
           `LIKE ? ESCAPE '\\'`,
       );
@@ -446,6 +451,81 @@ describe('SQLiteDialect', () => {
     });
   });
 
+  describe('like', () => {
+    it('emits a plain LIKE with one placeholder and no escape character', () => {
+      strictEqual(dialect.like('"name"', false), `"name" LIKE ?`);
+    });
+
+    it('declares backslash as the escape character when escaped', () => {
+      strictEqual(dialect.like('"name"', true), `"name" LIKE ? ESCAPE '\\'`);
+    });
+
+    it('folds ASCII case alone and reads a backslash literally without an escape', async () => {
+      const db = await open();
+      await db.exec('CREATE TABLE t (name TEXT)');
+      for (const name of ['Apple', 'École', 'a\\b']) {
+        await db.run('INSERT INTO t (name) VALUES (?)', [name]);
+      }
+      const like = (pattern: string) =>
+        db.query(`SELECT name FROM t WHERE ${dialect.like('"name"', false)}`, [pattern]);
+      deepStrictEqual(await like('aPP%'), [nullObj({ name: 'Apple' })]);
+      deepStrictEqual(await like('école'), []);
+      deepStrictEqual(await like('a\\b'), [nullObj({ name: 'a\\b' })]);
+      await db.close();
+    });
+  });
+
+  describe('accepts', () => {
+    it('accepts `:memory:`, a `file:` URL, and plain paths', () => {
+      ok(dialect.accepts(':memory:'));
+      ok(dialect.accepts('file:app.db?mode=ro'));
+      ok(dialect.accepts('file:///srv/app.db'));
+      ok(dialect.accepts('.data/ohne.db'));
+      ok(dialect.accepts('/srv/app.db'));
+    });
+
+    it('refuses a URL with another scheme', () => {
+      strictEqual(dialect.accepts('postgres://u:p@localhost/app'), false);
+      strictEqual(dialect.accepts('mysql://localhost/app'), false);
+    });
+  });
+
+  describe('paginate', () => {
+    it('emits nothing without a limit or an offset', () => {
+      deepStrictEqual(dialect.paginate(null, null), { sql: '', params: [] });
+    });
+
+    it('emits a limit alone', () => {
+      deepStrictEqual(dialect.paginate(10, null), { sql: 'LIMIT ?', params: [10] });
+    });
+
+    it('emits a limit with an offset', () => {
+      deepStrictEqual(dialect.paginate(10, 20), { sql: 'LIMIT ? OFFSET ?', params: [10, 20] });
+    });
+
+    it('emits `LIMIT -1` for an offset alone', () => {
+      deepStrictEqual(dialect.paginate(null, 20), { sql: 'LIMIT ? OFFSET ?', params: [-1, 20] });
+    });
+  });
+
+  describe('sortTerm', () => {
+    it('renders each direction', () => {
+      strictEqual(dialect.sortTerm('"title"', 'asc'), '"title" ASC');
+      strictEqual(dialect.sortTerm('"title"', 'desc'), '"title" DESC');
+    });
+  });
+
+  describe('ensureTable', () => {
+    it('creates the table once and tolerates a second call', async () => {
+      const db = await open();
+      await dialect.ensureTable(db, 'notes', '"key" TEXT PRIMARY KEY');
+      await db.run('INSERT INTO notes (key) VALUES (?)', ['a']);
+      await dialect.ensureTable(db, 'notes', '"key" TEXT PRIMARY KEY');
+      deepStrictEqual(await db.query('SELECT key FROM notes'), [nullObj({ key: 'a' })]);
+      await db.close();
+    });
+  });
+
   describe('adapter', () => {
     it('runs statements and reads rows back', async () => {
       const db = await open();
@@ -519,47 +599,6 @@ describe('SQLiteDialect', () => {
   });
 
   describe('schemaTransaction', () => {
-    it('commits DDL and DML together and returns the result', async () => {
-      const db = await open();
-      const result = await dialect.schemaTransaction(db, async (tx) => {
-        await tx.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
-        await tx.run('INSERT INTO t (id) VALUES (?)', ['a']);
-        return 'done';
-      });
-      strictEqual(result, 'done');
-      deepStrictEqual(await db.query('SELECT id FROM t'), [nullObj({ id: 'a' })]);
-      await db.close();
-    });
-
-    it('rolls back on success but returns the result when commit is false', async () => {
-      const db = await open();
-      const result = await dialect.schemaTransaction(
-        db,
-        async (tx) => {
-          await tx.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
-          await tx.run('INSERT INTO t (id) VALUES (?)', ['a']);
-          return 'done';
-        },
-        { commit: false },
-      );
-      strictEqual(result, 'done');
-      deepStrictEqual(await dialect.listTables(db), []);
-      await db.close();
-    });
-
-    it('rolls back DDL atomically when fn throws, then rethrows', async () => {
-      const db = await open();
-      await rejects(
-        dialect.schemaTransaction(db, async (tx) => {
-          await tx.exec('CREATE TABLE t (id TEXT PRIMARY KEY)');
-          throw new Error('boom');
-        }),
-        /boom/,
-      );
-      deepStrictEqual(await dialect.listTables(db), []);
-      await db.close();
-    });
-
     it('turns foreign-key enforcement off inside and back on after commit', async () => {
       const db = await open();
       await db.exec('CREATE TABLE parent (id TEXT PRIMARY KEY)');
@@ -686,96 +725,6 @@ describe('SQLiteDialect', () => {
       strictEqual(dialect.isBusy(Object.assign(new Error('locked'), { errcode: 517 })), true);
       strictEqual(dialect.isBusy(Object.assign(new Error('fk'), { errcode: 787 })), false);
       strictEqual(dialect.isBusy(new Error('x')), false);
-    });
-  });
-
-  describe('cluster lock', () => {
-    it('grants the lock to one caller and refuses the next', async () => {
-      const db = await open();
-      const first = await dialect.acquireLock(db, 'sync');
-      ok(first);
-      strictEqual(await dialect.acquireLock(db, 'sync'), null);
-      await db.close();
-    });
-
-    it('frees the lock on release, so it can be re-acquired', async () => {
-      const db = await open();
-      const handle = await dialect.acquireLock(db, 'sync');
-      ok(handle);
-      await dialect.releaseLock(db, handle);
-      ok(await dialect.acquireLock(db, 'sync'));
-      await db.close();
-    });
-
-    it('ignores a release with a mismatched nonce', async () => {
-      const db = await open();
-      ok(await dialect.acquireLock(db, 'sync'));
-      await dialect.releaseLock(db, { key: 'sync', nonce: 'wrong' });
-      strictEqual(await dialect.acquireLock(db, 'sync'), null);
-      await db.close();
-    });
-
-    it('waitForLock resolves once the holder releases', async () => {
-      const db = await open();
-      const handle = await dialect.acquireLock(db, 'sync');
-      ok(handle);
-      const waited = dialect.waitForLock(db, 'sync', { pollInterval: 5, staleAfter: 10_000 });
-      await sleep(15);
-      await dialect.releaseLock(db, handle);
-      await waited;
-      ok(await dialect.acquireLock(db, 'sync'));
-      await db.close();
-    });
-
-    it('waitForLock steals an abandoned lock', async () => {
-      const db = await open();
-      ok(await dialect.acquireLock(db, 'sync'));
-      await db.run('UPDATE "ohne_locks" SET "acquiredAt" = ? WHERE "key" = ?', [
-        Date.now() - 10_000,
-        'sync',
-      ]);
-      await dialect.waitForLock(db, 'sync', { pollInterval: 5, staleAfter: 50 });
-      ok(await dialect.acquireLock(db, 'sync'));
-      await db.close();
-    });
-
-    it("renewLock moves the holder's acquiredAt to now and leaves a rival's row alone", async (t) => {
-      const db = await open();
-      const handle = await dialect.acquireLock(db, 'sync');
-      ok(handle);
-      const renewed = [nullObj({ acquiredAt: 5_000 })];
-      t.mock.timers.enable({ apis: ['Date'], now: 5_000 });
-      await dialect.renewLock(db, handle);
-      deepStrictEqual(await db.query('SELECT "acquiredAt" FROM "ohne_locks"'), renewed);
-      t.mock.timers.tick(1_000);
-      await dialect.renewLock(db, { key: 'sync', nonce: 'wrong' });
-      deepStrictEqual(await db.query('SELECT "acquiredAt" FROM "ohne_locks"'), renewed);
-      await db.close();
-    });
-
-    it('releaseAbandonedLock frees an absent or abandoned key and keeps a live one', async () => {
-      const db = await open();
-      await dialect.waitForLock(db, 'sync', { pollInterval: 5, staleAfter: 50 });
-      strictEqual(await dialect.releaseAbandonedLock(db, 'sync', 50), true);
-      ok(await dialect.acquireLock(db, 'sync'));
-      strictEqual(await dialect.releaseAbandonedLock(db, 'sync', 10_000), false);
-      strictEqual(await dialect.acquireLock(db, 'sync'), null);
-      await db.run('UPDATE "ohne_locks" SET "acquiredAt" = ?', [Date.now() - 10_000]);
-      strictEqual(await dialect.releaseAbandonedLock(db, 'sync', 50), true);
-      deepStrictEqual(await db.query('SELECT * FROM "ohne_locks"'), []);
-      await db.close();
-    });
-
-    it('ensures the lock table once per adapter', async (t) => {
-      const db = await open();
-      const exec = t.mock.method(db, 'exec');
-      const handle = await dialect.acquireLock(db, 'sync');
-      ok(handle);
-      strictEqual(await dialect.acquireLock(db, 'sync'), null);
-      await dialect.releaseLock(db, handle);
-      await dialect.waitForLock(db, 'sync', { pollInterval: 5, staleAfter: 50 });
-      strictEqual(exec.mock.callCount(), 1);
-      await db.close();
     });
   });
 });

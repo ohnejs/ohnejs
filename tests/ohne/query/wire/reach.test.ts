@@ -6,7 +6,6 @@ import type { SearchParamValue } from '../../../../src/utils/index.ts';
 
 import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -19,6 +18,7 @@ import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { applyQuery } from '../../../../src/ohne/query/wire/apply.ts';
 import { resolveGuards } from '../../../../src/ohne/query/wire/guards.ts';
 import { parseWireQuery } from '../../../../src/ohne/query/wire/reach.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useLayers().add({
   path: '/reach-test',
@@ -66,8 +66,7 @@ useCollections().register('WrPins', {
   collection: { fields: { note: field('record', { collection: 'WrNotes' }) } },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

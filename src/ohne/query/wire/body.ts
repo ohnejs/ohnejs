@@ -1,6 +1,11 @@
 import type { SearchParamValue } from '../../../utils/index.ts';
 
-import { isPlainObject, jsonDepthWithin, parseMediaType } from '../../../utils/index.ts';
+import {
+  isPlainObject,
+  jsonDepthWithin,
+  jsonHasNUL,
+  parseMediaType,
+} from '../../../utils/index.ts';
 import { badRequest, unsupportedMediaType } from '../../http/http-error.ts';
 import { readTextBody } from '../../http/read-text-body.ts';
 import { translate } from '../../http/translate.ts';
@@ -25,7 +30,7 @@ export interface ReadQueryBodyOptions {
  *
  * The parsed object feeds the same `parseQueryParams` a URL does, so both transports converge.
  * Rejects `415` unless the `Content-Type` is `application/json` or a `+json` suffix.
- * An empty, non-object, malformed, or too-nested body rejects `400`.
+ * An empty, non-object, malformed, or too-nested body rejects `400`, as does a U+0000 (NUL) anywhere.
  * The result is unverified; `parseQueryParams` validates it.
  *
  * @example
@@ -61,7 +66,8 @@ export interface ReadRecordBodyOptions {
  * Reads a record write input from a JSON request body - the create and update endpoints' reader.
  *
  * The same gates as `readQueryBody`: `415` on a non-JSON `Content-Type`, `400` on a bad body.
- * Empty, non-object, malformed, and too-nested all reject, the depth scanned before `JSON.parse`.
+ * Empty, non-object, malformed, too-nested, and NUL-bearing bodies all reject.
+ * The depth is scanned before `JSON.parse`.
  * The result is unverified; the write pipeline validates it.
  *
  * @example
@@ -76,7 +82,7 @@ export async function readRecordBody({ maxDepth = 32 }: ReadRecordBodyOptions = 
 }
 
 /**
- * The shared read: the content-type gate, the depth scan, `JSON.parse`, and the plain-object check.
+ * The shared read: the content-type gate, the depth scan, `JSON.parse`, the plain-object and NUL checks.
  */
 async function readBoundedObject(maxDepth: number): Promise<Record<string, unknown>> {
   const { type } = parseMediaType(useRequest().headers.get('content-type') ?? '');
@@ -93,5 +99,6 @@ async function readBoundedObject(maxDepth: number): Promise<Record<string, unkno
     throw badRequest(translate('api.body.invalidJSON'));
   }
   if (!isPlainObject(parsed)) throw badRequest(translate('api.body.invalidJSON'));
+  if (jsonHasNUL(text)) throw badRequest(translate('api.body.containsNUL'));
   return parsed;
 }

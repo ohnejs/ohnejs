@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from 'node:sqlite';
 
+import type { OrderDirection } from '../../../query/ir.ts';
 import type { DatabaseAdapter, SQLValue, Transaction } from '../../adapter.ts';
 import type { TableAlter, TableDiff, TableSchema } from '../../schema/table-schema.ts';
 
@@ -11,6 +12,7 @@ import {
   createMutex,
   dirname,
   errorMessage,
+  isAbsolutePath,
   isBoolean,
   isNull,
   isNullish,
@@ -18,8 +20,10 @@ import {
   isObject,
   isString,
   isUndefined,
+  joinPath,
   uniqueArray,
 } from '../../../../utils/index.ts';
+import { appRoot } from '../../../layers/app-root.ts';
 import {
   Dialect,
   type DialectFragment,
@@ -59,13 +63,22 @@ export class SQLiteDialect extends Dialect {
   readonly maxParameters = 32766;
 
   /**
+   * Accepts `:memory:`, a `file:` URL, or a plain file path - anything without a `://` scheme.
+   */
+  accepts(url: string): boolean {
+    return isSQLiteURL(url);
+  }
+
+  /**
    * Opens the database at `url` (a file path or `:memory:`) and applies the pragma set before returning.
+   * A relative file path resolves against the app root rather than the process working directory.
    * A file path's parent directory is created on demand, since SQLite creates the file but not its folder.
-   * It registers `ohne_fold`, the `foldCase` a folded `textMatch` reads a non-ASCII row through.
+   * It registers `ohne_fold`, the `foldCase` a `textMatch` reads a non-ASCII row through.
    */
   async connect(url: string): Promise<DatabaseAdapter> {
-    if (url !== ':memory:' && !url.startsWith('file:')) await ensureDir(dirname(url));
-    const db = new DatabaseSync(url);
+    const path = isFilePath(url) && !isAbsolutePath(url) ? joinPath(appRoot(), url) : url;
+    if (isFilePath(path)) await ensureDir(dirname(path));
+    const db = new DatabaseSync(path);
     applyPragmas(db);
     db.function('ohne_fold', { deterministic: true }, foldText);
     return createAdapter(db);
@@ -127,18 +140,23 @@ export class SQLiteDialect extends Dialect {
 
   /**
    * SQLite's default `LIKE` folds ASCII case alone, so it serves an ASCII row exactly and in C.
-   * A folded match sends only a row holding non-ASCII text through `ohne_fold`.
+   * Only a row holding non-ASCII text goes through `ohne_fold`.
    * A row is ASCII when its character and byte lengths agree.
    * One shape serves every folded pattern, since an ASCII row can never match a non-ASCII one.
-   * Backslash is declared as the escape character.
    * `PRAGMA case_sensitive_like` must never be set: it would make the text-match operators case-sensitive.
    */
-  textMatch(quotedColumn: string, fold: boolean): string {
-    const column = fold
-      ? `(CASE WHEN length(${quotedColumn}) = octet_length(${quotedColumn}) THEN ${quotedColumn} ` +
-        `ELSE ohne_fold(${quotedColumn}) END)`
-      : quotedColumn;
-    return `${column} LIKE ? ESCAPE '\\'`;
+  textMatch(quotedColumn: string): string {
+    const column =
+      `(CASE WHEN length(${quotedColumn}) = octet_length(${quotedColumn}) THEN ${quotedColumn} ` +
+      `ELSE ohne_fold(${quotedColumn}) END)`;
+    return this.like(column, true);
+  }
+
+  /**
+   * SQLite's default `LIKE`, which folds ASCII case alone.
+   */
+  like(quotedColumn: string, escaped: boolean): string {
+    return escaped ? `${quotedColumn} LIKE ? ESCAPE '\\'` : `${quotedColumn} LIKE ?`;
   }
 
   /**
@@ -169,6 +187,22 @@ export class SQLiteDialect extends Dialect {
       sql: `EXISTS (SELECT 1 FROM ${each} WHERE json_each.value IN (${marks}))`,
       params: elements,
     };
+  }
+
+  /**
+   * An offset without a limit compiles `LIMIT -1 OFFSET ?`, SQLite's idiom for "all rows past the offset".
+   */
+  paginate(limit: number | null, offset: number | null): DialectFragment {
+    if (isNull(limit) && isNull(offset)) return { sql: '', params: [] };
+    if (isNull(offset)) return { sql: 'LIMIT ?', params: [limit] };
+    return { sql: 'LIMIT ? OFFSET ?', params: [limit ?? -1, offset] };
+  }
+
+  /**
+   * SQLite's native NULL placement already matches the contract: NULLs sort lowest.
+   */
+  sortTerm(expression: string, direction: OrderDirection): string {
+    return `${expression} ${direction === 'desc' ? 'DESC' : 'ASC'}`;
   }
 
   /**
@@ -320,6 +354,20 @@ export class SQLiteDialect extends Dialect {
 }
 
 /**
+ * Whether `url` names a SQLite database: `:memory:`, a `file:` URL, or a path with no `://` scheme.
+ */
+function isSQLiteURL(url: string): boolean {
+  return url.startsWith('file:') || !url.includes('://');
+}
+
+/**
+ * Whether `url` is a plain file path, neither `:memory:` nor a `file:` URL.
+ */
+function isFilePath(url: string): boolean {
+  return url !== ':memory:' && !url.startsWith('file:');
+}
+
+/**
  * Whether an alter holds anything SQLite's `ALTER TABLE` cannot express in place.
  * A dropped `sqlite_autoindex_` unique is an inline constraint, droppable only by rebuilding.
  */
@@ -402,7 +450,8 @@ function createAdapter(db: DatabaseSync): DatabaseAdapter {
         db.exec(mode === 'immediate' ? 'BEGIN IMMEDIATE' : 'BEGIN');
         open = {};
         try {
-          const result = await flow.run(open, fn, adapter);
+          const { exec, run, query, queryOne } = adapter;
+          const result = await flow.run(open, fn, { exec, run, query, queryOne });
           db.exec('COMMIT');
           return result;
         } catch (error) {

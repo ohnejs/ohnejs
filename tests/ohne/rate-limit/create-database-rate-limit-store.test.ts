@@ -1,32 +1,23 @@
 import { ok, rejects, strictEqual } from 'node:assert';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { after, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 
 import type { DatabaseAdapter } from '../../../src/ohne/database/adapter.ts';
 
-import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
 import { isBusyError } from '../../../src/ohne/query/write/busy.ts';
 import { createDatabaseRateLimitStore } from '../../../src/ohne/rate-limit/create-database-rate-limit-store.ts';
+import { busyError, connectTest, dialect, sharedURL } from '../../_dialect.ts';
 import { storeContract } from '../../utils/rate-limit/_store-contract.ts';
 
-const dialect = new SQLiteDialect();
 registerDialect(dialect);
 
-const root = mkdtempSync(join(tmpdir(), 'ohne-rate-limit-'));
 let sequence = 0;
-
-after(() => rmSync(root, { recursive: true, force: true }));
 
 async function helper(adapter?: DatabaseAdapter): Promise<string> {
   const name = `rateLimits${sequence++}`;
-  registerDatabase(adapter ?? (await dialect.connect(':memory:')), name);
+  registerDatabase(adapter ?? (await connectTest()), name);
   return name;
 }
-
-const BUSY = Object.assign(new Error('database is locked'), { errcode: 5 });
 
 describe('createDatabaseRateLimitStore', () => {
   storeContract(async () => {
@@ -35,9 +26,9 @@ describe('createDatabaseRateLimitStore', () => {
     return { clock, store: createDatabaseRateLimitStore({ database, now: () => clock.now }) };
   });
 
-  it('spends exactly the limit across two connections to one file', async () => {
-    const path = join(root, 'shared.db');
-    const [a, b] = [await dialect.connect(path), await dialect.connect(path)];
+  it('spends exactly the limit across two connections to one database', async () => {
+    const url = await sharedURL();
+    const [a, b] = [await dialect.connect(url), await dialect.connect(url)];
     const stores = [
       createDatabaseRateLimitStore({ database: await helper(a) }),
       createDatabaseRateLimitStore({ database: await helper(b) }),
@@ -52,9 +43,9 @@ describe('createDatabaseRateLimitStore', () => {
 
   it('rejects a busy database with the retryable busy error', async () => {
     const busy: DatabaseAdapter = {
-      ...(await dialect.connect(':memory:')),
+      ...(await connectTest()),
       exec: async () => {
-        throw BUSY;
+        throw busyError();
       },
     };
     const store = createDatabaseRateLimitStore({ database: await helper(busy) });
@@ -63,12 +54,12 @@ describe('createDatabaseRateLimitStore', () => {
   });
 
   it('decides a hit even when its sweep finds the database busy', async () => {
-    const real = await dialect.connect(':memory:');
+    const real = await connectTest();
     const store = createDatabaseRateLimitStore({
       database: await helper({
         ...real,
         run: async () => {
-          throw BUSY;
+          throw busyError();
         },
       }),
     });
@@ -76,7 +67,7 @@ describe('createDatabaseRateLimitStore', () => {
   });
 
   it('sweeps only rows whose budget is full again', async () => {
-    const db = await dialect.connect(':memory:');
+    const db = await connectTest();
     const rate = { limit: 1, window: 1000 };
     await dialect.takeRateLimit(db, 'spent', rate, 0);
     await dialect.takeRateLimit(db, 'live', rate, 500);
@@ -85,7 +76,7 @@ describe('createDatabaseRateLimitStore', () => {
   });
 
   it('keeps an overdrawn row until its whole debt has drained', async () => {
-    const db = await dialect.connect(':memory:');
+    const db = await connectTest();
     const rate = { limit: 1, window: 1000 };
     strictEqual(await dialect.chargeRateLimit(db, 'thrall', rate, 5, 0), 5000);
     strictEqual(await dialect.sweepRateLimits(db, 2000, 10), 0);
@@ -95,9 +86,9 @@ describe('createDatabaseRateLimitStore', () => {
 
   it('rejects a charge on a busy database with the retryable busy error', async () => {
     const busy: DatabaseAdapter = {
-      ...(await dialect.connect(':memory:')),
+      ...(await connectTest()),
       exec: async () => {
-        throw BUSY;
+        throw busyError();
       },
     };
     const store = createDatabaseRateLimitStore({ database: await helper(busy) });
@@ -105,7 +96,7 @@ describe('createDatabaseRateLimitStore', () => {
   });
 
   it('sweeps at most one batch at a time', async () => {
-    const db = await dialect.connect(':memory:');
+    const db = await connectTest();
     for (let i = 0; i < 5; i++)
       await dialect.takeRateLimit(db, `k${i}`, { limit: 1, window: 1 }, 0);
     strictEqual(await dialect.sweepRateLimits(db, 10, 3), 3);
@@ -113,9 +104,9 @@ describe('createDatabaseRateLimitStore', () => {
   });
 
   it('creates its table on check, and fails for an unknown helper', async () => {
-    const db = await dialect.connect(':memory:');
+    const db = await connectTest();
     await createDatabaseRateLimitStore({ database: await helper(db) }).check?.();
-    ok(await db.queryOne(`SELECT 1 FROM sqlite_master WHERE name = 'ohne_rate_limits'`));
+    ok((await dialect.listTables(db)).includes('ohne_rate_limits'));
     await rejects(
       createDatabaseRateLimitStore({ database: 'missing' }).check!(),
       /Unknown database helper/,

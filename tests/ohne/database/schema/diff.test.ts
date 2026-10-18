@@ -3,10 +3,8 @@ import { describe, it } from 'node:test';
 
 import type { TableAlter, TableSchema } from '../../../../src/ohne/database/schema/table-schema.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { diffSchemas } from '../../../../src/ohne/database/schema/diff.ts';
-
-const dialect = new SQLiteDialect();
+import { dialect } from '../../../_dialect.ts';
 
 function table(name: string, overrides: Partial<TableSchema> = {}): TableSchema {
   return {

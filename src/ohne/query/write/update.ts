@@ -42,6 +42,7 @@ import { prefixPath } from '../pipeline/prefix-errors.ts';
 import { runRecord } from '../pipeline/run-record.ts';
 import { readRows } from '../read/find.ts';
 import { narrowTranslations } from '../read/loaders/translations.ts';
+import { assertBoundParams } from '../sql/fragment.ts';
 import { compileFrom } from '../sql/from.ts';
 import { compileWhere } from '../sql/where.ts';
 import {
@@ -637,6 +638,7 @@ async function matchedUUIDs(
 ): Promise<string[]> {
   const where = compileWhere(condition, meta, dialect, locale);
   const from = compileFrom(meta, { condition }, locale, dialect);
+  assertBoundParams(from.params.length + where.params.length, dialect.maxParameters);
   const uuid = `${dialect.quote(meta.table)}.${dialect.quote('UUID')}`;
   const rows = await tx.query<{ UUID: string }>(
     `SELECT ${uuid} AS ${dialect.quote('UUID')} ${from.sql} WHERE ${where.sql}`,

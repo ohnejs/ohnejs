@@ -1,11 +1,10 @@
-import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
+import { deepStrictEqual, ok, rejects, strictEqual, throws } from 'node:assert';
 import { afterEach, before, describe, it } from 'node:test';
 
 import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
 import type { ConditionNode } from '../../../../src/utils/index.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -17,6 +16,7 @@ import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runUpdate } from '../../../../src/ohne/query/write/update.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 import { linksField } from './_links-field.ts';
 
 useLayers().add({
@@ -138,8 +138,7 @@ useCollections().register('ULinked', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {
@@ -709,6 +708,13 @@ describe('runUpdate across matched records', () => {
 describe('runUpdate guards', () => {
   it('throws without a filter through the untyped builder', () => {
     throws(() => queryUntyped('UPost').update({ views: 1 }), /without a filter/);
+  });
+
+  it('refuses a condition binding past the driver parameter cap', async () => {
+    const uuids = Array.from({ length: dialect.maxParameters + 1 }, (_, index) => `u${index}`);
+    await rejects(runUpdate('UPost', { views: 1 }, inUUIDs(uuids), null), {
+      message: 'Query exceeds the driver parameter cap',
+    });
   });
 });
 

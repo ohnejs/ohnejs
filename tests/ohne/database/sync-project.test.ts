@@ -9,6 +9,7 @@ import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
+import { dialect, memoryURL } from '../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -23,18 +24,17 @@ describe('syncProjectDatabase', () => {
   });
 
   it('rejects a literal default the field rejects, before the reconcile', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     register('SPBad', { body: field('text', { default: '' }) });
     await rejects(syncProjectDatabase(), (error: unknown) => {
       ok(isOhneError(error));
       return error.title === 'Field `body` defaults to a value it rejects';
     });
-    const tables = await useDatabase().query("SELECT name FROM sqlite_master WHERE type = 'table'");
-    deepStrictEqual(tables, []);
+    deepStrictEqual(await dialect.listTables(useDatabase()), []);
   });
 
   it('syncs a schema whose literal defaults pass', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     register('SPGood', { body: field('text', { default: '', allowEmpty: true }) });
     const report = await syncProjectDatabase();
     deepStrictEqual(report.deletions, []);
@@ -49,15 +49,12 @@ describe('isProjectSynced', () => {
   });
 
   it('holds once a sync realized the schema, never writing to a database no sync touched', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     await connect();
     strictEqual(await isProjectSynced(), true);
     register('SPPosts', { title: field('text') });
     strictEqual(await isProjectSynced(), false);
-    deepStrictEqual(
-      await useDatabase().query("SELECT name FROM sqlite_master WHERE type = 'table'"),
-      [],
-    );
+    deepStrictEqual(await dialect.listTables(useDatabase()), []);
     await syncProjectDatabase();
     strictEqual(await isProjectSynced(), true);
     useCollections().delete('SPPosts');

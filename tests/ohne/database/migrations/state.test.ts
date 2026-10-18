@@ -1,24 +1,16 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
-
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import {
   ensureMigrationsTable,
   readStampedNames,
   stampMigration,
 } from '../../../../src/ohne/database/migrations/state.ts';
-
-const dialect = new SQLiteDialect();
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 describe('migration state', () => {
   it('ensures the table idempotently', async () => {
-    const db = await open();
+    const db = await connectTest();
     await ensureMigrationsTable(db, dialect);
     await ensureMigrationsTable(db, dialect);
     deepStrictEqual(await readStampedNames(db, dialect), new Set());
@@ -26,7 +18,7 @@ describe('migration state', () => {
   });
 
   it('round-trips applied and skipped stamps', async () => {
-    const db = await open();
+    const db = await connectTest();
     await ensureMigrationsTable(db, dialect);
     await stampMigration(db, dialect, { name: 'app/001-move', status: 'applied' });
     await stampMigration(db, dialect, {

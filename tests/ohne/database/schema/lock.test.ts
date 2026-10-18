@@ -1,28 +1,18 @@
 import { match, notStrictEqual, ok, strictEqual } from 'node:assert';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { after, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 
 import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
-import type { LockHandle } from '../../../../src/ohne/database/dialect.ts';
+import type { Dialect, LockHandle } from '../../../../src/ohne/database/dialect.ts';
 import type { SchemaClassification } from '../../../../src/ohne/database/schema/snapshot.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { acquireSyncLock } from '../../../../src/ohne/database/schema/lock.ts';
 import { writeSnapshot } from '../../../../src/ohne/database/schema/snapshot.ts';
 import { sleep } from '../../../../src/utils/index.ts';
-
-const dialect = new SQLiteDialect();
-
-const root = mkdtempSync(join(tmpdir(), 'ohne-lock-'));
-let sequence = 0;
-
-after(() => rmSync(root, { recursive: true, force: true }));
+import { busyError, dialect, sharedURL } from '../../../_dialect.ts';
 
 async function openPair(): Promise<[DatabaseAdapter, DatabaseAdapter]> {
-  const path = join(root, `db-${sequence++}.db`);
-  return [await dialect.connect(path), await dialect.connect(path)];
+  const url = await sharedURL();
+  return [await dialect.connect(url), await dialect.connect(url)];
 }
 
 async function snapshotOf(db: DatabaseAdapter, generation: number, hash: string): Promise<void> {
@@ -114,20 +104,15 @@ describe('acquireSyncLock', () => {
 
   it('treats a busy database during the race as a held lock', async () => {
     const [a, b] = await openPair();
-    class BusyOnce extends SQLiteDialect {
-      private raced = false;
-      override async acquireLock(
-        db: DatabaseAdapter,
-        key: string,
-      ): ReturnType<SQLiteDialect['acquireLock']> {
-        if (!this.raced) {
-          this.raced = true;
-          throw Object.assign(new Error('database is locked'), { errcode: 5 });
-        }
-        return super.acquireLock(db, key);
-      }
-    }
-    const handle = await acquireSyncLock(a, new BusyOnce(), { desiredHash: 'H', pollInterval: 5 });
+    let raced = false;
+    const busyOnce: Dialect = Object.assign(Object.create(dialect), {
+      async acquireLock(db: DatabaseAdapter, key: string): ReturnType<Dialect['acquireLock']> {
+        if (raced) return dialect.acquireLock(db, key);
+        raced = true;
+        throw busyError();
+      },
+    });
+    const handle = await acquireSyncLock(a, busyOnce, { desiredHash: 'H', pollInterval: 5 });
     ok(handle);
     await a.close();
     await b.close();
@@ -143,13 +128,28 @@ describe('acquireSyncLock', () => {
       'dead',
       Date.now() - 10_000,
     ]);
+    let owner: DatabaseAdapter | undefined;
+    const contested = Promise.withResolvers<void>();
+    const watched: Dialect = Object.assign(Object.create(dialect), {
+      async acquireLock(db: DatabaseAdapter, key: string): ReturnType<Dialect['acquireLock']> {
+        const handle = await dialect.acquireLock(db, key);
+        if (handle) owner = db;
+        return handle;
+      },
+      releaseAbandonedLock(db: DatabaseAdapter, key: string, staleAfter: number): Promise<boolean> {
+        if (owner && owner !== db) contested.resolve();
+        return dialect.releaseAbandonedLock(db, key, staleAfter);
+      },
+    });
     const settle = async (db: DatabaseAdapter): Promise<LockHandle | undefined> => {
-      const result = await acquireSyncLock(db, dialect, {
+      const result = await acquireSyncLock(db, watched, {
         desiredHash: 'H',
         pollInterval: 5,
         staleAfter: 200,
       });
       if (result) {
+        // Holding until the rival polls the held lock proves the race overlapped on any engine.
+        await contested.promise;
         await snapshotOf(db, 1, 'H');
         await dialect.releaseLock(db, result);
       }

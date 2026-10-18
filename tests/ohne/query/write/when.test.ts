@@ -7,7 +7,6 @@ import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts'
 import type { ConditionNode } from '../../../../src/utils/index.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -18,6 +17,7 @@ import { hook } from '../../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runUpdate } from '../../../../src/ohne/query/write/update.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useFields().register('WNEpoch', {
   name: 'WNEpoch' as FieldTypeName,
@@ -315,8 +315,7 @@ useCollections().register('WNSoft', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

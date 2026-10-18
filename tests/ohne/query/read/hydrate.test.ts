@@ -6,7 +6,6 @@ import type { QueryIR } from '../../../../src/ohne/query/ir.ts';
 
 import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -14,6 +13,7 @@ import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { readRows } from '../../../../src/ohne/query/read/find.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useCollections().register('HAuthors', {
   name: 'HAuthors',
@@ -66,8 +66,7 @@ useCollections().register('HVault', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 
 let queries = 0;
 const counting: DatabaseAdapter = {

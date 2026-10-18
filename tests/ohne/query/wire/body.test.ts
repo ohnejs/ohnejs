@@ -107,6 +107,14 @@ describe('readQueryBody', () => {
       'object',
     );
   });
+
+  it('rejects a U+0000 escape in a key or a value with 400', async () => {
+    for (const body of ['{"title":"a\\u0000"}', '{"\\u0000":1}']) {
+      const error = await caught(readQueryBody, body);
+      strictEqual(error.status, 400);
+      strictEqual(error.message, 'api.body.containsNUL');
+    }
+  });
 });
 
 describe('readRecordBody', () => {
@@ -162,5 +170,13 @@ describe('readRecordBody', () => {
       typeof (await read(readRecordBody, nestedObject(40), undefined, { maxDepth: 64 })).a,
       'object',
     );
+  });
+
+  it('rejects a U+0000 escape in a key or a value with 400', async () => {
+    for (const body of ['{"title":"a\\u0000"}', '{"\\u0000":1}']) {
+      const error = await caught(readRecordBody, body);
+      strictEqual(error.status, 400);
+      strictEqual(error.message, 'api.body.containsNUL');
+    }
   });
 });

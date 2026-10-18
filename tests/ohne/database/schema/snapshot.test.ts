@@ -1,12 +1,9 @@
 import { deepStrictEqual, notStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
 import type { SchemaSnapshot } from '../../../../src/ohne/database/schema/snapshot.ts';
 import type { TableSchema } from '../../../../src/ohne/database/schema/table-schema.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
-import { createTable } from '../../../../src/ohne/database/dialects/sqlite/rebuild.ts';
 import {
   advanceSnapshot,
   applyClassification,
@@ -16,12 +13,7 @@ import {
   schemaHash,
   writeSnapshot,
 } from '../../../../src/ohne/database/schema/snapshot.ts';
-
-const dialect = new SQLiteDialect();
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 function snapshot(overrides: Partial<SchemaSnapshot> = {}): SchemaSnapshot {
   return {
@@ -47,7 +39,7 @@ function table(name: string, overrides: Partial<TableSchema> = {}): TableSchema 
 
 describe('ensureSchemaTable', () => {
   it('creates the table once, tolerating repeat calls', async () => {
-    const db = await open();
+    const db = await connectTest();
     await ensureSchemaTable(db, dialect);
     await ensureSchemaTable(db, dialect);
     deepStrictEqual(await dialect.listTables(db), ['ohne_schema']);
@@ -57,14 +49,14 @@ describe('ensureSchemaTable', () => {
 
 describe('readSnapshot and writeSnapshot', () => {
   it('reads undefined before any write', async () => {
-    const db = await open();
+    const db = await connectTest();
     await ensureSchemaTable(db, dialect);
     strictEqual(await readSnapshot(db, dialect), undefined);
     await db.close();
   });
 
   it('round-trips a snapshot', async () => {
-    const db = await open();
+    const db = await connectTest();
     await ensureSchemaTable(db, dialect);
     const written = snapshot({ generation: 2 });
     await writeSnapshot(db, dialect, written);
@@ -73,7 +65,7 @@ describe('readSnapshot and writeSnapshot', () => {
   });
 
   it('upserts: a second write replaces the one row', async () => {
-    const db = await open();
+    const db = await connectTest();
     await ensureSchemaTable(db, dialect);
     await writeSnapshot(db, dialect, snapshot());
     await writeSnapshot(db, dialect, snapshot({ generation: 2, hash: 'h2' }));
@@ -84,7 +76,7 @@ describe('readSnapshot and writeSnapshot', () => {
   });
 
   it('lifts the bare column maps of a version-1 snapshot into claims', async () => {
-    const db = await open();
+    const db = await connectTest();
     await ensureSchemaTable(db, dialect);
     const v1 = {
       version: 1,
@@ -181,7 +173,7 @@ describe('classifySchema', () => {
 
 describe('applyClassification', () => {
   it('restores boolean and json over introspected storage types', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = table('T', {
       columns: [
         { name: 'UUID', type: 'text', notNull: true },
@@ -189,7 +181,7 @@ describe('applyClassification', () => {
         { name: 'draft', type: 'boolean', notNull: true },
       ],
     });
-    await createTable(db, dialect, desired);
+    await dialect.applyTableDiff(db, { kind: 'create', table: desired });
     const live = await dialect.describeTable(db, 'T');
     strictEqual(live.columns[1]?.type, 'text');
     strictEqual(live.columns[2]?.type, 'integer');

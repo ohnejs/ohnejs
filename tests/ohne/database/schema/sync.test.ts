@@ -6,17 +6,12 @@ import type { Migration } from '../../../../src/ohne/database/migrations/define-
 import type { MigrationMeta } from '../../../../src/ohne/database/migrations/use-migrations.ts';
 import type { TableSchema } from '../../../../src/ohne/database/schema/table-schema.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
+import { OHNE_LOCKS, OHNE_SCHEMA } from '../../../../src/ohne/database/naming/table-names.ts';
 import { readSnapshot, schemaHash } from '../../../../src/ohne/database/schema/snapshot.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
-
-const dialect = new SQLiteDialect();
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 const UUID = { name: 'UUID', type: 'text', notNull: true } as const;
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
 
 function table(name: string, overrides: Partial<TableSchema> = {}): TableSchema {
   return {
@@ -44,7 +39,7 @@ function stampedRows(db: DatabaseAdapter): Promise<{ name: string; status: strin
 
 describe('syncDatabase', () => {
   it('materializes a fresh database and writes generation 1', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: true }],
       indexes: [{ name: 'IX__Posts__title', columns: ['title'] }],
@@ -60,7 +55,7 @@ describe('syncDatabase', () => {
   });
 
   it('re-syncs an identical schema as a no-op', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await syncDatabase(db, dialect, { desired: [posts] });
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
@@ -72,7 +67,7 @@ describe('syncDatabase', () => {
   });
 
   it('bumps the generation across an evolution', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = table('Posts');
     const after = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
@@ -87,7 +82,7 @@ describe('syncDatabase', () => {
   });
 
   it('writes a snapshot even for an empty desired set', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: [] });
     strictEqual((await readSnapshot(db, dialect))?.generation, 1);
     deepStrictEqual(await dialect.listTables(db), ['ohne_locks', 'ohne_schema']);
@@ -95,7 +90,7 @@ describe('syncDatabase', () => {
   });
 
   it('leaves foreign tables untouched, even under force', async () => {
-    const db = await open();
+    const db = await connectTest();
     await db.exec('CREATE TABLE "Legacy" ("a" TEXT)');
     await db.run('INSERT INTO "Legacy" ("a") VALUES (?)', ['kept']);
     await syncDatabase(db, dialect, { desired: [table('Posts')], force: true });
@@ -106,7 +101,7 @@ describe('syncDatabase', () => {
   });
 
   it('refuses a fresh-database collision with an unowned table', async () => {
-    const db = await open();
+    const db = await connectTest();
     await db.exec('CREATE TABLE "Posts" ("a" TEXT)');
     await rejects(syncDatabase(db, dialect, { desired: [table('Posts')] }), (error: unknown) => {
       match(String((error as Error).message), /collide/);
@@ -117,7 +112,7 @@ describe('syncDatabase', () => {
   });
 
   it('refuses a collision differing only in case', async () => {
-    const db = await open();
+    const db = await connectTest();
     await db.exec('CREATE TABLE "posts" ("a" TEXT)');
     await rejects(syncDatabase(db, dialect, { desired: [table('Posts')] }), /collide/);
     strictEqual((await db.query('SELECT * FROM "posts"')).length, 0);
@@ -126,7 +121,7 @@ describe('syncDatabase', () => {
   });
 
   it('syncs a previously-seen shape forward', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = table('Posts');
     const after = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
@@ -144,7 +139,7 @@ describe('syncDatabase', () => {
   });
 
   it('rolls back a populated change through a migration', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = table('Posts');
     const after = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
@@ -175,7 +170,7 @@ describe('syncDatabase', () => {
   });
 
   it('rolls back everything and frees the lock on a guard refusal', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await syncDatabase(db, dialect, { desired: [posts] });
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
@@ -190,7 +185,7 @@ describe('syncDatabase', () => {
   });
 
   it('drops a claimed table that left the desired set', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: [table('Posts'), table('Drafts')] });
     await syncDatabase(db, dialect, { desired: [table('Posts')] });
     deepStrictEqual(await dialect.listTables(db), ['Posts', 'ohne_locks', 'ohne_schema']);
@@ -198,7 +193,7 @@ describe('syncDatabase', () => {
   });
 
   it('re-adds a hand-dropped index without bumping the generation', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
       indexes: [{ name: 'IX__Posts__title', columns: ['title'] }],
@@ -212,7 +207,7 @@ describe('syncDatabase', () => {
   });
 
   it('never rebuilds coded primitives on a re-sync', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [
         UUID,
@@ -229,7 +224,7 @@ describe('syncDatabase', () => {
   });
 
   it('round-trips a real column through introspection, re-syncing as a no-op', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'rating', type: 'real', notNull: true }],
     });
@@ -247,7 +242,7 @@ describe('syncDatabase', () => {
 
   describe('migrations', () => {
     it('runs a move inside the sync, constraints down and re-added after', async () => {
-      const db = await open();
+      const db = await connectTest();
       const before = table('Posts', {
         columns: [UUID, { name: 'isDraft', type: 'text', notNull: false }],
         indexes: [{ name: 'IX__Posts__isDraft', columns: ['isDraft'] }],
@@ -296,7 +291,7 @@ describe('syncDatabase', () => {
     });
 
     it('never re-runs a stamped migration', async () => {
-      const db = await open();
+      const db = await connectTest();
       const posts = table('Posts', {
         columns: [UUID, { name: 'legacy', type: 'text', notNull: false }],
       });
@@ -316,7 +311,7 @@ describe('syncDatabase', () => {
     });
 
     it('lets a discard migration cover a populated drop the guard would refuse', async () => {
-      const db = await open();
+      const db = await connectTest();
       const posts = table('Posts', {
         columns: [UUID, { name: 'legacy', type: 'text', notNull: false }],
       });
@@ -339,7 +334,7 @@ describe('syncDatabase', () => {
     });
 
     it('renames a table and recreates its constraints under the new name', async () => {
-      const db = await open();
+      const db = await connectTest();
       const posts = table('Posts', {
         columns: [UUID, { name: 'email', type: 'text', notNull: false }],
         uniques: [{ name: 'UX__Posts__email', columns: ['email'] }],
@@ -365,7 +360,7 @@ describe('syncDatabase', () => {
     });
 
     it('renames a collection logically, the derived family and constraints following', async () => {
-      const db = await open();
+      const db = await connectTest();
       const posts = table('Posts', {
         columns: [UUID, { name: 'email', type: 'text', notNull: false }],
         uniques: [{ name: 'UX__Posts__email', columns: ['email'] }],
@@ -431,7 +426,7 @@ describe('syncDatabase', () => {
     });
 
     it('rolls back an applied migration and its stamp on a later refusal', async () => {
-      const db = await open();
+      const db = await connectTest();
       const posts = table('Posts', {
         columns: [
           UUID,
@@ -461,14 +456,14 @@ describe('syncDatabase', () => {
         (await dialect.describeTable(db, 'Posts')).columns.map((column) => column.name),
         ['UUID', 'legacy', 'doomed'],
       );
-      deepStrictEqual(await stampedRows(db), []);
+      ok(!(await dialect.listTables(db)).includes('ohne_migrations'));
       strictEqual((await db.query('SELECT * FROM "Posts"')).length, 1);
       await lockIsFree(db);
       await db.close();
     });
 
     it('reports the values a forced move dropped', async () => {
-      const db = await open();
+      const db = await connectTest();
       const posts = table('Posts', {
         columns: [UUID, { name: 'title', type: 'text', notNull: false }],
       });
@@ -499,9 +494,35 @@ describe('syncDatabase', () => {
     });
   });
 
+  it('keeps no migrations table a failed sync created', async () => {
+    const db = await connectTest();
+    const before = table('Posts', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+    });
+    await syncDatabase(db, dialect, { desired: [before] });
+    await db.run('INSERT INTO "Posts" ("UUID", "title") VALUES (?, ?)', ['a', 'kept']);
+    await rejects(
+      syncDatabase(db, dialect, {
+        desired: [before],
+        migrations: [
+          meta('app/001-fail', {
+            from: { table: 'Posts', column: 'title', type: 'text' },
+            to: { table: 'Posts', column: 'title', type: 'text' },
+            transform: () => {
+              throw new Error('transform failed');
+            },
+          }),
+        ],
+      }),
+      /fails in its transform/,
+    );
+    deepStrictEqual(await dialect.listTables(db), ['Posts', 'ohne_locks', 'ohne_schema']);
+    await db.close();
+  });
+
   describe('dry run', () => {
     it('rehearses an additive change without touching the schema', async () => {
-      const db = await open();
+      const db = await connectTest();
       const before = table('Posts');
       const after = table('Posts', {
         columns: [UUID, { name: 'title', type: 'text', notNull: false }],
@@ -518,18 +539,22 @@ describe('syncDatabase', () => {
       await db.close();
     });
 
-    it('creates nothing on a fresh database and writes no snapshot', async () => {
-      const db = await open();
-      const report = await syncDatabase(db, dialect, { desired: [table('Posts')], dryRun: true });
+    it('leaves a fresh database with only the sync lock bookkeeping', async () => {
+      const db = await connectTest();
+      const report = await syncDatabase(db, dialect, {
+        desired: [table('Posts')],
+        migrations: [meta('app/001-none', { from: { table: 'Posts' }, to: null })],
+        dryRun: true,
+      });
       deepStrictEqual(report, { deletions: [], warnings: [] });
-      deepStrictEqual(await dialect.listTables(db), ['ohne_locks', 'ohne_schema']);
+      deepStrictEqual((await dialect.listTables(db)).toSorted(), [OHNE_LOCKS, OHNE_SCHEMA]);
       strictEqual(await readSnapshot(db, dialect), undefined);
       await lockIsFree(db);
       await db.close();
     });
 
     it('still refuses a destructive change, leaving data and the lock intact', async () => {
-      const db = await open();
+      const db = await connectTest();
       await syncDatabase(db, dialect, { desired: [table('Posts')] });
       await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
       await rejects(
@@ -543,7 +568,7 @@ describe('syncDatabase', () => {
     });
 
     it('previews forced deletions but keeps the data', async () => {
-      const db = await open();
+      const db = await connectTest();
       await syncDatabase(db, dialect, { desired: [table('Posts')] });
       await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
       const report = await syncDatabase(db, dialect, { desired: [], dryRun: true, force: true });
@@ -557,7 +582,7 @@ describe('syncDatabase', () => {
     });
 
     it('leaves a rehearsed migration unstamped', async () => {
-      const db = await open();
+      const db = await connectTest();
       const before = table('Posts', {
         columns: [UUID, { name: 'title', type: 'text', notNull: false }],
       });
@@ -577,7 +602,7 @@ describe('syncDatabase', () => {
       });
       deepStrictEqual(report, { deletions: [], warnings: [] });
       deepStrictEqual(await dialect.describeTable(db, 'Posts'), before);
-      deepStrictEqual(await stampedRows(db), []);
+      ok(!(await dialect.listTables(db)).includes('ohne_migrations'));
       await lockIsFree(db);
       await syncDatabase(db, dialect, { desired: [after], migrations });
       deepStrictEqual(

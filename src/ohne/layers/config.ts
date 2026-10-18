@@ -700,10 +700,11 @@ export interface Config {
   database?: {
     /**
      * Which database dialect to use, by name.
-     * ohne ships `sqlite`; other dialects are added by layers.
      *
-     * @default
-     * 'sqlite'
+     * - ohne ships `sqlite`.
+     * - `@ohnejs/pg` adds `postgres`.
+     *
+     * Omitted means the first registered dialect that can open the database URL.
      */
     dialect?: DialectName;
 
@@ -885,7 +886,7 @@ export const DEFAULT_API_PORT = 9001;
 export const DEFAULT_DASHBOARD_PORT = 9000;
 
 /**
- * Default dialect selected when no layer sets `database.dialect`.
+ * Dialect selected when no layer sets `database.dialect` and no registered dialect accepts the URL.
  * Read at point of use in `connect`, like `DEFAULT_API_PORT`, because `database.dialect` is `'own'`.
  */
 export const DEFAULT_DIALECT = 'sqlite';

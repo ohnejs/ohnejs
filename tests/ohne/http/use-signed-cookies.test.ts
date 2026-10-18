@@ -55,6 +55,15 @@ describe('useSignedCookies', () => {
     );
   });
 
+  it('drops a value that would decode to a U+0000', () => {
+    useEnv().set('COOKIE_SECRET', 'k');
+    const event = makeEvent(`sid=${encodeURIComponent(signValue('a\0b', 'k', 'sid'))}`);
+    deepStrictEqual(
+      runWithEvent(event, () => useSignedCookies()),
+      {},
+    );
+  });
+
   it('drops a value replayed under a different name', () => {
     useEnv().set('COOKIE_SECRET', 'k');
     const event = makeEvent(`other=${signValue('u42', 'k', 'sid')}`);

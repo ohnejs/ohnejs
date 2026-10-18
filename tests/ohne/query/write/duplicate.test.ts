@@ -5,7 +5,6 @@ import type { FieldInstance } from '../../../../src/ohne/fields/field.ts';
 import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -17,6 +16,7 @@ import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../../src/ohne/query/write/errors.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useLayers().add({
   path: '/duplicate',
@@ -115,8 +115,7 @@ useCollections().register('DSettings', {
   collection: { singleton: true, fields: { motto: field('text', { default: '' }) } },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

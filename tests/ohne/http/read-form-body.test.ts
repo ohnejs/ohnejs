@@ -16,6 +16,12 @@ function makeEvent(request: Request): Event {
   };
 }
 
+function isContainsNUL(error: unknown): boolean {
+  return (
+    error instanceof HTTPError && error.status === 400 && error.message === 'api.body.containsNUL'
+  );
+}
+
 describe('readFormBody', () => {
   it('parses urlencoded into FormData, keeping repeated keys', async () => {
     const request = new Request('http://localhost/', {
@@ -63,6 +69,38 @@ describe('readFormBody', () => {
     });
     await runWithEvent(makeEvent(request), async () => {
       deepStrictEqual([...(await readFormBody())], []);
+    });
+  });
+
+  it('rejects a U+0000 in a urlencoded name or value with 400', async () => {
+    for (const body of ['email=a%00b', 'a%00=1']) {
+      const request = new Request('http://localhost/', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+      await runWithEvent(makeEvent(request), async () => {
+        await rejects(readFormBody(), isContainsNUL);
+      });
+    }
+  });
+
+  it('rejects a U+0000 in a multipart file name with 400', async () => {
+    const form = new FormData();
+    form.set('avatar', new File(['data'], 'a\u0000.txt', { type: 'text/plain' }));
+    const request = new Request('http://localhost/', { method: 'POST', body: form });
+    await runWithEvent(makeEvent(request), async () => {
+      await rejects(readFormBody(), isContainsNUL);
+    });
+  });
+
+  it('keeps a U+0000 inside file content', async () => {
+    const form = new FormData();
+    form.set('blob', new File([new Uint8Array([0, 1, 0])], 'a.bin'));
+    const request = new Request('http://localhost/', { method: 'POST', body: form });
+    await runWithEvent(makeEvent(request), async () => {
+      const file = (await readFormBody()).get('blob') as File;
+      deepStrictEqual([...new Uint8Array(await file.arrayBuffer())], [0, 1, 0]);
     });
   });
 });

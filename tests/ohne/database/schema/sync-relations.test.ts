@@ -6,7 +6,6 @@ import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
 import type { FieldTypeMeta } from '../../../../src/ohne/fields/use-fields.ts';
 import type { Registry } from '../../../../src/utils/index.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { diffSchemas } from '../../../../src/ohne/database/schema/diff.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
@@ -14,12 +13,7 @@ import { isOhneError } from '../../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { createRegistry } from '../../../../src/utils/index.ts';
-
-const dialect = new SQLiteDialect();
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 function refusalMatching(pattern: RegExp): (error: unknown) => boolean {
   return (error: unknown) => {
@@ -64,7 +58,7 @@ async function insertLink(
 
 describe('syncDatabase with relations', () => {
   it('creates endpoints and a junction in one sync, introspection re-diffing to zero', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf(users(), {
       name: 'Posts',
       collection: {
@@ -85,7 +79,7 @@ describe('syncDatabase with relations', () => {
   });
 
   it('enforces the junction constraints live: cascade, unique pair, parent cascade', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf(users(), {
       name: 'Posts',
       collection: { fields: { reviewers: field('records', { collection: 'Users' }) } },
@@ -116,7 +110,7 @@ describe('syncDatabase with relations', () => {
   });
 
   it('blocks a target delete under a restrict records field', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf(users(), {
       name: 'Posts',
       collection: {
@@ -135,7 +129,7 @@ describe('syncDatabase with relations', () => {
   });
 
   it('lands a foreign key on an existing populated table through a rebuild', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { author: field('text', { nullable: true, index: true }) } },
@@ -157,7 +151,7 @@ describe('syncDatabase with relations', () => {
   });
 
   it('refuses a record retarget over live references, clears them under force', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf(users(), {
       name: 'Posts',
       collection: { fields: { author: field('record', { collection: 'Users' }) } },
@@ -189,7 +183,7 @@ describe('syncDatabase with relations', () => {
   });
 
   it('refuses a records retarget over live links, deletes them under force', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf(users(), {
       name: 'Posts',
       collection: { fields: { reviewers: field('records', { collection: 'Users' }) } },
@@ -222,7 +216,7 @@ describe('syncDatabase with relations', () => {
   });
 
   it('drops a populated junction only under force when its field is removed', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf(users(), {
       name: 'Posts',
       collection: { fields: { reviewers: field('records', { collection: 'Users' }) } },
@@ -243,7 +237,7 @@ describe('syncDatabase with relations', () => {
   });
 
   it('syncs an inverse pair to one junction and replaces it destructively on a side flip', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf(
       {
         name: 'Users',
@@ -290,7 +284,7 @@ describe('syncDatabase with relations', () => {
   });
 
   it('syncs a self-referencing junction and links rows of one table', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: { fields: { related: field('records', { collection: 'Posts' }) } },
@@ -306,7 +300,7 @@ describe('syncDatabase with relations', () => {
   });
 
   it('removes a referenced collection only alongside its referencing field', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf(users(), {
       name: 'Posts',
       collection: { fields: { author: field('record', { collection: 'Users' }) } },

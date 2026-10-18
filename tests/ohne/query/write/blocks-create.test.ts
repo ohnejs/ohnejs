@@ -3,7 +3,6 @@ import { describe, it } from 'node:test';
 
 import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -11,6 +10,7 @@ import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useLayers().add({
   path: '/blocks-create',
@@ -90,8 +90,7 @@ useCollections().register('BCGated', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

@@ -10,6 +10,7 @@ import {
   hook,
   notFound,
   setResponseStatus,
+  unauthorized,
   useEvent,
   useHooks,
   useMiddleware,
@@ -216,6 +217,46 @@ describe('dispatch', () => {
     const { response } = await dispatch(route, request, url(), {}, { maxBodySize: 8 });
     strictEqual(response.status, 413);
     strictEqual(handlerRan, false);
+  });
+
+  it('refuses a U+0000 in the path or the query with 400 before the handler runs', async () => {
+    let handlerRan = false;
+    const route = makeRoute('/posts/[id]', () => {
+      handlerRan = true;
+      return 'ok';
+    });
+    for (const href of ['http://localhost/posts/a%00', 'http://localhost/posts/1?q=%00']) {
+      const { response } = await dispatch(route, req(href), url(href), { id: 'a' });
+      deepStrictEqual(await response.json(), { statusCode: 400, message: 'api.url.containsNUL' });
+    }
+    strictEqual(handlerRan, false);
+  });
+
+  it('refuses a U+0000 in the URL before any middleware runs', async () => {
+    let ran = false;
+    useMiddleware().registerGlobal('global-guard', () => {
+      ran = true;
+      return unauthorized();
+    });
+    const href = 'http://localhost/posts/1?q=%00';
+    const { response } = await dispatch(
+      makeRoute('/posts/[id]', () => 'ok'),
+      req(href),
+      url(href),
+      {
+        id: '1',
+      },
+    );
+    deepStrictEqual(await response.json(), { statusCode: 400, message: 'api.url.containsNUL' });
+    strictEqual(ran, false);
+  });
+
+  it('keeps an escaped percent sign followed by `00`', async () => {
+    const route = makeRoute('/posts', () => useEvent().url.searchParams.get('q'));
+    const href = 'http://localhost/posts?q=%2500';
+    const { response } = await dispatch(route, req(href), url(href), {});
+    strictEqual(response.status, 200);
+    strictEqual(await response.text(), '%00');
   });
 
   it('answers 429 with Retry-After past a route rateLimit, before the handler', async () => {

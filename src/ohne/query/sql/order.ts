@@ -1,4 +1,3 @@
-import type { SQLValue } from '../../database/adapter.ts';
 import type { Dialect } from '../../database/dialect.ts';
 import type { QueryIR } from '../ir.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
@@ -13,7 +12,8 @@ import { localePin } from './where.ts';
  * Sort keys render in priority order; a field repeated across `orderBy` calls keeps its first direction.
  * A composite sorts by its sort key's column, read from its child row in the queried locale.
  * `UUID` is appended ascending unless a key already orders it, so equal sort keys never shuffle.
- * SQLite's native NULL placement matches the pinned contract: NULLs first ascending, last descending.
+ * The dialect pins the NULL placement: NULLs first ascending, last descending.
+ * Only `UUID` drops the placement, since it is never NULL, so the primary key index serves it.
  * A record without the composite's row sorts as NULL.
  */
 export function compileOrder(
@@ -27,22 +27,23 @@ export function compileOrder(
   for (const entry of ir.order) {
     if (seen.has(entry.field)) continue;
     seen.add(entry.field);
-    const key = sortKey(meta.fields[entry.field]!, meta, dialect, locale, clauses.length);
-    const direction = entry.direction === 'desc' ? 'DESC' : 'ASC';
-    clauses.push({ sql: `${key.sql} ${direction}`, params: key.params });
+    const field = meta.fields[entry.field]!;
+    const key = sortKey(field, meta, dialect, locale, clauses.length);
+    clauses.push({
+      sql: dialect.sortTerm(key.sql, entry.direction, field.id !== true),
+      params: key.params,
+    });
   }
-  if (!seen.has('UUID')) clauses.push(rawFragment(`${dialect.quote('UUID')} ASC`));
+  if (!seen.has('UUID'))
+    clauses.push(rawFragment(dialect.sortTerm(dialect.quote('UUID'), 'asc', false)));
   return joinFragments(clauses, ', ');
 }
 
 /**
  * Compiles the `LIMIT`/`OFFSET` tail, or an empty fragment when neither is set.
- * An offset without a limit compiles `LIMIT -1 OFFSET ?`, SQLite's idiom for "all rows past the offset".
  */
-export function compileLimit(ir: QueryIR): SQLFragment {
-  if (isNull(ir.limit) && isNull(ir.offset)) return rawFragment('');
-  if (isNull(ir.offset)) return rawFragment('LIMIT ?', [ir.limit as SQLValue]);
-  return rawFragment('LIMIT ? OFFSET ?', [ir.limit ?? -1, ir.offset]);
+export function compileLimit(ir: QueryIR, dialect: Dialect): SQLFragment {
+  return dialect.paginate(ir.limit, ir.offset);
 }
 
 /**

@@ -8,7 +8,6 @@ import type { MigrationMeta } from '../../../../src/ohne/database/migrations/use
 import type { FieldTypeMeta } from '../../../../src/ohne/fields/use-fields.ts';
 import type { Registry } from '../../../../src/utils/index.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { diffSchemas } from '../../../../src/ohne/database/schema/diff.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
@@ -16,12 +15,7 @@ import { isOhneError } from '../../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { createRegistry } from '../../../../src/utils/index.ts';
-
-const dialect = new SQLiteDialect();
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 function refusalMatching(pattern: RegExp): (error: unknown) => boolean {
   return (error: unknown) => {
@@ -56,7 +50,7 @@ async function countRows(db: DatabaseAdapter, table: string): Promise<number> {
 
 describe('syncDatabase with composites', () => {
   it('creates object and repeater child tables in one sync, introspection re-diffing to zero', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: {
@@ -81,7 +75,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('enforces one child row per parent on an object, the row following its parent', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: {
@@ -109,7 +103,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('enforces a uniquePerParent subfield within one list, other parents staying free', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: {
@@ -134,13 +128,15 @@ describe('syncDatabase with composites', () => {
       );
     await place('l1', 'p1', 0, 'twitter');
     await place('l2', 'p2', 0, 'twitter');
-    await rejects(place('l3', 'p1', 1, 'twitter'), /UNIQUE constraint failed/);
+    await rejects(place('l3', 'p1', 1, 'twitter'), (error: unknown) =>
+      dialect.isUniqueViolation(error),
+    );
     strictEqual(await countRows(db, 'Posts_links'), 2);
     await db.close();
   });
 
   it('dedupes a uniquePerParent subfield through a unique switch', async () => {
-    const db = await open();
+    const db = await connectTest();
     const shape = (options: { unique?: boolean; uniquePerParent?: boolean }) =>
       desiredOf({
         name: 'Posts',
@@ -170,7 +166,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('switches a field unique off beside a composite unique that ends in the field', async () => {
-    const db = await open();
+    const db = await connectTest();
     const shape = (unique: boolean) =>
       desiredOf({
         name: 'Posts',
@@ -196,7 +192,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('cascades deletes through nested repeaters', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: {
@@ -227,7 +223,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('refuses a repeater-to-object collapse over multi-row parents, force keeping the first row', async () => {
-    const db = await open();
+    const db = await connectTest();
     const repeater = desiredOf({
       name: 'Posts',
       collection: {
@@ -285,7 +281,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('collapses freely when every parent holds at most one row', async () => {
-    const db = await open();
+    const db = await connectTest();
     const repeater = desiredOf({
       name: 'Posts',
       collection: {
@@ -315,7 +311,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('breaks collapse ties by UUID when positions collide', async () => {
-    const db = await open();
+    const db = await connectTest();
     const repeater = desiredOf({
       name: 'Posts',
       collection: {
@@ -349,7 +345,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('sweeps nested rows orphaned by a collapse to a fixed point', async () => {
-    const db = await open();
+    const db = await connectTest();
     const fields = (cardinality: 'object' | 'repeater'): CollectionMeta => ({
       name: 'Posts',
       collection: {
@@ -398,7 +394,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('refuses dropping a populated composite, deleting its tree under force', async () => {
-    const db = await open();
+    const db = await connectTest();
     const withSections = desiredOf({
       name: 'Posts',
       collection: {
@@ -438,7 +434,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('renames a collection through a migration, derived tables cascading', async () => {
-    const db = await open();
+    const db = await connectTest();
     const shape = (name: string): CollectionMeta => ({
       name,
       collection: {
@@ -515,7 +511,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('frees a renamed collection name for a new collection in the same sync', async () => {
-    const db = await open();
+    const db = await connectTest();
     const shape = (name: string): CollectionMeta => ({
       name,
       collection: {
@@ -543,7 +539,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('frees a renamed field name for a new field in the same sync, nested tables included', async () => {
-    const db = await open();
+    const db = await connectTest();
     const sections = () =>
       field('repeater', {
         fields: { items: field('repeater', { fields: { label: field('text') } }) },
@@ -571,7 +567,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('flattens an object subfield onto the parent through a move migration', async () => {
-    const db = await open();
+    const db = await connectTest();
     const nested = desiredOf({
       name: 'Posts',
       collection: {
@@ -620,7 +616,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('nests a parent column into its object child through a move migration', async () => {
-    const db = await open();
+    const db = await connectTest();
     const flat = desiredOf({
       name: 'Posts',
       collection: {
@@ -666,7 +662,7 @@ describe('syncDatabase with composites', () => {
   });
 
   it('refuses a cross-table move out of a repeater child', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: {

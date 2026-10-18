@@ -1,7 +1,4 @@
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
@@ -15,6 +12,7 @@ import { hook } from '../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
+import { dialect, memoryURL, sharedURL } from '../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -39,7 +37,7 @@ describe('seedSingletons', () => {
   });
 
   it('seeds one record from the field defaults at the first sync', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     register('SSSettings', settings);
     register('SSPosts', { fields: { title: field('text') } });
     await syncProjectDatabase();
@@ -49,7 +47,7 @@ describe('seedSingletons', () => {
   });
 
   it('leaves an existing record alone', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     register('SSSettings', settings);
     await syncProjectDatabase();
     await queryUntyped('SSSettings').update({ title: 'Changed' });
@@ -59,7 +57,7 @@ describe('seedSingletons', () => {
   });
 
   it('seeds once when two seeders race', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     register('SSSettings', settings);
     await syncProjectDatabase();
     await useDatabase().run('DELETE FROM "SSSettings"');
@@ -68,17 +66,14 @@ describe('seedSingletons', () => {
   });
 
   it('seeds nothing under `dryRun`', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     register('SSSettings', settings);
     await syncProjectDatabase({ dryRun: true });
-    const tables = await useDatabase().query<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type = 'table'",
-    );
-    ok(!tables.some((table) => table.name === 'SSSettings'));
+    ok(!(await dialect.listTables(useDatabase())).includes('SSSettings'));
   });
 
   it('fires the record hooks, and seeds before `schema:synced`', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     register('SSSettings', settings);
     const created: unknown[] = [];
     let seededAtSync = -1;
@@ -94,7 +89,7 @@ describe('seedSingletons', () => {
   });
 
   it('throws naming the field when a hook rejects the seed', async () => {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     register('SSSettings', settings);
     hook('record:validate', () => ({ title: 'No.' }));
     await rejects(syncProjectDatabase(), (error: unknown) => {
@@ -106,36 +101,30 @@ describe('seedSingletons', () => {
   });
 
   it('reports the data a sync removed even when the seed then fails', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'ohne-seed-singletons-'));
-    try {
-      useEnv().set('DATABASE', join(dir, 'app.sqlite'));
-      register('SSDropped', {
-        fields: { title: field('text'), extra: field('text', { nullable: true }) },
-      });
-      await syncProjectDatabase();
-      await queryUntyped('SSDropped').createOrThrow({ title: 'a', extra: 'kept' });
-      await closeDatabases();
+    useEnv().set('DATABASE', await sharedURL());
+    register('SSDropped', {
+      fields: { title: field('text'), extra: field('text', { nullable: true }) },
+    });
+    await syncProjectDatabase();
+    await queryUntyped('SSDropped').createOrThrow({ title: 'a', extra: 'kept' });
+    await closeDatabases();
 
-      useCollections().delete('SSDropped');
-      register('SSDropped', { fields: { title: field('text') } });
-      register('SSSettings', settings);
-      hook('record:validate', (_errors, _scope, ctx) =>
-        ctx.collection === 'SSSettings' ? { title: 'No.' } : undefined,
-      );
-      let printed = '';
-      usePrinter().configure({
-        stream: {
-          write: (chunk: string) => {
-            printed += chunk;
-            return true;
-          },
+    useCollections().delete('SSDropped');
+    register('SSDropped', { fields: { title: field('text') } });
+    register('SSSettings', settings);
+    hook('record:validate', (_errors, _scope, ctx) =>
+      ctx.collection === 'SSSettings' ? { title: 'No.' } : undefined,
+    );
+    let printed = '';
+    usePrinter().configure({
+      stream: {
+        write: (chunk: string) => {
+          printed += chunk;
+          return true;
         },
-      });
-      await rejects(syncProjectDatabase({ force: true }), /Cannot seed singleton/);
-      ok(printed.includes('SSDropped.extra'));
-    } finally {
-      await closeDatabases();
-      rmSync(dir, { recursive: true, force: true });
-    }
+      },
+    });
+    await rejects(syncProjectDatabase({ force: true }), /Cannot seed singleton/);
+    ok(printed.includes('SSDropped.extra'));
   });
 });

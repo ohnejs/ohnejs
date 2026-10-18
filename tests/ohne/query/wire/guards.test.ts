@@ -2,13 +2,13 @@ import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
 import { after, before, describe, it } from 'node:test';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { clearDatabases, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { HTTPError } from '../../../../src/ohne/http/http-error.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { DEFAULT_QUERY_GUARDS, resolveGuards } from '../../../../src/ohne/query/wire/guards.ts';
 import { parseQueryParams } from '../../../../src/ohne/query/wire/parse.ts';
+import { dialect } from '../../../_dialect.ts';
 
 useCollections().register('GPosts', {
   name: 'GPosts',
@@ -63,7 +63,7 @@ describe('resolveGuards binds a wire parse', () => {
 });
 
 describe('resolveGuards clamps maxBoundParams to the driver wall', () => {
-  before(() => registerDialect(new SQLiteDialect()));
+  before(() => registerDialect(dialect));
   after(() => clearDatabases());
 
   it('leaves a config value under the wall unchanged', () => {
@@ -71,6 +71,6 @@ describe('resolveGuards clamps maxBoundParams to the driver wall', () => {
   });
 
   it('caps a config value at the wall, never raising past it', () => {
-    strictEqual(resolveGuards({ maxBoundParams: 100000 }).maxBoundParams, 32766);
+    strictEqual(resolveGuards({ maxBoundParams: 100000 }).maxBoundParams, dialect.maxParameters);
   });
 });

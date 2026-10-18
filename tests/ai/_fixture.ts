@@ -18,7 +18,6 @@ import rolesField from '../../src/base/fields/roles.ts';
 import timezoneField from '../../src/base/fields/timezone.ts';
 import baseLayer from '../../src/base/ohne.layer.ts';
 import { useCollections } from '../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../src/ohne/database/use-database.ts';
@@ -35,6 +34,7 @@ import { useRoles } from '../../src/ohne/roles/use-roles.ts';
 import { collectRoutes } from '../../src/ohne/routes/collect-routes.ts';
 import { routeID } from '../../src/ohne/routes/route.ts';
 import { useRoutes } from '../../src/ohne/routes/use-routes.ts';
+import { connectTest, dialect } from '../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -122,12 +122,10 @@ useRoles().register('reader', {
   role: { capabilities: ['collection.Items.read'] },
 });
 
-const dialect = new SQLiteDialect();
-
 /**
- * The in-memory SQLite the fixture registers as the process database and syncs to the collections.
+ * The in-memory test database, registered as the process database and synced to the collections.
  */
-export const db = await dialect.connect(':memory:');
+export const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncSchema();

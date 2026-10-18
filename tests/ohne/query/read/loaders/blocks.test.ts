@@ -6,7 +6,6 @@ import type { FieldQueryMeta } from '../../../../../src/ohne/query/metadata.ts';
 
 import { useBlocks } from '../../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../../src/ohne/database/schema/sync.ts';
 import {
@@ -19,6 +18,7 @@ import { useFields } from '../../../../../src/ohne/fields/use-fields.ts';
 import { queryMetadata } from '../../../../../src/ohne/query/metadata.ts';
 import { queryUntyped } from '../../../../../src/ohne/query/query.ts';
 import { loadBlocks } from '../../../../../src/ohne/query/read/loaders/blocks.ts';
+import { connectTest, dialect } from '../../../../_dialect.ts';
 
 useBlocks().register('BHero', { name: 'BHero', block: { fields: { title: field('text') } } });
 useBlocks().register('BQuote', {
@@ -56,8 +56,7 @@ useCollections().register('BArticles', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 
 let queries = 0;
 const counting: DatabaseAdapter = {

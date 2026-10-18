@@ -12,12 +12,12 @@ import {
   closeDatabases,
   registerDatabase,
   useDatabase,
-  useDialect,
 } from '../../../src/ohne/database/use-database.ts';
 import { dispatch } from '../../../src/ohne/http/dispatch.ts';
 import { runWithEvent, useEvent } from '../../../src/ohne/http/use-event.ts';
 import { DEFAULTS } from '../../../src/ohne/layers/config.ts';
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
+import { connectTest, memoryURL } from '../../_dialect.ts';
 
 useLayers().add({ path: '/use-database-test', defaults: DEFAULTS, input: {} });
 
@@ -44,13 +44,13 @@ describe('bindDatabase', () => {
   });
 
   async function open(): Promise<DatabaseAdapter> {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     await connect();
     return useDatabase();
   }
 
   async function another(): Promise<DatabaseAdapter> {
-    const adapter = await useDialect().connect(':memory:');
+    const adapter = await connectTest();
     opened.push(adapter);
     return adapter;
   }
@@ -84,7 +84,7 @@ describe('bindDatabase', () => {
 
   it('leaves a named helper untouched', async () => {
     await open();
-    const helper = await useDialect().connect(':memory:');
+    const helper = await connectTest();
     registerDatabase(helper, 'cache');
     const seen = runWithEvent(event(), () => {
       bindDatabase(useDatabase());

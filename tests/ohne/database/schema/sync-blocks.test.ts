@@ -10,7 +10,6 @@ import type { TableSchema } from '../../../../src/ohne/database/schema/table-sch
 import type { FieldTypeMeta } from '../../../../src/ohne/fields/use-fields.ts';
 import type { Registry } from '../../../../src/utils/index.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { diffSchemas } from '../../../../src/ohne/database/schema/diff.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
@@ -18,12 +17,7 @@ import { isOhneError } from '../../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { createRegistry } from '../../../../src/utils/index.ts';
-
-const dialect = new SQLiteDialect();
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 function refusalMatching(pattern: RegExp): (error: unknown) => boolean {
   return (error: unknown) => {
@@ -183,7 +177,7 @@ async function countRows(db: DatabaseAdapter, table: string): Promise<number> {
 
 describe('syncDatabase with blocks', () => {
   it('creates wrapper and per-type tables in one sync, introspection re-diffing to zero', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf([hero(), cta()], posts(['Hero', 'CTA']));
     const report = await syncDatabase(db, dialect, { desired });
     deepStrictEqual(report, { deletions: [], warnings: [] });
@@ -200,7 +194,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('materializes only reachable blocks, dropping a table once nothing allows its type', async () => {
-    const db = await open();
+    const db = await connectTest();
     const both = [hero(), cta()];
     await syncDatabase(db, dialect, { desired: desiredOf(both, posts()) });
     ok((await dialect.listTables(db)).includes('block_CTA'));
@@ -211,7 +205,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('refuses an allow-list shrink over live references, naming the block and force alone', async () => {
-    const db = await open();
+    const db = await connectTest();
     const both = [hero(), cta()];
     await syncDatabase(db, dialect, {
       desired: desiredOf(both, posts(['Hero', 'CTA']), pages(['Hero'])),
@@ -241,7 +235,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('keeps a block row another wrapper still references when a shrink purges one field', async () => {
-    const db = await open();
+    const db = await connectTest();
     const both = [hero(), cta()];
     const wide = desiredOf(both, posts(['Hero', 'CTA']), pages(['Hero']));
     await syncDatabase(db, dialect, { desired: wide });
@@ -262,7 +256,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('refuses a block type removal over live rows; force purges the type everywhere', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: desiredOf([hero(), cta()], posts()) });
     await insertRow(db, 'Posts', 'p1');
     await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'Hi']);
@@ -289,7 +283,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('sweeps nested block data to a fixed point when a shrink strands a whole subtree', async () => {
-    const db = await open();
+    const db = await connectTest();
     const nestingHero: BlockMeta = {
       name: 'Hero',
       block: { fields: { title: field('text'), content: field('blocks', { allow: ['CTA'] }) } },
@@ -315,7 +309,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('discards a blocks field through a migration, sweeping its data without force', async () => {
-    const db = await open();
+    const db = await connectTest();
     const nestingHero: BlockMeta = {
       name: 'Hero',
       block: { fields: { title: field('text'), content: field('blocks', { allow: ['CTA'] }) } },
@@ -350,7 +344,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('refuses a blocks field removal without a migration, still offering the discard path', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: desiredOf([hero()], posts(['Hero'])) });
     await insertRow(db, 'Posts', 'p1');
     await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'Hi']);
@@ -373,7 +367,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('bars one wrapper from placing a block instance twice, other wrappers staying free', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, {
       desired: desiredOf([hero()], posts(['Hero']), pages(['Hero'])),
     });
@@ -384,7 +378,14 @@ describe('syncDatabase with blocks', () => {
     await insertReference(db, 'Posts_content', 'w1', 'p1', 'Hero', 'h1');
     await rejects(
       insertReference(db, 'Posts_content', 'w2', 'p2', 'Hero', 'h1'),
-      /UNIQUE constraint failed: Posts_content\._blockUUID/,
+      (error: unknown) => {
+        ok(dialect.isUniqueViolation(error));
+        deepStrictEqual(dialect.uniqueViolationTarget(error), {
+          table: 'Posts_content',
+          columns: ['_blockUUID'],
+        });
+        return true;
+      },
     );
     await insertReference(db, 'Pages_content', 'w3', 'g1', 'Hero', 'h1');
     strictEqual(await countRows(db, 'Posts_content'), 1);
@@ -393,7 +394,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('leaves unreferenced block rows alone: cleanup is the write layer to own, never the sync', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf([hero()], posts(['Hero']));
     await syncDatabase(db, dialect, { desired });
     await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'Stray']);
@@ -404,7 +405,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('cascades a collection rename over its wrapper, the shared block tables staying put', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: desiredOf([hero()], posts(['Hero'])) });
     await insertRow(db, 'Posts', 'p1');
     await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'Hi']);
@@ -434,7 +435,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('renames a blocks field through a migration, the wrapper following with its rows', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: desiredOf([hero()], posts(['Hero'])) });
     await insertRow(db, 'Posts', 'p1');
     await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'Hi']);
@@ -463,7 +464,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('lets relations live inside a block, their foreign keys enforced at runtime', async () => {
-    const db = await open();
+    const db = await connectTest();
     const teamHero: BlockMeta = {
       name: 'Hero',
       block: {
@@ -499,7 +500,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('sweeps a self-referencing block chain, the fixed point re-entering the same table', async () => {
-    const db = await open();
+    const db = await connectTest();
     const selfHero: BlockMeta = {
       name: 'Hero',
       block: { fields: { title: field('text'), content: field('blocks', { allow: ['Hero'] }) } },
@@ -533,7 +534,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('reshapes a blocks field into an object under force, sweeping what the wrapper held', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, { desired: desiredOf([hero()], posts(['Hero'])) });
     await insertRow(db, 'Posts', 'p1');
     await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'Hi']);
@@ -557,7 +558,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('nests blocks under a repeater and a repeater under a block, the tower re-diffing to zero', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf([towerHero(), towerCTA()], towerPosts(['Hero']), tags());
     const report = await syncDatabase(db, dialect, { desired });
     deepStrictEqual(report, { deletions: [], warnings: [] });
@@ -589,7 +590,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('discards a repeater holding blocks, the sweep clearing the whole subtree without force', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, {
       desired: desiredOf([towerHero(), towerCTA()], towerPosts(['Hero']), tags()),
     });
@@ -620,7 +621,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('probes an allow shrink on a wrapper nested under a repeater, force sweeping through it', async () => {
-    const db = await open();
+    const db = await connectTest();
     const wide = desiredOf(
       [towerHero(), towerCTA()],
       towerPosts(['Hero', 'CTA']),
@@ -656,7 +657,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('renames a repeater holding blocks, the nested wrapper following with its rows', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, {
       desired: desiredOf([towerHero(), towerCTA()], towerPosts(['Hero']), tags()),
     });
@@ -699,7 +700,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('collapses a repeater whose blocks ride into an object, sweeping only the stranded instances', async () => {
-    const db = await open();
+    const db = await connectTest();
     const sections = (kind: 'repeater' | 'object'): CollectionMeta => ({
       name: 'Posts',
       collection: {
@@ -753,7 +754,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('keeps a shared block instance when a discard migration drops one of two wrappers', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, {
       desired: desiredOf([hero()], posts(['Hero']), pages(['Hero'])),
     });
@@ -776,7 +777,7 @@ describe('syncDatabase with blocks', () => {
   });
 
   it('probes the allow set of a wrapper a same-sync migration renamed, refusal rolling stamps back', async () => {
-    const db = await open();
+    const db = await connectTest();
     await syncDatabase(db, dialect, {
       desired: desiredOf([hero(), cta()], posts(['Hero', 'CTA']), pages(['Hero'])),
     });
@@ -798,7 +799,7 @@ describe('syncDatabase with blocks', () => {
       syncDatabase(db, dialect, { desired: renamed, migrations }),
       refusalMatching(/`1` row of `Articles_content` holds block `Hero`, no longer allowed there/),
     );
-    strictEqual(await countRows(db, 'ohne_migrations'), 0);
+    ok(!(await dialect.listTables(db)).includes('ohne_migrations'));
     ok((await dialect.listTables(db)).includes('Posts_content'));
     const report = await syncDatabase(db, dialect, { desired: renamed, migrations, force: true });
     match(report.deletions.join('\n'), /`1` row of `block_Hero` deleted, no longer referenced/);

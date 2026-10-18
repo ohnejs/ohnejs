@@ -5,22 +5,12 @@ import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
 import type { TableSchema } from '../../../../src/ohne/database/schema/table-schema.ts';
 import type { OhneError } from '../../../../src/ohne/error/ohne-error.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
-import {
-  createIndexes,
-  createTable,
-} from '../../../../src/ohne/database/dialects/sqlite/rebuild.ts';
 import { diffSchemas } from '../../../../src/ohne/database/schema/diff.ts';
 import { guardDiffs } from '../../../../src/ohne/database/schema/guard.ts';
 import { isOhneError } from '../../../../src/ohne/error/ohne-error.ts';
-
-const dialect = new SQLiteDialect();
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 const UUID = { name: 'UUID', type: 'text', notNull: true } as const;
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
 
 function table(name: string, overrides: Partial<TableSchema> = {}): TableSchema {
   return {
@@ -36,8 +26,7 @@ function table(name: string, overrides: Partial<TableSchema> = {}): TableSchema 
 
 async function materialize(db: DatabaseAdapter, schemas: TableSchema[]): Promise<void> {
   for (const schema of schemas) {
-    await createTable(db, dialect, schema);
-    await createIndexes(db, dialect, schema);
+    await dialect.applyTableDiff(db, { kind: 'create', table: schema });
   }
 }
 
@@ -66,7 +55,7 @@ function bodyOf(error: OhneError): string {
 
 describe('guardDiffs', () => {
   it('refuses a required one-child table over parent rows that hold no child row', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const child = (required: boolean): TableSchema =>
       table('Posts_meta', {
@@ -107,7 +96,7 @@ describe('guardDiffs', () => {
   });
 
   it('counts a one-child table the sync recreates as holding no rows', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const parentKey = {
       column: '_parentUUID',
@@ -143,7 +132,7 @@ describe('guardDiffs', () => {
   });
 
   it('refuses a new required one-child table over a populated parent', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const child = table('Posts_meta', {
       columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
@@ -164,13 +153,13 @@ describe('guardDiffs', () => {
   });
 
   it('lets an empty diff through untouched', async () => {
-    const db = await open();
+    const db = await connectTest();
     deepStrictEqual(await guard(db, [], []), { deletions: [], warnings: [] });
     await db.close();
   });
 
   it('refuses a populated table drop and frees an empty one', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const empty = table('Drafts');
     await materialize(db, [posts, empty]);
@@ -182,7 +171,7 @@ describe('guardDiffs', () => {
   });
 
   it('refuses a populated column drop and frees an all-NULL one', async () => {
-    const db = await open();
+    const db = await connectTest();
     const live = table('Posts', {
       columns: [UUID, { name: 'legacy', type: 'text', notNull: false }],
     });
@@ -196,7 +185,7 @@ describe('guardDiffs', () => {
   });
 
   it('refuses a retype only while the column holds values', async () => {
-    const db = await open();
+    const db = await connectTest();
     const live = table('Posts', {
       columns: [UUID, { name: 'count', type: 'text', notNull: false }],
     });
@@ -212,7 +201,7 @@ describe('guardDiffs', () => {
   });
 
   it('blocks a retype under NOT NULL on a populated table even under force', async () => {
-    const db = await open();
+    const db = await connectTest();
     const live = table('Posts', {
       columns: [UUID, { name: 'views', type: 'text', notNull: true }],
     });
@@ -229,7 +218,7 @@ describe('guardDiffs', () => {
   });
 
   it('blocks NOT NULL over NULL rows even under force', async () => {
-    const db = await open();
+    const db = await connectTest();
     const live = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
     });
@@ -245,7 +234,7 @@ describe('guardDiffs', () => {
   });
 
   it('blocks a NOT NULL column add on a populated table, frees it on an empty one', async () => {
-    const db = await open();
+    const db = await connectTest();
     const live = table('Posts');
     const desired = table('Posts', {
       columns: [UUID, { name: 'role', type: 'text', notNull: true }],
@@ -259,7 +248,7 @@ describe('guardDiffs', () => {
   });
 
   it('blocks a unique over duplicates even under force, NULLs never counting', async () => {
-    const db = await open();
+    const db = await connectTest();
     const live = table('Posts', {
       columns: [UUID, { name: 'slug', type: 'text', notNull: false }],
     });
@@ -276,7 +265,7 @@ describe('guardDiffs', () => {
   });
 
   it('blocks a primary-key change over duplicate values', async () => {
-    const db = await open();
+    const db = await connectTest();
     const live = table('Posts', {
       columns: [UUID, { name: 'locale', type: 'text', notNull: true }],
     });
@@ -290,7 +279,7 @@ describe('guardDiffs', () => {
   });
 
   it('authorizes drops under force and reports every deletion', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
@@ -302,7 +291,7 @@ describe('guardDiffs', () => {
   });
 
   it('refuses dangling rows under a foreign key being added, clears them under force', async () => {
-    const db = await open();
+    const db = await connectTest();
     const users = table('Users');
     const live = table('Posts', {
       columns: [UUID, { name: 'author', type: 'text', notNull: false }],
@@ -335,7 +324,7 @@ describe('guardDiffs', () => {
   });
 
   it('deletes dangling rows when the column is NOT NULL on either side', async () => {
-    const db = await open();
+    const db = await connectTest();
     const users = table('Users');
     const tightened = table('Posts', {
       columns: [UUID, { name: 'author', type: 'text', notNull: false }],
@@ -361,7 +350,7 @@ describe('guardDiffs', () => {
   });
 
   it('deletes dangling rows when the column relaxes to nullable this sync', async () => {
-    const db = await open();
+    const db = await connectTest();
     const users = table('Users');
     const live = table('Posts', {
       columns: [UUID, { name: 'author', type: 'text', notNull: true }],
@@ -386,8 +375,43 @@ describe('guardDiffs', () => {
     await db.close();
   });
 
+  it('purges orphans under force on a table no diff touches, as the warning advises', async () => {
+    const db = await connectTest();
+    const users = table('Users');
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'author', type: 'text', notNull: false }],
+      foreignKeys: [
+        { column: 'author', targetTable: 'Users', targetColumn: 'UUID', onDelete: 'setNull' },
+      ],
+    });
+    const reviewers = table('Posts_reviewers', {
+      columns: [UUID, { name: 'reviewer', type: 'text', notNull: true }],
+      foreignKeys: [
+        { column: 'reviewer', targetTable: 'Users', targetColumn: 'UUID', onDelete: 'cascade' },
+      ],
+    });
+    await materialize(db, [users, posts, reviewers]);
+    await dialect.schemaTransaction(db, async (tx) => {
+      await tx.run('INSERT INTO "Posts" ("UUID", "author") VALUES (?, ?)', ['p1', 'ghost']);
+      await tx.run('INSERT INTO "Posts_reviewers" ("UUID", "reviewer") VALUES (?, ?)', [
+        'r1',
+        'ghost',
+      ]);
+    });
+    const schemas = [users, posts, reviewers];
+    deepStrictEqual(await guard(db, schemas, schemas), { deletions: [], warnings: [] });
+    const forced = await guard(db, schemas, schemas, true);
+    deepStrictEqual(forced.warnings, []);
+    strictEqual(forced.deletions.length, 2);
+    deepStrictEqual(await db.query('SELECT "UUID", "author" FROM "Posts"'), [
+      Object.assign(Object.create(null), { UUID: 'p1', author: null }),
+    ]);
+    deepStrictEqual(await db.query('SELECT "UUID" FROM "Posts_reviewers"'), []);
+    await db.close();
+  });
+
   it('warns about orphans under a surviving foreign key without wedging the boot', async () => {
-    const db = await open();
+    const db = await connectTest();
     const users = table('Users');
     const posts = table('Posts', {
       columns: [UUID, { name: 'author', type: 'text', notNull: false }],
@@ -422,7 +446,7 @@ describe('guardDiffs', () => {
   });
 
   it('skips probes over columns arriving in the same sync', async () => {
-    const db = await open();
+    const db = await connectTest();
     const live = table('Users');
     await materialize(db, [live]);
     await db.run('INSERT INTO "Users" ("UUID") VALUES (?)', ['u1']);
@@ -444,7 +468,7 @@ describe('guardDiffs', () => {
   });
 
   it('counts every value as dangling when the target arrives in the same sync', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'category', type: 'text', notNull: false }],
     });
@@ -481,7 +505,7 @@ describe('guardDiffs', () => {
   });
 
   it('cascades a force purge through a self-referencing chain', async () => {
-    const db = await open();
+    const db = await connectTest();
     const nodes = table('Nodes', {
       columns: [UUID, { name: 'parent', type: 'text', notNull: true }],
     });
@@ -507,7 +531,7 @@ describe('guardDiffs', () => {
   });
 
   it('purges rows of an untouched table orphaned by the purge itself', async () => {
-    const db = await open();
+    const db = await connectTest();
     const bosses = table('Bosses');
     const parents = table('Parents', {
       columns: [UUID, { name: 'boss', type: 'text', notNull: true }],
@@ -559,7 +583,7 @@ describe('guardDiffs', () => {
   });
 
   it('purges precisely on a table whose name matches the subquery alias', async () => {
-    const db = await open();
+    const db = await connectTest();
     const users = table('Users', {
       columns: [UUID, { name: 'author', type: 'text', notNull: false }],
     });
@@ -592,7 +616,7 @@ describe('guardDiffs', () => {
   });
 
   it('collects every finding into one refusal', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'legacy', type: 'text', notNull: false }],
     });

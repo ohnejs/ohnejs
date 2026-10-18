@@ -4,7 +4,6 @@ import { describe, it } from 'node:test';
 import type { DatabaseAdapter } from '../../../../src/ohne/database/adapter.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -12,6 +11,7 @@ import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useCollections().register('CXAccount', {
   name: 'CXAccount',
@@ -25,8 +25,7 @@ useCollections().register('CXAccount', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

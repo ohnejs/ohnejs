@@ -9,7 +9,6 @@ import type { MigrationMeta } from '../../../../src/ohne/database/migrations/use
 import type { FieldTypeMeta } from '../../../../src/ohne/fields/use-fields.ts';
 import type { Registry } from '../../../../src/utils/index.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { diffSchemas } from '../../../../src/ohne/database/schema/diff.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
@@ -17,12 +16,7 @@ import { isOhneError } from '../../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { createRegistry } from '../../../../src/utils/index.ts';
-
-const dialect = new SQLiteDialect();
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 function refusalMatching(pattern: RegExp): (error: unknown) => boolean {
   return (error: unknown) => {
@@ -77,7 +71,7 @@ async function countRows(db: DatabaseAdapter, table: string): Promise<number> {
 
 describe('syncDatabase with translatable scalars', () => {
   it('creates the companion in one sync, introspection re-diffing to zero', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: {
@@ -107,7 +101,7 @@ describe('syncDatabase with translatable scalars', () => {
   });
 
   it('keys one row per parent and locale, rows following their parent', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text', { translatable: true }) } },
@@ -126,7 +120,7 @@ describe('syncDatabase with translatable scalars', () => {
   });
 
   it('scopes `uniquePerLocale` to one locale, a global unique spanning all', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: {
@@ -160,7 +154,7 @@ describe('syncDatabase with translatable scalars', () => {
   });
 
   it('adds a translatable field to a populated collection without a refusal', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { views: field('integer') } },
@@ -184,7 +178,7 @@ describe('syncDatabase with translatable scalars', () => {
   });
 
   it('refuses to drop a populated companion, a logical discard escalating to the table', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: {
@@ -222,7 +216,7 @@ describe('syncDatabase with translatable scalars', () => {
   });
 
   it('renames a translatable field on the companion, values surviving every locale', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text', { translatable: true }) } },
@@ -257,7 +251,7 @@ describe('syncDatabase with translatable scalars', () => {
   });
 
   it('carries a populated companion through a collection rename', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text', { translatable: true }) } },
@@ -290,7 +284,7 @@ describe('syncDatabase with translatable scalars', () => {
 
 describe('syncDatabase with a translatable record', () => {
   it('probes the companion foreign key on a retarget, force clearing the references', async () => {
-    const db = await open();
+    const db = await connectTest();
     const users: CollectionMeta = { name: 'Users', collection: { fields: {} } };
     const teams: CollectionMeta = { name: 'Teams', collection: { fields: {} } };
     const before = desiredOf(
@@ -332,7 +326,7 @@ describe('syncDatabase with a translatable record', () => {
 
 describe('syncDatabase fan-out, off -> on', () => {
   it('moves every main value into a default-locale companion row, losslessly', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text'), views: field('integer', { nullable: true }) } },
@@ -374,7 +368,7 @@ describe('syncDatabase fan-out, off -> on', () => {
   });
 
   it('upserts into an existing companion: default-locale rows fill, other locales survive', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: {
@@ -412,7 +406,7 @@ describe('syncDatabase fan-out, off -> on', () => {
   });
 
   it('creates no row for an entity whose flipped values are all NULL', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { note: field('text', { nullable: true }) } },
@@ -429,7 +423,7 @@ describe('syncDatabase fan-out, off -> on', () => {
   });
 
   it('stamps the default locale onto a populated object child, the unique widening', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: {
@@ -476,7 +470,7 @@ describe('syncDatabase fan-out, off -> on', () => {
   });
 
   it('backfills a populated junction, the structural path alone staying blocked', async () => {
-    const db = await open();
+    const db = await connectTest();
     const tags: CollectionMeta = { name: 'Tags', collection: { fields: {} } };
     const before = desiredOf(
       { name: 'Posts', collection: { fields: { tags: field('records', { collection: 'Tags' }) } } },
@@ -510,7 +504,7 @@ describe('syncDatabase fan-out, off -> on', () => {
   });
 
   it('refuses a flip that retypes at the same time, naming the two-deploy fix', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { count: field('integer') } },
@@ -534,7 +528,7 @@ describe('syncDatabase fan-out, off -> on', () => {
   });
 
   it('refuses the flip on -> off without a migration, force dropping the locale data', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text', { nullable: true, translatable: true }) } },
@@ -561,7 +555,7 @@ describe('syncDatabase fan-out, off -> on', () => {
 
 describe('syncDatabase switch migrations, fan-in', () => {
   it('promotes the default locale, deletes the rest, and satisfies a NOT NULL main', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text', { translatable: true }) } },
@@ -598,7 +592,7 @@ describe('syncDatabase switch migrations, fan-in', () => {
   });
 
   it('keeps other locales and columns when one field of a multi-translatable collection flips', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: {
@@ -651,7 +645,7 @@ describe('syncDatabase switch migrations, fan-in', () => {
   });
 
   it('errors early when an entity promotes nothing into a NOT NULL main, rolling back whole', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text', { translatable: true }) } },
@@ -679,12 +673,12 @@ describe('syncDatabase switch migrations, fan-in', () => {
       },
     );
     strictEqual(await countRows(db, 'Posts__translations'), 1);
-    strictEqual(await countRows(db, 'ohne_migrations'), 0);
+    ok(!(await dialect.listTables(db)).includes('ohne_migrations'));
     await db.close();
   });
 
   it('refuses two promoted values for one entity, naming it', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text', { translatable: true }) } },
@@ -717,7 +711,7 @@ describe('syncDatabase switch migrations, fan-in', () => {
   });
 
   it('collapses a translatable object: one survivor passes, two abort at the unique', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: {
@@ -769,7 +763,7 @@ describe('syncDatabase switch migrations, fan-in', () => {
   });
 
   it("collapses a translatable repeater per locale, force keeping each locale's first row", async () => {
-    const db = await open();
+    const db = await connectTest();
     const shape = (type: 'object' | 'repeater') =>
       desiredOf({
         name: 'Posts',
@@ -804,7 +798,7 @@ describe('syncDatabase switch migrations, fan-in', () => {
 
 describe('syncDatabase switch migrations, value passes', () => {
   it('backfills NULLs through a nullable switch, passing the guard', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { note: field('text', { nullable: true }) } },
@@ -843,7 +837,7 @@ describe('syncDatabase switch migrations, value passes', () => {
   });
 
   it('massages duplicates through a unique switch; an unresolved one still refuses', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { slug: field('text') } },
@@ -890,7 +884,7 @@ describe('syncDatabase switch migrations, value passes', () => {
   });
 
   it('skips a switch whose state already holds, naming the state', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: { fields: { note: field('text') } },
@@ -913,7 +907,7 @@ describe('syncDatabase switch migrations, value passes', () => {
   });
 
   it('skips a switch on a fresh database end to end', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: { fields: { note: field('text') } },
@@ -934,7 +928,7 @@ describe('syncDatabase switch migrations, value passes', () => {
   });
 
   it('refuses an explicit `to` disagreeing with the desired schema', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { note: field('text', { nullable: true }) } },
@@ -963,7 +957,7 @@ describe('syncDatabase switch migrations, value passes', () => {
 
 describe('syncDatabase switch migrations, audit regressions', () => {
   it('sweeps the block instances a fan-in dooms, still-referenced ones surviving', async () => {
-    const db = await open();
+    const db = await connectTest();
     const hero: BlockMeta = { name: 'Hero', block: { fields: { heading: field('text') } } };
     const before = buildDesiredSchema(
       collections({
@@ -1012,7 +1006,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
   });
 
   it('cascades a fan-in over the nested children of its doomed rows', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: {
@@ -1066,7 +1060,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
   });
 
   it('cascades a value-pass entity deletion over children and companion rows', async () => {
-    const db = await open();
+    const db = await connectTest();
     const shape = (unique: boolean) =>
       desiredOf({
         name: 'Posts',
@@ -1113,7 +1107,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
   });
 
   it('refuses a transform-less fan-in that retypes at the same time', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { count: field('text', { nullable: true, translatable: true }) } },
@@ -1144,7 +1138,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
   });
 
   it('refuses a switch whose desired schema never flips the state', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text', { translatable: true }) } },
@@ -1169,7 +1163,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
   });
 
   it('refuses a transform on a composite fan-out: nothing reshapes', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: {
@@ -1205,7 +1199,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
   });
 
   it('refuses a stale fan-out switch naming the missing companion column', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: {
@@ -1241,7 +1235,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
   });
 
   it('refuses an absent field even under an explicit `to`', async () => {
-    const db = await open();
+    const db = await connectTest();
     const desired = desiredOf({
       name: 'Posts',
       collection: { fields: { note: field('text', { nullable: true }) } },
@@ -1267,7 +1261,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
   });
 
   it('hands a move transform the locale of each companion row', async () => {
-    const db = await open();
+    const db = await connectTest();
     const before = desiredOf({
       name: 'Posts',
       collection: { fields: { title: field('text', { translatable: true }) } },
@@ -1303,7 +1297,7 @@ describe('syncDatabase switch migrations, audit regressions', () => {
   });
 
   it('backfills a nested subfield through a nullable switch, the desired home resolving', async () => {
-    const db = await open();
+    const db = await connectTest();
     const shape = (nullable: boolean) =>
       desiredOf({
         name: 'Posts',

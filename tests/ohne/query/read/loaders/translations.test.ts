@@ -5,7 +5,6 @@ import type { DatabaseAdapter, SQLParams } from '../../../../../src/ohne/databas
 import type { FieldQueryMeta } from '../../../../../src/ohne/query/metadata.ts';
 
 import { useCollections } from '../../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../../src/ohne/database/schema/sync.ts';
 import {
@@ -22,6 +21,7 @@ import {
   narrowTranslations,
 } from '../../../../../src/ohne/query/read/loaders/translations.ts';
 import { parseCondition, type ConditionNode } from '../../../../../src/utils/index.ts';
+import { connectTest, dialect } from '../../../../_dialect.ts';
 
 useLayers().add({
   path: '/translations-loader',
@@ -47,8 +47,7 @@ useCollections().register('LTNotes', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 
 let queries = 0;
 const counting: DatabaseAdapter = {

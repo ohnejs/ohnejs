@@ -5,7 +5,6 @@ import type { DatabaseAdapter, SQLParams } from '../../../../../src/ohne/databas
 import type { PopulateNode } from '../../../../../src/ohne/query/ir.ts';
 
 import { useCollections } from '../../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../../src/ohne/database/schema/sync.ts';
 import {
@@ -19,6 +18,7 @@ import { hook } from '../../../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../../../src/ohne/hooks/use-hooks.ts';
 import { useLayers } from '../../../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../../../src/ohne/query/query.ts';
+import { connectTest, dialect } from '../../../../_dialect.ts';
 
 useLayers().add({
   path: '/populate-loaders',
@@ -74,8 +74,7 @@ useCollections().register('PDeep', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 
 let queries = 0;
 const counting: DatabaseAdapter = {

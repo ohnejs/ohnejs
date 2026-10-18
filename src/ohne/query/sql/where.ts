@@ -698,7 +698,7 @@ function compareFragment(
     case 'endsWith':
       return textMatch(column, `%${escapeLike(foldCase(value as string))}`, dialect);
     case 'like':
-      return { sql: `${column} LIKE ?`, params: [value as SQLValue] };
+      return { sql: dialect.like(column, false), params: [value as SQLValue] };
     case 'isNull':
       return { sql: `${column} IS NULL`, params: [] };
     case 'includes':
@@ -713,5 +713,5 @@ function compareFragment(
  * The value folds before `escapeLike`, since folding turns a full-width `％` into a wildcard `%`.
  */
 function textMatch(column: string, pattern: string, dialect: Dialect): SQLFragment {
-  return { sql: dialect.textMatch(column, true), params: [pattern] };
+  return { sql: dialect.textMatch(column), params: [pattern] };
 }

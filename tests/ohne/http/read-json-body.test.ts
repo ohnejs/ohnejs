@@ -32,6 +32,12 @@ function isTooNested(error: unknown): boolean {
   );
 }
 
+function isContainsNUL(error: unknown): boolean {
+  return (
+    error instanceof HTTPError && error.status === 400 && error.message === 'api.body.containsNUL'
+  );
+}
+
 describe('readJSONBody', () => {
   it('parses a JSON body', async () => {
     await runWithEvent(makeEvent(post('application/json', '{"email":"a@b.c"}')), async () => {
@@ -80,6 +86,26 @@ describe('readJSONBody', () => {
   it('honours a custom maxDepth', async () => {
     await runWithEvent(makeEvent(post('application/json', '{"a":{"b":1}}')), async () => {
       await rejects(readJSONBody({ maxDepth: 1 }), isTooNested);
+    });
+  });
+
+  it('rejects a U+0000 escape anywhere with 400', async () => {
+    for (const body of ['{"email":"a\\u0000@b.c"}', '{"\\u0000":1}', '["\\\\\\u0000"]']) {
+      await runWithEvent(makeEvent(post('application/json', body)), async () => {
+        await rejects(readJSONBody(), isContainsNUL);
+      });
+    }
+  });
+
+  it('rejects a raw U+0000 with 400', async () => {
+    await runWithEvent(makeEvent(post('application/json', '{"a":"\u0000"}')), async () => {
+      await rejects(readJSONBody(), isContainsNUL);
+    });
+  });
+
+  it('keeps an escaped backslash followed by the letters `u0000`', async () => {
+    await runWithEvent(makeEvent(post('application/json', '["\\\\u0000"]')), async () => {
+      deepStrictEqual(await readJSONBody(), ['\\u0000']);
     });
   });
 });

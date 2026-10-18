@@ -9,6 +9,7 @@ import { connect } from '../../../src/ohne/database/connect.ts';
 import { closeDatabases, useDatabase } from '../../../src/ohne/database/use-database.ts';
 import { withLock } from '../../../src/ohne/database/with-lock.ts';
 import { sleep } from '../../../src/utils/index.ts';
+import { memoryURL } from '../../_dialect.ts';
 
 type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
@@ -20,7 +21,7 @@ describe('withLock', () => {
   });
 
   async function open(): Promise<void> {
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     await connect();
   }
 
@@ -142,9 +143,9 @@ describe('withLock', () => {
     await open();
     t.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 1_000_000 });
     const release = await hold('job');
-    for (let beat = 0; beat < 5; beat++) {
+    for (let beat = 1; beat <= 5; beat++) {
       t.mock.timers.tick(5_000);
-      await setImmediate();
+      while ((await acquiredAt('job')) !== 1_000_000 + beat * 5_000) await setImmediate();
     }
     strictEqual(await acquiredAt('job'), 1_025_000);
     strictEqual(await withLock('job', () => 'stolen', { wait: false }), undefined);

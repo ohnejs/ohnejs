@@ -1,7 +1,9 @@
+import { truncateWithHash } from '../../../utils/crypto/index.ts';
 import { physicalName } from './_physical.ts';
 
 /**
- * The primary-key constraint name of a table.
+ * The primary-key constraint name of a physical table.
+ * A dialect knows only physical names, so a table capped at the boundary composes as it is.
  *
  * @example
  * ```ts
@@ -9,7 +11,7 @@ import { physicalName } from './_physical.ts';
  * ```
  */
 export function primaryKeyName(table: string): string {
-  return physicalName(`PK__${table}`);
+  return truncateWithHash(`PK__${table}`);
 }
 
 /**
@@ -41,7 +43,8 @@ export function indexName(table: string, columns: readonly string[]): string {
 }
 
 /**
- * The logical foreign-key name of a column.
+ * The foreign-key constraint name of a column of a physical table.
+ * A dialect knows only physical names, so a table capped at the boundary composes as it is.
  * A dialect with unnamed foreign keys, like SQLite, never writes it into the database.
  *
  * @example
@@ -50,5 +53,5 @@ export function indexName(table: string, columns: readonly string[]): string {
  * ```
  */
 export function foreignKeyName(table: string, column: string): string {
-  return physicalName(`FK__${table}__${column}`);
+  return truncateWithHash(`FK__${table}__${column}`);
 }

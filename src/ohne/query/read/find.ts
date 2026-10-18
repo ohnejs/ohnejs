@@ -80,7 +80,7 @@ export function compileReadTail(
   const order = compileOrder(ir, meta, dialect, locale);
   parts.push(`ORDER BY ${order.sql}`);
   params.push(...order.params);
-  const limit = compileLimit(ir);
+  const limit = compileLimit(ir, dialect);
   if (limit.sql !== '') {
     parts.push(limit.sql);
     params.push(...limit.params);

@@ -175,6 +175,21 @@ describe('reportError', () => {
     ok(!out.includes('errors.ts'));
   });
 
+  it('skips the frames of an installed package, such as a dialect', () => {
+    const error = Object.assign(new Error('column "nope" does not exist'), {
+      name: 'DatabaseError',
+    });
+    error.stack = [
+      'DatabaseError: column "nope" does not exist',
+      '    at async file:///app/node_modules/@ohnejs/pg/src/adapter.ts:89:24',
+      '    at async file:///app/commands/summon-thrall.ts:7:5',
+    ].join('\n');
+    const out = report(error);
+
+    ok(out.includes('/app/commands/summon-thrall.ts:7:5'), out);
+    ok(!out.includes('adapter.ts'), out);
+  });
+
   it('leaves the corner bare when every frame is inside the framework `src`', () => {
     const failures = [
       [validationError({ name: 'validation.required' }), 'ohne/query/write/errors.ts'],

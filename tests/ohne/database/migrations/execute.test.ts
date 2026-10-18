@@ -6,22 +6,12 @@ import type { Migration } from '../../../../src/ohne/database/migrations/define-
 import type { MigrationMeta } from '../../../../src/ohne/database/migrations/use-migrations.ts';
 import type { TableSchema } from '../../../../src/ohne/database/schema/table-schema.ts';
 
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
-import {
-  createIndexes,
-  createTable,
-} from '../../../../src/ohne/database/dialects/sqlite/rebuild.ts';
 import { executeMigrations } from '../../../../src/ohne/database/migrations/execute.ts';
 import { classifySchema } from '../../../../src/ohne/database/schema/snapshot.ts';
 import { truncateWithHash } from '../../../../src/utils/crypto/index.ts';
-
-const dialect = new SQLiteDialect();
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 const UUID = { name: 'UUID', type: 'text', notNull: true } as const;
-
-function open(): Promise<DatabaseAdapter> {
-  return dialect.connect(':memory:');
-}
 
 function table(name: string, overrides: Partial<TableSchema> = {}): TableSchema {
   return {
@@ -41,8 +31,7 @@ function meta(name: string, migration: Migration): MigrationMeta {
 
 async function materialize(db: DatabaseAdapter, schemas: TableSchema[]): Promise<void> {
   for (const schema of schemas) {
-    await createTable(db, dialect, schema);
-    await createIndexes(db, dialect, schema);
+    await dialect.applyTableDiff(db, { kind: 'create', table: schema });
   }
 }
 
@@ -53,7 +42,7 @@ async function columnNames(db: DatabaseAdapter, name: string): Promise<string[]>
 
 describe('executeMigrations', () => {
   it('moves a column within a table, transforming values and dropping FROM', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'isDraft', type: 'text', notNull: false }],
     });
@@ -93,7 +82,7 @@ describe('executeMigrations', () => {
   });
 
   it('retypes a column physically on a same-column move, values carried through', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'flag', type: 'text', notNull: false }],
     });
@@ -131,7 +120,7 @@ describe('executeMigrations', () => {
   });
 
   it('moves values across tables onto rows sharing the primary key', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
     });
@@ -163,7 +152,7 @@ describe('executeMigrations', () => {
   });
 
   it('refuses a cross-table move with unmatched rows, then drops them under force', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
     });
@@ -202,7 +191,7 @@ describe('executeMigrations', () => {
   });
 
   it('materializes a missing TO table from the desired schema, without its indexes', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
     });
@@ -230,7 +219,7 @@ describe('executeMigrations', () => {
   });
 
   it('materializes a missing TO column as nullable from the address itself', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'old', type: 'text', notNull: false }],
     });
@@ -260,7 +249,7 @@ describe('executeMigrations', () => {
   });
 
   it('refuses a move whose TO table is neither live nor desired', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
     });
@@ -283,7 +272,7 @@ describe('executeMigrations', () => {
   });
 
   it('exposes read-only queries and the deserialized row to a transform', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [
         UUID,
@@ -331,7 +320,7 @@ describe('executeMigrations', () => {
   });
 
   it('renames a table and follows it in the claim record', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
@@ -350,7 +339,7 @@ describe('executeMigrations', () => {
   });
 
   it('cascades a rename over the derived tables the claims own', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const junction = table('Posts_authors', {
       primaryKey: [],
@@ -396,7 +385,7 @@ describe('executeMigrations', () => {
   });
 
   it('refuses a cascade onto a truncated name, and allows one without derived tables', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const junction = table('Posts_authors', {
       primaryKey: [],
@@ -426,7 +415,7 @@ describe('executeMigrations', () => {
   });
 
   it('allows a case-only rename and refuses renaming onto an occupied name', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const users = table('Users');
     await materialize(db, [posts, users]);
@@ -452,7 +441,7 @@ describe('executeMigrations', () => {
   });
 
   it('discards a column on purpose, its covering index with it', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'legacy', type: 'text', notNull: false }],
       indexes: [{ name: 'IX__Posts__legacy', columns: ['legacy'] }],
@@ -478,7 +467,7 @@ describe('executeMigrations', () => {
   });
 
   it('discards a whole table on purpose', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
@@ -495,7 +484,7 @@ describe('executeMigrations', () => {
   });
 
   it('skips and stamps when FROM is absent and TO is satisfied by the desired schema', async () => {
-    const db = await open();
+    const db = await connectTest();
     const outcome = await executeMigrations(db, dialect, {
       migrations: [
         meta('app/001-draft', {
@@ -515,7 +504,7 @@ describe('executeMigrations', () => {
   });
 
   it('skips a whole chain on a fresh database when a later FROM consumes each TO', async () => {
-    const db = await open();
+    const db = await connectTest();
     const outcome = await executeMigrations(db, dialect, {
       migrations: [
         meta('app/001-move', {
@@ -539,7 +528,7 @@ describe('executeMigrations', () => {
   });
 
   it('refuses a migration whose FROM is absent while TO is nowhere', async () => {
-    const db = await open();
+    const db = await connectTest();
     await rejects(
       executeMigrations(db, dialect, {
         migrations: [
@@ -558,7 +547,7 @@ describe('executeMigrations', () => {
   });
 
   it('refuses a FROM whose live type drifted, never skipping it', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'count', type: 'integer', notNull: false }],
     });
@@ -581,7 +570,7 @@ describe('executeMigrations', () => {
   });
 
   it('refuses a migration addressing a foreign table', async () => {
-    const db = await open();
+    const db = await connectTest();
     await db.exec('CREATE TABLE "Theirs" ("id" TEXT PRIMARY KEY)');
     await rejects(
       executeMigrations(db, dialect, {
@@ -596,7 +585,7 @@ describe('executeMigrations', () => {
   });
 
   it('refuses a migration mixing a column and a table address', async () => {
-    const db = await open();
+    const db = await connectTest();
     await rejects(
       executeMigrations(db, dialect, {
         migrations: [
@@ -615,7 +604,7 @@ describe('executeMigrations', () => {
   });
 
   it('refuses to move a primary-key column away', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     await rejects(
@@ -638,7 +627,7 @@ describe('executeMigrations', () => {
 
 describe('executeMigrations with logical addresses', () => {
   it('moves a field logically, the types read from the claims and the desired schema', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'isDraft', type: 'text', notNull: false }],
     });
@@ -682,7 +671,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('moves a dot-path column on a child table, correlated through `_parentUUID`', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'summary', type: 'text', notNull: false }],
     });
@@ -723,7 +712,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('renames a collection as a compound, every owned table and claim origin following', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const tags = table('Posts_tags', {
       columns: [
@@ -775,7 +764,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('composes a compound rename with a same-sync field migration', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const sections = table('Posts_sections', {
       columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
@@ -822,7 +811,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('skips an absent family member whose new name is satisfied, applying the rest', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     const claimed = classifySchema([
@@ -855,7 +844,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('skips a whole logical chain on a fresh database, reading no FROM type', async () => {
-    const db = await open();
+    const db = await connectTest();
     const outcome = await executeMigrations(db, dialect, {
       migrations: [
         meta('app/001-move', {
@@ -883,7 +872,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('skips a move onto a derived table a later collection rename consumes, fresh database', async () => {
-    const db = await open();
+    const db = await connectTest();
     const outcome = await executeMigrations(db, dialect, {
       migrations: [
         meta('app/001-fresh', {
@@ -917,7 +906,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('skips a field rename a later collection rename consumes, fresh database', async () => {
-    const db = await open();
+    const db = await connectTest();
     const outcome = await executeMigrations(db, dialect, {
       migrations: [
         meta('app/001-parts', {
@@ -947,7 +936,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('skips an unpinned chain on a fresh database: no intermediate demands a type', async () => {
-    const db = await open();
+    const db = await connectTest();
     const outcome = await executeMigrations(db, dialect, {
       migrations: [
         meta('app/001-chapters', {
@@ -985,7 +974,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('discards a composite field as a compound, nested children first', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const sections = table('Posts_sections', {
       columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
@@ -1017,7 +1006,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('renames through the TO-tree bootstrap when the snapshot predates ownership', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const sections = table('Posts_sections', {
       columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
@@ -1057,7 +1046,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('refuses a move onto a junction with the many-rows wording, not a key mismatch', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'note', type: 'text', notNull: false }],
     });
@@ -1091,7 +1080,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('names the migration when its transform throws', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'flag', type: 'text', notNull: false }],
     });
@@ -1120,7 +1109,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('refuses to move `NULL` into a `NOT NULL` column instead of leaking the constraint', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'opt', type: 'text', notNull: false }],
     });
@@ -1148,7 +1137,7 @@ describe('executeMigrations with logical addresses', () => {
   });
 
   it('refuses a bootstrap rename when the same deploy edited the field tree', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const sections = table('Posts_sections', {
       columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
@@ -1193,7 +1182,7 @@ describe('executeMigrations over the translations companion', () => {
   }
 
   it('cascades a physical collection rename over the claimed companion', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const companion = companionSchema('Posts');
     await materialize(db, [posts, companion]);
@@ -1224,7 +1213,7 @@ describe('executeMigrations over the translations companion', () => {
   });
 
   it('installs the companion claim through a logical rename compound', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const companion = companionSchema('Posts');
     await materialize(db, [posts, companion]);
@@ -1252,7 +1241,7 @@ describe('executeMigrations with block addresses', () => {
   ] as const;
 
   it('renames a block as a compound, wrapper rows and claims rewritten', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const wrapper = table('Posts_content', {
       columns: [...wrapperColumns],
@@ -1321,7 +1310,7 @@ describe('executeMigrations with block addresses', () => {
   });
 
   it('skips a block chain end to end on a fresh database', async () => {
-    const db = await open();
+    const db = await connectTest();
     const outcome = await executeMigrations(db, dialect, {
       migrations: [
         meta('app/001-heading', {
@@ -1355,7 +1344,7 @@ describe('executeMigrations with block addresses', () => {
   });
 
   it('moves a block column in place, retyping through the transform', async () => {
-    const db = await open();
+    const db = await connectTest();
     const hero = table('block_Hero', {
       columns: [UUID, { name: 'size', type: 'text', notNull: false }],
       block: 'Hero',
@@ -1394,7 +1383,7 @@ describe('executeMigrations with block addresses', () => {
   });
 
   it('discards a composite inside a block as a compound', async () => {
-    const db = await open();
+    const db = await connectTest();
     const hero = table('block_Hero', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
       block: 'Hero',
@@ -1420,7 +1409,7 @@ describe('executeMigrations with block addresses', () => {
   });
 
   it('deletes wrapper links when a block-field switch deletes instances', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const wrapper = table('Posts_content', {
       columns: [...wrapperColumns],
@@ -1480,7 +1469,7 @@ describe('executeMigrations with block addresses', () => {
   });
 
   it('composes a block rename with a same-run field discard inside it', async () => {
-    const db = await open();
+    const db = await connectTest();
     const hero = table('block_Hero', {
       columns: [
         UUID,
@@ -1510,7 +1499,7 @@ describe('executeMigrations with block addresses', () => {
 
 describe('executeMigrations cascade over junctions', () => {
   it('cascades a `deleteRecord` through a plain junction with no locale column', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
     });
@@ -1572,9 +1561,127 @@ describe('executeMigrations cascade over junctions', () => {
   });
 });
 
+describe('executeMigrations references onto a deleted row', () => {
+  const authors = table('Authors', {
+    columns: [UUID, { name: 'name', type: 'text', notNull: false }],
+  });
+  const posts = table('Posts', {
+    columns: [UUID, { name: 'author', type: 'text', notNull: false }],
+    foreignKeys: [
+      { column: 'author', targetTable: 'Authors', targetColumn: 'UUID', onDelete: 'setNull' },
+    ],
+  });
+  const reviewers = table('Posts_reviewers', {
+    columns: [
+      { name: '_parentUUID', type: 'text', notNull: true },
+      { name: '_targetUUID', type: 'text', notNull: true },
+      { name: '_parentPosition', type: 'integer', notNull: true },
+    ],
+    primaryKey: [],
+    foreignKeys: [
+      { column: '_parentUUID', targetTable: 'Posts', targetColumn: 'UUID', onDelete: 'cascade' },
+      { column: '_targetUUID', targetTable: 'Authors', targetColumn: 'UUID', onDelete: 'cascade' },
+    ],
+    derived: { collection: 'Posts', path: ['reviewers'], kind: 'junction' },
+  });
+  const fans = table('Fans', {
+    columns: [UUID, { name: 'favorite', type: 'text', notNull: false }],
+    foreignKeys: [
+      { column: 'favorite', targetTable: 'Authors', targetColumn: 'UUID', onDelete: 'restrict' },
+    ],
+  });
+  const nameRequired = meta('app/001-name-required', {
+    from: { collection: 'Authors', field: 'name', nullable: true },
+    transform: (value, _row, ctx) => (value === null ? ctx.deleteRecord() : undefined),
+  });
+  const desired = table('Authors', {
+    columns: [UUID, { name: 'name', type: 'text', notNull: true }],
+  });
+
+  /**
+   * Seeds two authors, `a2` nameless, and a post that names `a2` as its author and both as reviewers.
+   */
+  async function seed(db: DatabaseAdapter, schemas: TableSchema[]): Promise<void> {
+    await materialize(db, schemas);
+    await db.run('INSERT INTO "Authors" ("UUID", "name") VALUES (?, ?), (?, ?)', [
+      'a1',
+      'Thrall',
+      'a2',
+      null,
+    ]);
+    await db.run('INSERT INTO "Posts" ("UUID", "author") VALUES (?, ?)', ['p1', 'a2']);
+    await db.run(
+      'INSERT INTO "Posts_reviewers" ("_parentUUID", "_targetUUID", "_parentPosition") ' +
+        'VALUES (?, ?, ?), (?, ?, ?)',
+      ['p1', 'a1', 0, 'p1', 'a2', 1],
+    );
+  }
+
+  it('follows each reference by its `onDelete`, foreign keys off as the sync runs', async () => {
+    const db = await connectTest();
+    await seed(db, [authors, posts, reviewers]);
+    const outcome = await dialect.schemaTransaction(db, (tx) =>
+      executeMigrations(tx, dialect, {
+        migrations: [nameRequired],
+        desired: [desired],
+        claimed: classifySchema([authors, posts, reviewers]),
+        force: false,
+      }),
+    );
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-name-required', status: 'applied' }]);
+    deepStrictEqual(
+      (await db.query<{ UUID: string }>('SELECT "UUID" FROM "Authors"')).map((row) => row.UUID),
+      ['a1'],
+    );
+    deepStrictEqual(
+      (await db.query<{ author: string | null }>('SELECT "author" FROM "Posts"')).map(
+        (row) => row.author,
+      ),
+      [null],
+    );
+    deepStrictEqual(
+      (await db.query<{ _targetUUID: string }>('SELECT "_targetUUID" FROM "Posts_reviewers"')).map(
+        (row) => row._targetUUID,
+      ),
+      ['a1'],
+    );
+    ok(
+      outcome.deletions.some((line) =>
+        /`1` row of `Posts_reviewers` deleted, referencing deleted `Authors` rows/.test(line),
+      ),
+      outcome.deletions.join('\n'),
+    );
+    await db.close();
+  });
+
+  it('refuses to delete a row a restricting reference still holds', async () => {
+    const db = await connectTest();
+    await seed(db, [authors, posts, reviewers, fans]);
+    await db.run('INSERT INTO "Fans" ("UUID", "favorite") VALUES (?, ?)', ['f1', 'a2']);
+    await rejects(
+      dialect.schemaTransaction(db, (tx) =>
+        executeMigrations(tx, dialect, {
+          migrations: [nameRequired],
+          desired: [desired],
+          claimed: classifySchema([authors, posts, reviewers, fans]),
+          force: false,
+        }),
+      ),
+      { message: 'Migration `app/001-name-required` deletes rows `Fans` still references' },
+    );
+    deepStrictEqual(
+      (await db.query<{ UUID: string }>('SELECT "UUID" FROM "Authors" ORDER BY "UUID"')).map(
+        (row) => row.UUID,
+      ),
+      ['a1', 'a2'],
+    );
+    await db.close();
+  });
+});
+
 describe('executeMigrations materializes translatable child rows', () => {
   it('stamps a fresh locale-scoped child-one row at the default locale', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'subtitle', type: 'text', notNull: false }],
     });
@@ -1619,7 +1726,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('adds a missing column nullable and fills every row', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['a', 'b']);
@@ -1656,7 +1763,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('fills only the NULL cells of a live nullable column, set values untouched', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'note', type: 'text', notNull: false }],
     });
@@ -1699,7 +1806,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('hands the transform `null`, the deserialized row, and a queryable `ctx`', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'draft', type: 'boolean', notNull: true }],
     });
@@ -1748,7 +1855,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('leaves a row NULL when the transform returns nothing', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['a', 'b']);
@@ -1779,7 +1886,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('deletes a row through the owned-row cascade on `deleteRecord`', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const sections = table('Posts_sections', {
       columns: [UUID, { name: '_parentUUID', type: 'text', notNull: true }],
@@ -1821,7 +1928,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('skips with a reason when the table is absent', async () => {
-    const db = await open();
+    const db = await connectTest();
     const outcome = await executeMigrations(db, dialect, {
       migrations: [
         meta('app/001-flag', {
@@ -1841,7 +1948,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('refuses a foreign table', async () => {
-    const db = await open();
+    const db = await connectTest();
     await materialize(db, [table('Posts')]);
     await rejects(
       executeMigrations(db, dialect, {
@@ -1862,7 +1969,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('refuses a column the schema does not hold and no later migration carries on', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     await rejects(
@@ -1900,7 +2007,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('fills a column a later move carries on', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
@@ -1933,7 +2040,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('fills each companion row per locale, `ctx.locale` set', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const translations = (users: TableSchema['columns']) =>
       table('Posts__translations', {
@@ -1987,7 +2094,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('fills a dot path on a child-one table, a parent without a child row getting none', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const sections = (users: TableSchema['columns']) =>
       table('Posts_sections', {
@@ -2032,7 +2139,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('gives each record a required child row on a fill, creating the child table', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     await materialize(db, [posts]);
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?), (?)', ['p1', 'p2']);
@@ -2081,7 +2188,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('refuses to create required child rows another column would leave `NULL`', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts');
     const address = table('Posts_address', {
       columns: [
@@ -2123,7 +2230,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('fills a block field on the per-type table', async () => {
-    const db = await open();
+    const db = await connectTest();
     const hero = table('block_Hero', {
       columns: [UUID, { name: 'title', type: 'text', notNull: false }],
       block: 'Hero',
@@ -2163,7 +2270,7 @@ describe('executeMigrations with fills', () => {
   });
 
   it('refuses a live column whose native type differs from the desired one', async () => {
-    const db = await open();
+    const db = await connectTest();
     const posts = table('Posts', {
       columns: [UUID, { name: 'flag', type: 'text', notNull: false }],
     });

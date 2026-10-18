@@ -82,6 +82,7 @@ interface Findings {
  * Force keeps each parent's first row - lowest `_parentPosition`, `UUID` breaking ties - and drops the rest.
  * Rows dangling under a foreign key being added refuse too; under force they are purged here.
  * Pre-existing orphans under a surviving foreign key only warn; under force they are purged as well.
+ * A table no diff alters is probed only under force, so a forced sync purges what an earlier one warned of.
  * A purge clears the dangling values where the column permits `NULL` both live and desired.
  * Everywhere else it deletes the rows: a `record` reference clears, a junction row vanishes.
  * Purges run to a fixed point: rows orphaned by a deletion are purged and reported too, `live`-wide.
@@ -125,6 +126,16 @@ export async function guardDiffs(
       continue;
     }
     await guardAlter(db, dialect, diff, creating, findings);
+  }
+  if (options.force) {
+    const altered = new Set(
+      diffs.flatMap((diff) => (diff.kind === 'alter' ? [diff.desired.name] : [])),
+    );
+    for (const probe of probeUniverse(diffs, live)) {
+      if (altered.has(probe.table)) continue;
+      const count = await countDangling(db, dialect, probe.table, probe.foreignKey);
+      if (count > 0) findings.orphans.push({ ...probe, count, targetCreated: false });
+    }
   }
   await probeDisallowed(db, dialect, live, desired, findings);
   await probeChildless(db, dialect, live, desired, creating, findings);

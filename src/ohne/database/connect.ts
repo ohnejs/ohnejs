@@ -1,9 +1,10 @@
 import type { Dialect } from './dialect.ts';
+import type { DialectName } from './known-dialects.ts';
 
-import { isAbsolutePath, isUndefined, joinPath } from '../../utils/index.ts';
+import { codeSpan } from '../../utils/ansi/index.ts';
+import { isUndefined, redactURL } from '../../utils/index.ts';
 import { useEnv } from '../env/use-env.ts';
 import { ohneError } from '../error/ohne-error.ts';
-import { appRoot } from '../layers/app-root.ts';
 import { DEFAULT_DATABASE_URL, DEFAULT_DIALECT } from '../layers/config.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { clearDatabases, registerDatabase, registerDialect } from './use-database.ts';
@@ -14,43 +15,67 @@ import { useDialects } from './use-dialects.ts';
  *
  * Runs in `serveAPI` before `listen`; returns the selected dialect for the sync that follows.
  * The main URL comes from `DATABASE` or `DB` environment variables, then `database.url`, then the default.
- * A plain relative path resolves against the app root rather than the process working directory.
+ * The dialect is `database.dialect`, else the first registered one that accepts the main URL.
+ * Every URL, helpers included, must be one the dialect accepts.
  * `closeDatabases` closes everything this opened; the caller sequences it after the server drain.
  */
 export async function connect(): Promise<Dialect> {
   const config = useConfig().database;
-  const dialectName = config?.dialect ?? DEFAULT_DIALECT;
-  const dialect = useDialects().get(dialectName);
-  if (isUndefined(dialect)) {
-    throw ohneError({
-      title: `Unknown database dialect \`${dialectName}\``,
-      body: [
-        `No dialect is registered under \`${dialectName}\`.`,
-        'Add the layer that provides it, or set `database.dialect` to a registered one.',
-      ],
-    });
-  }
-
   const url = resolveMainURL(config?.url);
+  const dialect = isUndefined(config?.dialect) ? inferDialect(url) : namedDialect(config.dialect);
+  const helpers = Object.entries(config?.helpers ?? {});
+
+  assertAccepts(dialect, url, 'Set `DATABASE` or `database.url` to a URL it can open.');
+  for (const [name, helperURL] of helpers) {
+    assertAccepts(dialect, helperURL, `Set \`database.helpers.${name}\` to a URL it can open.`);
+  }
 
   clearDatabases();
   registerDialect(dialect);
-  registerDatabase(await dialect.connect(rootRelative(url)));
-  for (const [name, helperURL] of Object.entries(config?.helpers ?? {})) {
-    registerDatabase(await dialect.connect(rootRelative(helperURL)), name);
+  registerDatabase(await dialect.connect(url));
+  for (const [name, helperURL] of helpers) {
+    registerDatabase(await dialect.connect(helperURL), name);
   }
   return dialect;
 }
 
 /**
- * Resolves a plain relative path against the app root.
- * `:memory:`, `file:` URLs, driver URLs carrying a scheme, and absolute paths pass through untouched.
+ * The dialect registered under `name`, which a configured `database.dialect` must name.
  */
-function rootRelative(url: string): string {
-  if (url === ':memory:' || url.startsWith('file:') || url.includes('://') || isAbsolutePath(url)) {
-    return url;
+function namedDialect(name: DialectName): Dialect {
+  const dialect = useDialects().get(name);
+  if (isUndefined(dialect)) {
+    throw ohneError({
+      title: `Unknown database dialect \`${name}\``,
+      body: [
+        `No dialect is registered under \`${name}\`.`,
+        'ohne ships `sqlite`, and `@ohnejs/pg` adds `postgres`.',
+        'Add the layer that provides it, or set `database.dialect` to a registered one.',
+      ],
+    });
   }
-  return joinPath(appRoot(), url);
+  return dialect;
+}
+
+/**
+ * The first registered dialect that accepts `url`, else the default one.
+ * Registration order holds, so the built-in `sqlite` is asked first and claims only non-URL paths.
+ */
+function inferDialect(url: string): Dialect {
+  const dialects = Object.values(useDialects().all());
+  return dialects.find((dialect) => dialect.accepts(url)) ?? namedDialect(DEFAULT_DIALECT);
+}
+
+/**
+ * Throws unless `dialect` accepts `url`, printing the URL without its secrets.
+ * `fix` is the row that tells the reader which setting to change.
+ */
+function assertAccepts(dialect: Dialect, url: string, fix: string): void {
+  if (dialect.accepts(url)) return;
+  throw ohneError({
+    title: `The database URL does not fit \`${dialect.name}\``,
+    body: [`The \`${dialect.name}\` dialect cannot open ${codeSpan(redactURL(url))}.`, fix],
+  });
 }
 
 /**

@@ -131,15 +131,12 @@ export async function syncDatabase(
   if (isUndefined(handle)) return { deletions: [], warnings: [] };
   try {
     await dialect.sweepRebuilds(db);
-    const snapshot = await readSnapshot(db, dialect);
-    const migrations = options.migrations ?? [];
-    let pending: MigrationMeta[] = [];
-    if (migrations.length > 0) {
-      await ensureMigrationsTable(db, dialect);
-      const stamped = await readStampedNames(db, dialect);
-      pending = migrations.filter((meta) => !stamped.has(meta.name));
-    }
     const names = await dialect.listTables(db);
+    const snapshot = names.includes(OHNE_SCHEMA) ? await readSnapshot(db, dialect) : undefined;
+    const stamped = names.includes(OHNE_MIGRATIONS)
+      ? await readStampedNames(db, dialect)
+      : new Set<string>();
+    const pending = (options.migrations ?? []).filter((meta) => !stamped.has(meta.name));
     const claimed = snapshot?.classification ?? {};
     const desiredNames = new Set(desired.map((table) => table.name.toLowerCase()));
     const external = names.filter(
@@ -197,6 +194,7 @@ export async function syncDatabase(
           dialect,
           advanceSnapshot(snapshot, desiredHash, classifySchema(desired)),
         );
+        if (outcome.stamps.length > 0) await ensureMigrationsTable(tx, dialect);
         for (const stamp of outcome.stamps) {
           await stampMigration(tx, dialect, stamp);
         }

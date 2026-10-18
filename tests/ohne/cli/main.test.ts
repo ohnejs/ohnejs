@@ -3,8 +3,9 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { after, before, describe, it } from 'node:test';
+
+import { dialect, prepareProject } from '../../_dialect.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
 const MAIN = join(FRAMEWORK, 'src', 'ohne', 'cli', 'main.ts');
@@ -12,16 +13,18 @@ const MAIN = join(FRAMEWORK, 'src', 'ohne', 'cli', 'main.ts');
 describe('ohne', () => {
   let root: string;
 
-  function makeApp(name: string, config = ''): string {
+  async function makeApp(
+    name: string,
+    layers: string[] = [],
+  ): Promise<{ dir: string; url: string }> {
     const dir = mkdtempSync(join(root, `${name}-`));
     writeFileSync(
       join(dir, 'package.json'),
       JSON.stringify({ name, type: 'module', dependencies: { ohnejs: '*' } }),
     );
-    writeFileSync(join(dir, 'ohne.config.ts'), config);
     mkdirSync(join(dir, 'node_modules'));
     symlinkSync(FRAMEWORK, join(dir, 'node_modules', 'ohnejs'), 'dir');
-    return dir;
+    return { dir, url: await prepareProject(dir, layers) };
   }
 
   function writeCommand(dir: string, name: string, imports: string, body: string): void {
@@ -49,8 +52,8 @@ describe('ohne', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('lists the commands of the app and its layers in the root help, each with its description', () => {
-    const dir = makeApp('help', "export default { layers: ['ohnejs/uploads'] };\n");
+  it('lists the commands of the app and its layers in the root help, each with its description', async () => {
+    const { dir } = await makeApp('help', ['ohnejs/uploads']);
     mkdirSync(join(dir, 'commands'));
     writeFileSync(
       join(dir, 'commands', 'muster.ts'),
@@ -65,8 +68,8 @@ describe('ohne', () => {
     match(result.output, /^ {2}sync +Sync the database schema\.$/m);
   });
 
-  it('runs a command in the `--cwd` project, querying a collection `ohne sync` created there', () => {
-    const dir = makeApp('notes');
+  it('runs a command in the `--cwd` project, querying a collection `ohne sync` created there', async () => {
+    const { dir, url } = await makeApp('notes');
     mkdirSync(join(dir, 'collections'));
     writeFileSync(
       join(dir, 'collections', 'Notes.ts'),
@@ -81,21 +84,21 @@ describe('ohne', () => {
         "console.log(`notes: ${notes.map((note) => note.body).join(', ')}`);",
     );
     strictEqual(ohne(root, 'sync', '--cwd', dir).status, 0);
-    const db = new DatabaseSync(join(dir, '.data', 'ohne.db'));
-    db.prepare('INSERT INTO "Notes" ("UUID", "_updatedAt", "body") VALUES (?, ?, ?)').run(
+    const db = await dialect.connect(url);
+    await db.run('INSERT INTO "Notes" ("UUID", "_updatedAt", "body") VALUES (?, ?, ?)', [
       'n1',
       0,
       'Thrall rides at dawn',
-    );
-    db.close();
+    ]);
+    await db.close();
 
     const result = ohne(root, 'notes', '--cwd', dir);
     strictEqual(result.status, 0);
     match(result.output, /^notes: Thrall rides at dawn$/m);
   });
 
-  it('runs an `onShutdown` hook the command registers once its `run` returns', () => {
-    const dir = makeApp('shutdown');
+  it('runs an `onShutdown` hook the command registers once its `run` returns', async () => {
+    const { dir } = await makeApp('shutdown');
     writeCommand(
       dir,
       'farewell',
@@ -108,8 +111,8 @@ describe('ohne', () => {
     match(result.output, /^run\nhook$/m);
   });
 
-  it("keeps the database open for the command's own shutdown hooks", () => {
-    const dir = makeApp('last');
+  it("keeps the database open for the command's own shutdown hooks", async () => {
+    const { dir } = await makeApp('last');
     writeCommand(
       dir,
       'tally',
@@ -125,8 +128,8 @@ describe('ohne', () => {
     match(result.output, /^answer 42$/m);
   });
 
-  it('prints a thrown `ohneError` once, exits 1, and still runs the shutdown hooks', () => {
-    const dir = makeApp('throws');
+  it('prints a thrown `ohneError` once, exits 1, and still runs the shutdown hooks', async () => {
+    const { dir } = await makeApp('throws');
     writeCommand(
       dir,
       'betray',
@@ -142,8 +145,8 @@ describe('ohne', () => {
     match(result.output, /^hook$/m);
   });
 
-  it('prints an unawaited rejection once, exits 1, and still runs the shutdown hooks', () => {
-    const dir = makeApp('stray');
+  it('prints an unawaited rejection once, exits 1, and still runs the shutdown hooks', async () => {
+    const { dir } = await makeApp('stray');
     writeCommand(
       dir,
       'portal',
@@ -161,8 +164,8 @@ describe('ohne', () => {
     match(result.output, /^hook$/m);
   });
 
-  it('keeps the `process.exitCode` a command sets', () => {
-    const dir = makeApp('exit');
+  it('keeps the `process.exitCode` a command sets', async () => {
+    const { dir } = await makeApp('exit');
     writeCommand(dir, 'retreat', '', 'process.exitCode = 3;');
 
     strictEqual(ohne(root, 'retreat', '--cwd', dir).status, 3);

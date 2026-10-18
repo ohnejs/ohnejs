@@ -38,4 +38,13 @@ describe('readTextBody', () => {
       await rejects(readTextBody(), (error) => error instanceof HTTPError && error.status === 400);
     });
   });
+
+  it('rejects a U+0000 with 400', async () => {
+    await runWithEvent(makeEvent(post('a\u0000b')), async () => {
+      await rejects(
+        readTextBody(),
+        (error) => error instanceof HTTPError && error.message === 'api.body.containsNUL',
+      );
+    });
+  });
 });

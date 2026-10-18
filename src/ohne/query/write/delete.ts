@@ -11,6 +11,7 @@ import { applyHook } from '../../hooks/apply-hook.ts';
 import { useHooks } from '../../hooks/use-hooks.ts';
 import { effectiveLocale } from '../locale.ts';
 import { queryMetadata } from '../metadata.ts';
+import { assertBoundParams } from '../sql/fragment.ts';
 import { compileFrom, conditionUsesCompanion } from '../sql/from.ts';
 import { compileWhere } from '../sql/where.ts';
 import {
@@ -182,10 +183,12 @@ async function attemptDelete(
   const where = compileWhere(condition, meta, dialect, locale);
   const table = dialect.quote(meta.table);
   if (isUndefined(meta.companionTable) || !conditionUsesCompanion(condition, meta.fields)) {
+    assertBoundParams(where.params.length, dialect.maxParameters);
     const { changes } = await tx.run(`DELETE FROM ${table} WHERE ${where.sql}`, where.params);
     return { deleted: changes, uuids: [] };
   }
   const from = compileFrom(meta, { condition }, locale, dialect);
+  assertBoundParams(from.params.length + where.params.length, dialect.maxParameters);
   const uuid = `${table}.${dialect.quote('UUID')}`;
   const { changes } = await tx.run(
     `DELETE FROM ${table} WHERE ${dialect.quote('UUID')} IN ` +
@@ -398,6 +401,7 @@ async function matchedUUIDs(
 ): Promise<string[]> {
   const where = compileWhere(condition, meta, dialect, locale);
   const from = compileFrom(meta, { condition }, locale, dialect);
+  assertBoundParams(from.params.length + where.params.length, dialect.maxParameters);
   const uuid = `${dialect.quote(meta.table)}.${dialect.quote('UUID')}`;
   const rows = await tx.query<{ UUID: string }>(
     `SELECT ${uuid} AS ${dialect.quote('UUID')} ${from.sql} WHERE ${where.sql}`,

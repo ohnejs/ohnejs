@@ -5,10 +5,10 @@ import type { ProcessedScope } from '../../../../src/ohne/query/pipeline/run-rec
 import type { KeptWrite } from '../../../../src/ohne/query/write/reorder.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { orderKeptWrites } from '../../../../src/ohne/query/write/reorder.ts';
+import { dialect } from '../../../_dialect.ts';
 
 useCollections().register('RORotate', {
   name: 'RORotate',
@@ -16,8 +16,6 @@ useCollections().register('RORotate', {
     fields: { items: field('repeater', { fields: { slug: field('text', { unique: true }) } }) },
   },
 });
-
-const dialect = new SQLiteDialect();
 
 function rotation(length: number, last: string): KeptWrite[] {
   return Array.from({ length }, (_, index) => ({

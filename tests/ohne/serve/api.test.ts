@@ -20,7 +20,6 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import type { GuardReport } from '../../../src/ohne/database/schema/guard.ts';
 
-import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { ensureSchemaTable, writeSnapshot } from '../../../src/ohne/database/schema/snapshot.ts';
 import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import {
@@ -36,6 +35,7 @@ import {
   useShutdown,
 } from '../../../src/ohne/index.ts';
 import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
+import { dialect, memoryURL, prepareProject, sharedURL } from '../../_dialect.ts';
 
 const scope = globalThis as typeof globalThis & {
   __ohneServeBoot: string[];
@@ -76,8 +76,6 @@ function get(port: number, path: string): Promise<number> {
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
 const BIN = join(FRAMEWORK, 'src', 'ohne', 'cli', 'bin.js');
-
-const dialect = new SQLiteDialect();
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -148,7 +146,7 @@ describe('serveAPI', () => {
     root = mkdtempSync(join(tmpdir(), 'ohne-serve-api-'));
     scope.__ohneServeBoot = [];
     useEnv().set('SILENT', true);
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     useEnv().set('PORT', 0);
     useEnv().set('NO_COLOR', true);
   });
@@ -283,9 +281,9 @@ describe('serveAPI', () => {
 
   it('never serves when the sync refuses', async () => {
     const dir = makeApp('dbfail', 'dbfail:boot');
-    const path = join(dir, 'data.db');
-    useEnv().set('DATABASE', path);
-    const seed = await dialect.connect(path);
+    const url = await sharedURL();
+    useEnv().set('DATABASE', url);
+    const seed = await dialect.connect(url);
     await ensureSchemaTable(seed, dialect);
     await seed.exec('CREATE TABLE "Orphans" ("UUID" TEXT NOT NULL, PRIMARY KEY ("UUID"))');
     await seed.run('INSERT INTO "Orphans" ("UUID") VALUES (?)', ['o1']);
@@ -303,7 +301,7 @@ describe('serveAPI', () => {
 
     await rejects(get(port, '/'));
     useEnv().set('PORT', 0);
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
   });
 
   it('never serves a route whose options are invalid', async () => {
@@ -328,9 +326,9 @@ describe('serveAPI', () => {
     useEnv().set('PORT', 0);
   });
 
-  it('re-syncs a file database as a no-op on a second boot', async () => {
+  it('re-syncs a persistent database as a no-op on a second boot', async () => {
     const dir = makeApp('dbfile', 'dbfile:boot');
-    useEnv().set('DATABASE', join(dir, 'data.db'));
+    useEnv().set('DATABASE', await sharedURL());
 
     http = await serveAPI(dir);
     await shutdownServer(http.server, http.gate);
@@ -344,7 +342,7 @@ describe('serveAPI', () => {
     );
     ok(row);
     strictEqual((JSON.parse(row.data) as { generation: number }).generation, 1);
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
   });
 
   it('builds the desired schema from the registered collections and syncs it', async () => {
@@ -479,6 +477,7 @@ describe('serveAPI', () => {
 
   it('drains and exits cleanly when its dev parent is gone before it is ready', async () => {
     const dir = serveable('orphaned');
+    const url = await prepareProject(dir);
     const log = join(dir, 'hook.log');
     writeFileSync(
       join(dir, 'boot', 'index.ts'),
@@ -492,7 +491,7 @@ describe('serveAPI', () => {
     );
 
     const child = fork(BIN, ['serve', 'api', '--cwd', dir], {
-      env: { ...process.env, DATABASE: ':memory:', PORT: '0', SILENT: '1' },
+      env: { ...process.env, DATABASE: url, PORT: '0', SILENT: '1' },
       stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
     });
     let stderr = '';

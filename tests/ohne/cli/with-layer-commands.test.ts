@@ -32,6 +32,7 @@ import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { useShutdown } from '../../../src/ohne/lifecycle/use-shutdown.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { runCommand } from '../../../src/utils/cli/index.ts';
+import { memoryURL } from '../../_dialect.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
 const BUILTINS = Object.keys(ohne.subCommands ?? {});
@@ -78,7 +79,7 @@ describe('withLayerCommands', () => {
   before(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'ohne-with-layer-commands-')));
     useEnv().set('NO_COLOR', true);
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     usePrinter().configure({ stream: { write: (chunk: string) => ((written += chunk), true) } });
   });
 

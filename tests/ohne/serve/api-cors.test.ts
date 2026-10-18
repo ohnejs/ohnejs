@@ -15,6 +15,7 @@ import {
   useMiddleware,
   useShutdown,
 } from '../../../src/ohne/index.ts';
+import { memoryURL } from '../../_dialect.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
 const ORIGIN = 'http://dash.example';
@@ -76,7 +77,7 @@ describe('serveAPI CORS', () => {
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-cors-'));
     useEnv().set('SILENT', true);
-    useEnv().set('DATABASE', ':memory:');
+    useEnv().set('DATABASE', memoryURL);
     useEnv().set('PORT', 0);
   });
 

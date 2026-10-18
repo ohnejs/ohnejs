@@ -3,8 +3,9 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { after, before, describe, it } from 'node:test';
+
+import { dialect, prepareProject, sharedURL } from '../../../_dialect.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..', '..');
 const MAIN = join(FRAMEWORK, 'src', 'ohne', 'cli', 'main.ts');
@@ -12,13 +13,19 @@ const MAIN = join(FRAMEWORK, 'src', 'ohne', 'cli', 'main.ts');
 describe('ohne sync', () => {
   let root: string;
 
-  function makeApp(name: string): string {
+  async function makeApp(name: string): Promise<{ dir: string; url: string }> {
     const dir = mkdtempSync(join(root, `${name}-`));
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ name, type: 'module' }));
-    writeFileSync(join(dir, 'ohne.config.ts'), '');
     mkdirSync(join(dir, 'node_modules'), { recursive: true });
     symlinkSync(FRAMEWORK, join(dir, 'node_modules', 'ohnejs'), 'dir');
-    return dir;
+    return { dir, url: await prepareProject(dir) };
+  }
+
+  async function tablesOf(url: string): Promise<string[]> {
+    const db = await dialect.connect(url);
+    const tables = await dialect.listTables(db);
+    await db.close();
+    return tables;
   }
 
   function writeNotes(dir: string): void {
@@ -58,42 +65,51 @@ describe('ohne sync', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('syncs a fresh database from the collections, idempotent on a re-run', () => {
-    const dir = makeApp('app');
+  it('syncs a fresh database from the collections, idempotent on a re-run', async () => {
+    const { dir, url } = await makeApp('app');
     writeNotes(dir);
 
     const first = sync(dir);
     strictEqual(first.status, 0);
     match(first.output, /Database synced/);
-    ok(existsSync(join(dir, '.data', 'ohne.db')));
 
-    const db = new DatabaseSync(join(dir, '.data', 'ohne.db'));
-    const columns = db
-      .prepare('PRAGMA table_info("Notes")')
-      .all()
-      .map((row) => row.name);
-    db.close();
-    deepStrictEqual(columns, ['UUID', '_updatedAt', 'body']);
+    const db = await dialect.connect(url);
+    const { columns } = await dialect.describeTable(db, 'Notes');
+    await db.close();
+    deepStrictEqual(
+      columns.map((column) => column.name),
+      ['UUID', '_updatedAt', 'body'],
+    );
 
     const again = sync(dir);
     strictEqual(again.status, 0);
     match(again.output, /Database synced/);
   });
 
-  it('reads `DATABASE` from the project `.env`, unless the shell already set it', () => {
-    const dir = makeApp('dotenv');
+  it('reads `DATABASE` from the project `.env`, unless the shell already set it', async () => {
+    const { dir, url } = await makeApp('dotenv');
     writeNotes(dir);
-    writeFileSync(join(dir, '.env'), 'DATABASE=.data/from-env.db\n');
+    const shell = await sharedURL();
 
     strictEqual(sync(dir).status, 0);
-    ok(existsSync(join(dir, '.data', 'from-env.db')));
+    ok((await tablesOf(url)).includes('Notes'));
+    deepStrictEqual(await tablesOf(shell), []);
 
-    strictEqual(syncWith(dir, { DATABASE: '.data/from-shell.db' }).status, 0);
-    ok(existsSync(join(dir, '.data', 'from-shell.db')));
+    strictEqual(syncWith(dir, { DATABASE: shell }).status, 0);
+    ok((await tablesOf(shell)).includes('Notes'));
   });
 
-  it('reports a malformed `.env` through the error funnel', () => {
-    const dir = makeApp('bad-dotenv');
+  it('syncs `.data/ohne.db` when no `DATABASE` is set', async () => {
+    const { dir } = await makeApp('default');
+    writeNotes(dir);
+    rmSync(join(dir, '.env'));
+
+    strictEqual(sync(dir).status, 0);
+    ok(existsSync(join(dir, '.data', 'ohne.db')));
+  });
+
+  it('reports a malformed `.env` through the error funnel', async () => {
+    const { dir } = await makeApp('bad-dotenv');
     writeNotes(dir);
     writeFileSync(join(dir, '.env'), 'NOEQUALS\n');
 
@@ -104,8 +120,8 @@ describe('ohne sync', () => {
     doesNotMatch(result.output, /Database synced/);
   });
 
-  it('reports a discard migration sweeping block data, no force involved', () => {
-    const dir = makeApp('blocks');
+  it('reports a discard migration sweeping block data, no force involved', async () => {
+    const { dir, url } = await makeApp('blocks');
     mkdirSync(join(dir, 'collections'), { recursive: true });
     mkdirSync(join(dir, 'blocks'), { recursive: true });
     writeFileSync(
@@ -120,14 +136,15 @@ describe('ohne sync', () => {
     );
     strictEqual(sync(dir).status, 0);
 
-    const db = new DatabaseSync(join(dir, '.data', 'ohne.db'));
-    db.prepare('INSERT INTO "Pages" ("UUID", "_updatedAt") VALUES (?, ?)').run('p1', 0);
-    db.prepare('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)').run('h1', 'Hi');
-    db.prepare(
+    const db = await dialect.connect(url);
+    await db.run('INSERT INTO "Pages" ("UUID", "_updatedAt") VALUES (?, ?)', ['p1', 0]);
+    await db.run('INSERT INTO "block_Hero" ("UUID", "title") VALUES (?, ?)', ['h1', 'Hi']);
+    await db.run(
       'INSERT INTO "Pages_content" ("UUID", "_parentUUID", "_parentPosition", "_blockType", "_blockUUID") ' +
         'VALUES (?, ?, ?, ?, ?)',
-    ).run('w1', 'p1', 0, 'Hero', 'h1');
-    db.close();
+      ['w1', 'p1', 0, 'Hero', 'h1'],
+    );
+    await db.close();
 
     writeFileSync(
       join(dir, 'collections', 'Pages.ts'),
@@ -147,26 +164,24 @@ describe('ohne sync', () => {
     match(discarded.output, /1 row of block_Hero deleted, no longer referenced/);
     doesNotMatch(discarded.output, /under force/);
 
-    const after = new DatabaseSync(join(dir, '.data', 'ohne.db'));
-    const tables = after
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'block%'")
-      .all();
-    after.close();
-    deepStrictEqual(tables, []);
+    deepStrictEqual(
+      (await tablesOf(url)).filter((name) => name.startsWith('block')),
+      [],
+    );
   });
 
-  it('refuses a destructive change, then performs it under --force', () => {
-    const dir = makeApp('destructive');
+  it('refuses a destructive change, then performs it under --force', async () => {
+    const { dir, url } = await makeApp('destructive');
     writeNotes(dir);
     strictEqual(sync(dir).status, 0);
 
-    const db = new DatabaseSync(join(dir, '.data', 'ohne.db'));
-    db.prepare('INSERT INTO "Notes" ("UUID", "_updatedAt", "body") VALUES (?, ?, ?)').run(
+    const db = await dialect.connect(url);
+    await db.run('INSERT INTO "Notes" ("UUID", "_updatedAt", "body") VALUES (?, ?, ?)', [
       'n1',
       0,
       'kept',
-    );
-    db.close();
+    ]);
+    await db.close();
     rmSync(join(dir, 'collections', 'Notes.ts'));
 
     const refused = sync(dir);
@@ -181,16 +196,11 @@ describe('ohne sync', () => {
     match(forced.output, /table Notes \(1 row\)/);
     match(forced.output, /Database synced/);
 
-    const after = new DatabaseSync(join(dir, '.data', 'ohne.db'));
-    const tables = after
-      .prepare('SELECT name FROM sqlite_master WHERE type = ? AND name = ?')
-      .all('table', 'Notes');
-    after.close();
-    deepStrictEqual(tables, []);
+    strictEqual((await tablesOf(url)).includes('Notes'), false);
   });
 
-  it('boots like `serve api`, so a `schema:synced` hook sees the routes, roles, and messages', () => {
-    const dir = makeApp('registries');
+  it('boots like `serve api`, so a `schema:synced` hook sees the routes, roles, and messages', async () => {
+    const { dir } = await makeApp('registries');
     writeNotes(dir);
     for (const sub of ['api', 'boot', 'messages', 'roles']) mkdirSync(join(dir, sub));
     writeFileSync(
@@ -217,8 +227,8 @@ describe('ohne sync', () => {
     match(result.output, /seen \[\["GET \/hello"\],\["editor"\],\["en"\]\]/);
   });
 
-  it('runs the shutdown hooks a boot file registers, so an open timer cannot hold the process', () => {
-    const dir = makeApp('timer');
+  it('runs the shutdown hooks a boot file registers, so an open timer cannot hold the process', async () => {
+    const { dir } = await makeApp('timer');
     mkdirSync(join(dir, 'boot'));
     writeFileSync(
       join(dir, 'boot', 'timer.ts'),

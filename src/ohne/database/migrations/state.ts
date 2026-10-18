@@ -29,12 +29,13 @@ export interface MigrationStamp {
  * Ensures the `ohne_migrations` table exists, tolerating a concurrent create.
  */
 export async function ensureMigrationsTable(db: Transaction, dialect: Dialect): Promise<void> {
-  await db.exec(
-    `CREATE TABLE IF NOT EXISTS ${dialect.quote(OHNE_MIGRATIONS)} (` +
-      `${dialect.quote('name')} ${dialect.columnType('text')} PRIMARY KEY, ` +
+  await dialect.ensureTable(
+    db,
+    OHNE_MIGRATIONS,
+    `${dialect.quote('name')} ${dialect.columnType('text')} PRIMARY KEY, ` +
       `${dialect.quote('status')} ${dialect.columnType('text')} NOT NULL, ` +
       `${dialect.quote('reason')} ${dialect.columnType('text')}, ` +
-      `${dialect.quote('stampedAt')} ${dialect.columnType('integer')} NOT NULL)`,
+      `${dialect.quote('stampedAt')} ${dialect.columnType('integer')} NOT NULL`,
   );
 }
 

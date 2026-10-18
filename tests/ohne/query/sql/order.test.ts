@@ -4,7 +4,6 @@ import { describe, it } from 'node:test';
 import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -15,6 +14,7 @@ import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { compileOrder } from '../../../../src/ohne/query/sql/order.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useLayers().add({
   path: '/order-read',
@@ -57,8 +57,7 @@ useCollections().register('OLocEvents', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {
@@ -129,8 +128,10 @@ describe('ordering by a composite sort key', () => {
   it('compiles a correlated subquery against the qualified main table', () => {
     const meta = queryMetadata('OLocEvents');
     const ir = { order: [{ field: 'span', direction: 'asc' }] } as never;
+    const key =
+      '(SELECT "_o0"."start" FROM "OLocEvents_span" "_o0" WHERE "_o0"."_parentUUID" = "OLocEvents"."UUID" AND "_o0"."_localeCode" = ?)';
     deepStrictEqual(compileOrder(ir, meta, dialect, 'de'), {
-      sql: '(SELECT "_o0"."start" FROM "OLocEvents_span" "_o0" WHERE "_o0"."_parentUUID" = "OLocEvents"."UUID" AND "_o0"."_localeCode" = ?) ASC, "UUID" ASC',
+      sql: `${dialect.sortTerm(key, 'asc', true)}, ${dialect.sortTerm('"UUID"', 'asc', false)}`,
       params: ['de'],
     });
   });

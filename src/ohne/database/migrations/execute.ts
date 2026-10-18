@@ -1,7 +1,7 @@
 import type { SQLParams, SQLValue, Transaction } from '../adapter.ts';
 import type { Dialect, LogicalType } from '../dialect.ts';
 import type { SchemaClassification, TableClaim } from '../schema/snapshot.ts';
-import type { ColumnSchema, TableSchema } from '../schema/table-schema.ts';
+import type { ColumnSchema, ForeignKeySchema, TableSchema } from '../schema/table-schema.ts';
 import type {
   ColumnAddress,
   MigrationContext,
@@ -23,6 +23,7 @@ import {
   chunk,
   deepEqual,
   errorMessage,
+  groupBy,
   isEmpty,
   isNull,
   isUndefined,
@@ -628,7 +629,7 @@ async function fillChildless(
       dialect.serialize(column.type, out),
     ]);
   }
-  await deleteOwnedRows(engine, parentSchema, doomed);
+  await deleteOwnedRows(engine, meta, parentSchema, doomed);
 }
 
 /**
@@ -1381,7 +1382,7 @@ async function runFanInDerived(
       });
     }
   }
-  await deleteOwnedRows(engine, schema, doomed);
+  await deleteOwnedRows(engine, meta, schema, doomed);
   const fresh = await describe(engine, lowered.table);
   const dropped = fresh.columns.find((item) => item.name === '_localeCode');
   if (!isUndefined(dropped)) await dropColumn(engine, fresh, dropped);
@@ -1393,7 +1394,6 @@ async function runFanInDerived(
  * A `nullable` or unique switch runs it over every row; a fill, under `onlyNull`, over the `NULL` cells.
  * The structural change stays with the diff, whose guard probes then pass over the massaged data.
  * `deleteRecord()` resolves a duplicate by dropping its row through the owned-row cascade.
- * Junction and record references aimed at a deleted row surface on the next sync's orphan probe.
  * Without a transform nothing runs.
  */
 async function runValuePass(
@@ -1436,24 +1436,55 @@ async function runValuePass(
     const key = schema.primaryKey.map((name) => row[name] ?? null);
     await db.run(update, [dialect.serialize(columnDef.type, out), ...key]);
   }
-  await deleteOwnedRows(engine, schema, doomed);
+  await deleteOwnedRows(engine, meta, schema, doomed);
 }
 
 /**
- * Deletes the given rows of one owned table, everything hanging off them following.
+ * A live foreign key, with the schema of the table that holds it.
+ */
+interface InboundKey {
+  schema: TableSchema;
+  key: ForeignKeySchema;
+}
+
+/**
+ * Deletes the given rows of one owned table, everything hanging off them or pointing at them following.
+ * The live foreign keys are read once, since no structure changes while the rows go.
+ */
+async function deleteOwnedRows(
+  engine: Engine,
+  meta: MigrationMeta,
+  schema: TableSchema,
+  doomed: readonly Record<string, SQLValue>[],
+): Promise<void> {
+  if (isEmpty(doomed)) return;
+  const keys: InboundKey[] = [];
+  for (const name of engine.names) {
+    const holder = await describe(engine, name);
+    keys.push(...holder.foreignKeys.map((key) => ({ schema: holder, key })));
+  }
+  const inbound = groupBy(keys, ({ key }) => key.targetTable);
+  await deleteRows(engine, meta, schema, doomed, inbound);
+}
+
+/**
+ * Deletes the given rows of one table, everything hanging off them following.
  *
  * The sync bracket runs with foreign keys off, so nothing cascades on its own.
  * A blocks wrapper first sweeps the instances only its doomed rows reference, reported like any purge.
  * Child tables, junctions, wrappers, and companions keyed to the deleted rows die next, recursively.
  * Rows of a per-type block table pull the wrapper rows referencing them along too.
  * The link is polymorphic, so no key would ever cascade it.
+ * Every other reference follows its key's `onDelete`, as `followReferences` applies it.
  * A junction row deletes by its link pair, plus `_localeCode` when the table carries it.
  * Every other table deletes by its primary key.
  */
-async function deleteOwnedRows(
+async function deleteRows(
   engine: Engine,
+  meta: MigrationMeta,
   schema: TableSchema,
   doomed: readonly Record<string, SQLValue>[],
+  inbound: Partial<Record<string, InboundKey[]>>,
 ): Promise<void> {
   if (isEmpty(doomed)) return;
   const { db, dialect } = engine;
@@ -1520,7 +1551,59 @@ async function deleteOwnedRows(
     engine.deletions.push(
       `- \`${orphaned.length}\` ${pluralize(orphaned.length, 'row')} of \`${name}\` deleted, following ${orphaned.length === 1 ? 'its deleted parent' : 'their deleted parents'}`,
     );
-    await deleteOwnedRows(engine, childSchema, orphaned);
+    await deleteRows(engine, meta, childSchema, orphaned, inbound);
+  }
+  await followReferences(engine, meta, schema.name, parents, inbound);
+}
+
+/**
+ * Applies each foreign key aimed at the deleted `parents` of `table` as its `onDelete` declares.
+ * A cascade deletes the referencing rows, reported like any purge, and `setNull` clears the column.
+ * Any other action refuses while a reference remains, rolling the sync back.
+ */
+async function followReferences(
+  engine: Engine,
+  meta: MigrationMeta,
+  table: string,
+  parents: readonly SQLValue[],
+  inbound: Partial<Record<string, InboundKey[]>>,
+): Promise<void> {
+  const { db, dialect } = engine;
+  for (const { schema, key } of inbound[table] ?? []) {
+    const holder = dialect.quote(schema.name);
+    const column = dialect.quote(key.column);
+    const referencing: Record<string, SQLValue>[] = [];
+    for (const batch of chunk(parents, 500)) {
+      const marks = batch.map(() => '?').join(', ');
+      referencing.push(
+        ...(await db.query<Record<string, SQLValue>>(
+          `SELECT * FROM ${holder} WHERE ${column} IN (${marks})`,
+          batch,
+        )),
+      );
+    }
+    if (isEmpty(referencing)) continue;
+    const count = `\`${referencing.length}\` ${pluralize(referencing.length, 'row')} of \`${schema.name}\``;
+    if (key.onDelete === 'cascade') {
+      engine.deletions.push(`- ${count} deleted, referencing deleted \`${table}\` rows`);
+      await deleteRows(engine, meta, schema, referencing, inbound);
+    } else if (key.onDelete === 'setNull') {
+      for (const batch of chunk(parents, 500)) {
+        const marks = batch.map(() => '?').join(', ');
+        await db.run(`UPDATE ${holder} SET ${column} = NULL WHERE ${column} IN (${marks})`, batch);
+      }
+    } else {
+      throw ohneError({
+        title: `Migration \`${meta.name}\` deletes rows \`${schema.name}\` still references`,
+        body: [
+          `${count} ${referencing.length === 1 ? 'points' : 'point'} at deleted \`${table}\` rows.`,
+          `Their \`${key.column}\` key's \`onDelete\` refuses the delete.`,
+          '',
+          'Point those references elsewhere in an earlier migration, or keep the rows.',
+        ],
+        path: meta.file,
+      });
+    }
   }
 }
 

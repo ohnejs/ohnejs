@@ -7,6 +7,7 @@ import { after, before, describe, it } from 'node:test';
 import { ohne } from '../../../../src/ohne/cli/ohne.ts';
 import { useEnv, useShutdown } from '../../../../src/ohne/index.ts';
 import { runCommand } from '../../../../src/utils/cli/index.ts';
+import { memoryURL } from '../../../_dialect.ts';
 
 describe('ohne serve api', () => {
   let root: string;
@@ -21,12 +22,14 @@ describe('ohne serve api', () => {
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ohne-serve-'));
     useEnv().set('SILENT', true);
+    useEnv().set('DATABASE', memoryURL);
     process.exitCode = 0;
   });
 
   after(() => {
     rmSync(root, { recursive: true, force: true });
     useEnv().unset('SILENT');
+    useEnv().unset('DATABASE');
     process.exitCode = 0;
   });
 

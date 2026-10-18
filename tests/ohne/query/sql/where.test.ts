@@ -1,12 +1,12 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import type { ListMembershipOperator } from '../../../../src/ohne/database/dialect.ts';
 import type { FieldInstance } from '../../../../src/ohne/fields/field.ts';
 import type { FieldTypeName } from '../../../../src/ohne/fields/known-fields.ts';
 
 import { useBlocks } from '../../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { defineField } from '../../../../src/ohne/fields/define-field.ts';
@@ -16,10 +16,9 @@ import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { compileWhere } from '../../../../src/ohne/query/sql/where.ts';
 import { parseCondition } from '../../../../src/utils/index.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
-const FOLDED =
-  `(CASE WHEN length("title") = octet_length("title") THEN "title" ELSE ohne_fold("title") END) ` +
-  `LIKE ? ESCAPE '\\'`;
+const FOLDED = dialect.textMatch('"title"');
 
 useLayers().add({
   path: '/where-compile',
@@ -147,7 +146,6 @@ useCollections().register('WJPosts', {
   },
 });
 
-const dialect = new SQLiteDialect();
 const meta = queryMetadata('WPosts');
 
 function compile(condition: Record<string, unknown>): { sql: string; params: unknown[] } {
@@ -163,6 +161,19 @@ function compileOn(
   const parsed = parseCondition(condition);
   if (!parsed.ok) throw new Error(`parse failed: ${parsed.error.code}`);
   return compileWhere(parsed.node, queryMetadata(collection), dialect, 'en');
+}
+
+/**
+ * The fragment the compiler builds around the dialect's own list probe on `"labels"`.
+ */
+function membership(
+  op: ListMembershipOperator,
+  values: unknown[],
+  negated = false,
+): { sql: string; params: unknown[] } {
+  const match = dialect.listMembership('"labels"', op, values);
+  const probe = negated ? `NOT (${match.sql})` : match.sql;
+  return { sql: `("labels" IS NOT NULL AND ${probe})`, params: match.params };
 }
 
 function compileTranslatable(
@@ -221,7 +232,7 @@ describe('compileWhere', () => {
 
   it('`like` binds its pattern raw, without escaping', () => {
     deepStrictEqual(compile({ title: { like: '%oh_' } }), {
-      sql: '"title" LIKE ?',
+      sql: dialect.like('"title"', false),
       params: ['%oh_'],
     });
   });
@@ -775,32 +786,32 @@ describe('compileWhere blocks', () => {
 });
 
 describe('compileWhere list membership', () => {
-  it('`includes` guards the column non-null and probes json_each', () => {
-    deepStrictEqual(compileOn('WJPosts', { labels: { includes: 'a' } }), {
-      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?)))',
-      params: ['a'],
-    });
+  it('`includes` guards the column non-null around the dialect probe', () => {
+    deepStrictEqual(
+      compileOn('WJPosts', { labels: { includes: 'a' } }),
+      membership('includes', ['a']),
+    );
   });
 
-  it('a boolean element probes as `1`', () => {
-    deepStrictEqual(compileOn('WJPosts', { labels: { includes: true } }), {
-      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?)))',
-      params: [1],
-    });
+  it('a boolean element reaches the dialect probe as is', () => {
+    deepStrictEqual(
+      compileOn('WJPosts', { labels: { includes: true } }),
+      membership('includes', [true]),
+    );
   });
 
-  it('`includesAll` counts distinct matches against the list length', () => {
-    deepStrictEqual(compileOn('WJPosts', { labels: { includesAll: ['a', 'b'] } }), {
-      sql: '("labels" IS NOT NULL AND (SELECT COUNT(DISTINCT json_each.value) FROM json_each("labels") WHERE json_each.value IN (?, ?)) = 2)',
-      params: ['a', 'b'],
-    });
+  it('`includesAll` probes every listed value', () => {
+    deepStrictEqual(
+      compileOn('WJPosts', { labels: { includesAll: ['a', 'b'] } }),
+      membership('includesAll', ['a', 'b']),
+    );
   });
 
   it('`includesAll` dedups, binding a duplicate once', () => {
-    deepStrictEqual(compileOn('WJPosts', { labels: { includesAll: ['a', 'a'] } }), {
-      sql: '("labels" IS NOT NULL AND (SELECT COUNT(DISTINCT json_each.value) FROM json_each("labels") WHERE json_each.value IN (?)) = 1)',
-      params: ['a'],
-    });
+    deepStrictEqual(
+      compileOn('WJPosts', { labels: { includesAll: ['a', 'a'] } }),
+      membership('includesAll', ['a']),
+    );
   });
 
   it('an empty `includesAll` is vacuously true inside the guard', () => {
@@ -810,11 +821,11 @@ describe('compileWhere list membership', () => {
     });
   });
 
-  it('`includesAny` exist-checks a placeholder per value', () => {
-    deepStrictEqual(compileOn('WJPosts', { labels: { includesAny: ['a', 'b'] } }), {
-      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?, ?)))',
-      params: ['a', 'b'],
-    });
+  it('`includesAny` probes every listed value', () => {
+    deepStrictEqual(
+      compileOn('WJPosts', { labels: { includesAny: ['a', 'b'] } }),
+      membership('includesAny', ['a', 'b']),
+    );
   });
 
   it('an empty `includesAny` matches nothing inside the guard', () => {
@@ -825,14 +836,14 @@ describe('compileWhere list membership', () => {
   });
 
   it('negation wraps the probe, the null guard staying outside', () => {
-    deepStrictEqual(compileOn('WJPosts', { labels: { not: { includes: 'a' } } }), {
-      sql: '("labels" IS NOT NULL AND NOT (EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?))))',
-      params: ['a'],
-    });
+    deepStrictEqual(
+      compileOn('WJPosts', { labels: { not: { includes: 'a' } } }),
+      membership('includes', ['a'], true),
+    );
   });
 });
 
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 await syncDatabase(db, dialect, {
   desired: buildDesiredSchema(useCollections(), useFields() as never, useBlocks()),
 });
@@ -905,49 +916,34 @@ await db.run(
   ['s1', 'w3', 0, 'Intro'],
 );
 
-async function postRows(
-  condition: Record<string, unknown>,
-  plan = false,
-): Promise<{ titles: string[]; plan: string }> {
+/**
+ * Runs `condition` against `WPosts` and returns the matching titles in order.
+ */
+async function postTitles(condition: Record<string, unknown>): Promise<string[]> {
   const parsed = parseCondition(condition);
   if (!parsed.ok) throw new Error(`parse failed: ${parsed.error.code}`);
   const fragment = compileWhere(parsed.node, meta, dialect, 'en');
-  const sql = `SELECT "title" FROM "WPosts" WHERE ${fragment.sql} ORDER BY "title"`;
-  const rows = await db.query<{ title: string }>(sql, fragment.params);
-  const steps = plan
-    ? await db.query<{ detail: string }>(`EXPLAIN QUERY PLAN ${sql}`, fragment.params)
-    : [];
-  return {
-    titles: rows.map((row) => row.title),
-    plan: steps.map((step) => step.detail).join('\n'),
-  };
+  const rows = await db.query<{ title: string }>(
+    `SELECT "title" FROM "WPosts" WHERE ${fragment.sql} ORDER BY "title"`,
+    fragment.params,
+  );
+  return rows.map((row) => row.title);
 }
 
 describe('compileWhere records membership behavior', () => {
   it('`includes` and `includesAny` match the linking rows, negation the rest', async () => {
-    deepStrictEqual((await postRows({ tags: { includes: 't2' } })).titles, ['One', 'Two']);
-    deepStrictEqual((await postRows({ tags: { includesAny: ['t1', 't3'] } })).titles, ['One']);
-    deepStrictEqual((await postRows({ tags: { not: { includes: 't1' } } })).titles, [
-      'Three',
-      'Two',
-    ]);
+    deepStrictEqual(await postTitles({ tags: { includes: 't2' } }), ['One', 'Two']);
+    deepStrictEqual(await postTitles({ tags: { includesAny: ['t1', 't3'] } }), ['One']);
+    deepStrictEqual(await postTitles({ tags: { not: { includes: 't1' } } }), ['Three', 'Two']);
   });
 
   it('an identity-only has finds the same rows as its correlated twin', async () => {
-    const identity = await postRows({ tags: { has: { UUID: 't2' } } });
-    const correlated = await postRows({ tags: { has: { UUID: 't2', label: { contains: 'e' } } } });
-    deepStrictEqual(identity.titles, ['One', 'Two']);
-    deepStrictEqual(correlated.titles, identity.titles);
-    deepStrictEqual((await postRows({ sections: { has: { UUID: 's1' } } })).titles, ['Three']);
-  });
-
-  it('a reverse lookup searches the parent table by key instead of scanning it', async () => {
-    for (const condition of [{ tags: { includes: 't2' } }, { tags: { has: { UUID: 't2' } } }]) {
-      const { plan } = await postRows(condition, true);
-      ok(/SEARCH WPosts USING/.test(plan), plan);
-      ok(!/SCAN WPosts\b/.test(plan), plan);
-    }
-    const { plan } = await postRows({ tags: { has: { label: 'green' } } }, true);
-    ok(/SCAN WPosts\b/.test(plan), plan);
+    const identity = await postTitles({ tags: { has: { UUID: 't2' } } });
+    const correlated = await postTitles({
+      tags: { has: { UUID: 't2', label: { contains: 'e' } } },
+    });
+    deepStrictEqual(identity, ['One', 'Two']);
+    deepStrictEqual(correlated, identity);
+    deepStrictEqual(await postTitles({ sections: { has: { UUID: 's1' } } }), ['Three']);
   });
 });

@@ -2,7 +2,6 @@ import { deepStrictEqual, ok, rejects, strictEqual, throws } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -14,6 +13,7 @@ import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
 import { runDelete } from '../../../../src/ohne/query/write/delete.ts';
 import { isReferenceViolation } from '../../../../src/ohne/query/write/errors.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 import { linksField } from './_links-field.ts';
 
 useCollections().register('DAuthor', {
@@ -42,8 +42,7 @@ useCollections().register('DLinked', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {
@@ -183,6 +182,14 @@ describe('runDelete hooks', () => {
     strictEqual(result.deleted, 1);
     strictEqual(await countWhere('DPost', 'UUID', post), 0);
   });
+
+  it('refuses a condition binding past the driver parameter cap, with or without a subscriber', async () => {
+    const uuids = Array.from({ length: dialect.maxParameters + 1 }, (_, index) => `u${index}`);
+    const refusal = { message: 'Query exceeds the driver parameter cap' };
+    await rejects(runDelete('DTag', uuidIn(uuids)), refusal);
+    hook('record:before-delete', () => {});
+    await rejects(runDelete('DTag', uuidIn(uuids)), refusal);
+  });
 });
 
 /**
@@ -190,4 +197,11 @@ describe('runDelete hooks', () => {
  */
 function uuidIs(uuid: string) {
   return { kind: 'compare', path: ['UUID'], op: 'equalsTo', value: uuid, negated: false } as const;
+}
+
+/**
+ * The condition matching the records whose `UUID` is one of `uuids`.
+ */
+function uuidIn(uuids: string[]) {
+  return { kind: 'compare', path: ['UUID'], op: 'in', value: uuids, negated: false } as const;
 }

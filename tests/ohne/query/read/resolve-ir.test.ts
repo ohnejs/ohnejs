@@ -4,7 +4,6 @@ import { afterEach, describe, it } from 'node:test';
 import type { ConditionNode } from '../../../../src/utils/index.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -14,6 +13,7 @@ import { hook } from '../../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { isNull } from '../../../../src/utils/index.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 useCollections().register('RPosts', {
   name: 'RPosts',
@@ -26,8 +26,7 @@ useCollections().register('RPosts', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

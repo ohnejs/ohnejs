@@ -1,4 +1,5 @@
 import type { RateLimitRate } from '../../utils/index.ts';
+import type { OrderDirection } from '../query/ir.ts';
 import type { DatabaseAdapter, SQLValue, Transaction } from './adapter.ts';
 import type { DialectName } from './known-dialects.ts';
 import type { TableDiff, TableSchema } from './schema/table-schema.ts';
@@ -115,7 +116,7 @@ const RATE_LIMIT_COLUMNS = ['limit', 'window', 'at', 'debt', 'wait'];
  *
  * Register an instance under a name with `useDialects`; `database.dialect` selects it.
  * The base lock methods implement a portable cluster lock over an `ohne_locks` table, renewed while held.
- * A dialect with a native lock, like Postgres advisory locks, overrides each of them.
+ * A dialect with a native lock overrides each of them.
  * The base rate-limit methods count hits in an `ohne_rate_limits` table, one atomic upsert per hit.
  */
 export abstract class Dialect {
@@ -129,6 +130,18 @@ export abstract class Dialect {
    * The wire's `maxBoundParams` guard clamps to this, so an untrusted query never reaches the wall.
    */
   abstract readonly maxParameters: number;
+
+  /**
+   * Whether this dialect can open `url`.
+   * `connect` asks it to pick a dialect when none is configured, and to refuse a URL that does not fit.
+   *
+   * @example
+   * ```ts
+   * dialect.accepts(':memory:')            // -> true on SQLite
+   * dialect.accepts('postgres://host/app') // -> false on SQLite
+   * ```
+   */
+  abstract accepts(url: string): boolean;
 
   /**
    * Opens a connection to `url` and returns a tuned adapter.
@@ -188,19 +201,28 @@ export abstract class Dialect {
    * The caller binds a pattern whose literal parts went through `escapeLike`.
    * Backslash is the escape character.
    * Backs `contains`/`startsWith`/`endsWith` - ignoring case and accents is their cross-dialect contract.
-   * `fold` matches the column as `foldCase` folds it, and the caller binds the pattern folded the same way.
-   * Without `fold`, the match is the dialect's plain `LIKE`.
+   * It matches the column as `foldCase` folds it, and the caller binds the pattern folded the same way.
    *
    * @example
    * ```ts
-   * dialect.textMatch('"title"', false)
-   * // -> `"title" LIKE ? ESCAPE '\'` on SQLite
-   *
-   * dialect.textMatch('"title"', true)
+   * dialect.textMatch('"title"')
    * // -> `(CASE ... ELSE ohne_fold("title") END) LIKE ? ESCAPE '\'` on SQLite
    * ```
    */
-  abstract textMatch(quotedColumn: string, fold: boolean): string;
+  abstract textMatch(quotedColumn: string): string;
+
+  /**
+   * The dialect's plain `LIKE` over an already-quoted column, holding exactly one `?` placeholder.
+   * `%` and `_` are wildcards, ASCII letters match either case, and nothing else folds.
+   * With `escaped`, backslash is the escape character; without it there is none.
+   *
+   * @example
+   * ```ts
+   * dialect.like('"title"', false) // -> `"title" LIKE ?` on SQLite
+   * dialect.like('"title"', true)  // -> `"title" LIKE ? ESCAPE '\'` on SQLite
+   * ```
+   */
+  abstract like(quotedColumn: string, escaped: boolean): string;
 
   /**
    * The dialect's list-membership match over an already-quoted `json` list column.
@@ -221,6 +243,32 @@ export abstract class Dialect {
     op: ListMembershipOperator,
     values: readonly unknown[],
   ): DialectFragment;
+
+  /**
+   * The row-window tail of a `SELECT`, empty with no parameters when both `limit` and `offset` are `null`.
+   *
+   * @example
+   * ```ts
+   * dialect.paginate(10, null)
+   * // -> { sql: 'LIMIT ?', params: [10] }
+   *
+   * dialect.paginate(null, 20)
+   * // -> { sql: 'LIMIT ? OFFSET ?', params: [-1, 20] } on SQLite
+   * ```
+   */
+  abstract paginate(limit: number | null, offset: number | null): DialectFragment;
+
+  /**
+   * One `ORDER BY` term over `expression`, placing NULLs first ascending and last descending.
+   * A term that is never `NULL` may drop the placement, so an index in the default order serves it.
+   *
+   * @example
+   * ```ts
+   * dialect.sortTerm('"title"', 'asc', true)  // -> '"title" ASC' on SQLite
+   * dialect.sortTerm('"title"', 'desc', true) // -> '"title" DESC' on SQLite
+   * ```
+   */
+  abstract sortTerm(expression: string, direction: OrderDirection, nullable: boolean): string;
 
   /**
    * Lists every table in the database, framework and app alike.
@@ -341,6 +389,20 @@ export abstract class Dialect {
   abstract isBusy(error: unknown): boolean;
 
   /**
+   * Creates `table` with the column list `columns` unless it exists, tolerating a concurrent create.
+   * The create runs as one `exec`.
+   * It may run inside a transaction, so tolerating the race must not abort it.
+   *
+   * @example
+   * ```ts
+   * await dialect.ensureTable(db, 'ohne_notes', '"key" TEXT PRIMARY KEY, "note" TEXT')
+   * ```
+   */
+  async ensureTable(db: Transaction, table: string, columns: string): Promise<void> {
+    await db.exec(`CREATE TABLE IF NOT EXISTS ${this.quote(table)} (${columns})`);
+  }
+
+  /**
    * Races for the cluster lock `key` by inserting a nonce row into `ohne_locks`.
    * Ensures the table first, then inserts with `ON CONFLICT DO NOTHING`.
    * The winner's insert changes one row and yields a handle; a contender that changed nothing gets `null`.
@@ -437,11 +499,12 @@ export abstract class Dialect {
    */
   protected async ensureLockTable(db: DatabaseAdapter): Promise<void> {
     if (lockTables.has(db)) return;
-    await db.exec(
-      `CREATE TABLE IF NOT EXISTS ${this.quote(OHNE_LOCKS)} (` +
-        `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
+    await this.ensureTable(
+      db,
+      OHNE_LOCKS,
+      `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
         `${this.quote('nonce')} ${this.columnType('text')} NOT NULL, ` +
-        `${this.quote('acquiredAt')} ${this.columnType('integer')} NOT NULL)`,
+        `${this.quote('acquiredAt')} ${this.columnType('integer')} NOT NULL`,
     );
     lockTables.add(db);
   }
@@ -615,11 +678,11 @@ export abstract class Dialect {
   protected async ensureRateLimitTable(db: DatabaseAdapter): Promise<void> {
     if (rateLimitTables.has(db)) return;
     const integer = this.columnType('integer');
-    await db.exec(
-      `CREATE TABLE IF NOT EXISTS ${this.quote(OHNE_RATE_LIMITS)} (` +
-        `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
-        RATE_LIMIT_COLUMNS.map((column) => `${this.quote(column)} ${integer} NOT NULL`).join(', ') +
-        ')',
+    await this.ensureTable(
+      db,
+      OHNE_RATE_LIMITS,
+      `${this.quote('key')} ${this.columnType('text')} PRIMARY KEY, ` +
+        RATE_LIMIT_COLUMNS.map((column) => `${this.quote(column)} ${integer} NOT NULL`).join(', '),
     );
     rateLimitTables.add(db);
   }

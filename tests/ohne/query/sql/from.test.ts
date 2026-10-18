@@ -4,11 +4,11 @@ import { describe, it } from 'node:test';
 import type { ConditionNode } from '../../../../src/utils/index.ts';
 
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { compileFrom } from '../../../../src/ohne/query/sql/from.ts';
 import { parseCondition } from '../../../../src/utils/index.ts';
+import { dialect } from '../../../_dialect.ts';
 
 useCollections().register('FRUsers', {
   name: 'FRUsers',
@@ -35,7 +35,6 @@ useCollections().register('FRPlain', {
   collection: { fields: { name: field('text') } },
 });
 
-const dialect = new SQLiteDialect();
 const posts = queryMetadata('FRPosts');
 
 const MAIN = { sql: 'FROM "FRPosts"', params: [] };

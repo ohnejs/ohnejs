@@ -1,4 +1,4 @@
-import { isUndefined, parseMediaType } from '../../utils/index.ts';
+import { isString, isUndefined, parseMediaType } from '../../utils/index.ts';
 import { badRequest, unsupportedMediaType } from './http-error.ts';
 import { readRawBody } from './read-raw-body.ts';
 import { translate } from './translate.ts';
@@ -8,6 +8,7 @@ import { useRequest } from './use-request.ts';
  * Reads a form request body into `FormData`.
  * Accepts `multipart/form-data` and `application/x-www-form-urlencoded`.
  * Any other `Content-Type` rejects with `415`, a malformed body with `400`.
+ * A U+0000 (NUL) in a field name, a text value, or a file name rejects with `400`; file content may hold one.
  * An absent body yields empty `FormData`.
  * Valid only within a request.
  *
@@ -30,9 +31,15 @@ export async function readFormBody(): Promise<FormData> {
   const bytes = await readRawBody();
   if (isUndefined(bytes)) return new FormData();
 
+  let form: FormData;
   try {
-    return await new Response(bytes, { headers: { 'content-type': contentType } }).formData();
+    form = await new Response(bytes, { headers: { 'content-type': contentType } }).formData();
   } catch {
     throw badRequest(translate('api.body.invalidForm'));
   }
+  for (const [name, value] of form) {
+    if (name.includes('\0') || (isString(value) ? value : value.name).includes('\0'))
+      throw badRequest(translate('api.body.containsNUL'));
+  }
+  return form;
 }

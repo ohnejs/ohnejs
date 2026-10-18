@@ -18,7 +18,7 @@ import { usePrinter } from '../printer/use-printer.ts';
 import { isBusyError } from '../query/write/busy.ts';
 import { isReferenceViolation, isValidationError } from '../query/write/errors.ts';
 import { enforceRateLimit } from './enforce-rate-limit.ts';
-import { conflict, HTTPError, payloadTooLarge, unprocessable } from './http-error.ts';
+import { badRequest, conflict, HTTPError, payloadTooLarge, unprocessable } from './http-error.ts';
 import { routeRateLimiter } from './route-limits.ts';
 import { routeMiddleware } from './route-middleware.ts';
 import { toResponse } from './to-response.ts';
@@ -134,6 +134,7 @@ export interface DispatchOptions {
  * Runs a matched route to a response.
  *
  * Builds the request `Event` and binds it via `runWithEvent`.
+ * A path or query that decodes to a U+0000 (NUL) is refused with `400` before any middleware runs.
  * Runs the global middleware, then the route's selected named middleware.
  * The `middleware:resolve` hook may filter or reorder that combined list first.
  * Records each on `event.appliedMiddleware` as it runs, then runs the handler.
@@ -192,6 +193,7 @@ export async function dispatch(
 
   const run = runWithEvent(event, async () => {
     try {
+      if (encodesNUL(url)) throw badRequest(translate('api.url.containsNUL'));
       const registry = useMiddleware();
       const selected = routeMiddleware(route.handler, registry.namedKeys());
       const base = [...registry.globalKeys(), ...selected];
@@ -306,6 +308,14 @@ function exceedsBodySize(request: Request, max: number | undefined): boolean {
   if (isNull(request.body) || isUndefined(max)) return false;
   const length = coerceToNumber(request.headers.get('content-length'));
   return isNumber(length) && length > max;
+}
+
+/**
+ * Whether the path or query decodes to a U+0000 (NUL), which some database engines cannot store.
+ * A `URL` percent-encodes a raw NUL, so `%00` is its only spelling.
+ */
+function encodesNUL(url: URL): boolean {
+  return url.pathname.includes('%00') || url.search.includes('%00');
 }
 
 /**
