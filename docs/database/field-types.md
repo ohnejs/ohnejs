@@ -216,6 +216,55 @@ An instant, stored as epoch milliseconds. A write takes that number only, so con
 | `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
 | `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
+### `duration`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/duration-dark.png">
+  <img alt="The duration field in the dashboard" src="../images/field-types/duration-light.png">
+</picture>
+
+A length of time, stored as whole milliseconds. In the dashboard you type it as text like `1h 30m`
+or `90m`, and read it in your own language. The units are `ms`, `s`, `m` (minutes), `h`, `d`, `w`,
+`mo` (30 days) and `y` (365 days), so mind `m` against `mo`.
+
+Writes, reads, and `where` carry the plain number of milliseconds. `min` and `max` also take text, and
+a `default` takes the number, which `parseDuration` from `ohnejs/utils` gives you:
+
+```ts
+// collections/Spells.ts
+import { defineCollection, field } from 'ohnejs';
+import { parseDuration } from 'ohnejs/utils';
+
+export default defineCollection({
+  fields: {
+    name: field('text'),
+    cooldown: field('duration', { max: '1h', default: parseDuration('30m') }),
+  },
+});
+```
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`             | -       | The longest duration, as milliseconds or text like `'2h'`.                                                                                                              |
+| `min`             | `0`     | The shortest duration, as milliseconds or text like `'5m'`. Its default keeps every duration at 0 or more.                                                              |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) find the exact duration, like `90m`.                                                                                      |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
 ### `email`
 
 <picture>
