@@ -53,6 +53,7 @@ export default defineConfig({
 
 `Uploads` holds one row per file and per folder:
 
+- `kind` - `file` or `folder`.
 - `directory` - the parent path, with no leading slash and `''` at the root. A write that would
   make any path longer than 768 characters is a `422`.
 - `name` - the file or folder name. The `directory` and `name` pair is unique, as on a filesystem,
@@ -77,7 +78,8 @@ Every read is decorated with extra fields:
   image service is configured.
 - `expires` says when a [private file's](./private-files.md) `url` and `variants` stop working.
 
-A folder is decorated with `path` only:
+A folder is decorated with `path` only. A read that narrows its `select` keeps `kind`, or a folder
+gets a `url` too:
 
 ```ts
 const upload = await query('Uploads').where('UUID', uuid).findFirst();

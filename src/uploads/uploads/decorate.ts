@@ -12,6 +12,7 @@ import { uploadURL } from './url.ts';
  * Without the secret it is the bare route, which only a signed-in reader can open, and `variants` is absent.
  * A file whose `select` left out `private` is decorated as private, since it may be one.
  * A folder gets `path` alone: it has no bytes to serve.
+ * A record whose `select` left out `kind` is decorated as a file.
  * A record whose `select` dropped `directory` or `name` is left untouched.
  *
  * @example
