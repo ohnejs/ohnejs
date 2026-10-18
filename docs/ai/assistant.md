@@ -35,6 +35,7 @@ Set `ANTHROPIC_API_KEY` in your [environment](../project/env.md), and the
 models: {
   claude: { provider: 'anthropic', model: 'claude-opus-5-5', key: 'ANTHROPIC_API_KEY' },
   gpt: { provider: 'openai', model: 'gpt-5', key: 'OPENAI_API_KEY' },
+  gemini: { provider: 'gemini', model: 'gemini-3.8-flash', key: 'GEMINI_API_KEY' },
   local: {
     provider: 'openai-compatible',
     model: 'qwen3',
@@ -44,7 +45,7 @@ models: {
 },
 ```
 
-- `provider` is the wire protocol. `anthropic` and `openai` talk to those APIs;
+- `provider` is the wire protocol. `anthropic`, `openai` and `gemini` talk to those APIs;
   `openai-compatible` talks to any server that speaks Chat Completions, such as Ollama, vLLM,
   OpenRouter, Groq or Mistral, at its `baseURL`.
 - `key` names the environment variable that holds the API key. The key never leaves the server.

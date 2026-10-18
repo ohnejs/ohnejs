@@ -249,8 +249,8 @@ describe('createOpenAIProvider', () => {
     transcript.push(
       ...(done?.items ?? []),
       ...provider.transcript.results([
-        { id: 'call_1', content: '{"status":200}' },
-        { id: 'call_2', content: 'Refused', error: true },
+        { id: 'call_1', name: 'request', content: '{"status":200}' },
+        { id: 'call_2', name: 'request', content: 'Refused', error: true },
       ]),
     );
     await run({ ...request, transcript });

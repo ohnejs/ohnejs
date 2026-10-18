@@ -355,9 +355,10 @@ declare module 'ohnejs' {
  * - `anthropic`: the Anthropic Messages API.
  * - `openai`: the OpenAI Responses API.
  * - `openai-compatible`: a Chat Completions API, as most model servers speak it.
+ * - `gemini`: the Gemini API's `generateContent`.
  * - `jev`: a classifier that answers a flow's `decide` nodes and nothing else.
  */
-export type AIProvider = 'anthropic' | 'openai' | 'openai-compatible' | 'jev';
+export type AIProvider = 'anthropic' | 'openai' | 'openai-compatible' | 'gemini' | 'jev';
 
 /**
  * A `models` entry's name, as `ai.model`, `ai.decide` and a flow node take it.
@@ -368,7 +369,7 @@ export type AIModelKey = LiteralUnion<Extract<keyof KnownAIModels, string>>;
 /**
  * One model the assistant may run on, shaped by its `provider`.
  */
-export type AIModel = AnthropicModel | OpenAIModel | OpenAICompatibleModel | JevModel;
+export type AIModel = AnthropicModel | OpenAIModel | OpenAICompatibleModel | GeminiModel | JevModel;
 
 /**
  * A model served by the Anthropic Messages API.
@@ -425,6 +426,28 @@ export interface OpenAICompatibleModel extends AIModelBase {
    * ```
    */
   model: string;
+}
+
+/**
+ * A model served by the Gemini API.
+ */
+export interface GeminiModel extends AIModelBase {
+  /**
+   * The provider API the model is served by.
+   */
+  provider: 'gemini';
+
+  /**
+   * The model id as the API takes it; the current Gemini models are suggested.
+   *
+   * @example
+   * ```ts
+   * 'gemini-3.8-flash'
+   * ```
+   */
+  model: LiteralUnion<
+    'gemini-4-argon' | 'gemini-3.8-flash' | 'gemini-3.6-flash' | 'gemini-3.5-flash-lite'
+  >;
 }
 
 /**
@@ -832,7 +855,7 @@ function validateModels({ models, model, decide, transform }: ResolvedAIConfig):
         body: [
           'A `jev` model answers flow decisions only, through `ai.decide`.',
           '',
-          `Name an \`anthropic\`, \`openai\` or \`openai-compatible\` model in \`ai.${key}\`.`,
+          `Name a model of another provider in \`ai.${key}\`.`,
         ],
       });
     }

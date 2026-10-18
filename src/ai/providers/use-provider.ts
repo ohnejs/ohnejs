@@ -9,6 +9,7 @@ import type { Provider, ProviderOptions } from './provider.ts';
 
 import { useAIConfig } from '../config.ts';
 import { createAnthropicProvider } from './anthropic.ts';
+import { createGeminiProvider } from './gemini.ts';
 import { createOpenAICompatibleProvider } from './openai-compatible.ts';
 import { createOpenAIProvider } from './openai.ts';
 
@@ -62,6 +63,7 @@ const FACTORIES: Record<Exclude<AIProvider, 'jev'>, (options: ProviderOptions) =
   anthropic: createAnthropicProvider,
   openai: createOpenAIProvider,
   'openai-compatible': createOpenAICompatibleProvider,
+  gemini: createGeminiProvider,
 };
 
 // A request asks for the same entry many times, and an `ai:credentials` hook may cost a lookup each time.

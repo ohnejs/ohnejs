@@ -261,7 +261,9 @@ describe('createOpenAICompatibleProvider', () => {
     const [first] = (await run({ ...request, transcript })).filter(isDone);
     transcript.push(
       ...(first?.items ?? []),
-      ...provider.transcript.results([{ id: 'call_1', content: '{"status":200}', error: true }]),
+      ...provider.transcript.results([
+        { id: 'call_1', name: 'request', content: '{"status":200}', error: true },
+      ]),
     );
     await run({ ...request, transcript });
     deepStrictEqual(transcript, [

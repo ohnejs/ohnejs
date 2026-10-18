@@ -143,6 +143,11 @@ export interface ToolResult {
   id: string;
 
   /**
+   * The name of the tool the call named, which a provider may echo beside `id`.
+   */
+  name: string;
+
+  /**
    * The answer's text.
    */
   content: string;

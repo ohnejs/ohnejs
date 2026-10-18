@@ -415,8 +415,8 @@ describe('createAnthropicProvider', () => {
     transcript.push(
       ...(done?.items ?? []),
       ...provider.transcript.results([
-        { id: 'toolu_1', content: '{"status":200}' },
-        { id: 'toolu_2', content: 'Refused', error: true },
+        { id: 'toolu_1', name: 'request', content: '{"status":200}' },
+        { id: 'toolu_2', name: 'request', content: 'Refused', error: true },
       ]),
     );
     await run({ ...request, transcript });

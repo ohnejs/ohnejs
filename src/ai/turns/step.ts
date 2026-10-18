@@ -310,10 +310,13 @@ export function followUpTranscript(turn: Turn, provider: Provider): TranscriptIt
 /**
  * The transcript items answering `calls` as closed, none for no calls.
  */
-function closedCalls(calls: readonly { id: string }[], provider: Provider): TranscriptItem[] {
+function closedCalls(
+  calls: readonly { id: string; name: string }[],
+  provider: Provider,
+): TranscriptItem[] {
   if (isEmpty(calls)) return [];
   return provider.transcript.results(
-    calls.map((call) => ({ id: call.id, content: CLOSED_CALL, error: true })),
+    calls.map((call) => ({ id: call.id, name: call.name, content: CLOSED_CALL, error: true })),
   );
 }
 
@@ -456,5 +459,5 @@ function errorCall(call: ToolCall, reason: Record<string, unknown>): BatchCall {
  */
 function toolResult(call: BatchCall): ToolResult {
   const content = call.content ?? JSON.stringify(call.receipts ?? []);
-  return { id: call.id, content, ...(call.error ? { error: true } : {}) };
+  return { id: call.id, name: call.name, content, ...(call.error ? { error: true } : {}) };
 }

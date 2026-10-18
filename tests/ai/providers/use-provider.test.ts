@@ -88,6 +88,28 @@ describe('useProvider', () => {
     strictEqual(server.requests.at(-1)?.body.max_tokens, 32000);
   });
 
+  it('calls a `gemini` entry through the Gemini API', async () => {
+    withModels({ gem: { provider: 'gemini', model: 'gemini-test', key: KEY } });
+    useEnv().set(KEY as never, 'g-key' as never);
+    server.answer({
+      body: sse([
+        {
+          data: {
+            candidates: [
+              { content: { role: 'model', parts: [{ text: 'Hi' }] }, finishReason: 'STOP' },
+            ],
+          },
+        },
+      ]),
+    });
+    const request = { system: [], tools: [], transcript: [] };
+    const provider = await useProvider('gem', user);
+    await Array.fromAsync(provider.step(request, new AbortController().signal));
+    const seen = server.requests.at(-1);
+    strictEqual(seen?.path, '/v1beta/models/gemini-test:streamGenerateContent?alt=sse');
+    strictEqual(seen?.headers['x-goog-api-key'], 'g-key');
+  });
+
   it('refuses a model whose key is unset or empty', async () => {
     withModels({ gpt: { provider: 'openai-compatible', model: 'gpt-test', key: KEY } });
     for (const value of [undefined, '']) {

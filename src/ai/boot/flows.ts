@@ -28,7 +28,7 @@ function assertFlows(): void {
           body: [
             'A `jev` model answers decide nodes only; an act node runs the assistant.',
             '',
-            'Name an `anthropic`, `openai` or `openai-compatible` model, or drop `model`.',
+            'Name a model of another provider, or drop `model`.',
           ],
         });
       }
