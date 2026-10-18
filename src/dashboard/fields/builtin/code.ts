@@ -2,9 +2,8 @@ import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { ValidationFailure } from '../../../utils/validate/validation-failure.ts';
 import type { CodeFieldOptions } from '../known-field-types.ts';
 
-import { last } from '../../../utils/array/last.ts';
 import { parseFieldPath } from '../../../utils/condition/field-path.ts';
-import { conditionResolver } from '../../../utils/condition/resolve-condition.ts';
+import { scopedValue } from '../../../utils/condition/scoped-value.ts';
 import { languageOf } from '../../../utils/highlight/tokenize.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
@@ -84,9 +83,8 @@ export const codeType: FieldType<CodeFieldOptions> = {
       },
     };
     const named = (): string => {
-      const scopes = ancestors?.() ?? [];
-      if (isUndefined(from) || scopes.length === 0) return '';
-      const value = conditionResolver(last(scopes)!, scopes.slice(0, -1))(from);
+      if (isUndefined(from)) return '';
+      const value = scopedValue(ancestors?.() ?? [], from);
       return isString(value) ? value : '';
     };
     const element = codeEditor(model, {
