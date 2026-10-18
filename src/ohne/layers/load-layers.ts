@@ -4,6 +4,7 @@ import { merge } from '../../utils/index.ts';
 import { resolveLayerStack, type ResolvedLayer } from '../project/resolve-layer-stack.ts';
 import { DEFAULTS } from './config.ts';
 import { useLayers } from './use-layers.ts';
+import { validateConfigKeys } from './validate-config-keys.ts';
 
 /**
  * Resolves the layer stack and registers it into `useLayers`, replacing any prior stack.
@@ -33,6 +34,7 @@ export async function loadLayers(
   options: LayerLoadOptions = {},
 ): Promise<ResolvedLayer[]> {
   const stack = await resolveLayerStack(from, options);
+  validateConfigKeys(stack);
   const layers = useLayers();
   if (stack.length > 0) layers.clear();
   stack.forEach((layer, i) => {
