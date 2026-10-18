@@ -117,7 +117,8 @@ export interface ValidateFieldArgs {
  * - A `blocks` hint requires `columnType: false` too; its `allow` must not be empty or repeat a name.
  * - The unique flags and `index` need a column, so a column-less field takes none.
  * - A junction field with no links is empty, never `NULL`, so it takes no `nullable` either.
- * - A child field takes no `nullable`: an absent one-row already reads as `null`, a list is never `NULL`.
+ * - A list child field takes no `nullable`: a list is never `NULL`.
+ * - A one-row child field is required unless `nullable`, like a column.
  * - A blocks field takes no `nullable` on the same terms: with no blocks it is empty, never `NULL`.
  * - A force-nullable type locks `nullable` on, so a field of it takes no `nullable` at all.
  * - A force-index type locks its index on the same terms: the field takes no `index`.
