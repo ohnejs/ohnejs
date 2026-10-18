@@ -1,15 +1,11 @@
-import { isArray } from '../is/is-array.ts';
-import { isBoolean } from '../is/is-boolean.ts';
-import { isNull } from '../is/is-null.ts';
-import { isNumber } from '../is/is-number.ts';
-import { isPlainObject } from '../is/is-plain-object.ts';
-import { isRealNumber } from '../is/is-real-number.ts';
-import { isString } from '../is/is-string.ts';
+import { jsonChildren } from './_json-children.ts';
+import { isJSONScalar } from './is-json-scalar.ts';
 
 /**
  * Checks whether a value is plain JSON data, exactly as `JSON.stringify` would keep it.
  * Accepts `null`, strings, booleans, finite numbers, and arrays and plain objects of the same.
  * Anything JSON would drop or distort - a function, a `Date`, `NaN`, a class instance - fails.
+ * So does an array with holes or extra keys, and an object with symbol keys.
  *
  * @example
  * ```ts
@@ -17,12 +13,10 @@ import { isString } from '../is/is-string.ts';
  * isJSONValue([1, () => 2])                 // -> false
  * isJSONValue(new Date())                   // -> false
  * isJSONValue(NaN)                          // -> false
+ * isJSONValue([, 1])                        // -> false
+ * isJSONValue({ a: undefined })             // -> false
  * ```
  */
 export function isJSONValue(value: unknown): boolean {
-  if (isNull(value) || isString(value) || isBoolean(value)) return true;
-  if (isNumber(value)) return isRealNumber(value);
-  if (isArray(value)) return value.every(isJSONValue);
-  if (isPlainObject(value)) return Object.values(value).every(isJSONValue);
-  return false;
+  return isJSONScalar(value) || (jsonChildren(value)?.every(isJSONValue) ?? false);
 }

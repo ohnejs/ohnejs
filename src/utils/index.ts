@@ -161,6 +161,7 @@ export * from './is/is-symbol.ts';
 export * from './is/is-timezone.ts';
 export * from './is/is-undefined.ts';
 export * from './json/compose-codecs.ts';
+export * from './json/is-json-scalar.ts';
 export * from './json/is-json-value.ts';
 export * from './json/json-clone.ts';
 export * from './json/json-depth-within.ts';

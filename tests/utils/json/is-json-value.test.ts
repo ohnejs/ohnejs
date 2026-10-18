@@ -45,4 +45,20 @@ describe('isJSONValue', () => {
     strictEqual(isJSONValue({ deep: { n: NaN } }), false);
     strictEqual(isJSONValue([[undefined]]), false);
   });
+
+  it('returns false for an array JSON would fill or trim', () => {
+    strictEqual(isJSONValue(Object.assign([], { 1: 1 })), false);
+    strictEqual(isJSONValue(Object.assign([1], { extra: 2 })), false);
+    strictEqual(isJSONValue(Object.assign([1], { [Symbol('x')]: 2 })), false);
+  });
+
+  it('returns false for an object with keys JSON would drop', () => {
+    strictEqual(isJSONValue({ a: undefined }), false);
+    strictEqual(isJSONValue({ a: 1, [Symbol('x')]: 2 }), false);
+    strictEqual(isJSONValue(Object.defineProperty({ a: 1 }, 'hidden', { value: 2 })), false);
+  });
+
+  it('returns true for a null-prototype object', () => {
+    strictEqual(isJSONValue(Object.assign(Object.create(null), { a: [1] })), true);
+  });
 });
