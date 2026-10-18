@@ -31,4 +31,8 @@ describe('formatNumberIn', () => {
       Intl.DateTimeFormat = Native;
     }
   });
+
+  it('formats a decimal string exactly', () => {
+    strictEqual(formatNumberIn('90071992547409.91', 'en'), '90,071,992,547,409.91');
+  });
 });
