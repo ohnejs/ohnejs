@@ -256,27 +256,30 @@ so normalize it first with `normalizeEmail` from `ohnejs/utils`.
 
 A whole number within JavaScript's safe range. For money, store minor units like cents.
 
-| Option            | Default | What it does                                                                                                                                                            |
-| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
-| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
-| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
-| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
-| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
-| `max`             | -       | The largest value.                                                                                                                                                      |
-| `min`             | -       | The smallest value.                                                                                                                                                     |
-| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
-| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
-| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
-| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
-| `search`          | `false` | `true` lets [search](./collections.md#search) find the exact number, like `1042`.                                                                                       |
-| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
-| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
-| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
-| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
-| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
-| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
-| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+| Option            | Default   | What it does                                                                                                                                                                                       |
+| ----------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -         | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                                                  |
+| `description`     | -         | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed.                            |
+| `display`         | `'input'` | The editor: `'input'`, or `'slider'` for an input beside a range track. A slider needs `min` and `max`. The stored value is the same either way.                                                   |
+| `immutable`       | `false`   | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                                              |
+| `index`           | `false`   | Adds an index on the column, for faster lookups.                                                                                                                                                   |
+| `label`           | -         | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                                                     |
+| `max`             | -         | The largest value.                                                                                                                                                                                 |
+| `min`             | -         | The smallest value.                                                                                                                                                                                |
+| `nullable`        | `false`   | Lets the field hold `null`.                                                                                                                                                                        |
+| `placeholder`     | -         | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                                                |
+| `readable`        | `true`    | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                                           |
+| `sanitizers`      | -         | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                                                   |
+| `search`          | `false`   | `true` lets [search](./collections.md#search) find the exact number, like `1042`.                                                                                                                  |
+| `step`            | -         | The grid every value must lie on: `min` plus a multiple of `step`, or a multiple of `step` without `min`. Checked on every write, so rows stored before you add it fail when they are saved again. |
+| `suffix`          | -         | A unit shown after the value, like `'kg'`, as a string or a [message key](../i18n/messages.md).                                                                                                    |
+| `translatable`    | `false`   | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                                                  |
+| `unique`          | `false`   | Rejects a value that another row already holds.                                                                                                                                                    |
+| `uniquePerLocale` | `false`   | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                                                  |
+| `uniquePerParent` | `false`   | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                                                      |
+| `validators`      | -         | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                                                    |
+| `when`            | -         | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                                                  |
+| `writable`        | `true`    | `false` removes the field from write inputs, so its value comes from `default`.                                                                                                                    |
 
 ### `json`
 
@@ -382,29 +385,33 @@ An ordered list of distinct strings, stored as a JSON list. Duplicates are remov
   <img alt="The number field in the dashboard" src="../images/field-types/number-light.png">
 </picture>
 
-A finite decimal, exactly like a JavaScript number. `NaN` and the infinities are rejected.
+A finite decimal, exactly like a JavaScript number. `NaN` and the infinities are rejected. A `step`
+is checked exactly in decimal, so `0.3` lies on a `0.1` grid while `0.1 + 0.2` does not.
 
-| Option            | Default | What it does                                                                                                                                                            |
-| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
-| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
-| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
-| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
-| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
-| `max`             | -       | The largest value.                                                                                                                                                      |
-| `min`             | -       | The smallest value.                                                                                                                                                     |
-| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
-| `placeholder`     | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
-| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
-| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
-| `search`          | `false` | `true` lets [search](./collections.md#search) find the exact number, like `1.5`.                                                                                        |
-| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
-| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
-| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
-| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
-| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
-| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
-| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+| Option            | Default   | What it does                                                                                                                                                                                       |
+| ----------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -         | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                                                  |
+| `description`     | -         | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed.                            |
+| `display`         | `'input'` | The editor: `'input'`, or `'slider'` for an input beside a range track. A slider needs `min`, `max` and `step`. The stored value is the same either way.                                           |
+| `immutable`       | `false`   | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                                              |
+| `index`           | `false`   | Adds an index on the column, for faster lookups.                                                                                                                                                   |
+| `label`           | -         | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                                                     |
+| `max`             | -         | The largest value.                                                                                                                                                                                 |
+| `min`             | -         | The smallest value.                                                                                                                                                                                |
+| `nullable`        | `false`   | Lets the field hold `null`.                                                                                                                                                                        |
+| `placeholder`     | -         | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                                                |
+| `readable`        | `true`    | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                                           |
+| `sanitizers`      | -         | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                                                   |
+| `search`          | `false`   | `true` lets [search](./collections.md#search) find the exact number, like `1.5`.                                                                                                                   |
+| `step`            | -         | The grid every value must lie on: `min` plus a multiple of `step`, or a multiple of `step` without `min`. Checked on every write, so rows stored before you add it fail when they are saved again. |
+| `suffix`          | -         | A unit shown after the value, like `'kg'`, as a string or a [message key](../i18n/messages.md).                                                                                                    |
+| `translatable`    | `false`   | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                                                  |
+| `unique`          | `false`   | Rejects a value that another row already holds.                                                                                                                                                    |
+| `uniquePerLocale` | `false`   | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                                                  |
+| `uniquePerParent` | `false`   | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                                                      |
+| `validators`      | -         | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                                                    |
+| `when`            | -         | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                                                  |
+| `writable`        | `true`    | `false` removes the field from write inputs, so its value comes from `default`.                                                                                                                    |
 
 ### `object`
 
