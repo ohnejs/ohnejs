@@ -1,5 +1,7 @@
 import { isUndefined } from '../is/is-undefined.ts';
 import { ref } from '../reactive/ref.ts';
+import { countryCodes } from './country-codes.ts';
+import { currencyCodes } from './currency-codes.ts';
 
 /**
  * A unit `formatRelativeTime` words a span in.
@@ -66,6 +68,11 @@ export interface IntlData {
    * The number separators.
    */
   number: { decimal: string; group: string };
+
+  /**
+   * The names of every country and currency code, where the engine has one.
+   */
+  names: { region: Record<string, string>; currency: Record<string, string> };
 }
 
 const PRESETS: Record<IntlPreset, Intl.DateTimeFormatOptions> = {
@@ -122,12 +129,33 @@ export function deriveIntlData(language: string): IntlData {
     presets: {} as Record<IntlPreset, string>,
     relative: {} as Record<IntlRelativeUnit, IntlRelativeWords>,
     number: separators(language),
+    names: {
+      region: codeNames(language, 'region', countryCodes),
+      currency: codeNames(language, 'currency', currencyCodes),
+    },
   };
   for (const key of Object.keys(PRESETS) as IntlPreset[]) {
     data.presets[key] = presetPattern(language, PRESETS[key], data);
   }
   for (const unit of UNITS) data.relative[unit] = relativeWords(language, unit);
   return data;
+}
+
+/**
+ * The names the engine gives `codes` in `language`, leaving out each code it cannot name.
+ */
+function codeNames(
+  language: string,
+  type: 'region' | 'currency',
+  codes: readonly string[],
+): Record<string, string> {
+  const names = new Intl.DisplayNames(language, { type, fallback: 'none' });
+  const named: Record<string, string> = {};
+  for (const code of codes) {
+    const name = names.of(code);
+    if (!isUndefined(name)) named[code] = name;
+  }
+  return named;
 }
 
 /**

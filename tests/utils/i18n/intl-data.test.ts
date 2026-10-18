@@ -85,4 +85,11 @@ describe('registerIntlData', () => {
     registerIntlData('xx', deriveIntlData('en'));
     deepStrictEqual(seen, [undefined, 'AM']);
   });
+
+  it('names every country and currency the engine names', () => {
+    const { names } = deriveIntlData('de');
+    strictEqual(names.region.DE, 'Deutschland');
+    strictEqual(names.currency.EUR, 'Euro');
+    strictEqual(names.region.UK, undefined);
+  });
 });

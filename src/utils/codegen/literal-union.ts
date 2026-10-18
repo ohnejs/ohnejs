@@ -13,6 +13,6 @@ import { literalString } from './literal-string.ts';
  * literalUnion([])         // -> 'never'
  * ```
  */
-export function literalUnion(members: string[]): string {
+export function literalUnion(members: readonly string[]): string {
   return members.length === 0 ? 'never' : members.map(literalString).join(' | ');
 }
