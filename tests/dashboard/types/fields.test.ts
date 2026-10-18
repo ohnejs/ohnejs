@@ -78,6 +78,17 @@ describe('field', () => {
     >(true);
   });
 
+  it('types a range by its kind, the end `null` when open', () => {
+    const sieges = {
+      window: field('range', { of: 'date' }),
+      raid: field('range', { of: 'dateTime', open: true, nullable: true }),
+    };
+    assertType<
+      FormValue<typeof sieges>,
+      { window: { start: string; end: string }; raid: { start: number; end: number | null } | null }
+    >(true);
+  });
+
   it('types a spec with the options as written', () => {
     assertType<
       typeof raid.faction,

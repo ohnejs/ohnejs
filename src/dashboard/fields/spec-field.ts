@@ -18,6 +18,7 @@ const KINDS: Readonly<Record<string, DashboardField['kind']>> = {
   record: 'record',
   records: 'records',
   object: 'childOne',
+  range: 'childOne',
   repeater: 'childMany',
 };
 

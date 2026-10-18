@@ -64,6 +64,7 @@ describe('browser field options', () => {
     assertDrift<'record'>(true);
     assertDrift<'records'>(true);
     assertDrift<'object'>(true);
+    assertDrift<'range'>(true);
     assertDrift<'repeater'>(true);
   });
 });

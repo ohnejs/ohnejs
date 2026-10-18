@@ -10,6 +10,7 @@ import type { Text } from '../runtime/text-type.ts';
 
 declare const choiceBrand: unique symbol;
 declare const itemBrand: unique symbol;
+declare const rangeBrand: unique symbol;
 
 /**
  * A placeholder value type: one of the `choices` the spec declares.
@@ -31,6 +32,17 @@ export interface ItemValue {
    * Brands the placeholder, so no real value matches it.
    */
   readonly [itemBrand]: true;
+}
+
+/**
+ * A placeholder value type: the `{ start, end }` of a range.
+ * `FieldValue` replaces it with ends of the spec's `of` kind, the end `| null` when the spec is `open`.
+ */
+export interface RangeValue {
+  /**
+   * Brands the placeholder, so no real value matches it.
+   */
+  readonly [rangeBrand]: true;
 }
 
 /**
@@ -556,9 +568,52 @@ export interface RepeaterFieldOptions extends ObjectFieldOptions {
 }
 
 /**
+ * The options of a `range` field.
+ */
+export interface RangeFieldOptions {
+  /**
+   * The kind of both ends: a `date` day, a `dateTime` instant, or a `time` of day.
+   */
+  of: 'date' | 'dateTime' | 'time';
+
+  /**
+   * The earliest legal start, in the form the `of` type takes for its own `min`.
+   */
+  min?: number | string;
+
+  /**
+   * The latest legal end, in the form the `of` type takes for its own `max`.
+   */
+  max?: number | string;
+
+  /**
+   * The shortest legal span from start to end, as milliseconds or text like `'1 day'`.
+   */
+  minSpan?: number | string;
+
+  /**
+   * The longest legal span from start to end, as milliseconds or text like `'2 weeks'`.
+   */
+  maxSpan?: number | string;
+
+  /**
+   * Whether the end may stay `null`, for a range that has begun but not ended.
+   *
+   * @default
+   * false
+   */
+  open?: boolean;
+
+  /**
+   * The IANA time zone a `dateTime` range is shown and edited in; omitted, the user's preference.
+   */
+  timezone?: string;
+}
+
+/**
  * Every field type the dashboard can render, by name: what `registerFieldType` registered.
  * Each entry pairs the type's own options with its value type.
- * `ChoiceValue` and `ItemValue` are placeholders `FieldValue` fills from a spec's options.
+ * `ChoiceValue`, `ItemValue` and `RangeValue` are placeholders `FieldValue` fills from a spec's options.
  * A layer or app adds its own beside the `registerFieldType` call, as a plain entry.
  *
  * @example
@@ -677,6 +732,11 @@ export interface KnownFieldTypes {
   object: { options: ObjectFieldOptions; value: ItemValue };
 
   /**
+   * A start and an end of one temporal kind.
+   */
+  range: { options: RangeFieldOptions; value: RangeValue };
+
+  /**
    * An ordered list of nested field groups.
    */
   repeater: { options: RepeaterFieldOptions; value: ItemValue[] };
@@ -749,9 +809,17 @@ type Substitute<V, O> = V extends ChoiceValue
     ? O extends { readonly fields: infer F extends FieldSpecs }
       ? FormValue<F>
       : never
-    : V extends readonly (infer E)[]
-      ? Substitute<E, O>[]
-      : V;
+    : V extends RangeValue
+      ? RangeOf<O>
+      : V extends readonly (infer E)[]
+        ? Substitute<E, O>[]
+        : V;
+
+type RangeOf<O> = O extends { readonly of: infer K }
+  ? (K extends 'dateTime' ? number : string) extends infer T
+    ? { start: T; end: O extends { readonly open: true } ? T | null : T }
+    : never
+  : never;
 
 type ChoiceOf<O> = O extends { readonly choices: readonly (infer C)[] }
   ? C extends { readonly value: infer V }

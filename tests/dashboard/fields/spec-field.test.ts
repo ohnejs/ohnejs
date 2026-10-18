@@ -92,6 +92,16 @@ describe('specField', () => {
     strictEqual(specField('bank', field('object', { fields: {} })).kind, 'childOne');
   });
 
+  it('describes a range as a one-child composite, required unless nullable', () => {
+    const window = specField('window', field('range', { of: 'date', minSpan: '1 day' }));
+    strictEqual(window.kind, 'childOne');
+    strictEqual(window.required, true);
+    deepStrictEqual(window.options, { of: 'date', minSpan: '1 day' });
+    const open = specField('open', field('range', { of: 'dateTime', nullable: true }));
+    strictEqual(open.required, false);
+    strictEqual(open.options?.default, null);
+  });
+
   it('splits an expandable description and fills its toggle labels', () => {
     const lore = specField('lore', field('text', { description: { text: 'The **long** tale' } }));
     deepStrictEqual(lore.expandable, {

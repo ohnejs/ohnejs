@@ -17,8 +17,8 @@ import { labelOf } from './labels.ts';
 /**
  * A child item's one-line digest values, in field order.
  * Scalar columns contribute their text, `record` links their resolved label.
- * A column type with a `summary` hook contributes what it answers.
- * A nested child's own values flatten in place.
+ * A column or one-child type with a `summary` hook contributes what it answers.
+ * Any other nested child's own values flatten in place.
  * Booleans, list kinds, and unresolved links contribute nothing.
  */
 export function summaryParts(
@@ -36,7 +36,10 @@ export function summaryParts(
       const label = linkLabel(field, value);
       if (label !== '') parts.push(label);
     } else if (field.kind === 'childOne' && isPlainObject<Record<string, unknown>>(value)) {
-      parts.push(...summaryParts(value, field.subfields ?? []));
+      const { summary } = fieldTypeFor(field);
+      const text = isUndefined(summary) ? undefined : summary(value, field);
+      if (isUndefined(text)) parts.push(...summaryParts(value, field.subfields ?? []));
+      else if (text !== '') parts.push(text);
     }
   }
   return parts;
@@ -93,7 +96,10 @@ function titleRows(
       if (resolved !== '') rows.push(`${label}: ${resolved}`);
     } else if (field.kind === 'childOne') {
       if (isPlainObject<Record<string, unknown>>(value)) {
-        rows.push(...titleRows(value, field.subfields ?? [], t, label));
+        const { summary } = fieldTypeFor(field);
+        const text = isUndefined(summary) ? undefined : summary(value, field);
+        if (isUndefined(text)) rows.push(...titleRows(value, field.subfields ?? [], t, label));
+        else if (text !== '') rows.push(`${label}: ${text}`);
       }
     } else if (isArray(value) && value.length > 0) {
       rows.push(`${label}: ${value.length} ×`);

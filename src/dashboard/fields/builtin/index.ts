@@ -12,6 +12,7 @@ import './link.ts';
 import './multi-select.ts';
 import './number.ts';
 import './object.ts';
+import './range.ts';
 import './record.ts';
 import './records.ts';
 import './repeater.ts';
