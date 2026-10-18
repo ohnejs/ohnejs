@@ -278,6 +278,40 @@ A whole number within JavaScript's safe range. For money, store minor units like
 | `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
 | `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
+### `json`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/json-dark.png">
+  <img alt="The json field in the dashboard" src="../images/field-types/json-light.png">
+</picture>
+
+Any plain JSON value, stored as JSON, for data whose shape stays open, like an imported payload. The
+dashboard edits it as highlighted JSON text. Its value has the type `unknown`; for a checked shape,
+write a [custom type](./custom-field-types.md#storage).
+
+A top-level `null` is the field's own `null`, so it needs `nullable`, while a nested `null` is plain
+data. A write rejects what JSON would drop or distort, like `NaN`, a `Date`, or a key set to
+`undefined`, so leave such a key out. Key order is not kept.
+
+| Option         | Default | What it does                                                                                                                                                            |
+| -------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`      | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`  | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`    | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`        | `false` | Adds an index on the column, for faster `null` lookups.                                                                                                                 |
+| `label`        | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `maxDepth`     | `32`    | How deeply arrays and objects may nest; a scalar is depth 0. An API request also caps its body at 32, so a field there nests at most 31.                                |
+| `nullable`     | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `placeholder`  | -       | The hint an empty input shows, as a string or a [message key](../i18n/messages.md).                                                                                     |
+| `readable`     | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`   | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`       | `false` | Locked: [search](./collections.md#search) never matches a JSON value, and `true` fails at boot.                                                                         |
+| `translatable` | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`       | `false` | Locked: one value can be stored with its keys in another order, so `true` fails at boot, as does a unique composite index over the field.                               |
+| `validators`   | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`         | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`     | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
 ### `link`
 
 <picture>
