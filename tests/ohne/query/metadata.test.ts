@@ -195,7 +195,7 @@ describe('queryMetadata', () => {
           kind: 'column',
           fieldType: integer,
           type: 'integer',
-          options: COMMON,
+          options: { ...COMMON, display: 'input' },
           nullable: false,
           logicalType: 'integer',
           column: 'views',

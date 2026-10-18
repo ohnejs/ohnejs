@@ -1,7 +1,7 @@
-import { checkRange, isInteger } from '../../../utils/index.ts';
+import { checkRange, checkStep, isInteger } from '../../../utils/index.ts';
 import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
-import { option } from '../option.ts';
+import { numericOptions, numericOptionsProblem } from '../numeric.ts';
 import { failureMessage } from '../validation-message.ts';
 
 /**
@@ -10,19 +10,12 @@ import { failureMessage } from '../validation-message.ts';
  */
 export const integer = defineField({
   columnType: 'integer',
-  options: {
-    /**
-     * The smallest legal value.
-     */
-    min: option<number>(),
-
-    /**
-     * The largest legal value.
-     */
-    max: option<number>(),
-  },
-  validateOptions: ({ options }) => boundsProblem(options),
-  validators: [(value, ctx) => failureMessage(checkRange(value, ctx.options))],
+  options: numericOptions,
+  validateOptions: ({ options }) =>
+    boundsProblem(options) ?? numericOptionsProblem(options, { whole: true }),
+  validators: [
+    (value, ctx) => failureMessage(checkRange(value, ctx.options) ?? checkStep(value, ctx.options)),
+  ],
   search: {
     default: false,
     match: ({ token }) =>
