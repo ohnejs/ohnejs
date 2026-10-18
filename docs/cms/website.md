@@ -101,26 +101,8 @@ When your website lives in its own repository, download the file from your API a
 Run `pnpm ohne:types` again after you change a collection or a block. Your dev API serves the
 same route, so `OHNE_API=http://localhost:9001` works too.
 
-In a monorepo, set `cms.types` and `ohne dev` keeps that file current as you edit collections and
-blocks. `ohne prepare` writes it too. Put it in your website, not in the cms app:
-
-```ts
-// ohne.config.ts
-import { defineConfig } from 'ohnejs';
-
-export default defineConfig({
-  layers: ['ohnejs/base', 'ohnejs/uploads', '@ohnejs/cms'],
-  cms: {
-    site: 'https://example.com',
-    routes: { Pages: '/[...slug]' },
-    types: '../web/ohne.ts',
-  },
-});
-```
-
-The path is relative to your project. `ohne serve` never writes it.
-
-In CI, `ohne prepare` or `ohne cms types` writes the same file.
+In a [monorepo](../project/monorepo.md#adding-the-cms), set `cms.types` and the CMS writes the file
+into your website as you edit.
 
 `/cms/types.ts` is public, like the pages it describes: it shows only what a visitor without a
 session can read. Each collection's read access is asked as that visitor, so a collection that

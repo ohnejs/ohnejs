@@ -27,6 +27,7 @@ project extend another.
 - [Hooks](./project/hooks.md) - run code at fixed points in the framework, or change what it
   produces.
 - [Layers](./project/layers.md) - stack projects as packages and override what they ship.
+- [Monorepo](./project/monorepo.md) - your ohne app and your Nuxt or Next website in one repository.
 
 ## Database
 
