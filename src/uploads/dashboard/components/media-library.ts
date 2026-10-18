@@ -264,7 +264,7 @@ export function mediaActionsRegistry(): MediaActions {
  * Shift ranges the selection from the checkbox, or from the tile itself once something is selected.
  * Escape clears, and Delete deletes.
  * Cmd/Ctrl+A selects the page, or clears the selection when the page is already selected.
- * A right-click opens the record's context menu: open, rename, move, details, delete.
+ * A right-click or a long-press opens the record's context menu: open, rename, move, details, delete.
  * A layer with private files adds make private or make public to it.
  * Empty folders say so once the read has answered.
  */
@@ -431,7 +431,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
     if (candidates.length === 0) return;
     event.preventDefault();
     if (candidates.every((record) => view.isSelected(record.UUID))) view.clearSelection();
-    else for (const record of candidates) view.select(record);
+    else view.selectAll();
   });
   hotkeys.listen('close', (event) => {
     if (view.selection.value.length === 0) return;
@@ -498,11 +498,11 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
                       disabled: options.disabled,
                       onPick: options.onPick,
                       actions,
-                      onContextMenu: isNull(menu)
+                      contextMenu: isNull(menu)
                         ? undefined
-                        : (target, event) => {
+                        : (target) => {
                             menuRecord = target;
-                            menu.onContextMenu(event);
+                            return menu;
                           },
                       rangeKey: () => shift,
                     }),

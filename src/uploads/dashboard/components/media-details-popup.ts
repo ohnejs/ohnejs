@@ -193,7 +193,7 @@ css`
 
   .o-media-details-focal-surface .o-media-details-image-frame {
     cursor: crosshair;
-    touch-action: none;
+    touch-action: manipulation;
     user-select: none;
   }
 
@@ -240,21 +240,24 @@ css`
 
   .o-media-details-url {
     --ohne-padding: 0.5rem;
-    position: relative;
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
     margin-top: 0.5em;
+    padding-right: calc(var(--ohne-padding) - 0.0625rem);
+    background-color: hsl(var(--ohne-card));
+    border-width: 1px;
+    border-radius: var(--ohne-radius);
   }
 
   .o-media-details-url-code {
     display: block;
-    width: 100%;
-    max-width: 100%;
+    flex: 1;
+    min-width: 0;
     padding: calc(var(--ohne-padding) - 0.0625rem) var(--ohne-padding);
     overflow-x: auto;
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--ohne-foreground) / 0.25) transparent;
-    background-color: hsl(var(--ohne-card));
-    border-width: 1px;
-    border-radius: var(--ohne-radius);
     outline: none;
     font-family: var(--ohne-font-mono);
     font-size: calc((1rem + var(--ohne-size) * 0.125rem) - 0.0625rem);
@@ -263,31 +266,15 @@ css`
 
   .o-media-details-url-actions {
     --ohne-background: var(--ohne-card);
-    position: absolute;
-    top: 0.5em;
-    right: 0.5em;
-    z-index: 1;
     display: flex;
+    flex-shrink: 0;
     gap: 0.25rem;
-    height: calc(100% - 1em);
-    background-color: hsl(var(--ohne-card));
-    box-shadow: -0.5rem 0 0.5rem hsl(var(--ohne-card));
   }
 
-  .o-media-details-url-actions > * {
-    min-width: 0;
-    max-height: 100%;
-    aspect-ratio: 1;
-  }
-
-  @media (hover: hover) {
-    .o-media-details-url-actions {
-      display: none;
+  @media (hover: hover) and (pointer: fine) {
+    .o-media-details-url:not(:hover, :focus-within) .o-media-details-url-actions {
+      visibility: hidden;
     }
-  }
-
-  .o-media-details-url:is(:hover, :focus-within) .o-media-details-url-actions {
-    display: flex;
   }
 
   .o-media-details-variant {
@@ -360,7 +347,7 @@ css`
     display: flex;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .o-media-details-variant-copy {
       display: none;
     }
@@ -410,7 +397,7 @@ export async function loadUpload(
  * An undo or redo of a change on a hidden tab switches to that tab.
  * Variants lists every named image variant with its tokens, byte size, rendered size, and a copy button.
  * That tab exists only while the record carries `variants`; on a private file it says when the links expire.
- * Pressing or dragging on an image preview places the focal point.
+ * Pressing or dragging on an image preview places the focal point; a touch places it only on a tap.
  * The point and the switch show in place and save with the description.
  * Cmd/Ctrl+S saves and closes; a `422` lands on the control and raises the tab's error bubble.
  * Closing is dirty-guarded through the leave prompt.
@@ -635,14 +622,23 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
         focal.value = focalPointAt(event.offsetX, event.offsetY, img.clientWidth, img.clientHeight);
       };
       props.onPointerdown = (event: PointerEvent) => {
-        if (event.button !== 0) return;
+        if (event.button !== 0 || event.pointerType === 'touch') return;
         img.setPointerCapture(event.pointerId);
         place(event);
       };
+      // Touch captures implicitly on pointerdown, so a capture alone does not mean a drag.
       props.onPointermove = (event: PointerEvent) => {
-        if (img.hasPointerCapture(event.pointerId)) place(event);
+        if (event.pointerType !== 'touch' && img.hasPointerCapture(event.pointerId)) place(event);
       };
-      props.onLostpointercapture = recordEdit;
+      props.onPointerup = (event: PointerEvent) => {
+        if (event.pointerType === 'touch') {
+          place(event);
+          recordEdit();
+        }
+      };
+      props.onLostpointercapture = (event: PointerEvent) => {
+        if (event.pointerType !== 'touch') recordEdit();
+      };
     }
     const img = h('img', props);
     const marker = when(hasFocal, () =>

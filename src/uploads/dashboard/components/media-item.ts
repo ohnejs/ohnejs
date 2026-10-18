@@ -1,4 +1,4 @@
-import { attachTooltip, button, checkbox, css, h, when } from 'ohnejs/dashboard';
+import { attachTooltip, button, checkbox, type ContextMenu, css, h, when } from 'ohnejs/dashboard';
 import { isEmpty, isNull, onCleanup, type Ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
@@ -83,9 +83,10 @@ export interface MediaItemOptions {
   actions?: MediaItemActions;
 
   /**
-   * Called with the tile's record on a right-click, the library's context menu seam.
+   * The library's context menu, aimed at the tile's record.
+   * The tile opens it on a right-click or a long-press.
    */
-  onContextMenu?(record: UploadRecord, event: MouseEvent): void;
+  contextMenu?(record: UploadRecord): ContextMenu;
 
   /**
    * Whether the range modifier is held, read when the checkbox toggles.
@@ -108,6 +109,7 @@ css`
 
   .o-media-item-box {
     position: relative;
+    -webkit-touch-callout: none;
   }
 
   .o-media-item-checkbox {
@@ -125,7 +127,7 @@ css`
     transition: var(--ohne-transition);
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .o-media-item-checkbox,
     .o-media-item-delete-button {
       opacity: 0;
@@ -161,7 +163,7 @@ css`
     text-decoration: none;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .o-media-item-rename-button {
       display: none;
     }
@@ -325,7 +327,9 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
           event.dataTransfer?.setDragImage(dragImage(), -16, 10);
         },
         onDragend: () => stopMoving(view),
-        onContextmenu: (event: MouseEvent) => options.onContextMenu?.(record(), event),
+        onContextmenu: (event: MouseEvent) => options.contextMenu?.(record()).onContextMenu(event),
+        onTouchstart: (event: TouchEvent) => options.contextMenu?.(record()).onTouchStart(event),
+        onTouchend: (event: TouchEvent) => options.contextMenu?.(record()).onTouchEnd(event),
       },
       tile,
       when(() => selectable && !disabled().value, checkboxEl),

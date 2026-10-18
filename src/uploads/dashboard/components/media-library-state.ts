@@ -194,6 +194,11 @@ export interface MediaView {
   deselect(record: UploadRecord, range?: boolean): void;
 
   /**
+   * Adds every selectable record on the page to the selection, in visual order.
+   */
+  selectAll(): void;
+
+  /**
    * Empties the selection.
    */
   clearSelection(): void;
@@ -370,6 +375,9 @@ export function createMediaView(options: MediaViewOptions = {}): MediaView {
     },
     select,
     deselect,
+    selectAll: () => {
+      for (const record of uploads.value.filter(selectable)) select(record);
+    },
     clearSelection: () => write([]),
     isSelected,
   };

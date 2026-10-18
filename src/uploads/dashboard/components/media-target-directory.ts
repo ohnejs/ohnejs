@@ -50,7 +50,7 @@ css`
     justify-content: flex-start;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .o-media-target-directory-subdirectory-button {
       display: none;
     }

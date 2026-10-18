@@ -49,9 +49,14 @@ css`
     color: hsl(var(--ohne-muted-foreground));
   }
 
-  .o-media-breadcrumb:not(.o-media-breadcrumb-active):hover,
   .o-media-breadcrumb:not(.o-media-breadcrumb-active):focus {
     color: hsl(var(--ohne-foreground));
+  }
+
+  @media (hover: hover) {
+    .o-media-breadcrumb:not(.o-media-breadcrumb-active):hover {
+      color: hsl(var(--ohne-foreground));
+    }
   }
 
   .o-media-breadcrumb::before {

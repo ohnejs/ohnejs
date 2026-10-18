@@ -133,6 +133,15 @@ describe('media view selection', () => {
     strictEqual(view.origin.value, null);
   });
 
+  it('selects the rest of the page in visual order, keeping earlier picks first', () => {
+    const view = createMediaView({ selectable: (record) => record.kind === 'file' });
+    view.uploads.value = [photos, sunset, dusk, notes];
+    view.select(dusk);
+    view.selectAll();
+    deepStrictEqual(uuids(view.selection.value), [dusk.UUID, sunset.UUID, notes.UUID]);
+    strictEqual(view.origin.value, notes);
+  });
+
   it('clears the selection and the origin', () => {
     const view = createMediaView();
     view.uploads.value = [photos, sunset];

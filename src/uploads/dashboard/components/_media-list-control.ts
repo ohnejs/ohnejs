@@ -130,7 +130,7 @@ css`
     display: none;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .o-media-chips-field-image .ohne-dynamic-chips-remove {
       display: none;
     }
@@ -147,10 +147,16 @@ css`
     display: flex;
   }
 
-  .o-media-chips-field-image .ohne-dynamic-chips-remove:hover,
   .o-media-chips-field-image .ohne-dynamic-chips-remove:focus {
     background-color: hsl(var(--ohne-destructive));
     color: hsl(var(--ohne-destructive-foreground));
+  }
+
+  @media (hover: hover) {
+    .o-media-chips-field-image .ohne-dynamic-chips-remove:hover {
+      background-color: hsl(var(--ohne-destructive));
+      color: hsl(var(--ohne-destructive-foreground));
+    }
   }
 
   .o-media-chips-field-image .ohne-dynamic-chips-input {
@@ -167,9 +173,6 @@ css`
     border-radius: calc(var(--ohne-radius) - 0.25rem);
   }
 
-  .o-media-chips-field-image .ohne-dynamic-chips-item:hover .o-media-image-dimensions,
-  .o-media-chips-field-image .ohne-dynamic-chips-item:hover .o-media-image-size,
-  .o-media-chips-field-image .ohne-dynamic-chips-item:hover .o-media-file-size,
   .o-media-chips-field-image .ohne-dynamic-chips-item:focus .o-media-image-dimensions,
   .o-media-chips-field-image .ohne-dynamic-chips-item:focus .o-media-image-size,
   .o-media-chips-field-image .ohne-dynamic-chips-item:focus .o-media-file-size,
@@ -177,6 +180,14 @@ css`
   .o-media-chips-field-image .ohne-dynamic-chips-dragging .o-media-image-size,
   .o-media-chips-field-image .ohne-dynamic-chips-dragging .o-media-file-size {
     display: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .o-media-chips-field-image .ohne-dynamic-chips-item:hover .o-media-image-dimensions,
+    .o-media-chips-field-image .ohne-dynamic-chips-item:hover .o-media-image-size,
+    .o-media-chips-field-image .ohne-dynamic-chips-item:hover .o-media-file-size {
+      display: none;
+    }
   }
 
   .o-media-chips-field-image .ohne-dynamic-chips-dropdown-item {
@@ -209,7 +220,8 @@ css`
  * An orderable chips field over `Uploads`: image chips show their tile, file chips their name.
  * The dropdown searches file names across every folder, newest first, within the constraints it can express.
  * A leading library button opens the picker in multiple mode; upload permission adds an Upload button.
- * A double-click on a chip opens the file's details; a modified one opens the media page in a new tab.
+ * A double-click or double tap on a chip opens the file's details.
+ * A modified double-click opens the media page in a new tab instead.
  * A file deleted from the details popup leaves the list.
  * Server messages keyed by index mark their chips destructive.
  */

@@ -130,7 +130,8 @@ css`
 /**
  * The footer row: pagination on the left, the action cluster on the right.
  * The cluster holds the selection actions while something is selected, then search, filter, and sorting.
- * The selection actions are delete, clear, move, make private, and make public.
+ * The selection actions are delete, clear, select all, move, make private, and make public.
+ * Select all shows while a record on the page is left out.
  * Make private shows while a public item is selected, make public while a private one is.
  * On the page it ends with New folder, upload from URL, and Upload; in a multiple picker with Apply.
  * The create buttons stay hidden in a folder whose own row the scope hides.
@@ -219,6 +220,16 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
 
   const clearButton = (): HTMLElement =>
     clearSelectionButton(selectionCount, () => view.clearSelection());
+
+  const selectAllButton = (): HTMLElement =>
+    iconButton(
+      'select-all',
+      () => t('dashboard.selectAll'),
+      () => view.selectAll(),
+    );
+
+  const selectsAll = (): boolean =>
+    view.uploads.value.every((record) => view.isSelected(record.UUID));
 
   const moveButton = (): HTMLElement =>
     iconButton(
@@ -456,6 +467,7 @@ export function mediaFooter(options: MediaFooterOptions): HTMLElement {
       { class: 'ohne-row ohne-ml-auto' },
       when(() => hasSelection() && canDelete, deleteButton),
       when(hasSelection, clearButton),
+      when(() => hasSelection() && !selectsAll(), selectAllButton),
       when(() => hasSelection() && canMove && !isUndefined(options.onMove), moveButton),
       when(
         () => hasSelection() && canSetPrivate && selects(false),

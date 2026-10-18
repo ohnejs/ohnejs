@@ -89,9 +89,14 @@ css`
     transition: var(--ohne-transition);
   }
 
-  .o-upload-notification:hover .o-upload-notification-button,
   .o-upload-notification:focus .o-upload-notification-button {
     background-color: hsl(var(--ohne-foreground) / 0.06);
+  }
+
+  @media (hover: hover) {
+    .o-upload-notification:hover .o-upload-notification-button {
+      background-color: hsl(var(--ohne-foreground) / 0.06);
+    }
   }
 
   .o-upload-notification-status {
@@ -179,7 +184,7 @@ css`
     pointer-events: none;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .o-upload-notification-action-hide {
       opacity: 0;
     }
@@ -192,18 +197,28 @@ css`
     opacity: 1;
   }
 
-  .o-upload-notification-action-button:hover,
   .o-upload-notification-action-button:focus-visible {
     background-color: hsl(var(--ohne-destructive));
     color: hsl(var(--ohne-destructive-foreground));
   }
 
-  .o-upload-notification-action-retry:hover,
   .o-upload-notification-action-retry:focus-visible,
-  .o-upload-notification-action-resume:hover,
   .o-upload-notification-action-resume:focus-visible {
     background-color: hsl(var(--ohne-foreground));
     color: hsl(var(--ohne-background));
+  }
+
+  @media (hover: hover) {
+    .o-upload-notification-action-button:hover {
+      background-color: hsl(var(--ohne-destructive));
+      color: hsl(var(--ohne-destructive-foreground));
+    }
+
+    .o-upload-notification-action-retry:hover,
+    .o-upload-notification-action-resume:hover {
+      background-color: hsl(var(--ohne-foreground));
+      color: hsl(var(--ohne-background));
+    }
   }
 
   .o-upload-notification-input {

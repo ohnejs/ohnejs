@@ -100,13 +100,23 @@ css`
 
   .o-media-field-description svg {
     flex-shrink: 0;
-    display: none;
     font-size: 0.875rem;
   }
 
-  button.o-media-field-description:hover,
+  @media (hover: hover) and (pointer: fine) {
+    button.o-media-field-description svg {
+      display: none;
+    }
+  }
+
   button.o-media-field-description:focus {
     color: hsl(var(--ohne-foreground));
+  }
+
+  @media (hover: hover) {
+    button.o-media-field-description:hover {
+      color: hsl(var(--ohne-foreground));
+    }
   }
 
   button.o-media-field-description:hover svg,

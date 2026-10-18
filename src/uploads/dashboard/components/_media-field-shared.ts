@@ -79,9 +79,9 @@ const OCTET_STREAM = 'application/octet-stream';
 const NOT_DISABLED: MediaItemDisabled = { value: false };
 
 /**
- * Whether a click carries none of the modifiers that ask for a new tab, so the dashboard handles it itself.
+ * Whether a click or tap carries none of the new-tab modifiers, so the dashboard handles it itself.
  */
-export function isPlainClick(event: MouseEvent): boolean {
+export function isPlainClick(event: MouseEvent | TouchEvent): boolean {
   return !event.metaKey && !event.ctrlKey && !event.shiftKey;
 }
 

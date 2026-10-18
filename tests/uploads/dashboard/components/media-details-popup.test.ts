@@ -140,12 +140,12 @@ describe('mediaDetailsPopup', () => {
   });
 
   /**
-   * The popup over a PDF on its Description tab, with lookups into its live tree.
+   * The popup over `record`, a PDF by default, on its Description tab, with lookups into its live tree.
    */
-  function open() {
+  function open(record = RECORD) {
     const scope = effectScope();
     const handle = scope.run(() =>
-      popup.mediaDetailsPopup(RECORD, { tab: 'description', onClose() {} }),
+      popup.mediaDetailsPopup(record, { tab: 'description', onClose() {} }),
     );
     const root = handle.root as unknown as FakeElement;
     const find = (match: (element: FakeElement) => boolean) => findElement(root, match);
@@ -157,6 +157,8 @@ describe('mediaDetailsPopup', () => {
     };
     return {
       scope,
+      find,
+      undoButton: () => labelled('dashboard.history.undo'),
       description: () =>
         find(
           (element) => (element as unknown as { id?: string }).id === 'field-description-input',
@@ -204,6 +206,30 @@ describe('mediaDetailsPopup', () => {
     await settle();
     strictEqual(description(), undefined);
     strictEqual(knob()?.checked, true);
+    scope.dispose();
+  });
+
+  it('places the focal point on a touch tap, never on a touch swipe', async () => {
+    const image = { ...RECORD, name: 'fox.png', type: 'image/png', width: 200, height: 100 };
+    const { scope, find, undoButton } = open(image as UploadRecord);
+    await settle();
+    const img = find((element) => element.tagName === 'IMG')!;
+    Object.assign(img, { clientWidth: 200, clientHeight: 100, hasPointerCapture: () => true });
+    const marker = () => find((element) => hasClass(element, 'o-media-details-focal-marker'));
+    const touch = { pointerType: 'touch', pointerId: 1, button: 0, offsetX: 50, offsetY: 25 };
+    fire(img, 'pointerdown', touch);
+    fire(img, 'pointermove', { ...touch, offsetY: 75 });
+    fire(img, 'pointercancel', touch);
+    fire(img, 'lostpointercapture', touch);
+    flush();
+    strictEqual(marker(), undefined);
+    strictEqual(undoButton()?.getAttribute('aria-label'), 'dashboard.history.undo 0');
+    fire(img, 'pointerdown', touch);
+    fire(img, 'pointerup', touch);
+    fire(img, 'lostpointercapture', touch);
+    flush();
+    strictEqual(marker()?.getAttribute('style'), 'left: 25%; top: 25%');
+    strictEqual(undoButton()?.getAttribute('aria-label'), 'dashboard.history.undo 1');
     scope.dispose();
   });
 });
