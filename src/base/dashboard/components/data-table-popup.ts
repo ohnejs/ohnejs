@@ -144,7 +144,7 @@ css`
  * The table pages, sorts by its headers, and configures through the filter, columns, and sorting popups.
  * Its view state is remembered per collection; the first open seeds from the collection page's own view.
  * A view part the query endpoint refuses is dropped with a toast, as on the collection page.
- * Single mode picks on double-click or the row's Select action and closes.
+ * Single mode picks on a click or tap, or the row's Select action, and closes.
  * Multiple mode selects with checkboxes and shift ranges across pages, and applies explicitly.
  * A row's actions also open the record in a new tab, as edit or view by the row's update verdict.
  * Cmd/Ctrl+S applies or closes, Cmd/Ctrl+A toggles the page's selection, and arrow keys page.
@@ -345,7 +345,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
       sort,
       serverSort: true,
       fixed: true,
-      selection: { selected, checkboxes: () => multiple },
+      selection: multiple ? { selected } : undefined,
       onOpen: (row) => (multiple ? select(String(row.UUID)) : pick(String(row.UUID))),
       actions: rowActions,
     });

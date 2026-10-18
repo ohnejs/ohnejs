@@ -8,6 +8,7 @@ import {
   h,
   isEditingText,
   navigate,
+  overlayCount,
   type PageFrameContext,
   releaseUnsavedChanges,
   sessionUser,
@@ -422,12 +423,19 @@ function layout(
   const overlayViewport = window.matchMedia('(max-width: 1024px)');
   let swipeStartX = 0;
   let swipeStartY = 0;
+  let swipeScrolled = false;
   const onTouchStart = (event: TouchEvent): void => {
     swipeStartX = event.touches[0]?.clientX ?? 0;
     swipeStartY = event.touches[0]?.clientY ?? 0;
+    swipeScrolled = false;
+  };
+  const onScroll = (): void => {
+    swipeScrolled = true;
   };
   const onTouchEnd = (event: TouchEvent): void => {
     if (!overlayViewport.matches || untracked(() => transition.value)) return;
+    // A popup sits above the drawer, and a gesture that scrolled content was a scroll, not a swipe.
+    if (overlayCount() > 0 || swipeScrolled) return;
     const touch = event.changedTouches[0];
     if (isUndefined(touch)) return;
     const deltaX = touch.clientX - swipeStartX;
@@ -438,11 +446,13 @@ function layout(
   };
   document.body.addEventListener('touchstart', onTouchStart, { passive: true });
   document.body.addEventListener('touchend', onTouchEnd, { passive: true });
+  document.addEventListener('scroll', onScroll, { capture: true, passive: true });
 
   onCleanup(() => {
     releaseTrap?.();
     document.body.removeEventListener('touchstart', onTouchStart);
     document.body.removeEventListener('touchend', onTouchEnd);
+    document.removeEventListener('scroll', onScroll, { capture: true });
   });
 
   return h(

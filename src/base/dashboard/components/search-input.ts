@@ -78,9 +78,11 @@ css`
     line-height: 1;
   }
 
-  .o-search-input .o-search-input-clear:hover {
-    background-color: hsl(var(--ohne-muted) / 0.6);
-    color: hsl(var(--ohne-foreground));
+  @media (hover: hover) {
+    .o-search-input .o-search-input-clear:hover {
+      background-color: hsl(var(--ohne-muted) / 0.6);
+      color: hsl(var(--ohne-foreground));
+    }
   }
 
   .o-search-input .o-search-input-clear:focus-visible {

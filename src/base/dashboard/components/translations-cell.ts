@@ -59,10 +59,12 @@ css`
     color: hsl(var(--ohne-foreground));
   }
 
-  a.o-translations-chip:hover {
-    background-color: hsl(var(--ohne-accent));
-    border-color: hsl(var(--ohne-accent));
-    color: hsl(var(--ohne-accent-foreground));
+  @media (hover: hover) {
+    a.o-translations-chip:hover {
+      background-color: hsl(var(--ohne-accent));
+      border-color: hsl(var(--ohne-accent));
+      color: hsl(var(--ohne-accent-foreground));
+    }
   }
 
   a.o-translations-chip:focus-visible {

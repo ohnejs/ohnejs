@@ -116,7 +116,7 @@ css`
     display: inline-flex;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .o-editable-field-cell-button {
       opacity: 0;
     }

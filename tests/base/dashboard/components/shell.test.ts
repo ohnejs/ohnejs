@@ -19,13 +19,29 @@ describe('the base frame', () => {
   const builds = { home: 0, wide: 0, login: 0 };
   let browser!: FakeBrowser;
   let shell!: Shell;
+  const gestures = new Map<string, (event: unknown) => void>();
 
   const find = (name: string) =>
     findElement(container, (element) => element.classList.has(name) || hasClass(element, name));
 
   before(async () => {
     browser = baseBrowser('/home');
+    const record = (type: string, listener: (event: unknown) => void) =>
+      gestures.set(type, listener);
+    const matchMedia = (query: string) => ({
+      matches: query === '(max-width: 1024px)',
+      addEventListener() {},
+      removeEventListener() {},
+    });
+    const classes = new Set<string>();
+    Object.assign(document.body, {
+      addEventListener: record,
+      classList: Object.assign(classes, { remove: (name: string) => classes.delete(name) }),
+    });
+    Object.assign(document, { addEventListener: record });
+    Object.assign(window, { matchMedia });
     Object.assign(globalThis, {
+      matchMedia,
       fetch: async (url: string) =>
         url.endsWith('/auth/me')
           ? Response.json({ UUID: 'u1', email: 'a@b.c' })
@@ -79,6 +95,27 @@ describe('the base frame', () => {
     strictEqual(find('o-main-content')?.textContent, 'wide');
     strictEqual(find('o-main')?.classList.has('o-main-fill'), false);
     ok(hasClass(find('o-layout') as FakeElement, 'o-layout-wide'));
+  });
+
+  it('opens the drawer on an edge swipe, unless a popup is up or the gesture scrolled', async () => {
+    const swipe = async (scrolls = false) => {
+      gestures.get('touchstart')?.({ touches: [{ clientX: 10, clientY: 300 }] });
+      if (scrolls) gestures.get('scroll')?.({});
+      gestures.get('touchend')?.({ changedTouches: [{ clientX: 220, clientY: 305 }] });
+      await nextTick();
+    };
+    const { acquireOverlay } = await import('../../../../src/dashboard/ui/overlay.ts');
+    const overlay = acquireOverlay();
+    await swipe();
+    strictEqual(shell.sidebarExpanded(), false);
+    overlay.release();
+    await swipe(true);
+    strictEqual(shell.sidebarExpanded(), false);
+    await swipe();
+    strictEqual(shell.sidebarExpanded(), true);
+    shell.toggleSidebar();
+    await nextTick();
+    strictEqual(shell.sidebarExpanded(), false);
   });
 
   it('closes the expanded sidebar on a query step', async () => {

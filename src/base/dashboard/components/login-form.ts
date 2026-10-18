@@ -93,6 +93,8 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     },
   );
   reveal.tabIndex = -1;
+  // The password input keeps focus, so a phone keyboard stays up.
+  reveal.addEventListener('mousedown', (event) => event.preventDefault());
   // `button` takes a static variant, so the accent state patches the class list instead.
   effect(() => {
     reveal.classList.toggle('ohne-button-accent', revealed.value);

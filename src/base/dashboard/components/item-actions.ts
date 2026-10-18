@@ -8,7 +8,7 @@ css`
     margin-left: auto;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .o-item-actions {
       display: none;
     }

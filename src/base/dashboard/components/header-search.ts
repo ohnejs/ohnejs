@@ -21,10 +21,12 @@ css`
     transition-property: background-color, border-color, box-shadow, color;
   }
 
-  .o-header-search:hover {
-    background-color: hsl(var(--ohne-accent));
-    border-color: hsl(var(--ohne-accent));
-    color: hsl(var(--ohne-accent-foreground));
+  @media (hover: hover) {
+    .o-header-search:hover {
+      background-color: hsl(var(--ohne-accent));
+      border-color: hsl(var(--ohne-accent));
+      color: hsl(var(--ohne-accent-foreground));
+    }
   }
 
   .o-header-search:focus-visible {
@@ -63,10 +65,12 @@ css`
     transition-property: background-color, border-color, color;
   }
 
-  .o-header-search:hover > kbd > span {
-    background-color: hsl(var(--ohne-primary));
-    border-color: hsl(var(--ohne-primary));
-    color: hsl(var(--ohne-primary-foreground));
+  @media (hover: hover) {
+    .o-header-search:hover > kbd > span {
+      background-color: hsl(var(--ohne-primary));
+      border-color: hsl(var(--ohne-primary));
+      color: hsl(var(--ohne-primary-foreground));
+    }
   }
 
   @media (max-width: 767px) {

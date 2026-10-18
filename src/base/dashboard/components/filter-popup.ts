@@ -154,7 +154,7 @@ css`
     margin-left: auto;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .o-where-filters :where(.o-where-filters-actions) {
       display: none;
     }

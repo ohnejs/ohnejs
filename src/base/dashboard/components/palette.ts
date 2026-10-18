@@ -89,9 +89,11 @@ css`
     line-height: 1;
   }
 
-  .o-palette-tab:hover {
-    background-color: hsl(var(--ohne-muted) / 0.6);
-    color: hsl(var(--ohne-foreground));
+  @media (hover: hover) {
+    .o-palette-tab:hover {
+      background-color: hsl(var(--ohne-muted) / 0.6);
+      color: hsl(var(--ohne-foreground));
+    }
   }
 
   .o-palette-tab:focus-visible {
@@ -140,11 +142,13 @@ css`
   }
 
   /* Hovering a row selects it, so the menu's own hover tint would mark a second row. */
-  .o-palette-results
-    .ohne-vertical-menu-item:not(.ohne-vertical-menu-item-active)
-    .ohne-vertical-menu-item-button:hover {
-    background-color: transparent;
-    color: hsl(var(--ohne-muted-foreground));
+  @media (hover: hover) {
+    .o-palette-results
+      .ohne-vertical-menu-item:not(.ohne-vertical-menu-item-active)
+      .ohne-vertical-menu-item-button:hover {
+      background-color: transparent;
+      color: hsl(var(--ohne-muted-foreground));
+    }
   }
 
   /* The active row moves with the pointer, so the menu's bolder active label would make rows jump. */
@@ -499,8 +503,14 @@ export function palette(): Child {
         if (document.getSelection()?.isCollapsed === false) return;
         field.input.focus();
       };
-      // A timeout: a click's own handlers run first, and a control they unmount drops focus to the body.
-      handle.root.addEventListener('click', () => setTimeout(refocus));
+      let pointerType = '';
+      handle.root.addEventListener('pointerdown', (event) => (pointerType = event.pointerType));
+      handle.root.addEventListener('click', () => {
+        // A tap would raise the phone keyboard over the results it is browsing.
+        if (pointerType === 'touch') return;
+        // A timeout: a click's own handlers run first, and a control they unmount drops focus to the body.
+        setTimeout(refocus);
+      });
       return null;
     },
   );

@@ -110,8 +110,10 @@ css`
     border-bottom-width: 0;
   }
 
-  .o-overview-recent-row:hover {
-    background-color: hsl(var(--ohne-muted) / 0.4);
+  @media (hover: hover) {
+    .o-overview-recent-row:hover {
+      background-color: hsl(var(--ohne-muted) / 0.4);
+    }
   }
 
   .o-overview-recent-label {
@@ -164,9 +166,11 @@ css`
     text-align: center;
   }
 
-  .o-overview-recent-more:hover:not(:disabled) {
-    background-color: hsl(var(--ohne-muted) / 0.4);
-    color: hsl(var(--ohne-foreground));
+  @media (hover: hover) {
+    .o-overview-recent-more:hover:not(:disabled) {
+      background-color: hsl(var(--ohne-muted) / 0.4);
+      color: hsl(var(--ohne-foreground));
+    }
   }
 
   .o-overview-recent-more:disabled {

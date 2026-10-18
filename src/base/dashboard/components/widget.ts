@@ -89,9 +89,14 @@ css`
     border-right: 1px solid var(--o-widget-divider, hsl(210 8% 90.2%));
   }
 
-  .o-widget a:hover,
   .o-widget a:focus-visible {
     color: var(--o-widget-color-accent, hsl(324 49% 10%));
+  }
+
+  @media (hover: hover) {
+    .o-widget a:hover {
+      color: var(--o-widget-color-accent, hsl(324 49% 10%));
+    }
   }
 
   .o-widget svg {
@@ -123,9 +128,14 @@ css`
     border-right-color: var(--o-widget-divider, hsl(231 16.7% 24%));
   }
 
-  .dark .o-widget a:hover,
   .dark .o-widget a:focus-visible {
     color: var(--o-widget-color-accent, hsl(0 0% 98%));
+  }
+
+  @media (hover: hover) {
+    .dark .o-widget a:hover {
+      color: var(--o-widget-color-accent, hsl(0 0% 98%));
+    }
   }
 
   .dark .o-widget-logo {
