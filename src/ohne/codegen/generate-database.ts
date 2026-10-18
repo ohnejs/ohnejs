@@ -685,7 +685,14 @@ async function writeNode(
     code.line('const collections = useCollections();');
     collections.forEach((collection, i) => {
       const name = literalString(collection.name);
-      code.line(`collections.register(${name}, { name: ${name}, collection: c${i} });`);
+      code.line();
+      code.line(`collections.register(${name}, {`);
+      code.indent(() => {
+        code.line(`name: ${name},`);
+        code.line(`collection: c${i},`);
+        code.line(`file: ${literalString(collection.file)},`);
+      });
+      code.line('});');
     });
   }
   if (fields.length > 0 || deletions.length > 0) {
@@ -702,7 +709,14 @@ async function writeNode(
     code.line('const blocks = useBlocks();');
     blocks.forEach((block, i) => {
       const name = literalString(block.name);
-      code.line(`blocks.register(${name}, { name: ${name}, block: b${i} });`);
+      code.line();
+      code.line(`blocks.register(${name}, {`);
+      code.indent(() => {
+        code.line(`name: ${name},`);
+        code.line(`block: b${i},`);
+        code.line(`file: ${literalString(block.file)},`);
+      });
+      code.line('});');
     });
   }
   if (migrations.length > 0) {

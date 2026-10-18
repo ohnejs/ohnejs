@@ -4,7 +4,7 @@ import type { ScannedBlock } from './scan-layer-blocks.ts';
 
 import { importDefault } from '../../utils/fs/index.ts';
 import { isPlainObject, naturalCompare, relativePath } from '../../utils/index.ts';
-import { ohneError } from '../error/ohne-error.ts';
+import { locateError, ohneError } from '../error/ohne-error.ts';
 import { DIR_DEFAULTS } from '../layers/config.ts';
 import { useLayers } from '../layers/use-layers.ts';
 import { scanLayerBlocks } from './scan-layer-blocks.ts';
@@ -108,7 +108,11 @@ function assertDistinctNames(scanned: readonly ScannedBlock[]): void {
  * Imports one block's definition and rejects a file that does not default-export one.
  */
 async function definitionOf(scanned: ScannedBlock, fresh: boolean): Promise<AnyBlockDefinition> {
-  const definition = await importDefault<AnyBlockDefinition>(scanned.file, { fresh });
+  const definition = await importDefault<AnyBlockDefinition>(scanned.file, { fresh }).catch(
+    (error: unknown) => {
+      throw locateError(error, scanned.file);
+    },
+  );
   if (!isPlainObject(definition) || !isPlainObject(definition.fields)) {
     throw ohneError({
       title: `Block \`${scanned.name}\` has no definition`,

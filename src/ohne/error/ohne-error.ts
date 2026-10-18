@@ -85,3 +85,17 @@ export function ohneError(input: string | OhneErrorInit): OhneError {
 export function isOhneError(value: unknown): value is OhneError {
   return value instanceof Error && hasKey(value, OHNE_ERROR);
 }
+
+/**
+ * Gives a pathless `ohneError` the location it was raised for, then returns `error` to rethrow.
+ * Any other error, or one that already names its path, passes through untouched.
+ *
+ * @example
+ * ```ts
+ * throw locateError(error, file)
+ * ```
+ */
+export function locateError(error: unknown, path: string | undefined): unknown {
+  if (isOhneError(error) && isUndefined(error.path) && !isUndefined(path)) error.path = path;
+  return error;
+}

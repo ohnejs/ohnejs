@@ -1,10 +1,10 @@
-import { deepStrictEqual, rejects } from 'node:assert';
+import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { resolveLayerStack } from '../../../src/ohne/index.ts';
+import { isOhneError, resolveLayerStack } from '../../../src/ohne/index.ts';
 
 interface LayerSpec {
   name: string;
@@ -225,5 +225,19 @@ describe('resolveLayerStack', { skip: process.platform === 'win32' }, () => {
     writeManifest(consumer, { name: 'self-ghost', layers: ['self-ghost/ghost'], exports: {} });
 
     await rejects(() => resolveLayerStack(consumer), /Layer `self-ghost\/ghost` cannot be used/);
+  });
+
+  it('names the listing config in the corner when a layer is not installed', async () => {
+    const consumer = join(root, 'missing');
+    mkdirSync(consumer, { recursive: true });
+    writeManifest(consumer, { name: 'missing', layers: ['nowhere'] });
+
+    await rejects(
+      () => resolveLayerStack(consumer),
+      (error: unknown) => {
+        strictEqual(isOhneError(error) && error.path, join(consumer, 'ohne.config.ts'));
+        return true;
+      },
+    );
   });
 });

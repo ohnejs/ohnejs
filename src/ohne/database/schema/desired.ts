@@ -23,7 +23,7 @@ import { createRegistry, isEmpty, isUndefined, naturalCompare } from '../../../u
 import { resolveAllowedBlocks } from '../../blocks/resolve-allowed-blocks.ts';
 import { validateBlockDefinition } from '../../blocks/validate-block.ts';
 import { validateCollectionDefinition } from '../../collections/validate-collection.ts';
-import { ohneError } from '../../error/ohne-error.ts';
+import { locateError, ohneError } from '../../error/ohne-error.ts';
 import { resolveFieldStorage } from '../../fields/resolve-field.ts';
 import {
   type FieldOwner,
@@ -167,7 +167,13 @@ export function buildDesiredSchema(
     'block',
   );
   const reachable = new Set<string>();
-  const tables = metas.flatMap((meta) => buildCollectionTables(meta, registries, reachable));
+  const tables = metas.flatMap((meta) => {
+    try {
+      return buildCollectionTables(meta, registries, reachable);
+    } catch (error) {
+      throw locateError(error, meta.file);
+    }
+  });
   return [...tables, ...buildReachableBlocks(registries, reachable)];
 }
 
@@ -295,7 +301,11 @@ function buildReachableBlocks(registries: SchemaRegistries, reachable: Set<strin
   while (pending.length > 0) {
     for (const name of pending) {
       const meta = registries.blocks.get(name) as BlockMeta;
-      built.set(name, buildBlockTables(meta, registries, reachable));
+      try {
+        built.set(name, buildBlockTables(meta, registries, reachable));
+      } catch (error) {
+        throw locateError(error, meta.file);
+      }
     }
     pending = [...reachable].filter((name) => !built.has(name));
   }

@@ -1,7 +1,7 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { isOhneError, ohneError } from '../../../src/ohne/error/ohne-error.ts';
+import { isOhneError, locateError, ohneError } from '../../../src/ohne/error/ohne-error.ts';
 
 describe('ohneError', () => {
   it('builds a bare-message error with no title or path', () => {
@@ -44,5 +44,28 @@ describe('isOhneError', () => {
     strictEqual(isOhneError('x'), false);
     strictEqual(isOhneError(null), false);
     strictEqual(isOhneError({ title: 'x' }), false);
+  });
+});
+
+describe('locateError', () => {
+  it('gives a pathless ohneError the path', () => {
+    const error = ohneError('Bad field');
+
+    strictEqual(locateError(error, '/x/Posts.ts'), error);
+    strictEqual(error.path, '/x/Posts.ts');
+  });
+
+  it('keeps a path the error already names', () => {
+    const error = ohneError({ title: 'Bad field', path: '/x/field.ts:3:5' });
+
+    locateError(error, '/x/Posts.ts');
+    strictEqual(error.path, '/x/field.ts:3:5');
+  });
+
+  it('leaves a plain Error untouched', () => {
+    const error = new Error('boom');
+
+    strictEqual(locateError(error, '/x/Posts.ts'), error);
+    ok(!('path' in error));
   });
 });

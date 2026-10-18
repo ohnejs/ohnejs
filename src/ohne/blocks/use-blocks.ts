@@ -16,6 +16,12 @@ export interface BlockMeta {
    * The block definition, widened so any concrete `defineBlock` result fits.
    */
   block: AnyBlockDefinition;
+
+  /**
+   * Absolute path of the file that default-exports the definition.
+   * Schema errors raised at sync name it in their corner.
+   */
+  file?: string;
 }
 
 const registry: Registry<BlockMeta> = createRegistry<BlockMeta>();

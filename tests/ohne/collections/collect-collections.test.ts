@@ -1,11 +1,16 @@
-import { deepStrictEqual, rejects } from 'node:assert';
+import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 import { collectCollections, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 import { stackedLayers } from '../../../src/ohne/layers/stacked-layers.ts';
+
+const SRC = pathToFileURL(
+  join(import.meta.dirname, '..', '..', '..', 'src', 'ohne', 'index.ts'),
+).href;
 
 describe('collectCollections', () => {
   let root: string;
@@ -91,5 +96,20 @@ describe('collectCollections', () => {
       writeFileSync(file, 'export const posts = 1;\n');
     });
     await rejects(collectCollections(stackedLayers()), /`Posts` has no definition/);
+  });
+
+  it('names the file of a collection whose definition throws on import', async () => {
+    const app = await appWith('located', (app) => {
+      const file = join(app, 'collections/Posts.ts');
+      mkdirSync(join(file, '..'), { recursive: true });
+      writeFileSync(
+        file,
+        `import { defineCollection, field } from '${SRC}';\n` +
+          "export default defineCollection({ fields: { 'my title': field('text') } });\n",
+      );
+    });
+    const error = await collectCollections(stackedLayers()).catch((error: unknown) => error);
+    ok(error instanceof Error);
+    strictEqual((error as { path?: string }).path, join(app, 'collections/Posts.ts'));
   });
 });

@@ -4,7 +4,7 @@ import type { ScannedCollection } from './scan-layer-collections.ts';
 
 import { importDefault } from '../../utils/fs/index.ts';
 import { isPlainObject, naturalCompare, relativePath } from '../../utils/index.ts';
-import { ohneError } from '../error/ohne-error.ts';
+import { locateError, ohneError } from '../error/ohne-error.ts';
 import { DIR_DEFAULTS } from '../layers/config.ts';
 import { useLayers } from '../layers/use-layers.ts';
 import { scanLayerCollections } from './scan-layer-collections.ts';
@@ -111,7 +111,11 @@ async function definitionOf(
   scanned: ScannedCollection,
   fresh: boolean,
 ): Promise<AnyCollectionDefinition> {
-  const definition = await importDefault<AnyCollectionDefinition>(scanned.file, { fresh });
+  const definition = await importDefault<AnyCollectionDefinition>(scanned.file, { fresh }).catch(
+    (error: unknown) => {
+      throw locateError(error, scanned.file);
+    },
+  );
   if (!isPlainObject(definition) || !isPlainObject(definition.fields)) {
     throw ohneError({
       title: `Collection \`${scanned.name}\` has no definition`,

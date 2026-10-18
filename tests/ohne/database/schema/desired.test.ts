@@ -1758,4 +1758,36 @@ describe('buildDesiredSchema', () => {
       bodyMatching(/Field `tone` in block `Hero` is `select`\.\n`choices` repeats a value/),
     );
   });
+
+  it('names the collection file in the corner of a definition error', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: {
+              fields: { slug: field('text', { unique: true, uniquePerLocale: true }) },
+            },
+            file: '/x/collections/Posts.ts',
+          }),
+          useFields(),
+        ),
+      (error: unknown) => isOhneError(error) && error.path === '/x/collections/Posts.ts',
+    );
+  });
+
+  it('names the collection file in the corner of a missing-collection error', () => {
+    throws(
+      () =>
+        buildDesiredSchema(
+          collections({
+            name: 'Posts',
+            collection: { fields: { author: field('record', { collection: 'Nobody' }) } },
+            file: '/x/collections/Posts.ts',
+          }),
+          useFields(),
+        ),
+      (error: unknown) => isOhneError(error) && error.path === '/x/collections/Posts.ts',
+    );
+  });
 });

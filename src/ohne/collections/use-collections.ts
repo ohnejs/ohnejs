@@ -16,6 +16,12 @@ export interface CollectionMeta {
    * The collection definition, widened so any concrete `defineCollection` result fits.
    */
   collection: AnyCollectionDefinition;
+
+  /**
+   * Absolute path of the file that default-exports the definition.
+   * Schema errors raised at sync name it in their corner.
+   */
+  file?: string;
 }
 
 const registry: Registry<CollectionMeta> = createRegistry<CollectionMeta>();

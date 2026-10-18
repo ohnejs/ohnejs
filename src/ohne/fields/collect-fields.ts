@@ -4,7 +4,7 @@ import type { ScannedFieldType } from './scan-layer-fields.ts';
 
 import { importDefault } from '../../utils/fs/index.ts';
 import { isPlainObject, isString, naturalCompare } from '../../utils/index.ts';
-import { ohneError } from '../error/ohne-error.ts';
+import { locateError, ohneError } from '../error/ohne-error.ts';
 import { DIR_DEFAULTS } from '../layers/config.ts';
 import { useLayers } from '../layers/use-layers.ts';
 import { scanLayerFields } from './scan-layer-fields.ts';
@@ -84,7 +84,11 @@ export async function collectFields(
  * Imports one field type's definition and rejects a file that does not default-export one.
  */
 async function definitionOf(scanned: ScannedFieldType, fresh: boolean): Promise<FieldType> {
-  const definition = await importDefault<FieldType>(scanned.file, { fresh });
+  const definition = await importDefault<FieldType>(scanned.file, { fresh }).catch(
+    (error: unknown) => {
+      throw locateError(error, scanned.file);
+    },
+  );
   if (
     !isPlainObject(definition) ||
     (definition.columnType !== false && !isString(definition.columnType))

@@ -1,3 +1,5 @@
+import type { BlockName } from '../blocks/known-blocks.ts';
+import type { CollectionName } from '../collections/known-collections.ts';
 import type { RoleName } from '../roles/known-roles.ts';
 
 import { groupBy, swapRegistry } from '../../utils/index.ts';
@@ -72,11 +74,14 @@ export async function withStackRegistries<T>(
     ),
     swapRegistry(
       useCollections(),
-      collections.map(({ name, collection }) => [name, { name, collection }]),
+      collections.map(({ name, collection, file }) => [
+        name,
+        { name: name as CollectionName, collection, file },
+      ]),
     ),
     swapRegistry(
       useBlocks(),
-      blocks.map(({ name, block }) => [name, { name, block }]),
+      blocks.map(({ name, block, file }) => [name, { name: name as BlockName, block, file }]),
     ),
     swapRegistry(
       useFields(),

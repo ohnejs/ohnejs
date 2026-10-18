@@ -3,7 +3,7 @@ import type { Config } from '../layers/config.ts';
 import type { LayerCodegen } from '../layers/define-layer.ts';
 
 import { resolveModuleDir } from '../../utils/fs/index.ts';
-import { isNull, isUndefined, last, relativePath } from '../../utils/index.ts';
+import { isNull, isUndefined, joinPath, last, relativePath } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { isOhneProject } from './is-ohne-project.ts';
 import { type LayerLoadOptions, readLayerConfig } from './read-layer-config.ts';
@@ -104,8 +104,8 @@ export async function resolveLayerStack(
           title: `Layer \`${specifier}\` cannot be used`,
           body: [
             `\`${specifier}\` is not installed, or its package does not export it as a layer.`,
-            `It is listed by \`${layer.name}\`.`,
           ],
+          path: joinPath(layer.dir, 'ohne.config.ts'),
         });
       }
       if (!(await isOhneProject(dir))) {
@@ -113,8 +113,8 @@ export async function resolveLayerStack(
           title: `Layer \`${specifier}\` cannot be used`,
           body: [
             `\`${specifier}\` resolved to \`${relativePath(process.cwd(), dir)}\`, which has no \`ohne.config.ts\`.`,
-            `It is listed by \`${layer.name}\`.`,
           ],
+          path: joinPath(layer.dir, 'ohne.config.ts'),
         });
       }
       await walk({ name: specifier, dir });

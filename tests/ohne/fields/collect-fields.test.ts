@@ -1,11 +1,16 @@
-import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 import { collectFields, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 import { stackedLayers } from '../../../src/ohne/layers/stacked-layers.ts';
+
+const SRC = pathToFileURL(
+  join(import.meta.dirname, '..', '..', '..', 'src', 'ohne', 'index.ts'),
+).href;
 
 describe('collectFields', () => {
   let root: string;
@@ -80,5 +85,20 @@ describe('collectFields', () => {
       writeFileSync(file, 'export const slug = 1;\n');
     });
     await rejects(collectFields(stackedLayers()), /`slug` has no definition/);
+  });
+
+  it('names the file of a field type whose definition throws on import', async () => {
+    const app = await appWith('located', (app) => {
+      const file = join(app, 'fields/ghost.ts');
+      mkdirSync(join(file, '..'), { recursive: true });
+      writeFileSync(
+        file,
+        `import { defineField } from '${SRC}';\n` +
+          'export default defineField({ columnType: false, forceNullable: true });\n',
+      );
+    });
+    const error = await collectFields(stackedLayers()).catch((error: unknown) => error);
+    ok(error instanceof Error);
+    strictEqual((error as { path?: string }).path, join(app, 'fields/ghost.ts'));
   });
 });

@@ -163,7 +163,15 @@ describe('generateDatabase', () => {
     ok(out.includes("import { useCollections, useFields } from 'ohnejs';"));
     ok(out.includes(`import c0 from '../../collections/Posts.ts';`));
     ok(!out.includes('packages/dep/collections'));
-    ok(out.includes("collections.register('Posts', { name: 'Posts', collection: c0 });"));
+    ok(
+      out.includes(
+        "collections.register('Posts', {\n" +
+          "  name: 'Posts',\n" +
+          '  collection: c0,\n' +
+          `  file: '${join(app, 'collections', 'Posts.ts')}',\n` +
+          '});',
+      ),
+    );
     ok(out.includes("fields.register('slug', { name: 'slug', fieldType: f0 });"));
     ok(out.includes("slug: typeof import('../../packages/dep/fields/slug.ts').default;"));
   });
@@ -625,8 +633,24 @@ describe('generateDatabase', () => {
     ok(node.includes("import { useCollections, useBlocks } from 'ohnejs';"));
     ok(node.includes('interface KnownBlocks extends GeneratedBlocks {}'));
     ok(node.includes("import b0 from '../../blocks/CTA.ts';"));
-    ok(node.includes("blocks.register('CTA', { name: 'CTA', block: b0 });"));
-    ok(node.includes("blocks.register('Hero', { name: 'Hero', block: b1 });"));
+    ok(
+      node.includes(
+        "blocks.register('CTA', {\n" +
+          "  name: 'CTA',\n" +
+          '  block: b0,\n' +
+          `  file: '${join(app, 'blocks', 'CTA.ts')}',\n` +
+          '});',
+      ),
+    );
+    ok(
+      node.includes(
+        "blocks.register('Hero', {\n" +
+          "  name: 'Hero',\n" +
+          '  block: b1,\n' +
+          `  file: '${join(app, 'blocks', 'Hero.ts')}',\n` +
+          '});',
+      ),
+    );
   });
 
   it('nests a blocks field inside a block, a self-reference included', async () => {
