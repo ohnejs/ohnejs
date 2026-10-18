@@ -13,6 +13,7 @@ import { deepEqual } from '../../utils/object/deep-equal.ts';
 import { hasKey } from '../../utils/object/has-key.ts';
 import { computed, type ComputedRef } from '../../utils/reactive/computed.ts';
 import { effectScope } from '../../utils/reactive/effect-scope.ts';
+import { ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { checkRequired } from '../../utils/validate/check-required.ts';
 import { css } from '../render/css.ts';
@@ -285,6 +286,10 @@ export function createFieldForm(
   const showsLocked =
     options.readOnlyRows === true || options.readOnly === true || options.disabled === true;
   const checksRequired = options.mode === 'create' || options.path !== '';
+  const rowByName = new Map<string, ControlRow>();
+  const lockedByName = new Map<string, ControlRow>();
+  // A control may read a sibling while it is built, so values read the seed until every row exists.
+  const built = ref(false);
   const values: Record<string, unknown> = {};
   for (const field of fields) {
     const value = scope.run(() => computed(() => currentValue(field)));
@@ -358,12 +363,13 @@ export function createFieldForm(
     if (showsLocked && field.readable) statics.push(field);
   }
 
-  const rowByName = new Map(rows.map((row) => [row.field.name, row]));
-  const lockedByName = new Map(lockedRows.map((row) => [row.field.name, row]));
+  for (const row of rows) rowByName.set(row.field.name, row);
+  for (const row of lockedRows) lockedByName.set(row.field.name, row);
+  built.value = true;
   const activeRows = (): ControlRow[] => rows.filter((row) => active(row.field.name));
 
   function currentValue(field: DashboardField): unknown {
-    const reading = rowByName.get(field.name)?.control.read();
+    const reading = built.value ? rowByName.get(field.name)?.control.read() : undefined;
     if (!isUndefined(reading) && hasKey(reading, 'value')) return reading.value;
     if (!isUndefined(seed) && hasKey(seed, field.name)) return seed[field.name];
     return field.options?.default;

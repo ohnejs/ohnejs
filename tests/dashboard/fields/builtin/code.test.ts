@@ -7,9 +7,12 @@ import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
 import { ref } from '../../../../src/utils/reactive/ref.ts';
 import { type FakeElement, findElement, hasClass } from '../../_fake-dom.ts';
-import { type } from '../_controls.ts';
+import { inputOf, type } from '../_controls.ts';
 
 const { codeType } = await import('../../../../src/dashboard/fields/builtin/code.ts');
+const { createFieldForm } = await import('../../../../src/dashboard/fields/field-form.ts');
+const { h } = await import('../../../../src/dashboard/render/h.ts');
+await import('../../../../src/dashboard/fields/builtin/text.ts');
 
 type Scopes = () => readonly Readonly<Record<string, unknown>>[];
 
@@ -178,6 +181,33 @@ describe('codeType control', () => {
       ]);
       flush();
       strictEqual(highlighted(snippet.element), true);
+    });
+  });
+
+  it('follows a sibling in a real form, whichever of the two comes first', () => {
+    effectScope().run(() => {
+      const path = { ...field(), name: 'path', type: 'text', options: {} };
+      const snippet = field({ languageFrom: 'path' });
+      for (const fields of [
+        [path, snippet],
+        [snippet, path],
+      ]) {
+        const form = createFieldForm(
+          fields,
+          { path: 'Posts.ts', snippet: 'const a = 1' },
+          {
+            mode: 'edit',
+            path: '',
+            language: () => 'en',
+          },
+        );
+        const root = h('div', null, form.render());
+        flush();
+        strictEqual(highlighted(root), true);
+        type(inputOf(form.controlOf('path')!.element), 'notes.txt');
+        flush();
+        strictEqual(highlighted(root), false);
+      }
     });
   });
 
