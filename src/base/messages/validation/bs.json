@@ -8,6 +8,8 @@
   "invalidJSON": "Ova vrijednost mora biti ispravan JSON",
   "invalidLink": "Ovaj link mora biti web, e-mail ili telefonska adresa, `/putanja` ili `#fragment`",
   "invalidReference": "Referencirani zapis ne postoji",
+  "invalidStep": "Ova vrijednost mora biti višekratnik od `{step}`",
+  "invalidStepFrom": "Ova vrijednost mora biti `{min}` plus višekratnik od `{step}`",
   "invalidTime": "Ova vrijednost mora biti vrijeme u obliku `HH:MM:SS`",
   "invalidURL": "Ova vrijednost mora biti javna web adresa poput `https://orgrimmar.example`",
   "invalidValue": "Ova vrijednost nije važeća",

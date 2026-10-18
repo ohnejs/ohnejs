@@ -8,6 +8,8 @@
   "invalidJSON": "Dieser Wert muss gültiges JSON sein",
   "invalidLink": "Dieser Link muss eine Web-, E-Mail- oder Telefonadresse, ein `/Pfad` oder ein `#Fragment` sein",
   "invalidReference": "Der referenzierte Datensatz existiert nicht",
+  "invalidStep": "Dieser Wert muss ein Vielfaches von `{step}` sein",
+  "invalidStepFrom": "Dieser Wert muss `{min}` plus ein Vielfaches von `{step}` sein",
   "invalidTime": "Dieser Wert muss eine Uhrzeit im Format `HH:MM:SS` sein",
   "invalidURL": "Dieser Wert muss eine öffentliche Webadresse wie `https://orgrimmar.example` sein",
   "invalidValue": "Dieser Wert ist ungültig",

@@ -8,6 +8,8 @@
   "invalidJSON": "This value must be valid JSON",
   "invalidLink": "This link must be a web, email or phone address, a `/path` or a `#fragment`",
   "invalidReference": "The referenced record does not exist",
+  "invalidStep": "This value must be a multiple of `{step}`",
+  "invalidStepFrom": "This value must be `{min}` plus a multiple of `{step}`",
   "invalidTime": "This value must be a time of day in `HH:MM:SS` form",
   "invalidURL": "This value must be a public web address like `https://orgrimmar.example`",
   "invalidValue": "This value is invalid",
