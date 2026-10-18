@@ -4,6 +4,7 @@ import type { code } from './builtin/code.ts';
 import type { color } from './builtin/color.ts';
 import type { dateTime } from './builtin/date-time.ts';
 import type { date } from './builtin/date.ts';
+import type { duration } from './builtin/duration.ts';
 import type { email } from './builtin/email.ts';
 import type { integer } from './builtin/integer.ts';
 import type { json } from './builtin/json.ts';
@@ -112,6 +113,11 @@ export interface KnownFields {
    * An instant, stored as epoch milliseconds.
    */
   dateTime: typeof dateTime;
+
+  /**
+   * A length of time, stored as whole milliseconds.
+   */
+  duration: typeof duration;
 
   /**
    * A reference to one row of another collection.

@@ -8,6 +8,7 @@ import { code } from './builtin/code.ts';
 import { color } from './builtin/color.ts';
 import { dateTime } from './builtin/date-time.ts';
 import { date } from './builtin/date.ts';
+import { duration } from './builtin/duration.ts';
 import { email } from './builtin/email.ts';
 import { integer } from './builtin/integer.ts';
 import { json } from './builtin/json.ts';
@@ -58,6 +59,7 @@ for (const [name, fieldType] of [
   ['url', url],
   ['slug', slug],
   ['dateTime', dateTime],
+  ['duration', duration],
   ['record', record],
   ['records', records],
   ['link', link],

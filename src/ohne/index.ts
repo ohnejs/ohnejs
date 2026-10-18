@@ -83,6 +83,7 @@ export * from './fields/builtin/code.ts';
 export * from './fields/builtin/color.ts';
 export * from './fields/builtin/date-time.ts';
 export * from './fields/builtin/date.ts';
+export * from './fields/builtin/duration.ts';
 export * from './fields/builtin/email.ts';
 export * from './fields/builtin/integer.ts';
 export * from './fields/builtin/json.ts';

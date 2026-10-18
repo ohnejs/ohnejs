@@ -12,6 +12,7 @@ describe('useFields', () => {
       'color',
       'date',
       'dateTime',
+      'duration',
       'email',
       'integer',
       'json',
