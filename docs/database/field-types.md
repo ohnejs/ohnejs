@@ -696,8 +696,70 @@ lowercased and a default port dropped. For a `mailto:` or `tel:` address or a `/
 
 ## Base layer types
 
-The [`ohnejs/base`](../project/layers.md#what-the-base-layer-ships) layer ships the types its
-`Users` collection is built from. Any collection can use them while your app stacks the layer.
+The [`ohnejs/base`](../project/layers.md#what-the-base-layer-ships) layer ships these types. Any
+collection can use them while your app stacks the layer.
+
+### `country`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/country-dark.png">
+  <img alt="The country field in the dashboard" src="../images/field-types/country-light.png">
+</picture>
+
+An ISO 3166-1 country code, like `DE`, stored in upper case. The dashboard shows the country's name
+in the reader's language and picks it from a searchable list. A `where` and `orderBy` see the code, so
+query with the upper-case code.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `only`            | -       | The country codes the field admits, like `['DE', 'AT', 'CH']`. Omitted, every country is admitted.                                                                      |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) find the exact code, or a word start of the country's name.                                                               |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
+### `currency`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/currency-dark.png">
+  <img alt="The currency field in the dashboard" src="../images/field-types/currency-light.png">
+</picture>
+
+An ISO 4217 code of a circulating currency, like `EUR`, stored in upper case. The dashboard shows
+the currency's name in the reader's language. To store an amount, use an
+[`integer` with a `currency`](./collections.md#column-fields) instead.
+
+| Option            | Default | What it does                                                                                                                                                            |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`         | -       | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
+| `description`     | -       | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`       | `false` | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `index`           | `false` | Adds an index on the column, for faster lookups.                                                                                                                        |
+| `label`           | -       | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `nullable`        | `false` | Lets the field hold `null`.                                                                                                                                             |
+| `only`            | -       | The currency codes the field admits, like `['EUR', 'USD']`. Omitted, every circulating currency is admitted.                                                            |
+| `readable`        | `true`  | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`      | -       | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`          | `false` | `true` lets [search](./collections.md#search) find the exact code, or a word start of the currency's name.                                                              |
+| `translatable`    | `false` | Keeps [one value per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `unique`          | `false` | Rejects a value that another row already holds.                                                                                                                         |
+| `uniquePerLocale` | `false` | Limits `unique` to one locale. Needs `unique` and `translatable`.                                                                                                       |
+| `uniquePerParent` | `false` | Limits `unique` to each record's own list, inside a repeater. Needs `unique`.                                                                                           |
+| `validators`      | -       | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`            | -       | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`        | `true`  | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
 ### `datePattern`
 
