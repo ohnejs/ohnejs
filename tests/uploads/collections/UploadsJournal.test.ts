@@ -4,7 +4,6 @@ import { describe, it } from 'node:test';
 import type { CollectionDefinition } from '../../../src/ohne/collections/define-collection.ts';
 
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
@@ -14,12 +13,12 @@ import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import UploadsJournal from '../../../src/uploads/collections/UploadsJournal.ts';
+import { connectTest, dialect } from '../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 useLayers().add({ path: '/journal-collection', defaults: DEFAULTS, input: {} });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 

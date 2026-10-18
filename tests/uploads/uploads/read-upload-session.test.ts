@@ -97,11 +97,20 @@ describe('readUploadSession', () => {
   it('answers sessionExpired to every concurrent read of an expired session', async () => {
     const session = await createUploadSession({ name: 'lordaeron.txt', size: 5, author: jaina });
     await tamper(session.UUID, { expiresAt: Date.now() - 1 });
+    const { delete: remove } = storage;
+    // The discard waits for the rival read to settle, so both reads find the row.
+    const rival = Promise.withResolvers<void>();
+    storage.delete = async (path) => {
+      await rival.promise;
+      return remove(path);
+    };
 
-    const reads = await Promise.allSettled([
-      readUploadSession(session.UUID, { author: jaina }),
-      readUploadSession(session.UUID, { author: jaina }),
-    ]);
+    const reads = await Promise.allSettled(
+      [0, 1].map(() =>
+        readUploadSession(session.UUID, { author: jaina }).finally(() => rival.resolve()),
+      ),
+    );
+    storage.delete = remove;
 
     const expired = translate('uploads.errors.sessionExpired');
     deepStrictEqual(

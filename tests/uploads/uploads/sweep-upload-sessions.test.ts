@@ -14,6 +14,7 @@ import { createUploadSession } from '../../../src/uploads/uploads/create-upload-
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
 import { sweepUploadSessions } from '../../../src/uploads/uploads/sweep-upload-sessions.ts';
 import { writeUploadChunk } from '../../../src/uploads/uploads/write-upload-chunk.ts';
+import { failDeletes } from '../../_dialect.ts';
 import { bytes, db, holdSession, promptly, storage, stream } from '../_fixture.ts';
 
 const LAYER = '/uploads-sessions-sweep';
@@ -153,14 +154,12 @@ describe('sweepUploadSessions', () => {
   it('warns about a session whose row the database refuses to delete and keeps it', async () => {
     const session = await upload('acherus', 'bound.txt', 16);
     await tamper(session.UUID, { expiresAt: 8_500 });
-    await db.run(
-      'CREATE TRIGGER "bound" BEFORE DELETE ON "UploadsSessions" BEGIN SELECT RAISE(ABORT, \'bound\'); END',
-    );
+    const undo = await failDeletes(db, 'UploadsSessions');
     written.length = 0;
     try {
       strictEqual(await sweepUploadSessions(9_000), 0);
     } finally {
-      await db.run('DROP TRIGGER "bound"');
+      await undo();
     }
 
     match(written.join(''), new RegExp(`Upload session ${session.UUID} not discarded: .*bound`));

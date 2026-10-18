@@ -4,7 +4,6 @@ import { describe, it } from 'node:test';
 import type { CollectionDefinition } from '../../../src/ohne/collections/define-collection.ts';
 
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
@@ -16,14 +15,14 @@ import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import Uploads from '../../../src/uploads/collections/Uploads.ts';
 import directoryNameField from '../../../src/uploads/fields/directory-name.ts';
 import fileNameField from '../../../src/uploads/fields/file-name.ts';
+import { connectTest, dialect } from '../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 useLayers().add({ path: '/uploads-collection', defaults: DEFAULTS, input: {} });
 useFields().register('fileName', { name: 'fileName', fieldType: fileNameField });
 useFields().register('directoryName', { name: 'directoryName', fieldType: directoryNameField });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 
