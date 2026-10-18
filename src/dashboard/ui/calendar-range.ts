@@ -86,6 +86,18 @@ export interface CalendarRangeOptions {
   clearable?: boolean;
 
   /**
+   * Whether the start calendar's clear button renders while it holds a value.
+   * Omitted, `clearable` decides.
+   */
+  clearableFrom?: boolean;
+
+  /**
+   * Whether the end calendar's clear button renders while it holds a value.
+   * Omitted, `clearable` decides.
+   */
+  clearableTo?: boolean;
+
+  /**
    * The icon in the start calendar's handle: a Tabler icon name, an element, or `null` for none.
    *
    * @default
@@ -167,6 +179,12 @@ export interface CalendarRangeOptions {
    * 1
    */
   startDay?: number;
+
+  /**
+   * The instant whose day both calendars mark as today, read in `timezone`.
+   * Omitted means now.
+   */
+  today?: number;
 
   /**
    * Labels used for the calendar components.
@@ -295,7 +313,6 @@ export function calendarRange(
   };
 
   const shared = {
-    clearable: options.clearable,
     disabled: options.disabled,
     formatter: options.formatter,
     initial: options.initial,
@@ -303,6 +320,7 @@ export function calendarRange(
     showSeconds: options.showSeconds,
     startDay: options.startDay,
     timezone: options.timezone,
+    today: options.today,
     withTime: options.withTime,
   };
 
@@ -314,6 +332,7 @@ export function calendarRange(
     },
     calendar(fromModel, {
       ...shared,
+      clearable: options.clearableFrom ?? options.clearable,
       icon: options.iconFrom === undefined ? 'calendar-down' : options.iconFrom,
       id: options.id ? `${options.id}--1` : undefined,
       name: options.name ? `${options.name}--1` : undefined,
@@ -324,6 +343,7 @@ export function calendarRange(
     }),
     calendar(toModel, {
       ...shared,
+      clearable: options.clearableTo ?? options.clearable,
       icon: options.iconTo === undefined ? 'calendar-up' : options.iconTo,
       id: options.id ? `${options.id}--2` : undefined,
       name: options.name ? `${options.name}--2` : undefined,
