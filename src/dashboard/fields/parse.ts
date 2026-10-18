@@ -1,6 +1,7 @@
 import type { CurrencyCode } from '../../utils/i18n/currency-digits.ts';
 import type { DashboardField } from '../runtime/meta-types.ts';
 
+import { parseWholeDuration } from '../../utils/duration/parse-whole-duration.ts';
 import { amountEditText } from '../../utils/i18n/amount-edit-text.ts';
 import { currencyDigits } from '../../utils/i18n/currency-digits.ts';
 import { isDecimalString } from '../../utils/is/is-decimal-string.ts';
@@ -23,6 +24,7 @@ export interface ScalarParse {
    * The message of the parse failure that blocks the write: a key, or a key with its params.
    */
   error?:
+    | 'dashboard.invalidDuration'
     | 'dashboard.invalidInteger'
     | 'dashboard.invalidNumber'
     | 'validation.invalidJSON'
@@ -63,6 +65,17 @@ export function parseRealValue(field: DashboardField, raw: string): ScalarParse 
     return { error: 'dashboard.invalidNumber' };
   }
   return { value: Number(text) };
+}
+
+/**
+ * A duration input parsed into whole milliseconds, from text like `1h 30m` or `90m`.
+ * A bare number other than `0` names no unit, so it is refused rather than guessed.
+ * Emptied, a nullable field writes `null` and a non-nullable one is omitted.
+ */
+export function parseDurationValue(field: DashboardField, raw: string): ScalarParse {
+  if (raw.trim() === '') return field.nullable ? { value: null } : {};
+  const ms = parseWholeDuration(raw);
+  return isUndefined(ms) ? { error: 'dashboard.invalidDuration' } : { value: ms };
 }
 
 /**

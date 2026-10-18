@@ -228,6 +228,24 @@ export interface SlugFieldOptions {
 }
 
 /**
+ * The options of a `duration` field.
+ */
+export interface DurationFieldOptions {
+  /**
+   * The shortest legal duration, as milliseconds or text like `'5m'`.
+   *
+   * @default
+   * 0
+   */
+  min?: number | string;
+
+  /**
+   * The longest legal duration, as milliseconds or text like `'2h'`.
+   */
+  max?: number | string;
+}
+
+/**
  * The options of a `json` field.
  */
 export interface JSONFieldOptions {
@@ -627,6 +645,11 @@ export interface KnownFieldTypes {
    * A link to a record or to an address.
    */
   link: { options: LinkFieldOptions; value: Link };
+
+  /**
+   * A length of time as whole milliseconds.
+   */
+  duration: { options: DurationFieldOptions; value: number };
 
   /**
    * The URL-safe name of a record, as lowercase words joined by `-`.

@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import type { DashboardField } from '../../../src/dashboard/runtime/meta-types.ts';
 
 import {
+  parseDurationValue,
   parseIntegerValue,
   parseJSONValue,
   parseRealValue,
@@ -117,5 +118,21 @@ describe('parseJSONValue', () => {
 
   it('omits an emptied non-nullable field', () => {
     deepStrictEqual(parseJSONValue(field(), ''), {});
+  });
+});
+
+describe('parseDurationValue', () => {
+  it('parses duration text into milliseconds', () => {
+    deepStrictEqual(parseDurationValue(field(), '1h 30m'), { value: 5_400_000 });
+    deepStrictEqual(parseDurationValue(field(), '0'), { value: 0 });
+  });
+
+  it('refuses a bare number', () => {
+    deepStrictEqual(parseDurationValue(field(), '90'), { error: 'dashboard.invalidDuration' });
+  });
+
+  it('resolves an emptied nullable field to null, and omits a non-nullable one', () => {
+    deepStrictEqual(parseDurationValue(field({ nullable: true }), ' '), { value: null });
+    deepStrictEqual(parseDurationValue(field(), ''), {});
   });
 });

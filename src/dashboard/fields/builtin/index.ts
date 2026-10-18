@@ -4,6 +4,7 @@ import './code.ts';
 import './color.ts';
 import './date.ts';
 import './date-time.ts';
+import './duration.ts';
 import './email.ts';
 import './integer.ts';
 import './json.ts';
