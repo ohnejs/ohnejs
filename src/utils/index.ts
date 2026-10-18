@@ -82,6 +82,8 @@ export * from './duration/align-expiry.ts';
 export * from './duration/format-duration.ts';
 export * from './duration/measure.ts';
 export * from './duration/parse-duration.ts';
+export * from './duration/parse-whole-duration.ts';
+export * from './duration/stringify-duration.ts';
 export * from './error/error-message.ts';
 export * from './field-layout/field-layout.ts';
 export * from './field-layout/layout-field-names.ts';
