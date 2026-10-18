@@ -97,7 +97,8 @@ stat(() => ({ value: 0.082, previous: 0.117, trend: [0.15, 0.12, 0.1, 0.082] }),
   with `changeOf(current, previous)` from `ohnejs/utils`.
 
 `formatNumber(value, { compact, currency, percent, decimals, signed })` formats in the dashboard
-language and follows it when the language switches.
+language and follows it when the language switches. With a `currency`, the value is in major units
+and shows the currency's ISO 4217 digits unless you pass `decimals`.
 
 ## Line and area
 

@@ -76,8 +76,28 @@ Adding a required field to a collection that already holds records takes a
 - `number` holds finite decimals, exactly like a JavaScript number. `NaN` and the infinities are
   rejected.
 
-For money, use `integer` minor units (cents), not `number`. A double cannot represent a tenth
-exactly, so float arithmetic builds up small errors that money must not have.
+For money, use `integer` with a `currency`, never `number`. A double cannot represent a tenth
+exactly, so float arithmetic builds up small errors that money must not have:
+
+```ts
+// collections/Products.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    name: field('text'),
+    price: field('integer', { currency: 'EUR', min: 0 }),
+  },
+});
+```
+
+- The value counts minor units, so `1999` is 19.99 €. Writes, reads, and `where` all use that
+  number, and so do `min` and `max`.
+- The dashboard shows `19,99 €` in German, and takes the amount typed in major units.
+- The digits come from ISO 4217, so `JPY` has none and `KWD` has three.
+- The largest amount is 90,071,992,547,409.91 at two digits.
+- Changing `currency` reinterprets every stored value: `1999` in `EUR` reads as ¥1,999 in `JPY`.
+  Migrate the data when the digits differ.
 
 `text`, `integer`, and `number` take `min` and `max`. On `integer` and `number` they limit the
 value, and on `text` they limit the length in characters. The length is counted like

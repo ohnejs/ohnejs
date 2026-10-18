@@ -254,10 +254,12 @@ so normalize it first with `normalizeEmail` from `ohnejs/utils`.
   <img alt="The integer field in the dashboard" src="../images/field-types/integer-light.png">
 </picture>
 
-A whole number within JavaScript's safe range. For money, store minor units like cents.
+A whole number within JavaScript's safe range. With a `currency` it holds an
+[amount of money](./collections.md#column-fields) in minor units, so `1999` in `EUR` is 19.99 €.
 
 | Option            | Default   | What it does                                                                                                                                                                                       |
 | ----------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `currency`        | -         | The ISO 4217 currency the value counts in, as minor units: `1999` with `'EUR'` is 19.99 €. `min` and `max` count minor units, and `suffix`, `step` and a slider are refused beside it.             |
 | `default`         | -         | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                                                  |
 | `description`     | -         | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed.                            |
 | `display`         | `'input'` | The editor: `'input'`, or `'slider'` for an input beside a range track. A slider needs `min` and `max`. The stored value is the same either way.                                                   |
