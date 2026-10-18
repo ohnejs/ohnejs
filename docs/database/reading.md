@@ -51,7 +51,7 @@ await query('Posts')
 | `includes`, `includesAll`, `includesAny`       | [`multiSelect`](./field-types.md#multiselect), a [custom field type](./custom-field-types.md#storage) marked `jsonList`, and [`_translations`](./translations.md#reading) |
 | `includes`, `includesAny`                      | [`records`](#filtering-relations), by the linked record's `UUID`                                                                                                          |
 | `isNull`                                       | [Nullable fields](#null)                                                                                                                                                  |
-| `has`, `empty`                                 | [Relations](#filtering-relations), [`object`](./field-types.md#object), [`repeater`](./field-types.md#repeater), and [blocks](#blocks)                                    |
+| `has`, `empty`                                 | [Relations](#filtering-relations), [`object`](./field-types.md#object), [`range`](./field-types.md#range), [`repeater`](./field-types.md#repeater), and [blocks](#blocks) |
 
 An operator the field does not allow, like ordering on a boolean or `contains` on a number, does not
 compile.

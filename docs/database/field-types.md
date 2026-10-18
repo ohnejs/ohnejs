@@ -491,6 +491,73 @@ holds one group, or none when the field is `nullable`.
 | `when`         | -        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
 | `writable`     | `true`   | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
+### `range`
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/field-types/range-dark.png">
+  <img alt="The range field in the dashboard" src="../images/field-types/range-light.png">
+</picture>
+
+A start and an end of one kind: two days, two instants, or two times of day. `of` picks the kind,
+and each end is stored as a field of that type would store it. The dashboard edits the pair in two
+linked pickers, so the end can never land before the start.
+
+```ts
+// collections/Sieges.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  fields: {
+    name: field('text'),
+    window: field('range', { of: 'date', minSpan: '1 day' }),
+  },
+});
+```
+
+A record reads its range as `{ UUID, start, end }`. A write always takes both ends, as
+`{ start: '2008-11-13', end: '2008-11-20' }`, and the start must not lie after the end.
+
+The span is `end - start`. A range that starts and ends on the same day spans `0`, and a `dateTime`
+span counts real milliseconds, so `'1 day'` is always 24 hours.
+
+An `open` range may leave its `end` as `null`, for something that has begun but not ended.
+
+Filter a range through [`has`](./reading.md#filtering-relations), comparing its parts. This finds
+the sieges that overlap 14 to 15 November:
+
+```ts
+query('Sieges')
+  .where('window', (w) =>
+    w.has((r) => r.where('start', (s) => s.atMost('2008-11-15')).where('end', (e) => e.atLeast('2008-11-14'))),
+  )
+  .findMany();
+```
+
+Compare each part in its stored form: `YYYY-MM-DD` for a day, `HH:MM:SS` for a time, and epoch
+milliseconds for an instant. `orderBy('window')` sorts by the start.
+
+| Option         | Default  | What it does                                                                                                                                                            |
+| -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default`      | -        | A function that returns the range a [create](./writing.md#defaults) stores when its input leaves the field out.                                                         |
+| `description`  | -        | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `immutable`    | `false`  | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`        | -        | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`          | -        | The latest end, in the form the `of` type takes for its own `max`.                                                                                                      |
+| `maxSpan`      | -        | The longest span, as milliseconds or text like `'2 weeks'`. Not with `open`.                                                                                            |
+| `min`          | -        | The earliest start, in the form the `of` type takes for its own `min`.                                                                                                  |
+| `minSpan`      | -        | The shortest span, as milliseconds or text like `'1 day'`. Whole days for a `date` range.                                                                               |
+| `nullable`     | `false`  | Lets the record hold no range, read as `null`.                                                                                                                          |
+| `of`           | required | The kind of both ends: `date`, `dateTime`, or `time`.                                                                                                                   |
+| `open`         | `false`  | Lets the `end` stay `null`. Not for a `time` range, which starts and ends on one day.                                                                                   |
+| `readable`     | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`   | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`       | `true`   | Lets [search](./collections.md#search) match an end, as a field of its `of` type would.                                                                                 |
+| `timezone`     | -        | A fixed IANA zone the dashboard shows and edits a `dateTime` range in. Omitted, the viewer's own zone applies.                                                          |
+| `translatable` | `false`  | Keeps [one range per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `validators`   | -        | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`         | -        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`     | `true`   | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+
 ### `record`
 
 <picture>

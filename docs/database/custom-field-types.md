@@ -211,7 +211,8 @@ export default defineField({
 });
 ```
 
-The validators receive the whole value. A field of this type filters through
+For a start and an end of a date or time, the built-in [`range`](./field-types.md#range) already
+compares the ends as they are stored. The validators receive the whole value. A field of this type filters through
 [`has`](./reading.md#filtering-relations), like any object.
 
 `orderBy` names the part a query sorts by when it orders by the field itself. A field
