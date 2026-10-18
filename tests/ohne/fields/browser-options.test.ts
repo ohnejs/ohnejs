@@ -59,6 +59,7 @@ describe('browser field options', () => {
     assertDrift<'dateTime'>(true);
     assertDrift<'link'>(true);
     assertDrift<'json'>(true);
+    assertDrift<'slug'>(true);
     assertDrift<'record'>(true);
     assertDrift<'records'>(true);
     assertDrift<'object'>(true);

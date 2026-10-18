@@ -210,6 +210,24 @@ export interface ColorFieldOptions {
 }
 
 /**
+ * The options of a `slug` field.
+ */
+export interface SlugFieldOptions {
+  /**
+   * Whether the slug may hold `/` between segments, like `docs/install`.
+   *
+   * @default
+   * false
+   */
+  nested?: boolean;
+
+  /**
+   * The field the slug follows while you type, as a field path in `when` syntax.
+   */
+  from?: string;
+}
+
+/**
  * The options of a `json` field.
  */
 export interface JSONFieldOptions {
@@ -609,6 +627,11 @@ export interface KnownFieldTypes {
    * A link to a record or to an address.
    */
   link: { options: LinkFieldOptions; value: Link };
+
+  /**
+   * The URL-safe name of a record, as lowercase words joined by `-`.
+   */
+  slug: { options: SlugFieldOptions; value: string };
 
   /**
    * Any plain JSON value, a top-level scalar included.
