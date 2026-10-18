@@ -169,7 +169,7 @@ export default defineConfig({
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "ohnejs": ">=0.1.0 <0.2.0-0"
+    "ohnejs": ">=0.2.0 <0.3.0-0"
   }
 }
 ```
@@ -215,11 +215,12 @@ line, since the next line may break it:
 
 ```json
 {
-  "peerDependencies": { "ohnejs": ">=0.1.0 <0.2.0-0" }
+  "peerDependencies": { "ohnejs": ">=0.2.0 <0.3.0-0" }
 }
 ```
 
-- A line is a minor before 1.0 and a major from then on. A lone `>=0.1.0` reads the same.
+- A line is a minor before 1.0 and a major from then on. A lone floor, with no `<` bound, reads the
+  same.
 - When the ohne an app runs falls outside the range, `ohne dev`, `ohne prepare`, and a boot that
   runs codegen warn, naming the layer.
 - A range in any other shape, like `^0.1.0`, is left to the package manager.
@@ -276,7 +277,8 @@ export default defineLayer({
 ```
 
 `ohne.layer.ts` default-exports `defineLayer` with what the layer owns. A layer needs the file only
-when it adds config keys or generates files.
+when it adds config keys or generates files. ohne refuses a config key that no layer in the stack
+declares in `defaults` or `strategies`.
 
 - `defaults` apply when no project sets the key. Once codegen has run, a key with a default is
   always present, so you read [`useConfig()`](./config.md#reading-config)`.blog.pageSize` without a

@@ -8,14 +8,17 @@ import { isPlainObject } from '../src/utils/is/is-plain-object.ts';
 import { isString } from '../src/utils/is/is-string.ts';
 import { merge } from '../src/utils/merge/merge.ts';
 import { codeFences } from '../src/utils/text/code-fences.ts';
+import { nextVersionLine } from '../src/utils/version/next-version-line.ts';
 
 /**
  * Rewrites the pins of every starter `package.json` shown in `docs/` to match `package.json`.
  * A starter is a `json` fence whose `dependencies.ohnejs` is a string, the shape `ohne init` writes.
+ * It also moves every `ohnejs` peer range to the current line, so the layer example takes this release.
  * Only the pinned fields move, so a page's own `name` or `scripts` survive.
  */
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PINS = { dependencies: { ohnejs: version }, ...toolchain };
+const PEER = `>=${version} <${nextVersionLine(version)}-0`;
 
 const changed: string[] = [];
 
@@ -31,6 +34,7 @@ for (const entry of (await listDir(resolve(ROOT, 'docs'), { ext: 'md' })) ?? [])
     const pinned = JSON.stringify(merge(manifest, PINS), null, 2);
     next = next.slice(0, fence.start) + pinned + next.slice(fence.end);
   }
+  next = next.replace(/("ohnejs": ")>=[^"]*(")/g, `$1${PEER}$2`);
 
   if (await writeFileIfChanged(entry.path, next)) changed.push(`docs/${entry.relativePath}`);
 }

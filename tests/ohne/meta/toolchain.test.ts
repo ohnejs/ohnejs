@@ -7,7 +7,7 @@ import pkg from '../../../package.json' with { type: 'json' };
 import { toolchain } from '../../../src/ohne/meta/toolchain.ts';
 import { version } from '../../../src/ohne/meta/version.ts';
 import { listDir } from '../../../src/utils/fs/index.ts';
-import { codeFences } from '../../../src/utils/index.ts';
+import { codeFences, nextVersionLine } from '../../../src/utils/index.ts';
 
 const DOCS = join(import.meta.dirname, '../../../docs');
 
@@ -49,6 +49,18 @@ describe('toolchain', () => {
         { ohnejs: version, ...toolchain },
         page,
       );
+    }
+  });
+
+  it('sets every docs peer range on `ohnejs` to the current line, so run `pnpm sync:starter` after a bump', async () => {
+    const ranges: [string, string][] = [];
+    for (const entry of (await listDir(DOCS, { ext: 'md' })) ?? []) {
+      for (const [, range] of readFileSync(entry.path, 'utf8').matchAll(/"ohnejs": "(>=[^"]*)"/g))
+        ranges.push([entry.relativePath, range as string]);
+    }
+    ok(ranges.length > 0);
+    for (const [page, range] of ranges) {
+      deepStrictEqual(range, `>=${version} <${nextVersionLine(version)}-0`, page);
     }
   });
 });
