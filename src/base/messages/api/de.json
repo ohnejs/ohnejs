@@ -1,5 +1,6 @@
 {
   "body": {
+    "containsNUL": "Anfragekörper enthält ein NUL-Zeichen",
     "empty": "Anfragekörper ist leer",
     "invalidForm": "Anfragekörper sind keine gültigen Formulardaten",
     "invalidJSON": "Anfragekörper ist kein gültiges JSON",
@@ -27,5 +28,8 @@
   "messages": {
     "invalidLanguage": "Ungültige Sprache `{language}`",
     "unknownGroup": "Unbekannte Nachrichtengruppe `{group}`"
+  },
+  "url": {
+    "containsNUL": "Anfrage-URL enthält ein NUL-Zeichen"
   }
 }

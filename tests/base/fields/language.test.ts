@@ -3,7 +3,6 @@ import { describe, it } from 'node:test';
 
 import languageField from '../../../src/base/fields/language.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
@@ -14,6 +13,7 @@ import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { createTypeImports } from '../../../src/utils/codegen/index.ts';
+import { connectTest, dialect } from '../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -27,8 +27,7 @@ useCollections().register('LanguageAccounts', {
   collection: { fields: { name: field('text'), language: field('language') } },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

@@ -13,7 +13,6 @@ import passwordField from '../../../../src/base/fields/password.ts';
 import rolesField from '../../../../src/base/fields/roles.ts';
 import timezoneField from '../../../../src/base/fields/timezone.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -22,6 +21,7 @@ import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -36,8 +36,7 @@ useFields().register('datePattern', { name: 'datePattern', fieldType: datePatter
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

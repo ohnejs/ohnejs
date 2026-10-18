@@ -20,7 +20,6 @@ import rolesField from '../../../src/base/fields/roles.ts';
 import timezoneField from '../../../src/base/fields/timezone.ts';
 import { useBlocks } from '../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { seedSingletons } from '../../../src/ohne/database/seed-singletons.ts';
@@ -38,6 +37,7 @@ import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
 import { routeID } from '../../../src/ohne/routes/route.ts';
 import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
 import { isNull } from '../../../src/utils/index.ts';
+import { connectTest, dialect } from '../../_dialect.ts';
 
 const printed: string[] = [];
 usePrinter().configure({
@@ -425,8 +425,7 @@ useRoutes().register(routeID('POST', '/collections/[collection]/query'), {
   handler: () => null,
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

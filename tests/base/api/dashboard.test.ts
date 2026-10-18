@@ -22,7 +22,6 @@ import rolesField from '../../../src/base/fields/roles.ts';
 import timezoneField from '../../../src/base/fields/timezone.ts';
 import { useBlocks } from '../../../src/ohne/blocks/use-blocks.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../src/ohne/database/use-database.ts';
@@ -41,6 +40,7 @@ import { collectRoutes } from '../../../src/ohne/routes/collect-routes.ts';
 import { routeID } from '../../../src/ohne/routes/route.ts';
 import { useRoutes } from '../../../src/ohne/routes/use-routes.ts';
 import { joinPath, keyBy } from '../../../src/utils/index.ts';
+import { connectTest, dialect } from '../../_dialect.ts';
 
 declare module 'ohnejs' {
   interface KnownMessages {
@@ -315,8 +315,7 @@ useCollections().register('DashSettings', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

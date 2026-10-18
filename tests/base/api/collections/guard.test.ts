@@ -20,7 +20,6 @@ import rolesField from '../../../../src/base/fields/roles.ts';
 import timezoneField from '../../../../src/base/fields/timezone.ts';
 import requireAuthMiddleware from '../../../../src/base/middleware/require-auth.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -32,6 +31,7 @@ import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../../src/ohne/roles/use-roles.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -81,8 +81,7 @@ useCollections().register('GuardMixed', {
 
 useMiddleware().register('guard-note', () => undefined);
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

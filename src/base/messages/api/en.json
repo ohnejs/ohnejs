@@ -1,5 +1,6 @@
 {
   "body": {
+    "containsNUL": "Request body contains a NUL character",
     "empty": "Request body is empty",
     "invalidForm": "Request body is not valid form data",
     "invalidJSON": "Request body is not valid JSON",
@@ -27,5 +28,8 @@
   "messages": {
     "invalidLanguage": "Invalid language `{language}`",
     "unknownGroup": "Unknown message group `{group}`"
+  },
+  "url": {
+    "containsNUL": "Request URL contains a NUL character"
   }
 }

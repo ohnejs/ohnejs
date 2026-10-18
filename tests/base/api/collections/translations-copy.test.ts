@@ -5,7 +5,6 @@ import type { AnyHandler, Route } from '../../../../src/ohne/routes/route.ts';
 
 import copyPost from '../../../../src/base/api/collections/[collection]/[uuid]/translations/copy.post.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -16,6 +15,7 @@ import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { isEmpty } from '../../../../src/utils/index.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -95,8 +95,7 @@ useCollections().register('CpGuarded', {
   collection: { api: { update: true }, fields: { title: field('text', { translatable: true }) } },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {

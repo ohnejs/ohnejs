@@ -10,7 +10,6 @@ import translationsGet from '../../../../src/base/api/collections/[collection]/[
 import listGet from '../../../../src/base/api/collections/[collection]/index.get.ts';
 import queryPost from '../../../../src/base/api/collections/[collection]/query.post.ts';
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
@@ -23,6 +22,7 @@ import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { isNull } from '../../../../src/utils/index.ts';
+import { connectTest, dialect } from '../../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -123,8 +123,7 @@ useCollections().register('TrLinks', {
   },
 });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 
 let queries = 0;
 const counting: DatabaseAdapter = {

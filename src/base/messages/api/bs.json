@@ -1,5 +1,6 @@
 {
   "body": {
+    "containsNUL": "Tijelo zahtjeva sadrži NUL znak",
     "empty": "Tijelo zahtjeva je prazno",
     "invalidForm": "Tijelo zahtjeva nisu važeći podaci forme",
     "invalidJSON": "Tijelo zahtjeva nije važeći JSON",
@@ -27,5 +28,8 @@
   "messages": {
     "invalidLanguage": "Neispravan jezik `{language}`",
     "unknownGroup": "Nepoznata grupa poruka `{group}`"
+  },
+  "url": {
+    "containsNUL": "URL zahtjeva sadrži NUL znak"
   }
 }

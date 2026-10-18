@@ -16,7 +16,6 @@ import passwordField from '../../../src/base/fields/password.ts';
 import rolesField from '../../../src/base/fields/roles.ts';
 import timezoneField from '../../../src/base/fields/timezone.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
-import { SQLiteDialect } from '../../../src/ohne/database/dialects/sqlite/dialect.ts';
 import { collectionTableName } from '../../../src/ohne/database/naming/table-names.ts';
 import { buildDesiredSchema } from '../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../src/ohne/database/schema/sync.ts';
@@ -28,6 +27,7 @@ import { useMessages } from '../../../src/ohne/messages/use-messages.ts';
 import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { hashPassword } from '../../../src/utils/crypto/hash-password.ts';
+import { connectTest, dialect } from '../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
@@ -47,8 +47,7 @@ useFields().register('datePattern', { name: 'datePattern', fieldType: datePatter
 useCollections().register('Users', { name: 'Users', collection: UsersCollection });
 useCollections().register('Sessions', { name: 'Sessions', collection: SessionsCollection });
 
-const dialect = new SQLiteDialect();
-const db = await dialect.connect(':memory:');
+const db = await connectTest();
 registerDialect(dialect);
 registerDatabase(db);
 await syncDatabase(db, dialect, {
@@ -148,5 +147,21 @@ describe('the sessions boot file', () => {
     await login('rehash@example.com');
 
     strictEqual(await status(phone), 200);
+  });
+
+  it('ends the other sessions on a real password change after a rehash on the same connection', async () => {
+    await account('after-rehash@example.com');
+    const stale = await hashPassword('correct horse', { cost: 2048 });
+    await db.run(`UPDATE "${collectionTableName('Users')}" SET "password" = ? WHERE "email" = ?`, [
+      stale,
+      'after-rehash@example.com',
+    ]);
+    const phone = await login('after-rehash@example.com');
+    const laptop = await login('after-rehash@example.com');
+
+    strictEqual((await call(ROUTES.patch, phone, { password: 'new horse' })).status, 200);
+
+    strictEqual(await status(phone), 200);
+    strictEqual(await status(laptop), 204);
   });
 });
