@@ -235,6 +235,7 @@
     "welcomeMessage": "Willkommen bei ohne! Gib deine Daten ein, um das primäre Administratorkonto zu erstellen."
   },
   "invalidAmount": "Betrag wie `{example}` eingeben",
+  "invalidDuration": "Dauer wie `1h 30m` eingeben",
   "invalidInteger": "Ganze Zahl eingeben",
   "invalidNumber": "Zahl eingeben",
   "layout": {

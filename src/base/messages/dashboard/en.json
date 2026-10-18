@@ -235,6 +235,7 @@
     "welcomeMessage": "Welcome to ohne! Enter your details to create your primary administrator account."
   },
   "invalidAmount": "Enter an amount like `{example}`",
+  "invalidDuration": "Enter a duration like `1h 30m`",
   "invalidInteger": "Enter a whole number",
   "invalidNumber": "Enter a number",
   "layout": {

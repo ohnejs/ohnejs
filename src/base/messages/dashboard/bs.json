@@ -235,6 +235,7 @@
     "welcomeMessage": "Dobrodošli u ohne! Unesite svoje podatke da kreirate primarni administratorski račun."
   },
   "invalidAmount": "Unesite iznos kao `{example}`",
+  "invalidDuration": "Unesite trajanje poput `1h 30m`",
   "invalidInteger": "Unesite cijeli broj",
   "invalidNumber": "Unesite broj",
   "layout": {
