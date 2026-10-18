@@ -178,4 +178,25 @@ describe('dynamicChips', () => {
       strictEqual(hasClass(root, 'ohne-dynamic-chips-dropdown-visible'), false);
     });
   });
+
+  describe('touch', () => {
+    it('leaves a touch on a chip to the page and calls a double tap a double-click', async () => {
+      const opened: Primitive[] = [];
+      const root = dynamicChips(ref([7]), {
+        choicesResolver: () =>
+          Promise.resolve({ choices: [], currentPage: 1, lastPage: 1, perPage: 10, total: 0 }),
+        selectedChoicesResolver: () => Promise.resolve([{ value: 7, label: 'Jaina' }]),
+        onDblclick: (value) => opened.push(value),
+      }) as unknown as FakeElement;
+      await settle();
+      const chip = findElement(root, (element) => hasClass(element, 'ohne-dynamic-chips-item'))!;
+      const touches = [{ clientX: 0, clientY: 0 }];
+      const starts = [0, 150].map((timeStamp) => {
+        const start = fire(chip, 'touchstart', { touches, timeStamp });
+        fire(chip, 'touchend', { timeStamp: timeStamp + 50 });
+        return start.defaultPrevented;
+      });
+      deepStrictEqual([starts, opened], [[false, false], [7]]);
+    });
+  });
 });

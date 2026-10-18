@@ -177,7 +177,7 @@ css`
  *
  * Every instance shares the `structureDraggable` signal.
  * A drag started in one structure lights up the drop zones of every structure that accepts it.
- * A mouseup over a zone moves the item.
+ * A pointerup over a zone moves the item.
  * A same-structure drop reorders in place.
  * A cross-structure drop inserts here first and removes from the donor a tick later.
  * So the item transiently exists in both lists.
@@ -322,7 +322,7 @@ export function structure<TItem extends Record<string, unknown>>(
         class: () =>
           'ohne-structure-empty-zone' +
           (structureDraggable.value?.touch ? ' ohne-structure-empty-zone-highlighted' : ''),
-        onMouseup: () => onDrop(0, 'before'),
+        onPointerup: () => onDrop(0, 'before'),
       },
       h('p', null, dropItemsHereLabel),
     );

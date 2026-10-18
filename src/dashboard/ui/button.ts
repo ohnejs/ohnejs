@@ -141,27 +141,14 @@ css`
     color: hsl(var(--ohne-primary-foreground));
   }
 
-  .ohne-button-primary:hover {
-    background-color: hsl(var(--ohne-primary) / 0.9);
-  }
-
   .ohne-button-secondary {
     background-color: hsl(var(--ohne-secondary));
     color: hsl(var(--ohne-secondary-foreground));
   }
 
-  .ohne-button-secondary:hover {
-    background-color: hsl(var(--ohne-accent));
-    color: hsl(var(--ohne-accent-foreground));
-  }
-
   .ohne-button-accent {
     background-color: hsl(var(--ohne-accent));
     color: hsl(var(--ohne-accent-foreground));
-  }
-
-  .ohne-button-accent:hover {
-    background-color: hsl(var(--ohne-accent) / 0.9);
   }
 
   .ohne-button-destructive {
@@ -170,38 +157,68 @@ css`
     color: hsl(var(--ohne-destructive-foreground));
   }
 
-  .ohne-button-destructive:hover {
-    background-color: hsl(var(--ohne-destructive) / 0.9);
-  }
-
   .ohne-button-outline {
     background-color: hsl(var(--ohne-background));
     border: 1px solid hsl(var(--ohne-input));
-  }
-
-  .ohne-button-outline:hover {
-    background-color: hsl(var(--ohne-accent));
-    border: 1px solid hsl(var(--ohne-accent));
-    color: hsl(var(--ohne-accent-foreground));
   }
 
   .ohne-button-ghost {
     background-color: transparent;
   }
 
-  .ohne-button-ghost:hover {
-    background-color: hsl(var(--ohne-accent));
-    color: hsl(var(--ohne-accent-foreground));
-  }
-
   .ohne-button-destructive-hover {
     --ohne-ring: var(--ohne-destructive);
   }
 
-  .ohne-button-destructive-hover:hover {
-    background-color: hsl(var(--ohne-destructive) / 0.9);
-    border-color: hsl(var(--ohne-destructive));
-    color: hsl(var(--ohne-destructive-foreground));
+  @media (hover: hover) {
+    .ohne-button-primary:hover {
+      background-color: hsl(var(--ohne-primary) / 0.9);
+    }
+
+    .ohne-button-secondary:hover {
+      background-color: hsl(var(--ohne-accent));
+      color: hsl(var(--ohne-accent-foreground));
+    }
+
+    .ohne-button-accent:hover {
+      background-color: hsl(var(--ohne-accent) / 0.9);
+    }
+
+    .ohne-button-destructive:hover {
+      background-color: hsl(var(--ohne-destructive) / 0.9);
+    }
+
+    .ohne-button-outline:hover {
+      background-color: hsl(var(--ohne-accent));
+      border: 1px solid hsl(var(--ohne-accent));
+      color: hsl(var(--ohne-accent-foreground));
+    }
+
+    .ohne-button-ghost:hover {
+      background-color: hsl(var(--ohne-accent));
+      color: hsl(var(--ohne-accent-foreground));
+    }
+
+    .ohne-button-destructive-hover:hover {
+      background-color: hsl(var(--ohne-destructive) / 0.9);
+      border-color: hsl(var(--ohne-destructive));
+      color: hsl(var(--ohne-destructive-foreground));
+    }
+  }
+
+  .ohne-button-primary[aria-haspopup][aria-expanded='true'] {
+    background-color: hsl(var(--ohne-primary) / 0.9);
+  }
+
+  :is(.ohne-button-secondary, .ohne-button-ghost)[aria-haspopup][aria-expanded='true'] {
+    background-color: hsl(var(--ohne-accent));
+    color: hsl(var(--ohne-accent-foreground));
+  }
+
+  .ohne-button-outline[aria-haspopup][aria-expanded='true'] {
+    background-color: hsl(var(--ohne-accent));
+    border-color: hsl(var(--ohne-accent));
+    color: hsl(var(--ohne-accent-foreground));
   }
 
   .ohne-button:focus-visible {

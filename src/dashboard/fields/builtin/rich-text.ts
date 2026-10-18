@@ -162,6 +162,8 @@ export const richTextType: FieldType<RichTextFieldOptions> = {
         bulletList: t('dashboard.richText.bulletList'),
         orderedList: t('dashboard.richText.orderedList'),
         quote: t('dashboard.richText.quote'),
+        indent: t('dashboard.richText.indent'),
+        outdent: t('dashboard.richText.outdent'),
         strong: t('dashboard.richText.strong'),
         em: t('dashboard.richText.em'),
         del: t('dashboard.richText.del'),

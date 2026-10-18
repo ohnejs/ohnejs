@@ -23,6 +23,7 @@ import { formatNumber } from '../runtime/number.ts';
 import { isResource, resourceState } from '../runtime/resource.ts';
 import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { helpIcon } from './_help-icon.ts';
+import { longPress } from './_long-press.ts';
 import { button } from './button.ts';
 import { checkbox } from './checkbox.ts';
 import { icon } from './icon.ts';
@@ -81,7 +82,7 @@ export interface TableOptions<T, K extends string | number, C extends string> {
   empty?: Text | Node;
 
   /**
-   * Turns on row checkboxes, shift ranges, and the select-all box.
+   * Turns on row checkboxes, the select-all box, and ranges by Shift or a long press on touch.
    */
   selection?: TableSelection<T, K>;
 
@@ -100,6 +101,7 @@ export interface TableOptions<T, K extends string | number, C extends string> {
   /**
    * Called when the reader opens a row.
    * A click opens it, or a double-click on a table with `selection`; Enter opens a focused row.
+   * On touch a tap opens it, or toggles its checkbox while the checkboxes show.
    */
   onOpen?: (row: T) => void;
 
@@ -132,6 +134,7 @@ type Phase = 'forbidden' | 'error' | 'loading' | 'empty' | 'rows';
 const IGNORED = 'a, button, input, textarea, select, label, [contenteditable]';
 const SKELETON_ROWS = 5;
 const NO_KEYS: ReadonlySet<never> = new Set();
+const TOUCH_DURATION = 500;
 
 const shiftHeld = ref(false);
 let shiftTracked = false;
@@ -141,7 +144,7 @@ css`
     --ohne-table-check: calc(1rem + var(--ohne-table-button) * 0.125rem + 1.375rem);
     --ohne-table-kebab: calc(2 * (1rem + var(--ohne-table-button) * 0.125rem) + 1.75rem);
     --ohne-table-bg: hsl(var(--ohne-table-surface, var(--ohne-background)));
-    --ohne-table-shadow: hsl(var(--ohne-foreground) / 0.14);
+    --ohne-table-shadow: rgb(0 0 0 / 0.08);
     container-type: inline-size;
     display: flex;
     flex-direction: column;
@@ -150,17 +153,80 @@ css`
     min-height: 0;
   }
 
+  .dark .ohne-table {
+    --ohne-table-shadow: rgb(0 0 0 / 0.4);
+  }
+
+  .ohne-table-viewport {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .ohne-table-viewport::before,
+  .ohne-table-viewport::after,
+  .ohne-table-grid :where(th, td):is(.ohne-table-check, .ohne-table-actions)::before {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    width: 1rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: var(--ohne-transition);
+    transition-property: opacity;
+  }
+
+  .ohne-table-viewport::before,
+  .ohne-table-viewport::after {
+    bottom: var(--ohne-table-scrollbar-x, 0px);
+  }
+
+  .ohne-table-viewport::before,
+  .ohne-table-grid :where(th, td).ohne-table-check::before {
+    background: linear-gradient(to right, var(--ohne-table-shadow), transparent);
+  }
+
+  .ohne-table-viewport::after,
+  .ohne-table-grid :where(th, td).ohne-table-actions::before {
+    background: linear-gradient(to left, var(--ohne-table-shadow), transparent);
+  }
+
+  .ohne-table-viewport::before {
+    left: 0;
+  }
+
+  .ohne-table-viewport::after {
+    right: var(--ohne-table-scrollbar-y, 0px);
+  }
+
+  .ohne-table-grid :where(th, td).ohne-table-check::before {
+    bottom: 0;
+    left: 100%;
+  }
+
+  .ohne-table-grid :where(th, td).ohne-table-actions::before {
+    bottom: 0;
+    right: 100%;
+  }
+
+  /* A pinned column casts the edge's shadow itself, so it ends with the last row. */
+  .ohne-table-overflow-start:not(.ohne-table-pinned-start)::before,
+  .ohne-table-overflow-end:not(.ohne-table-pinned-end)::after,
+  .ohne-table-overflow-start.ohne-table-pinned-start :where(th, td).ohne-table-check::before,
+  .ohne-table-overflow-end.ohne-table-pinned-end :where(th, td).ohne-table-actions::before {
+    opacity: 1;
+  }
+
   .ohne-table-scroller {
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
     outline: none;
-    background:
-      linear-gradient(to right, var(--ohne-table-bg) 30%, transparent) left / 2.5rem 100% local,
-      linear-gradient(to left, var(--ohne-table-bg) 30%, transparent) right / 2.5rem 100% local,
-      linear-gradient(to right, var(--ohne-table-shadow), transparent) left / 1rem 100% scroll,
-      linear-gradient(to left, var(--ohne-table-shadow), transparent) right / 1rem 100% scroll;
-    background-repeat: no-repeat;
+    /* The sticky cells' z-indexes stay inside the table, under page chrome like a sticky toolbar. */
+    isolation: isolate;
   }
 
   .ohne-table-grid {
@@ -187,7 +253,7 @@ css`
 
   .ohne-table-grid :where(th) {
     position: sticky;
-    z-index: 11;
+    z-index: 13;
     top: 0;
     padding: 0.6875rem 0 0.6875rem 0.75rem;
     background-color: var(--ohne-table-bg);
@@ -215,25 +281,24 @@ css`
     text-align: end;
   }
 
-  .ohne-table-grid :where(th, td):is(.ohne-table-check, .ohne-table-first) {
+  .ohne-table-grid :where(th, td).ohne-table-check {
     position: sticky;
     z-index: 12;
     left: 0;
     background-color: var(--ohne-table-bg);
   }
 
-  .ohne-table-grid :where(th):is(.ohne-table-check, .ohne-table-first, .ohne-table-actions) {
-    z-index: 13;
-  }
-
-  .ohne-table-checks :where(th, td).ohne-table-first {
-    left: var(--ohne-table-check);
-  }
-
   .ohne-table-grid :where(th, td).ohne-table-check {
     width: var(--ohne-table-check);
     min-width: var(--ohne-table-check);
     padding-right: 0.25rem;
+    -webkit-touch-callout: none;
+  }
+
+  .ohne-table-check .ohne-checkbox-button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
   }
 
   .ohne-table-grid :where(th, td).ohne-table-actions {
@@ -242,6 +307,11 @@ css`
     right: 0;
     width: var(--ohne-table-kebab);
     min-width: var(--ohne-table-kebab);
+    background-color: var(--ohne-table-bg);
+  }
+
+  .ohne-table-grid :where(th):is(.ohne-table-check, .ohne-table-actions) {
+    z-index: 14;
   }
 
   .ohne-table-grid :where(th).ohne-table-actions {
@@ -306,7 +376,7 @@ css`
 
   /* Every header is sticky and opaque, so the next one would paint over a focus ring. */
   .ohne-table-grid :where(th):has(> .ohne-table-head :focus-visible) {
-    z-index: 14;
+    z-index: 15;
   }
 
   .ohne-table-sort > svg {
@@ -315,7 +385,7 @@ css`
   }
 
   /* Opacity, not display, so a focused header still shows where its icon sits. */
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .ohne-table-grid
       :where(th)[aria-sort='none']:not(:hover)
       .ohne-table-sort:not(:focus-visible)
@@ -362,12 +432,22 @@ css`
     cursor: pointer;
   }
 
-  .ohne-table-clickable:hover > td {
-    background-image: linear-gradient(hsl(var(--ohne-muted) / 0.5), hsl(var(--ohne-muted) / 0.5));
+  @media (hover: hover) {
+    .ohne-table-clickable:hover > td {
+      background-image: linear-gradient(hsl(var(--ohne-muted) / 0.5), hsl(var(--ohne-muted) / 0.5));
+    }
   }
 
   .ohne-table-state > td {
     white-space: normal;
+  }
+
+  /* Centred in the visible box, not across the full width of the scrolled columns. */
+  .ohne-table-state > td > * {
+    position: sticky;
+    left: 0.75rem;
+    box-sizing: border-box;
+    width: calc(100cqw - 1.5rem);
   }
 
   .ohne-table > .ohne-pagination {
@@ -403,7 +483,7 @@ function trackShift(): void {
  * Sortable headers sort on the client, or only write `sort` with `serverSort`.
  * The header sticks while the table has a bounded height.
  * The checkbox and first columns stick to the start, the actions column to the end.
- * Rows open by `href` or `onOpen`, select with checkboxes and shift ranges, and carry an actions menu.
+ * Rows open by `href` or `onOpen`, select with checkboxes and ranges, and carry an actions menu.
  *
  * @example
  * ```ts
@@ -519,11 +599,11 @@ export function table<T, K extends string | number, C extends string = string>(
     write(next);
   };
 
-  const toggleRow = (item: K, value: boolean): void => {
+  const toggleRow = (item: K, value: boolean, ranging = untracked(() => shiftHeld.value)): void => {
     const origin = untracked(() => anchor.value);
     const list = untracked(shown);
     const onScreen = list.some((row, index) => key(row, index) === origin);
-    if (untracked(() => shiftHeld.value) && !isNull(origin) && origin !== item && onScreen) {
+    if (ranging && !isNull(origin) && origin !== item && onScreen) {
       write(rangeSelect(list, key, untracked(selected), origin, item, value, admits));
       return;
     }
@@ -623,8 +703,7 @@ export function table<T, K extends string | number, C extends string = string>(
     return h('th', { class: 'ohne-table-check' }, box);
   };
 
-  const checkCell = (row: () => T, index: () => number): HTMLElement => {
-    const item = (): K => key(row(), index());
+  const checkCell = (row: () => T, item: () => K): HTMLElement => {
     const model: Ref<boolean> = {
       get value() {
         return selected().has(item());
@@ -633,15 +712,46 @@ export function table<T, K extends string | number, C extends string = string>(
         toggleRow(untracked(item), next);
       },
     };
-    return h(
+    let touching = false;
+    let pressed = false;
+    const press = longPress(TOUCH_DURATION, () => {
+      pressed = true;
+      const current = untracked(item);
+      toggleRow(current, !untracked(selected).has(current), true);
+    });
+    const cell = h(
       'td',
-      { class: 'ohne-table-check' },
+      {
+        class: 'ohne-table-check',
+        onPointerdown: (event: PointerEvent) => {
+          touching = event.pointerType === 'touch';
+          pressed = false;
+          if (touching && admits(untracked(row))) press.start(event);
+        },
+        onPointermove: (event: PointerEvent) => press.move(event),
+        onPointerup: () => press.end(),
+        onPointercancel: () => press.end(),
+        onContextmenu: (event: Event) => {
+          if (touching) event.preventDefault();
+        },
+      },
       checkbox(model, undefined, {
         variant: 'accent',
         disabled: () => !admits(row()) || (shiftHeld.value && anchor.value === item()),
         ariaLabel: () => defaultText('dashboard.selectRow', 'Select row'),
       }),
     );
+    // Capture, so the click a long press may still release never reaches the box to undo it.
+    cell.addEventListener(
+      'click',
+      (event) => {
+        if (!pressed || event.detail === 0) return;
+        pressed = false;
+        event.stopPropagation();
+      },
+      true,
+    );
+    return cell;
   };
 
   const kebabCell = (items: (row: T) => readonly MenuItem[], row: () => T): HTMLElement =>
@@ -671,6 +781,7 @@ export function table<T, K extends string | number, C extends string = string>(
   };
 
   const dataRow = (row: () => T, index: () => number): HTMLElement => {
+    const item = (): K => key(row(), index());
     const fromInside = (event: Event): boolean =>
       event.target instanceof Element && !isNull(event.target.closest(IGNORED));
     const newTab = (event: MouseEvent | KeyboardEvent): boolean =>
@@ -678,15 +789,29 @@ export function table<T, K extends string | number, C extends string = string>(
     const pointer = (event: MouseEvent): void => {
       if (!fromInside(event)) open(untracked(row), newTab(event));
     };
+    let touch = false;
+    const tap = (event: MouseEvent): void => {
+      if (!touch || fromInside(event)) return;
+      const current = untracked(row);
+      if (!untracked(showChecks)) open(current, false);
+      else if (admits(current)) {
+        const selecting = untracked(item);
+        toggleRow(selecting, !untracked(selected).has(selecting));
+      }
+    };
     return h(
       'tr',
       openable
         ? {
             tabindex: 0,
             class: selection ? 'ohne-table-openable' : 'ohne-table-openable ohne-table-clickable',
-            onClick: selection ? undefined : pointer,
+            onPointerdown: (event: PointerEvent) => {
+              touch = event.pointerType === 'touch';
+            },
+            onClick: selection ? tap : pointer,
             onDblclick: selection
               ? (event: MouseEvent) => {
+                  if (touch) return;
                   window.getSelection()?.removeAllRanges();
                   pointer(event);
                 }
@@ -703,7 +828,7 @@ export function table<T, K extends string | number, C extends string = string>(
             },
           }
         : null,
-      when(showChecks, () => checkCell(row, index)),
+      when(showChecks, () => checkCell(row, item)),
       entries.map(([, column], position) =>
         h('td', { class: cellClass(column, position) }, () => bodyCell(column, row())),
       ),
@@ -776,7 +901,6 @@ export function table<T, K extends string | number, C extends string = string>(
       class: () =>
         'ohne-table-grid' +
         (options.fixed ? ' ohne-table-fixed' : '') +
-        (showChecks() ? ' ohne-table-checks' : '') +
         (phase.value === 'rows' || phase.value === 'loading' ? '' : ' ohne-table-filled'),
       'aria-busy': () => (phase.value === 'loading' ? 'true' : null),
     },
@@ -810,6 +934,38 @@ export function table<T, K extends string | number, C extends string = string>(
     keyed(() => phase.value, body),
   );
 
+  const scroller = h(
+    'div',
+    {
+      tabindex: -1,
+      class: 'ohne-table-scroller o-scrollbar',
+      style: isUndefined(options.maxHeight) ? undefined : `max-height: ${options.maxHeight}`,
+      onScroll: () => measureOverflow(),
+    },
+    grid,
+  );
+  const viewport = h('div', { class: 'ohne-table-viewport' }, scroller);
+  effect(() => {
+    const filled = phase.value === 'rows' || phase.value === 'loading';
+    viewport.classList.toggle('ohne-table-pinned-start', filled && showChecks());
+    viewport.classList.toggle('ohne-table-pinned-end', filled && !isUndefined(actions));
+  });
+  const measureOverflow = (): void => {
+    const { scrollLeft, clientWidth, scrollWidth, offsetWidth, clientHeight, offsetHeight } =
+      scroller;
+    viewport.classList.toggle('ohne-table-overflow-start', scrollLeft > 0);
+    viewport.classList.toggle(
+      'ohne-table-overflow-end',
+      scrollLeft + clientWidth < scrollWidth - 1,
+    );
+    viewport.style.setProperty('--ohne-table-scrollbar-y', `${offsetWidth - clientWidth}px`);
+    viewport.style.setProperty('--ohne-table-scrollbar-x', `${offsetHeight - clientHeight}px`);
+  };
+  const resize = new ResizeObserver(measureOverflow);
+  resize.observe(scroller);
+  resize.observe(grid);
+  onCleanup(() => resize.disconnect());
+
   return h(
     'div',
     {
@@ -818,15 +974,7 @@ export function table<T, K extends string | number, C extends string = string>(
         `--ohne-table-button: ${buttonSize}` +
         (isUndefined(options.size) ? '' : `; --ohne-size: ${options.size}`),
     },
-    h(
-      'div',
-      {
-        tabindex: -1,
-        class: 'ohne-table-scroller o-scrollbar',
-        style: isUndefined(options.maxHeight) ? undefined : `max-height: ${options.maxHeight}`,
-      },
-      grid,
-    ),
+    viewport,
     isUndefined(pageSize)
       ? null
       : pagination({

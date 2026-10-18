@@ -74,8 +74,10 @@ css`
     text-decoration: none;
   }
 
-  .ohne-page-back:not(.ohne-raw):hover {
-    color: hsl(var(--ohne-foreground));
+  @media (hover: hover) {
+    .ohne-page-back:not(.ohne-raw):hover {
+      color: hsl(var(--ohne-foreground));
+    }
   }
 
   .ohne-page-title-row {

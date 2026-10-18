@@ -158,7 +158,12 @@ css`
     flex-shrink: 0;
     gap: 0.125rem;
     margin-left: auto;
-    visibility: hidden;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ohne-blocks-tree-actions {
+      visibility: hidden;
+    }
   }
 
   .ohne-tree-item:hover .ohne-blocks-tree-actions,

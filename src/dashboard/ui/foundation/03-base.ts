@@ -65,8 +65,10 @@ css`
     text-decoration: none;
   }
 
-  :is(a, button):not(.ohne-raw):hover {
-    color: hsl(var(--ohne-foreground) / 0.64);
+  @media (hover: hover) {
+    :is(a, button):not(.ohne-raw):hover {
+      color: hsl(var(--ohne-foreground) / 0.64);
+    }
   }
 
   :is(a, button):not(.ohne-raw):focus-visible {

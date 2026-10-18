@@ -7,6 +7,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { defaultText } from '../runtime/text.ts';
+import { longPress } from './_long-press.ts';
 import { card } from './card.ts';
 import { structureDraggable } from './container.ts';
 import { icon } from './icon.ts';
@@ -103,6 +104,7 @@ css`
     cursor: move;
     color: hsl(var(--ohne-foreground));
     outline: none;
+    touch-action: none;
   }
 
   .ohne-structure-item-inner {
@@ -180,10 +182,11 @@ css`
  *
  * The header carries a drag handle.
  * A primary mouse press followed by more than 5px of travel reports the drag through `onDraggable`.
- * So does a `touchDuration` press on touch devices.
+ * So does a still `touchDuration` press on touch devices; a finger that drifts first drops it.
  * Window blur, a document mouseup, or Escape ends the drag with `onDraggable(null)`.
  * While `droppable` reports `true`, invisible before/after zones cover the list gaps.
- * They report a mouseup as `onDrop`; a touch drag keeps them visible.
+ * They report a pointerup as `onDrop`, so a finger lifted over one drops there.
+ * A touch drag keeps them visible.
  * The dragged card dims its body, and `$expanded === false` collapses it.
  */
 export function structureItem(options: StructureItemOptions): HTMLElement {
@@ -192,7 +195,9 @@ export function structureItem(options: StructureItemOptions): HTMLElement {
   const touchDuration = options.touchDuration ?? 500;
 
   const dragStops: (() => void)[] = [];
-  let touchTimeout: ReturnType<typeof setTimeout> | undefined;
+  const press = longPress(touchDuration, () =>
+    options.onDraggable({ item: options.item(), touch: true }),
+  );
 
   const stopDragging = (): void => {
     options.onDraggable(null);
@@ -229,26 +234,25 @@ export function structureItem(options: StructureItemOptions): HTMLElement {
     );
   };
 
-  const onTouchStart = (): void => {
-    if (isDraggable) {
-      touchTimeout = setTimeout(() => {
-        options.onDraggable({ item: options.item(), touch: true });
-      }, touchDuration);
-    }
+  const onTouchStart = (event: TouchEvent): void => {
+    const touch = event.touches[0];
+    if (isDraggable && touch) press.start(touch);
+  };
+
+  const onTouchMove = (event: TouchEvent): void => {
+    const touch = event.touches[0];
+    if (touch) press.move(touch);
   };
 
   const onTouchEnd = (): void => {
-    clearTimeout(touchTimeout);
+    press.end();
     if (options.droppable()) {
       setTimeout(() => window.getSelection()?.removeAllRanges(), 50);
     }
   };
   window.addEventListener('touchend', onTouchEnd);
 
-  onCleanup(() => {
-    window.removeEventListener('touchend', onTouchEnd);
-    clearTimeout(touchTimeout);
-  });
+  onCleanup(() => window.removeEventListener('touchend', onTouchEnd));
 
   const zone = (position: 'before' | 'after'): (() => Child) =>
     when(
@@ -260,7 +264,7 @@ export function structureItem(options: StructureItemOptions): HTMLElement {
             class: () =>
               `ohne-structure-item-zone-${position}` +
               (structureDraggable.value?.touch ? ' ohne-structure-item-zone-visible' : ''),
-            onMouseup: () => options.onDrop(position),
+            onPointerup: () => options.onDrop(position),
           },
           h('span', null, icon('grip-horizontal')),
         ),
@@ -294,10 +298,19 @@ export function structureItem(options: StructureItemOptions): HTMLElement {
                     type: 'button',
                     class: 'ohne-structure-drag-handle ohne-raw',
                     onMousedown: handleDrag,
+                    onPointerdown: (event: PointerEvent) => {
+                      // A touch stays captured by the node it hit, so its release would miss the zones.
+                      const target = event.target as Element;
+                      if (target.hasPointerCapture(event.pointerId)) {
+                        target.releasePointerCapture(event.pointerId);
+                      }
+                    },
                     onTouchstart: (event: TouchEvent) => {
                       event.preventDefault();
-                      onTouchStart();
+                      onTouchStart(event);
                     },
+                    onTouchmove: onTouchMove,
+                    onTouchcancel: () => press.end(),
                   },
                   icon('grip-vertical'),
                 ),

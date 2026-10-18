@@ -8,6 +8,7 @@ import { attachTooltip } from './tooltip.ts';
 /**
  * A moment as words relative to now, such as "3 minutes ago", in a `<time>` element.
  * The words follow the dashboard clock and language; the exact date and time show in a tooltip.
+ * On touch a tap pins that tooltip.
  * `datetime` carries the ISO instant for machines.
  *
  * @example
@@ -24,6 +25,6 @@ export function relativeTime(at: MaybeGetter<number | Date>): HTMLElement {
   const element = h('time', { datetime: () => new Date(timestamp()).toISOString() }, () =>
     formatRelative(timestamp()),
   );
-  onCleanup(attachTooltip(element, () => formatDateTime(timestamp())));
+  onCleanup(attachTooltip(element, () => formatDateTime(timestamp()), { tap: true }));
   return element;
 }

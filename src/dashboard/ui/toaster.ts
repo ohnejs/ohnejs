@@ -350,9 +350,11 @@ css`
       0 0 0 2px rgba(0, 0, 0, 0.2);
   }
 
-  [data-sonner-toast]:hover [data-close-button]:hover {
-    background: var(--gray2);
-    border-color: var(--gray5);
+  @media (hover: hover) {
+    [data-sonner-toast]:hover [data-close-button]:hover {
+      background: var(--gray2);
+      border-color: var(--gray5);
+    }
   }
 
   :where([data-sonner-toast][data-swiping='true'])::before {
@@ -1068,10 +1070,17 @@ function createToaster(): HTMLElement {
       style: () =>
         `--front-toast-height: ${first(heights.value)?.height}px; ` +
         `--offset: 0.5rem; --width: 336px; --gap: ${GAP}px;`,
-      onMouseenter: () => (expanded.value = true),
-      onMousemove: () => (expanded.value = true),
-      onMouseleave: () => {
-        if (!untracked(() => interacting.value)) expanded.value = false;
+      // A tap sends compatibility mouse events but never the leave, so only a hovering pointer expands.
+      onPointerenter: (event: PointerEvent) => {
+        if (event.pointerType !== 'touch') expanded.value = true;
+      },
+      onPointermove: (event: PointerEvent) => {
+        if (event.pointerType !== 'touch') expanded.value = true;
+      },
+      onPointerleave: (event: PointerEvent) => {
+        if (event.pointerType !== 'touch' && !untracked(() => interacting.value)) {
+          expanded.value = false;
+        }
       },
       onPointerdown: (event: PointerEvent) => {
         const dismissible =

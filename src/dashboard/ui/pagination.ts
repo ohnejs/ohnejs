@@ -129,9 +129,11 @@ css`
     color: hsl(var(--ohne-muted-foreground) / 0.64);
   }
 
-  .ohne-pagination-button:not(.ohne-pagination-ellipsis):not(.ohne-pagination-button-active):hover {
-    background-color: hsl(var(--ohne-secondary));
-    color: hsl(var(--ohne-secondary-foreground));
+  @media (hover: hover) {
+    .ohne-pagination-button:not(.ohne-pagination-ellipsis, .ohne-pagination-button-active):hover {
+      background-color: hsl(var(--ohne-secondary));
+      color: hsl(var(--ohne-secondary-foreground));
+    }
   }
 
   .ohne-pagination-button-active {

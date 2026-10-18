@@ -247,9 +247,11 @@ css`
     margin-left: 0;
   }
 
-  .ohne-vertical-menu-item-button:hover {
-    background-color: hsl(var(--ohne-secondary));
-    color: hsl(var(--ohne-secondary-foreground));
+  @media (hover: hover) {
+    .ohne-vertical-menu-item-button:hover {
+      background-color: hsl(var(--ohne-secondary));
+      color: hsl(var(--ohne-secondary-foreground));
+    }
   }
 
   .ohne-vertical-menu-item-button:focus-visible {
@@ -301,9 +303,11 @@ css`
     transition-property: background-color, box-shadow, color;
   }
 
-  .ohne-vertical-menu-item-toggle:hover {
-    background-color: hsl(var(--ohne-secondary));
-    color: hsl(var(--ohne-secondary-foreground));
+  @media (hover: hover) {
+    .ohne-vertical-menu-item-toggle:hover {
+      background-color: hsl(var(--ohne-secondary));
+      color: hsl(var(--ohne-secondary-foreground));
+    }
   }
 
   .ohne-vertical-menu-item-toggle:focus-visible {

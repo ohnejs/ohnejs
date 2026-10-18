@@ -77,11 +77,18 @@ css`
     pointer-events: none;
   }
 
-  .ohne-block-picker-block:hover,
   .ohne-block-picker-block-highlighted {
     background-color: hsl(var(--ohne-accent));
     border-color: hsl(var(--ohne-accent));
     color: hsl(var(--ohne-accent-foreground));
+  }
+
+  @media (hover: hover) {
+    .ohne-block-picker-block:hover {
+      background-color: hsl(var(--ohne-accent));
+      border-color: hsl(var(--ohne-accent));
+      color: hsl(var(--ohne-accent-foreground));
+    }
   }
 
   .ohne-block-picker-block:focus-visible {

@@ -169,7 +169,10 @@ css`
 
   .ohne-code-input,
   .ohne-code-view {
-    padding: calc(0.5em - 0.15625rem) 0.5em;
+    padding: calc(0.5em - 0.15625rem) 0 calc(0.5em - 0.15625rem) 0.5em;
+    /* A border, not padding: a textarea leaves its end padding out of the range it scrolls. */
+    border: 0 solid transparent;
+    border-right-width: 0.5em;
     overflow: auto;
     scrollbar-gutter: stable;
     font: 1em / 1.5 var(--ohne-font-mono);
@@ -190,7 +193,6 @@ css`
     max-height: calc(var(--ohne-code-max-rows) * 1.5em + 1em - 0.3125rem);
     padding-left: var(--ohne-code-gutter);
     background-color: transparent;
-    border: none;
     outline: none;
     resize: none;
     color: transparent;

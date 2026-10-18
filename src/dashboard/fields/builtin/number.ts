@@ -1,6 +1,7 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { NumberFieldOptions } from '../known-field-types.ts';
 
+import { numericInputMode } from '../../../utils/html/numeric-input-mode.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
@@ -66,7 +67,8 @@ export const numberType: FieldType<NumberFieldOptions> = {
     const control = textInput(raw, { disabled: () => off, placeholder: fieldPlaceholder(field) });
     const input = control.querySelector('input') as HTMLInputElement;
     control.classList.add('ohne-input-numeric');
-    input.setAttribute('inputmode', 'decimal');
+    const inputMode = numericInputMode(field.options?.min, true);
+    if (inputMode) input.setAttribute('inputmode', inputMode);
     input.addEventListener('input', touch);
     input.addEventListener('keydown', (event) => {
       if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;

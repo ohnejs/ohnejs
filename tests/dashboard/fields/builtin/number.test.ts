@@ -145,4 +145,23 @@ describe('numberType control', () => {
       deepStrictEqual(control.read(), { value: 5 });
     });
   });
+
+  it('asks for a digit pad only when `min` rules out negatives', () => {
+    effectScope().run(() => {
+      const mode = (options: DashboardField['options']): string | null =>
+        inputOf(
+          numberType.control!({
+            field: { ...GOLD, options },
+            initial: 1,
+            mode: 'edit',
+            path: 'gold',
+            language: () => 'en',
+            onInput() {},
+          })!.element,
+        ).getAttribute('inputmode');
+      strictEqual(mode({ min: 0 }), 'decimal');
+      strictEqual(mode({ min: -10 }), null);
+      strictEqual(mode({}), null);
+    });
+  });
 });

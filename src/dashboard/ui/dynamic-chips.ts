@@ -16,6 +16,7 @@ import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { refocusAfterRemoval } from './_chip-focus.ts';
+import { chipTouch } from './_chip-touch.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { type Primitive } from './button-group.ts';
 import { nearestContainer } from './container.ts';
@@ -200,10 +201,10 @@ export interface DynamicChipsOptions {
   scrollContainer?: HTMLElement;
 
   /**
-   * Called when a chip is double-clicked, with its value and the mouse event.
+   * Called when a chip is double-clicked or double-tapped, with its value and the event.
    * Consumers open edit popups from here.
    */
-  onDblclick?: (value: Primitive, event: MouseEvent) => void;
+  onDblclick?: (value: Primitive, event: MouseEvent | TouchEvent) => void;
 
   /**
    * Custom chip content, replacing the tooltip'd ellipsis label.
@@ -271,6 +272,7 @@ css`
     gap: 0.375em;
     padding: 0 0.5em;
     user-select: none;
+    -webkit-touch-callout: none;
     background-color: hsl(var(--ohne-background));
     border-radius: calc(var(--ohne-radius) - 0.25rem);
     color: hsl(var(--ohne-foreground));
@@ -364,6 +366,12 @@ css`
   .ohne-dynamic-chips-dropzone:hover,
   .ohne-dynamic-chips-dragging-touch .ohne-dynamic-chips-dropzone {
     opacity: 1;
+  }
+
+  .ohne-dynamic-chips-dragging-touch .ohne-dynamic-chips-dropzone::after {
+    content: '';
+    position: absolute;
+    inset: -0.5rem -1rem;
   }
 
   .ohne-dynamic-chips-input {
@@ -513,7 +521,6 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
   let lastPage = 1;
   let fetchCounter = 0;
   let isLoadingMore = false;
-  let touchTimeout: ReturnType<typeof setTimeout> | undefined;
   let releaseOpen: (() => void) | undefined;
 
   const resolveChoices = async (): Promise<void> => {
@@ -621,17 +628,13 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     );
   };
 
-  const onTouchStart = (itemIndex: number): void => {
-    if (!disabled()) {
-      touchTimeout = setTimeout(() => {
-        draggingIndex.value = itemIndex;
-        isTouchDragging.value = true;
-        clearTimeout(touchTimeout);
-        const onDocumentTouchStart = (): void => stopDragging();
-        document.addEventListener('touchstart', onDocumentTouchStart);
-        dragStops.push(() => document.removeEventListener('touchstart', onDocumentTouchStart));
-      }, options.touchDuration ?? 500);
-    }
+  const startTouchDrag = (itemIndex: number): void => {
+    if (disabled()) return;
+    draggingIndex.value = itemIndex;
+    isTouchDragging.value = true;
+    const onDocumentTouchStart = (): void => stopDragging();
+    document.addEventListener('touchstart', onDocumentTouchStart);
+    dragStops.push(() => document.removeEventListener('touchstart', onDocumentTouchStart));
   };
 
   const drop = (index: number): void => {
@@ -734,7 +737,11 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     h('span', {
       class: 'ohne-dynamic-chips-dropzone',
       onMouseup: () => drop(target()),
-      onTouchstart: () => drop(target()),
+      // The drop moves the chips, so the tap's later click would land on whatever took its place.
+      onTouchstart: (event: TouchEvent) => {
+        event.preventDefault();
+        drop(target());
+      },
     });
 
   const chipLabel = (choice: () => DynamicChipsChoice, index: () => number): Child => {
@@ -837,10 +844,11 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
                   : ''),
               onDblclick: (event: MouseEvent) => options.onDblclick?.(choice().value, event),
               onMousedown: (event: MouseEvent) => handleDrag(index(), event),
-              onTouchstart: (event: TouchEvent) => {
-                event.preventDefault();
-                onTouchStart(index());
-              },
+              ...chipTouch(
+                options.touchDuration ?? 500,
+                () => startTouchDrag(index()),
+                (event) => options.onDblclick?.(choice().value, event),
+              ),
             },
             chipLabel(choice, index),
             when(
@@ -1025,13 +1033,8 @@ export function dynamicChips(model: Ref<Primitive[]>, options: DynamicChipsOptio
     });
   });
 
-  const onTouchEnd = (): void => clearTimeout(touchTimeout);
-  window.addEventListener('touchend', onTouchEnd);
-
   onCleanup(() => {
     document.body.style.removeProperty('cursor');
-    clearTimeout(touchTimeout);
-    window.removeEventListener('touchend', onTouchEnd);
     for (const stop of dragStops) stop();
     dragStops.length = 0;
     releaseOpen?.();

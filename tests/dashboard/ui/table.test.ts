@@ -515,6 +515,82 @@ describe('table rows that open', () => {
     dispatch(row, 'keydown', { key: 'Enter', target: new FakeElement('input') });
     deepStrictEqual(seen, ['Anduin', 'Anduin']);
   });
+
+  it('opens a selecting row on a touch tap, and ignores the double-tap after it', () => {
+    const seen: string[] = [];
+    const root = raidTable(() => RAIDERS, {
+      selection: { selected: ref(new Set()), checkboxes: () => false },
+      onOpen: (raider) => seen.push(raider.name),
+    });
+    const row = rowOf(root, 'Jaina');
+    dispatch(row, 'pointerdown', { pointerType: 'touch' });
+    dispatch(row, 'click');
+    dispatch(row, 'dblclick');
+    deepStrictEqual(seen, ['Jaina']);
+    dispatch(row, 'pointerdown', { pointerType: 'mouse' });
+    dispatch(row, 'click');
+    deepStrictEqual(seen, ['Jaina']);
+  });
+
+  it('toggles a selectable row on a touch tap while the checkboxes show', () => {
+    const seen: string[] = [];
+    const selected = ref<ReadonlySet<string>>(new Set(['Thrall']));
+    const root = raidTable(() => RAIDERS, {
+      selection: { selected, selectable: (raider) => raider.name !== 'Jaina' },
+      onOpen: (raider) => seen.push(raider.name),
+    });
+    for (const name of ['Anduin', 'Jaina', 'Thrall']) {
+      const row = rowOf(root, name);
+      dispatch(row, 'pointerdown', { pointerType: 'touch' });
+      dispatch(row, 'click');
+    }
+    flush();
+    deepStrictEqual([...selected.value], ['Anduin']);
+    deepStrictEqual(seen, []);
+  });
+});
+
+describe('table long press', () => {
+  const cellOf = (root: FakeElement, name: string): FakeElement =>
+    byClass(rowOf(root, name), 'ohne-table-check')[0]!;
+  const press = (cell: FakeElement, extra: Record<string, unknown> = {}): void => {
+    dispatch(cell, 'pointerdown', { pointerType: 'touch', clientX: 0, clientY: 0, ...extra });
+  };
+
+  it('ranges from the anchor on touch, and swallows the click its release sends', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const selected = ref<ReadonlySet<string>>(new Set());
+    const root = raidTable(() => RAIDERS, { selection: { selected } });
+    toggle(root, 'Thrall');
+    const cell = cellOf(root, 'Sylvanas');
+    press(cell);
+    t.mock.timers.tick(500);
+    flush();
+    deepStrictEqual([...selected.value], ['Thrall', 'Jaina', 'Sylvanas']);
+    strictEqual(dispatch(cell, 'contextmenu').defaultPrevented, true);
+    let reached = true;
+    dispatch(cell, 'click', { detail: 1, stopPropagation: () => (reached = false) });
+    strictEqual(reached, false);
+  });
+
+  it('leaves a moved press, a short tap, and the mouse alone', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const selected = ref<ReadonlySet<string>>(new Set());
+    const root = raidTable(() => RAIDERS, { selection: { selected } });
+    toggle(root, 'Thrall');
+    const cell = cellOf(root, 'Anduin');
+    press(cell);
+    dispatch(cell, 'pointermove', { clientX: 0, clientY: 12 });
+    t.mock.timers.tick(500);
+    press(cell);
+    dispatch(cell, 'pointerup');
+    t.mock.timers.tick(500);
+    dispatch(cell, 'pointerdown', { pointerType: 'mouse' });
+    t.mock.timers.tick(500);
+    flush();
+    deepStrictEqual([...selected.value], ['Thrall']);
+    strictEqual(dispatch(cell, 'contextmenu').defaultPrevented, false);
+  });
 });
 
 describe('table types', () => {

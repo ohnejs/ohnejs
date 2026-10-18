@@ -5,7 +5,7 @@ import type { DashboardField } from '../../../../src/dashboard/runtime/meta-type
 import type { RichText } from '../../../../src/utils/rich-text/rich-text.ts';
 
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
-import { FakeElement } from '../../_fake-dom.ts';
+import { FakeElement, findElement } from '../../_fake-dom.ts';
 import '../_controls.ts';
 
 // The editor binds its key and selection listeners on the surface's document.
@@ -40,6 +40,20 @@ const field = (options: Record<string, unknown> = {}, nullable = false): Dashboa
 });
 
 const paragraph = (text: string): RichText => [{ kind: 'paragraph', content: [{ text }] }];
+
+const list: RichText = [
+  {
+    kind: 'list',
+    ordered: false,
+    items: [{ content: [{ text: 'One' }] }, { content: [{ text: 'Two' }] }],
+  },
+];
+
+const tool = (root: unknown, label: string) =>
+  findElement(root as FakeElement, (el) => el.getAttribute('aria-label') === label);
+
+const disabled = (root: unknown, label: string) =>
+  tool(root, label)!.getAttribute('disabled') !== null;
 
 function control(initial: unknown, options: Record<string, unknown> = {}, nullable = false) {
   return richTextType.control!({
@@ -84,6 +98,17 @@ describe('richTextType control', () => {
       emptied.restore?.([]);
       strictEqual(emptied.draft?.(), null);
       deepStrictEqual(emptied.read(), { value: null });
+    });
+  });
+
+  it('offers indent and outdent while lists are allowed, enabled only as far as the item can move', () => {
+    effectScope().run(() => {
+      const body = control(list);
+      strictEqual(disabled(body.element, 'dashboard.richText.indent'), true);
+      strictEqual(disabled(body.element, 'dashboard.richText.outdent'), false);
+      const plain = control(paragraph('Ony'), { elements: ['h2'] });
+      strictEqual(tool(plain.element, 'dashboard.richText.indent'), undefined);
+      strictEqual(tool(plain.element, 'dashboard.richText.outdent'), undefined);
     });
   });
 });

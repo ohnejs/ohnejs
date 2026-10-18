@@ -88,12 +88,14 @@ css`
     outline: none;
   }
 
-  .ohne-bar-list-row:hover,
-  .ohne-bar-list-row:focus-visible {
-    background-color: hsl(var(--ohne-muted) / 0.6);
+  @media (hover: hover) {
+    .ohne-bar-list-row:hover {
+      background-color: hsl(var(--ohne-muted) / 0.6);
+    }
   }
 
   .ohne-bar-list-row:focus-visible {
+    background-color: hsl(var(--ohne-muted) / 0.6);
     box-shadow: inset 0 0 0 0.125rem hsl(var(--ohne-ring));
   }
 

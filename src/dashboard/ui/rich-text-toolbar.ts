@@ -13,6 +13,7 @@ import { last } from '../../utils/array/last.ts';
 import { next } from '../../utils/array/next.ts';
 import { prev } from '../../utils/array/prev.ts';
 import { debounce } from '../../utils/debounce/debounce.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { ariaKeyShortcut } from '../../utils/keys/aria-key-shortcut.ts';
 import { keySpecLabel } from '../../utils/keys/key-spec-label.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
@@ -34,7 +35,14 @@ import { dropdown } from './dropdown.ts';
 import { placeFloating } from './floater-place.ts';
 import { icon } from './icon.ts';
 import { placeFixed, raiseToTopLayer } from './overlay.ts';
-import { clearMarks, setBlockType, toggleList, toggleMark } from './rich-text-commands.ts';
+import {
+  clearMarks,
+  liftItem,
+  setBlockType,
+  sinkItem,
+  toggleList,
+  toggleMark,
+} from './rich-text-commands.ts';
 import { RICH_TEXT_KEYS } from './rich-text-keys.ts';
 import { isCollapsed } from './rich-text-model.ts';
 import { attachTooltip } from './tooltip.ts';
@@ -78,6 +86,16 @@ export interface RichTextToolbarLabels {
    * The quote block type.
    */
   quote: string;
+
+  /**
+   * The button that nests a list item under the one before it.
+   */
+  indent: string;
+
+  /**
+   * The button that moves a list item one level out.
+   */
+  outdent: string;
 
   /**
    * The bold button.
@@ -197,7 +215,7 @@ css`
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.125rem;
+    gap: 0.125rem 0.5625rem;
     padding: 0.25rem;
     background-color: hsl(var(--ohne-card));
     border-bottom: 1px solid hsl(var(--ohne-border));
@@ -212,7 +230,7 @@ css`
   .ohne-rich-text-bubble:popover-open {
     display: flex;
     align-items: center;
-    gap: 0.125rem;
+    gap: 0.5625rem;
     padding: 0.25rem;
     background-color: hsl(var(--ohne-card));
     border: 1px solid hsl(var(--ohne-border));
@@ -221,11 +239,26 @@ css`
     color: hsl(var(--ohne-foreground));
   }
 
-  .ohne-rich-text-separator {
+  .ohne-rich-text-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+  }
+
+  /* Drawn in the gap, so hiding it on a wrapped row never changes what fits on the row. */
+  .ohne-rich-text-group + .ohne-rich-text-group::before {
+    content: '';
+    position: absolute;
+    top: calc(50% - 0.5rem);
+    left: calc(-0.28125rem - 0.5px);
     width: 1px;
     height: 1rem;
-    margin: 0 0.25rem;
     background-color: hsl(var(--ohne-border));
+  }
+
+  .ohne-rich-text-group.ohne-rich-text-group-wrapped::before {
+    display: none;
   }
 
   .ohne-rich-text-tool {
@@ -245,10 +278,16 @@ css`
     transition-property: background-color, color, box-shadow;
   }
 
-  .ohne-rich-text-tool:hover:not(:disabled, [aria-pressed='true']),
   .ohne-rich-text-tool:is([aria-pressed='true'], [aria-expanded='true']) {
     background-color: hsl(var(--ohne-accent));
     color: hsl(var(--ohne-accent-foreground));
+  }
+
+  @media (hover: hover) {
+    .ohne-rich-text-tool:hover:not(:disabled, [aria-pressed='true']) {
+      background-color: hsl(var(--ohne-accent));
+      color: hsl(var(--ohne-accent-foreground));
+    }
   }
 
   .ohne-rich-text-tool:focus-visible {
@@ -271,7 +310,7 @@ css`
   }
 
   .ohne-rich-text-block-type > span {
-    min-width: 5rem;
+    min-width: 4rem;
     text-align: left;
   }
 
@@ -288,11 +327,14 @@ css`
 
 /**
  * The formatting toolbar of a rich text editor, or nothing when the field's options leave no button.
- * A block value gets a fixed toolbar: the block-type dropdown, the marks and the link, then clear formatting.
+ * A block value gets a fixed toolbar, led by the block-type dropdown.
+ * Indent and outdent follow it when lists are allowed.
+ * The marks and the link follow, then clear formatting.
  * An `inline` value gets a bubble toolbar instead, which floats above a selection once it settles.
  * The bubble hides when the selection collapses or focus leaves the frame.
  * Buttons never take focus from a pointer, so the selection stays where it is.
  * A mark button is pressed when the whole selection has its mark, the link button when it touches a link.
+ * Indent and outdent are enabled only while the selected list items can move that way.
  * The block-type dropdown names the current type, even a disallowed one, and offers only allowed ones.
  * The whole field is one tab stop: `Alt-F10` enters the toolbar, arrows, Home and End move along it.
  * Escape returns to the surface with the selection where it was.
@@ -452,8 +494,20 @@ export function richTextToolbar<C extends string>(
         )
       : undefined;
 
+  const listTools = kinds.some((kind) => kind === 'ul' || kind === 'ol')
+    ? [
+        tool('indent-increase', () => labels.value.indent, RICH_TEXT_KEYS.sink, act(sinkItem), {
+          disabled: () => !sinkItem(editor.state()),
+        }),
+        tool('indent-decrease', () => labels.value.outdent, RICH_TEXT_KEYS.lift, act(liftItem), {
+          disabled: () => !liftItem(editor.state()),
+        }),
+      ]
+    : [];
+
   const groups = [
     kinds.length > 1 ? [blockType()] : [],
+    listTools,
     [...markTools, ...(linkTool ? [linkTool] : [])],
     clearTool ? [clearTool] : [],
   ].filter((group) => group.length > 0);
@@ -473,6 +527,12 @@ export function richTextToolbar<C extends string>(
           recent = event.target;
         }
       },
+      onFocusout: (event: FocusEvent) => {
+        // A tool that disables itself by running drops focus to the body.
+        if (!event.relatedTarget && (event.target as HTMLElement).matches(':disabled')) {
+          editor.surface.focus();
+        }
+      },
       onKeydown: (event: KeyboardEvent) => {
         const tools = [...element.querySelectorAll<HTMLElement>(TOOL)];
         const current = tools.find((el) => el === document.activeElement);
@@ -489,11 +549,21 @@ export function richTextToolbar<C extends string>(
         event.preventDefault();
       },
     },
-    groups.map((group, index) => [
-      index > 0 ? h('span', { class: 'ohne-rich-text-separator' }) : null,
-      group,
-    ]),
+    groups.map((group) => h('span', { class: 'ohne-rich-text-group' }, group)),
   );
+
+  // A group that opens a wrapped row hides its separator, so no row starts on a bare divider.
+  const markWrapped = (): void => {
+    const spans = [...element.children] as HTMLElement[];
+    for (const [index, span] of spans.entries()) {
+      const previous = spans[index - 1];
+      if (isUndefined(previous)) continue;
+      span.classList.toggle('ohne-rich-text-group-wrapped', span.offsetTop > previous.offsetTop);
+    }
+  };
+  const wraps = new ResizeObserver(markWrapped);
+  wraps.observe(element);
+  onCleanup(() => wraps.disconnect());
 
   const enter = (): void => {
     const target =

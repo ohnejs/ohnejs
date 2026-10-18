@@ -104,7 +104,7 @@ export interface TimeOptions {
 
   /**
    * Called with the composed value in ms whenever a segment settles.
-   * A segment settles on blur, an arrow key step, or a stepper click.
+   * A segment settles on Enter, blur, an arrow key step, or a stepper click.
    */
   onCommit?: (value: number) => void;
 }

@@ -110,4 +110,23 @@ describe('integerType control', () => {
       deepStrictEqual(bounded.read(), { value: 4 });
     });
   });
+
+  it('asks for a digit pad only when `min` rules out negatives', () => {
+    effectScope().run(() => {
+      const mode = (options: DashboardField['options']): string | null =>
+        inputOf(
+          integerType.control!({
+            field: { ...MINUTES, options },
+            initial: 1,
+            mode: 'edit',
+            path: 'minutes',
+            language: () => 'en',
+            onInput() {},
+          })!.element,
+        ).getAttribute('inputmode');
+      strictEqual(mode({ min: 0 }), 'numeric');
+      strictEqual(mode({ min: -10 }), null);
+      strictEqual(mode({}), null);
+    });
+  });
 });

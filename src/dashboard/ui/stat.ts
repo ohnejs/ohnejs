@@ -124,8 +124,10 @@ css`
     transition-property: border-color, box-shadow;
   }
 
-  a.ohne-stat:hover {
-    border-color: hsl(var(--ohne-foreground) / 0.24);
+  @media (hover: hover) {
+    a.ohne-stat:hover {
+      border-color: hsl(var(--ohne-foreground) / 0.24);
+    }
   }
 
   a.ohne-stat:focus-visible {

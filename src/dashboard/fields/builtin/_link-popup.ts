@@ -51,8 +51,14 @@ css`
     text-decoration: none;
   }
 
-  .ohne-link-resolved:is(:hover, :focus-visible) {
+  .ohne-link-resolved:focus-visible {
     color: hsl(var(--ohne-foreground));
+  }
+
+  @media (hover: hover) {
+    .ohne-link-resolved:hover {
+      color: hsl(var(--ohne-foreground));
+    }
   }
 
   .ohne-link-resolved > svg {

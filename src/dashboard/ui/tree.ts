@@ -178,7 +178,8 @@ export interface TreeOptions<T> {
   source?: TreeSource;
 
   /**
-   * The duration in milliseconds to trigger dragging on touch devices.
+   * How long in milliseconds a touch must hold still to start a drag.
+   * A touch that drifts first scrolls instead.
    *
    * @default
    * 500

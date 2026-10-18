@@ -1,6 +1,7 @@
 import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { NumberFieldOptions } from '../known-field-types.ts';
 
+import { numericInputMode } from '../../../utils/html/numeric-input-mode.ts';
 import { isInteger } from '../../../utils/is/is-integer.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
@@ -64,7 +65,8 @@ export const integerType: FieldType<NumberFieldOptions> = {
     const control = textInput(raw, { disabled: () => off, placeholder: fieldPlaceholder(field) });
     const input = control.querySelector('input') as HTMLInputElement;
     control.classList.add('ohne-input-numeric');
-    input.setAttribute('inputmode', 'numeric');
+    const inputMode = numericInputMode(field.options?.min);
+    if (inputMode) input.setAttribute('inputmode', inputMode);
     input.addEventListener('input', touch);
     input.addEventListener('blur', () => {
       const parsed = parseIntegerValue(field, raw.value);

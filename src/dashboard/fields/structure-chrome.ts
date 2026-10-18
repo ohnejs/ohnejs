@@ -110,7 +110,7 @@ css`
     margin-left: auto;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .ohne-item-actions {
       display: none;
     }

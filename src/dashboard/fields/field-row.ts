@@ -146,12 +146,22 @@ css`
     transition-property: opacity;
   }
 
-  .ohne-fieldrow-revert:is(:hover, :focus-visible) svg {
+  .ohne-fieldrow-revert:focus-visible svg {
     opacity: 1;
   }
 
-  .ohne-fieldrow-revert:is(:hover, :focus-visible) .ohne-fieldrow-dot {
+  .ohne-fieldrow-revert:focus-visible .ohne-fieldrow-dot {
     opacity: 0;
+  }
+
+  @media (hover: hover) {
+    .ohne-fieldrow-revert:hover svg {
+      opacity: 1;
+    }
+
+    .ohne-fieldrow-revert:hover .ohne-fieldrow-dot {
+      opacity: 0;
+    }
   }
 
   .ohne-field-description-toggle {
@@ -252,13 +262,14 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
 
   const languageMark = (): HTMLElement => {
     const mark = h('span', { class: 'ohne-fieldrow-meta ohne-muted' }, icon('language'));
-    onCleanup(attachTooltip(mark, () => t('dashboard.field.translatable')));
+    onCleanup(attachTooltip(mark, () => t('dashboard.field.translatable'), { tap: true }));
     return mark;
   };
 
   const lockMark = (): HTMLElement => {
     const mark = h('span', { class: 'ohne-fieldrow-meta ohne-muted' }, icon('lock'));
-    onCleanup(attachTooltip(mark, options.lockedHint ?? (() => t('dashboard.field.locked'))));
+    const hint = options.lockedHint ?? (() => t('dashboard.field.locked'));
+    onCleanup(attachTooltip(mark, hint, { tap: true }));
     return mark;
   };
 

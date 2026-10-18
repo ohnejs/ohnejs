@@ -12,6 +12,7 @@ import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { refocusAfterRemoval } from './_chip-focus.ts';
+import { chipTouch } from './_chip-touch.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { nearestContainer } from './container.ts';
 import { type DropdownHandle, dropdown } from './dropdown.ts';
@@ -204,6 +205,7 @@ css`
     gap: 0.375em;
     padding: 0 0.5em;
     user-select: none;
+    -webkit-touch-callout: none;
     background-color: hsl(var(--ohne-background));
     border-radius: calc(var(--ohne-radius) - 0.25rem);
     color: hsl(var(--ohne-foreground));
@@ -296,6 +298,12 @@ css`
   .ohne-chips-dropzone:hover,
   .ohne-chips-dragging-touch .ohne-chips-dropzone {
     opacity: 1;
+  }
+
+  .ohne-chips-dragging-touch .ohne-chips-dropzone::after {
+    content: '';
+    position: absolute;
+    inset: -0.5rem -1rem;
   }
 
   .ohne-chips-input {
@@ -417,7 +425,6 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
   let root: HTMLElement | null = null;
   let quietFocus = false;
   let dropdownHandle: DropdownHandle | null = null;
-  let touchTimeout: ReturnType<typeof setTimeout> | undefined;
   let releaseOpen: (() => void) | null = null;
 
   const labels = computed<Record<string, string>>(() => {
@@ -541,17 +548,13 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     );
   };
 
-  const onTouchStart = (itemIndex: number): void => {
-    if (!options.disabled?.()) {
-      touchTimeout = setTimeout(() => {
-        draggingIndex.value = itemIndex;
-        isTouchDragging.value = true;
-        clearTimeout(touchTimeout);
-        const onDocumentTouchStart = (): void => stopDragging();
-        document.addEventListener('touchstart', onDocumentTouchStart);
-        dragStops.push(() => document.removeEventListener('touchstart', onDocumentTouchStart));
-      }, options.touchDuration ?? 500);
-    }
+  const startTouchDrag = (itemIndex: number): void => {
+    if (options.disabled?.()) return;
+    draggingIndex.value = itemIndex;
+    isTouchDragging.value = true;
+    const onDocumentTouchStart = (): void => stopDragging();
+    document.addEventListener('touchstart', onDocumentTouchStart);
+    dragStops.push(() => document.removeEventListener('touchstart', onDocumentTouchStart));
   };
 
   const drop = (index: number): void => {
@@ -648,7 +651,11 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     h('span', {
       class: 'ohne-chips-dropzone',
       onMouseup: () => drop(target()),
-      onTouchstart: () => drop(target()),
+      // The drop moves the chips, so the tap's later click would land on whatever took its place.
+      onTouchstart: (event: TouchEvent) => {
+        event.preventDefault();
+        drop(target());
+      },
     });
 
   const openDropdown = (): HTMLElement => {
@@ -764,10 +771,7 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
                     ? ' ohne-chips-item-destructive'
                     : ''),
                 onMousedown: (event: MouseEvent) => handleDrag(index(), event),
-                onTouchstart: (event: TouchEvent) => {
-                  event.preventDefault();
-                  onTouchStart(index());
-                },
+                ...chipTouch(options.touchDuration ?? 500, () => startTouchDrag(index())),
               },
               label,
               when(
@@ -878,13 +882,8 @@ export function chips(model: Ref<string[]>, options: ChipsOptions = {}): HTMLEle
     }
   });
 
-  const onTouchEnd = (): void => clearTimeout(touchTimeout);
-  document.addEventListener('touchend', onTouchEnd);
-
   onCleanup(() => {
     document.body.style.removeProperty('cursor');
-    clearTimeout(touchTimeout);
-    document.removeEventListener('touchend', onTouchEnd);
     for (const stop of dragStops) stop();
     dragStops.length = 0;
     releaseOpen?.();

@@ -4,10 +4,13 @@ import type { Placement } from './floater-place.ts';
 
 import { first } from '../../utils/array/first.ts';
 import { last } from '../../utils/array/last.ts';
+import { isNull } from '../../utils/is/is-null.ts';
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { longPress } from './_long-press.ts';
 import { placeFloating } from './floater-place.ts';
 import { placeFixed, raiseToTopLayer } from './overlay.ts';
 import { scrollable } from './scrollable.ts';
@@ -52,15 +55,19 @@ export interface ContextMenu {
   onContextMenu(event: MouseEvent): void;
 
   /**
-   * Bind to the trigger area's `touchstart` event; a hold of `touchDuration` opens the menu.
+   * Bind to the trigger area's `touchstart` event.
+   * A still, single-finger hold of `touchDuration` opens the menu.
+   * The finger moving past a few pixels, a second finger, or a `touchcancel` drops the hold.
    */
   onTouchStart(event: TouchEvent): void;
 
   /**
    * Bind to the trigger area's `touchend` event.
-   * Cancels a pending hold and clears the text selection the long-press created.
+   * Cancels a pending hold.
+   * After a hold that opened the menu, it suppresses the release click.
+   * It also clears the text selection the long-press created.
    */
-  onTouchEnd(): void;
+  onTouchEnd(event: TouchEvent): void;
 }
 
 const ALLOWED_PLACEMENTS: Placement[] = ['bottom-start', 'bottom-end', 'top-start', 'top-end'];
@@ -83,7 +90,16 @@ const ALLOWED_PLACEMENTS: Placement[] = ['bottom-start', 'bottom-end', 'top-star
  * const event = ref<MouseEvent | TouchEvent | null>(null)
  * const menu = contextMenu(event, [item1, h('hr'), item2])
  *
- * h('div', { onContextmenu: (e: MouseEvent) => menu.onContextMenu(e) }, target, menu.root)
+ * h(
+ *   'div',
+ *   {
+ *     onContextmenu: (e: MouseEvent) => menu.onContextMenu(e),
+ *     onTouchstart: (e: TouchEvent) => menu.onTouchStart(e),
+ *     onTouchend: (e: TouchEvent) => menu.onTouchEnd(e),
+ *   },
+ *   target,
+ *   menu.root,
+ * )
  * ```
  */
 export function contextMenu(
@@ -278,25 +294,69 @@ export function contextMenu(
     when(() => event.value, buildDropdown),
   );
 
-  let touchTimeout: ReturnType<typeof setTimeout> | undefined;
-  onCleanup(() => clearTimeout(touchTimeout));
+  let touching = false;
+  let held = false;
+  let pressed: TouchEvent | null = null;
+  let untrack = (): void => {};
+  const press = longPress(options.touchDuration ?? 500, () => {
+    held = true;
+    event.value = pressed;
+  });
+
+  const endTouch = (): void => {
+    press.end();
+    untrack();
+    untrack = () => {};
+    touching = false;
+  };
+  onCleanup(endTouch);
 
   return {
     root,
     onContextMenu: (trigger) => {
       trigger.preventDefault();
+      // A platform that also fires `contextmenu` on a long-press would toggle the held menu shut.
+      if (held) {
+        trigger.stopPropagation();
+        return;
+      }
+      if (touching) {
+        press.end();
+        held = true;
+      }
       event.value = trigger;
     },
     onTouchStart: (trigger) => {
-      touchTimeout = setTimeout(() => {
-        event.value = trigger;
-      }, options.touchDuration ?? 500);
+      endTouch();
+      held = false;
+      const start = trigger.touches[0];
+      const target = trigger.target;
+      if (trigger.touches.length > 1 || isUndefined(start) || isNull(target)) return;
+      const onMove = (move: Event): void => {
+        const touch = (move as TouchEvent).touches[0];
+        if (touch) press.move(touch);
+      };
+      const onCancel = (): void => {
+        endTouch();
+        held = false;
+      };
+      // Touch events keep targeting the touched node, even once it leaves the trigger area.
+      target.addEventListener('touchmove', onMove, { passive: true });
+      target.addEventListener('touchcancel', onCancel);
+      untrack = () => {
+        target.removeEventListener('touchmove', onMove);
+        target.removeEventListener('touchcancel', onCancel);
+      };
+      touching = true;
+      pressed = trigger;
+      press.start(start);
     },
-    onTouchEnd: () => {
-      clearTimeout(touchTimeout);
-      if (event.value) {
-        setTimeout(() => window.getSelection()?.removeAllRanges(), 50);
-      }
+    onTouchEnd: (end) => {
+      endTouch();
+      if (!held) return;
+      held = false;
+      end.preventDefault();
+      setTimeout(() => window.getSelection()?.removeAllRanges(), 50);
     },
   };
 }

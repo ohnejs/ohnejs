@@ -38,7 +38,8 @@ css`
  * There is no inline cell editor: the list edits on the record page and in the edit popup.
  * The form control is the async `dynamicChips` field over the target's records.
  * A leading table-overview button opens the record picker over the target's full data table.
- * Chips remove and drag-reorder, the dropdown searches and paginates, a double-click opens the record.
+ * Chips remove and drag-reorder, and the dropdown searches and paginates.
+ * A double-click or double tap on a chip opens its record in a new tab.
  * Server messages keyed by index mark their chips destructive.
  * A changed list is checked against `min` and `max`, with the server's messages.
  */

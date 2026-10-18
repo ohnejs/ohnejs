@@ -219,13 +219,10 @@ export function scrollable(
       {
         class: () =>
           'ohne-scrollable-button' + (visible.value ? ' ohne-scrollable-button-visible' : ''),
-        onMouseenter: (event: MouseEvent) => {
-          const capabilities = (
-            event as MouseEvent & { sourceCapabilities?: { firesTouchEvents?: boolean } }
-          ).sourceCapabilities;
-          if (!capabilities?.firesTouchEvents) startStepScroll(direction);
+        onPointerenter: (event: PointerEvent) => {
+          if (event.pointerType === 'mouse') startStepScroll(direction);
         },
-        onMouseleave: () => stopStepScroll(),
+        onPointerleave: () => stopStepScroll(),
         onDragenter: (event: DragEvent) => {
           event.preventDefault();
           startStepScroll(direction);

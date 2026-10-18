@@ -142,19 +142,21 @@ css`
     color: hsl(var(--ohne-primary-foreground));
   }
 
-  .ohne-button-group-primary .ohne-button-group-item:not(.ohne-button-group-item-active):hover {
-    background-color: hsl(var(--ohne-accent));
-    color: hsl(var(--ohne-accent-foreground));
-  }
-
   .ohne-button-group-accent .ohne-button-group-item-active {
     background-color: hsl(var(--ohne-accent));
     color: hsl(var(--ohne-accent-foreground));
   }
 
-  .ohne-button-group-accent .ohne-button-group-item:not(.ohne-button-group-item-active):hover {
-    background-color: hsl(var(--ohne-secondary));
-    color: hsl(var(--ohne-secondary-foreground));
+  @media (hover: hover) {
+    .ohne-button-group-primary .ohne-button-group-item:not(.ohne-button-group-item-active):hover {
+      background-color: hsl(var(--ohne-accent));
+      color: hsl(var(--ohne-accent-foreground));
+    }
+
+    .ohne-button-group-accent .ohne-button-group-item:not(.ohne-button-group-item-active):hover {
+      background-color: hsl(var(--ohne-secondary));
+      color: hsl(var(--ohne-secondary-foreground));
+    }
   }
 
   .ohne-button-group:where([aria-invalid='true']) .ohne-button-group-item-active {

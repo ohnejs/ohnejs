@@ -96,7 +96,7 @@ css`
     padding-left: 0.75rem;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .ohne-fields-card-collapsible:not(.ohne-fields-card-collapsed)
       > .ohne-card-header
       > .ohne-fields-card-toggle {
@@ -201,9 +201,14 @@ css`
     transition-property: opacity;
   }
 
-  .ohne-fields-tab:hover,
   .ohne-fields-tab-active {
     color: hsl(var(--ohne-foreground));
+  }
+
+  @media (hover: hover) {
+    .ohne-fields-tab:hover {
+      color: hsl(var(--ohne-foreground));
+    }
   }
 
   .ohne-fields-tab-active::after {

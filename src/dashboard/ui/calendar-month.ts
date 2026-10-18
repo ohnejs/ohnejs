@@ -113,11 +113,6 @@ css`
     transition-property: background-color, box-shadow, color;
   }
 
-  .ohne-calendar-day-button:hover {
-    background-color: hsl(var(--ohne-secondary));
-    color: hsl(var(--ohne-secondary-foreground));
-  }
-
   .ohne-calendar-day-button:focus-visible {
     box-shadow:
       0 0 0 0.125rem hsl(var(--ohne-ring)),
@@ -139,9 +134,16 @@ css`
     color: hsl(var(--ohne-primary-foreground));
   }
 
-  .ohne-calendar-day-button-selected:hover {
-    background-color: hsl(var(--ohne-primary) / 0.9);
-    color: hsl(var(--ohne-primary-foreground));
+  @media (hover: hover) {
+    .ohne-calendar-day-button:hover {
+      background-color: hsl(var(--ohne-secondary));
+      color: hsl(var(--ohne-secondary-foreground));
+    }
+
+    .ohne-calendar-day-button-selected:hover {
+      background-color: hsl(var(--ohne-primary) / 0.9);
+      color: hsl(var(--ohne-primary-foreground));
+    }
   }
 
   .ohne-calendar-day-button-today::before {

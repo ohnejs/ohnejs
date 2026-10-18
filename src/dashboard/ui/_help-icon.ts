@@ -16,12 +16,14 @@ css`
     opacity: 0.7;
   }
 
-  .ohne-help:hover,
-  .ohne-help:focus-visible {
-    opacity: 1;
+  @media (hover: hover) {
+    .ohne-help:hover {
+      opacity: 1;
+    }
   }
 
   .ohne-help:focus-visible {
+    opacity: 1;
     box-shadow:
       0 0 0 0.125rem hsl(var(--ohne-background)),
       0 0 0 0.25rem hsl(var(--ohne-ring)),
@@ -33,6 +35,7 @@ css`
 
 /**
  * The muted info icon beside a label, its help in a tooltip on hover and focus.
+ * On touch a tap pins the help.
  */
 export function helpIcon(help: Text): HTMLElement {
   const element = h(
@@ -41,7 +44,12 @@ export function helpIcon(help: Text): HTMLElement {
     icon('info-circle-filled'),
   );
   onCleanup(
-    attachTooltip(element, () => resolveText(help), { maxWidth: 260, plain: true, offset: 14 }),
+    attachTooltip(element, () => resolveText(help), {
+      maxWidth: 260,
+      plain: true,
+      offset: 14,
+      tap: true,
+    }),
   );
   return element;
 }

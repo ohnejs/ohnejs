@@ -1,5 +1,6 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 
+import { numericInputMode } from '../../utils/html/numeric-input-mode.ts';
 import { isRealNumber } from '../../utils/is/is-real-number.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
@@ -136,7 +137,7 @@ export interface NumberInputOptions {
   ariaDragLabel?: string | (() => string);
 
   /**
-   * Called with each settled value: after blur, arrow key steps, stepper clicks, and drag end.
+   * Called with each settled value: after Enter, blur, arrow key steps, stepper clicks, and drag end.
    * Plain typing only writes the model.
    */
   onCommit?: (value: number) => void;
@@ -296,7 +297,8 @@ function leadingZeros(value: number, width: number): string {
  * Arrow keys, optional steppers, and an optional drag button step the value by `increment`.
  * Shift multiplies a step by 10, and Escape blurs, or ends a drag.
  * Typing writes the model on every valid number.
- * Blur, steps, and drag end settle the value, then report it to `onCommit`.
+ * Enter, blur, steps, and drag end settle the value, then report it to `onCommit`.
+ * Touch keyboards show a digit pad when `min` rules out negatives.
  * A settled value is clamped to the bounds, rounded to `decimalPlaces`, and zero-padded.
  * Writing the model reformats the display, unless the text already reads as the new value.
  *
@@ -361,6 +363,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
   const input = h('input', {
     disabled: options.disabled,
     id: options.id,
+    inputmode: numericInputMode(options.min, decimalPlaces > 0),
     name: options.name,
     placeholder: options.placeholder,
     type: 'text',
@@ -380,6 +383,8 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
       event.stopPropagation();
       const direction = event.key === 'ArrowUp' ? 1 : -1;
       step(direction * (event.shiftKey ? 10 : 1) * increment);
+    } else if (event.key === 'Enter') {
+      if (normalize()) maybeEmit(true);
     } else if (event.key === 'Escape') {
       event.stopPropagation();
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -432,6 +437,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
     track(document, 'touchmove', onMove);
     track(document, 'mouseup', stopDrag);
     track(document, 'touchend', stopDrag);
+    track(document, 'touchcancel', stopDrag);
     track(window, 'keydown', onKeydown);
     track(window, 'keyup', onKeyup);
   };
@@ -474,7 +480,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
   const steppers = (): HTMLElement =>
     h(
       'span',
-      // Mouse-only twins of the arrow keys the input already takes, so assistive tech skips them.
+      // Pointer-only twins of the arrow keys the input already takes, so assistive tech skips them.
       { 'aria-hidden': 'true', class: 'ohne-number-steppers' },
       h(
         'button',

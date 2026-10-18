@@ -11,6 +11,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
+import { longPress } from './_long-press.ts';
 import { isMac } from './hotkeys.ts';
 import { icon } from './icon.ts';
 import {
@@ -89,7 +90,8 @@ export interface TreeItemOptions<T> {
   mousePaused: Ref<boolean>;
 
   /**
-   * The duration in milliseconds to trigger dragging on touch devices.
+   * How long in milliseconds a touch must hold still to start a drag.
+   * A touch that drifts first scrolls instead.
    *
    * @default
    * 500
@@ -308,8 +310,6 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
   const allowedAfter = ref<Record<string, boolean>>({});
   const dragStops: (() => void)[] = [];
 
-  let touchTimeout: ReturnType<typeof setTimeout> | undefined;
-
   const item = (): TreeItemModel<T> => options.model().item;
 
   const isDraggable = (): boolean => treeItemAllows(item(), 'draggable');
@@ -460,15 +460,22 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
     );
   };
 
-  const onTouchStart = (): void => {
-    if (item().selectable !== false && isDraggable()) {
-      touchTimeout = setTimeout(() => {
-        options.onSelect([item()]);
-        options.isDragging.value = true;
-        options.isTouchDragging.value = true;
-        clearTimeout(touchTimeout);
-      }, touchDuration);
-    }
+  const press = longPress(touchDuration, () => {
+    options.onSelect([item()]);
+    options.isDragging.value = true;
+    options.isTouchDragging.value = true;
+  });
+
+  const onTouchStart = (event: TouchEvent): void => {
+    const touch = event.touches[0];
+    if (touch && item().selectable !== false && isDraggable()) press.start(touch);
+  };
+
+  const onTouchMove = (event: TouchEvent): void => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    if (press.held()) event.preventDefault();
+    else press.move(touch);
   };
 
   const refuse = (zone: TreeDropTarget<T>['zone'], id: string | number): void => {
@@ -573,6 +580,12 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
         }
       },
       onMousedown: handleDrag,
+      onPointerdown: (event: PointerEvent) => {
+        // A touch stays captured by the node it hit, so its release would miss the zones.
+        const target = event.target as Element;
+        if (target.hasPointerCapture(event.pointerId))
+          target.releasePointerCapture(event.pointerId);
+      },
       onMouseenter: () => {
         if (item().selectable !== false && !options.mousePaused.value) {
           options.onHighlight(item());
@@ -592,7 +605,9 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
           options.mousePaused.value = false;
         }
       },
-      onTouchstart: () => onTouchStart(),
+      onTouchstart: onTouchStart,
+      onTouchmove: onTouchMove,
+      onTouchcancel: () => press.end(),
     },
     when(hasToggle, () =>
       h(
@@ -662,7 +677,7 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
             if (canDrop('before')) options.dropTarget.value = { item: item(), zone: 'before' };
           },
           onMouseleave: () => (options.dropTarget.value = null),
-          onMouseup: () => {
+          onPointerup: () => {
             if (canDrop('before')) options.onDrop({ item: item(), zone: 'before' });
           },
         }),
@@ -681,7 +696,7 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
             if (canDrop('inside')) options.dropTarget.value = { item: item(), zone: 'inside' };
           },
           onMouseleave: () => (options.dropTarget.value = null),
-          onMouseup: () => {
+          onPointerup: () => {
             if (canDrop('inside')) options.onDrop({ item: item(), zone: 'inside' });
           },
         }),
@@ -706,7 +721,7 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
             if (canDrop('after')) options.dropTarget.value = { item: item(), zone: 'after' };
           },
           onMouseleave: () => (options.dropTarget.value = null),
-          onMouseup: () => {
+          onPointerup: () => {
             if (canDrop('after')) options.onDrop({ item: item(), zone: 'after' });
           },
         }),
@@ -737,7 +752,7 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
                     }
                   },
                   onMouseleave: () => (options.dropTarget.value = null),
-                  onMouseup: () => {
+                  onPointerup: () => {
                     if (canDrop('after', zone().item)) {
                       options.onDrop({ item: zone().item, zone: 'after' });
                     }
@@ -774,17 +789,14 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
   });
 
   const onTouchEnd = (): void => {
-    clearTimeout(touchTimeout);
+    press.end();
     if (options.isDragging.value) {
       setTimeout(() => window.getSelection()?.removeAllRanges(), 50);
     }
   };
   window.addEventListener('touchend', onTouchEnd);
 
-  onCleanup(() => {
-    window.removeEventListener('touchend', onTouchEnd);
-    clearTimeout(touchTimeout);
-  });
+  onCleanup(() => window.removeEventListener('touchend', onTouchEnd));
 
   return root;
 }

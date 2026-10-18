@@ -61,6 +61,16 @@ export interface TooltipOptions {
    * false
    */
   plain?: boolean;
+
+  /**
+   * Whether a tap pins the tooltip on touch, and a tap elsewhere or a scroll hides it.
+   * Set it on an element whose only content is its tooltip, like an info icon.
+   * An element with its own tap action leaves it off, so its tooltip never outlives the touch.
+   *
+   * @default
+   * false
+   */
+  tap?: boolean;
 }
 
 const INLINE = /\*\*(.+?)\*\*|`+/g;
@@ -126,6 +136,7 @@ function renderContent(target: HTMLElement, text: string, plain = false): void {
  * Attaches a tooltip to an element; returns the dispose.
  *
  * Show and hide are instant, any click hides, and touch shows only while holding.
+ * With `tap`, a tap toggles it instead.
  * Keyboard focus shows it too; focus from a click, or handed back by a closing dropdown, does not.
  * Every tooltip is raised to the top layer as it appears, so it covers the surface that opened it.
  * The content string speaks markdown-lite: `**bold**`, backticked code, and `<br>` breaks.
@@ -147,8 +158,9 @@ export function attachTooltip(
 ): () => void {
   trackTouch();
   let dismiss: (() => void) | null = null;
+  let pinned = false;
 
-  const show = (): void => {
+  const show = (tapped = false): void => {
     if (dismiss) return;
     const initial = isFunction<() => string | null>(content) ? content() : content;
     if (!initial) return;
@@ -190,6 +202,7 @@ export function attachTooltip(
         placement: options.placement ?? 'top',
         flip: true,
         offset: options.offset ?? 10,
+        shiftPadding: 8,
       });
       placeFixed(root, placed.x, placed.y);
       box.setAttribute('data-placement', placed.placement);
@@ -212,9 +225,16 @@ export function attachTooltip(
     update();
 
     const onDocumentMouseDown = (): void => hide();
-    window.addEventListener('scroll', update, { capture: true, passive: true });
+    const onDocumentPointerDown = (event: PointerEvent): void => {
+      if (event.pointerType !== 'touch' || !el.contains(event.target as Node)) hide();
+    };
+    const onScroll = tapped ? hide : update;
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
     window.addEventListener('resize', update);
-    if (options.hideOnClick !== false) {
+    // A tap's compatibility mousedown lands after its touchstart, so a pinned tooltip listens for pointers.
+    if (tapped) {
+      document.addEventListener('pointerdown', onDocumentPointerDown, { capture: true });
+    } else if (options.hideOnClick !== false) {
       document.addEventListener('mousedown', onDocumentMouseDown, { capture: true });
     }
     const stopLive = isFunction<() => string | null>(content)
@@ -229,19 +249,27 @@ export function attachTooltip(
 
     dismiss = () => {
       stopLive?.();
-      window.removeEventListener('scroll', update, { capture: true });
+      window.removeEventListener('scroll', onScroll, { capture: true });
       window.removeEventListener('resize', update);
       document.removeEventListener('mousedown', onDocumentMouseDown, { capture: true });
+      document.removeEventListener('pointerdown', onDocumentPointerDown, { capture: true });
       root.remove();
       dismiss = null;
+      pinned = false;
     };
+    pinned = tapped;
   };
 
   const hide = (): void => dismiss?.();
   const onMouseEnter = (): void => {
     if (!usingTouch) show();
   };
-  const onTouchStart = (): void => show();
+  const onTouchStart = (): void => {
+    if (!options.tap) return show();
+    const open = pinned;
+    hide();
+    if (!open) show(true);
+  };
   const onFocus = (): void => {
     if (el.matches(':focus-visible')) show();
   };
@@ -251,8 +279,10 @@ export function attachTooltip(
   el.addEventListener('focus', onFocus);
   el.addEventListener('blur', hide);
   el.addEventListener('touchstart', onTouchStart, { passive: true });
-  el.addEventListener('touchend', hide);
-  el.addEventListener('touchcancel', hide);
+  if (!options.tap) {
+    el.addEventListener('touchend', hide);
+    el.addEventListener('touchcancel', hide);
+  }
 
   return () => {
     el.removeEventListener('mouseenter', onMouseEnter);

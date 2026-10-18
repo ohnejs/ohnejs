@@ -133,8 +133,10 @@ css`
     transition-property: border-color, box-shadow;
   }
 
-  .ohne-card-link:hover {
-    border-color: hsl(var(--ohne-foreground) / 0.24);
+  @media (hover: hover) {
+    .ohne-card-link:hover {
+      border-color: hsl(var(--ohne-foreground) / 0.24);
+    }
   }
 
   .ohne-card-link:focus-visible {
@@ -211,8 +213,10 @@ css`
     transition-property: box-shadow, color;
   }
 
-  .ohne-card-more:hover {
-    color: hsl(var(--ohne-foreground));
+  @media (hover: hover) {
+    .ohne-card-more:hover {
+      color: hsl(var(--ohne-foreground));
+    }
   }
 
   .ohne-card-more:focus-visible {
