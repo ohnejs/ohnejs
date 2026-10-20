@@ -110,6 +110,7 @@ export * from './html/node-like.ts';
 export * from './html/numeric-input-mode.ts';
 export * from './html/sanitize-svg.ts';
 export * from './i18n/amount-edit-text.ts';
+export * from './i18n/amount-with-code.ts';
 export * from './i18n/canonicalize-language.ts';
 export * from './i18n/country-codes.ts';
 export * from './i18n/currency-affix-in.ts';
