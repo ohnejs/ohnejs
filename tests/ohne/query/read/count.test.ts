@@ -45,6 +45,14 @@ describe('count', () => {
   it('ignores the row window, since a count spans the whole match', async () => {
     strictEqual(await queryUntyped('CPosts').limit(1).offset(1).count(), 3);
   });
+
+  it('answers a condition thousands of terms wide', async () => {
+    const or = Array.from({ length: 5000 }, (_, n) => ({ views: n }));
+    strictEqual(await queryUntyped('CPosts').where({ or }).count(), 3);
+    const chain = queryUntyped('CPosts');
+    for (let n = 0; n < 2000; n += 1) chain.where({ views: { not: { equalsTo: n * 100 + 50 } } });
+    strictEqual(await chain.count(), 2);
+  });
 });
 
 describe('exists', () => {

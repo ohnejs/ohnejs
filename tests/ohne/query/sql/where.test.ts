@@ -273,6 +273,13 @@ describe('compileWhere', () => {
     });
   });
 
+  it('a wide group nests as a balanced tree, its params in order', () => {
+    deepStrictEqual(compile({ or: [{ views: 1 }, { views: 2 }, { views: 3 }, { views: 4 }] }), {
+      sql: '(("views" = ? OR "views" = ?) OR ("views" = ? OR "views" = ?))',
+      params: [1, 2, 3, 4],
+    });
+  });
+
   it('sibling field keys AND, parenthesized', () => {
     deepStrictEqual(compile({ title: 'x', views: { atLeast: 5 } }), {
       sql: '("title" = ? AND "views" >= ?)',

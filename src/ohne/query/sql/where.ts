@@ -176,7 +176,7 @@ function compileNode(
 }
 
 /**
- * Joins a group's children with `separator`, parenthesizing the result; an empty group is `constant`.
+ * Joins a group's children with `separator` as a balanced tree; an empty group is `constant`.
  */
 function group(
   nodes: readonly ConditionNode[],
@@ -187,9 +187,23 @@ function group(
   ctx: CompileContext,
 ): SQLFragment {
   if (isEmpty(nodes)) return rawFragment(constant);
-  const fragments = nodes.map((child) => compileNode(child, scope, dialect, ctx));
+  return balance(
+    nodes.map((child) => compileNode(child, scope, dialect, ctx)),
+    separator,
+  );
+}
+
+/**
+ * Joins fragments as a balanced tree, parenthesizing each join.
+ * SQLite nests a flat chain one level per term, so depth then grows with the log of the width.
+ */
+function balance(fragments: readonly SQLFragment[], separator: string): SQLFragment {
   if (fragments.length === 1) return fragments[0];
-  const joined = joinFragments(fragments, separator);
+  const mid = fragments.length >> 1;
+  const joined = joinFragments(
+    [balance(fragments.slice(0, mid), separator), balance(fragments.slice(mid), separator)],
+    separator,
+  );
   return { sql: `(${joined.sql})`, params: joined.params };
 }
 
