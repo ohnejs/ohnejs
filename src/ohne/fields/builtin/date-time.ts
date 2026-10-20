@@ -1,4 +1,4 @@
-import { isRealNumber, isString, isUndefined } from '../../../utils/index.ts';
+import { instantToMs, isUndefined } from '../../../utils/index.ts';
 import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { option } from '../option.ts';
@@ -42,29 +42,19 @@ export const dateTime = defineField({
   },
   validateOptions: ({ options }) =>
     boundsProblem(options, {
-      parse: (bound) => {
-        const ms = isString(bound) || isRealNumber(bound) ? instant(bound) : undefined;
-        return isRealNumber(ms) ? ms : undefined;
-      },
+      parse: instantToMs,
       form: 'epoch milliseconds or an ISO 8601 string',
     }),
   validators: [
     (value, ctx) => {
       const { min, max } = ctx.options;
-      if (!isUndefined(min) && value < instant(min)) {
+      if (!isUndefined(min) && value < instantToMs(min)!) {
         return validationMessage('validation.minValue', { min });
       }
-      if (!isUndefined(max) && value > instant(max)) {
+      if (!isUndefined(max) && value > instantToMs(max)!) {
         return validationMessage('validation.maxValue', { max });
       }
       return undefined;
     },
   ],
 });
-
-/**
- * A declared bound as epoch milliseconds, parsing the ISO form.
- */
-function instant(bound: number | string): number {
-  return isString(bound) ? Date.parse(bound) : bound;
-}

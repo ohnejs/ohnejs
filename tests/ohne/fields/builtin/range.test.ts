@@ -420,6 +420,39 @@ describe('range', () => {
       strictEqual(checkOptions({ of: 'number', suffix: 'kg', step: 0.5 }), undefined);
     });
 
+    it('refuses a `minSpan` no range between its bounds can reach', () => {
+      deepStrictEqual(checkOptions({ of: 'time', minSpan: '2d' }), [
+        '`minSpan` is `2d`, wider than any range from `00:00:00` to `23:59:59`, so no range can pass.',
+        'Lower `minSpan` below a day: a `time` range starts and ends on the same day.',
+      ]);
+      deepStrictEqual(
+        checkOptions({ of: 'date', min: '2030-01-01', max: '2030-01-04', minSpan: '1 week' }),
+        [
+          '`minSpan` is `7d`, wider than any range from `2030-01-01` to `2030-01-04`, so no range can pass.',
+          'Lower `minSpan`, or widen `min` and `max`.',
+        ],
+      );
+      strictEqual(
+        checkOptions({ of: 'dateTime', min: 0, max: 3_600_000, minSpan: '2h' })?.[0],
+        '`minSpan` is `2h`, wider than any range from `0` to `3600000`, so no range can pass.',
+      );
+      strictEqual(
+        checkOptions({ of: 'integer', min: 0, max: 10, minSpan: 20 })?.[0],
+        '`minSpan` is `20`, wider than any range from `0` to `10`, so no range can pass.',
+      );
+      strictEqual(
+        checkOptions({ of: 'integer', min: 0, max: 10, step: 3, minSpan: 10 })?.[0],
+        '`minSpan` is `10`, wider than any range from `0` to `9`, so no range can pass.',
+      );
+      strictEqual(checkOptions({ of: 'time', minSpan: '23h 59m 59s' }), undefined);
+      strictEqual(checkOptions({ of: 'number', min: 0.1, max: 0.3, minSpan: 0.2 }), undefined);
+      strictEqual(checkOptions({ of: 'dateTime', min: 0, minSpan: '1 week' }), undefined);
+      strictEqual(
+        checkOptions({ of: 'date', min: '2030-01-01', max: '2030-01-08', minSpan: '1 week' }),
+        undefined,
+      );
+    });
+
     it('takes a numeric span at or above `0`, whole on an `integer` range', () => {
       deepStrictEqual(checkOptions({ of: 'number', minSpan: '1 day' }), [
         '`minSpan` is `1 day`, which the field cannot read.',

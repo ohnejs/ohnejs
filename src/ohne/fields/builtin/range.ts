@@ -1,4 +1,4 @@
-import type { CurrencyCode } from '../../../utils/index.ts';
+import type { CurrencyCode, ValidationFailure } from '../../../utils/index.ts';
 import type { Message } from '../../messages/known-messages.ts';
 import type { FieldInstance } from '../field.ts';
 
@@ -7,6 +7,7 @@ import {
   checkNumberSpan,
   checkSpan,
   coerceToNumber,
+  instantToMs,
   isCurrencyCode,
   isInteger,
   isoDayToMs,
@@ -19,6 +20,7 @@ import {
   isUndefined,
   nonNegativeNumber,
   parseWholeDuration,
+  stepValue,
   stringifyDuration,
 } from '../../../utils/index.ts';
 import { boundsProblem } from '../bounds.ts';
@@ -125,24 +127,11 @@ export const range = defineField({
   validators: [
     (value, ctx) => {
       if (!isPlainObject(value)) return undefined;
-      const { of, minSpan, maxSpan, currency } = ctx.options;
-      if (NUMERIC.includes(of)) {
-        const start = endNumber(value.start, of);
-        const end = endNumber(value.end, of);
-        if (isUndefined(start) || isUndefined(end)) return undefined;
-        const show = isUndefined(currency)
-          ? undefined
-          : (minor: number) => amountWithCode(minor, currency);
-        const bounds = {
-          min: minSpan as number | undefined,
-          max: maxSpan as number | undefined,
-        };
-        return failureMessage(checkNumberSpan(start, end, bounds, show));
-      }
-      const start = endMs(value.start, of);
-      const end = endMs(value.end, of);
+      const read = NUMERIC.includes(ctx.options.of) ? endNumber : endMs;
+      const start = read(value.start, ctx.options.of);
+      const end = read(value.end, ctx.options.of);
       if (isUndefined(start) || isUndefined(end)) return undefined;
-      return failureMessage(checkSpan(start, end, { min: minSpan, max: maxSpan }));
+      return failureMessage(spanFailure(start, end, ctx.options));
     },
   ],
 });
@@ -246,7 +235,8 @@ function rangeOptionsProblem(options: RangeOptions): string[] | undefined {
       ];
     }
   }
-  const problem = numeric ? numericSpanProblem(options) : temporalSpanProblem(options);
+  const problem =
+    (numeric ? numericSpanProblem(options) : temporalSpanProblem(options)) ?? reachProblem(options);
   if (!isUndefined(problem)) return problem;
   if (open && of === 'time') {
     return ['A `time` range cannot be `open`: it starts and ends on the same day.', 'Drop `open`.'];
@@ -264,6 +254,59 @@ function rangeOptionsProblem(options: RangeOptions): string[] | undefined {
     ];
   }
   return undefined;
+}
+
+/**
+ * How a span from `start` to `end` fails the range's `minSpan` and `maxSpan`, or `undefined` when it holds.
+ * A temporal span counts milliseconds; a numeric one compares exactly in decimal.
+ */
+function spanFailure(
+  start: number,
+  end: number,
+  options: RangeOptions,
+): ValidationFailure | undefined {
+  const { of, minSpan, maxSpan, currency } = options;
+  if (!NUMERIC.includes(of)) return checkSpan(start, end, { min: minSpan, max: maxSpan });
+  const show = isUndefined(currency)
+    ? undefined
+    : (minor: number) => amountWithCode(minor, currency);
+  const bounds = { min: minSpan as number | undefined, max: maxSpan as number | undefined };
+  return checkNumberSpan(start, end, bounds, show);
+}
+
+/**
+ * What makes `minSpan` unreachable, as error body rows, or `undefined` when the widest range spans it.
+ * A `time` range stays within its day, so its absent bounds are the day's first and last second.
+ * A stepped range ends on the last grid point at or below `max`.
+ * Bounds the ends cannot read, or an inverted pair, are left for the ends to name.
+ */
+function reachProblem(options: RangeOptions): string[] | undefined {
+  const { of, minSpan, step } = options;
+  const day = of === 'time' ? { min: '00:00:00', max: '23:59:59' } : {};
+  const bounds = { ...day, ...options };
+  const start = boundAt(bounds.min, of);
+  const top = boundAt(bounds.max, of);
+  if (isUndefined(minSpan) || isUndefined(start) || isUndefined(top) || start > top)
+    return undefined;
+  const end = isUndefined(step) ? top : stepValue(top, 1, { step, min: start, max: top });
+  if (isUndefined(spanFailure(start, end, { ...options, maxSpan: undefined }))) return undefined;
+  const [span, from, to] = NUMERIC.includes(of)
+    ? [minSpan, start, end]
+    : [stringifyDuration(parseWholeDuration(minSpan)!), bounds.min, bounds.max];
+  return [
+    `\`minSpan\` is \`${span}\`, wider than any range from \`${from}\` to \`${to}\`, so no range can pass.`,
+    of === 'time' && isUndefined(options.min) && isUndefined(options.max)
+      ? 'Lower `minSpan` below a day: a `time` range starts and ends on the same day.'
+      : 'Lower `minSpan`, or widen `min` and `max`.',
+  ];
+}
+
+/**
+ * A declared `min` or `max` on its kind's own line, or `undefined` when it is absent or unreadable.
+ */
+function boundAt(bound: unknown, of: RangeKind): number | undefined {
+  if (of === 'dateTime') return instantToMs(bound);
+  return NUMERIC.includes(of) ? endNumber(bound, 'number') : endMs(bound, of);
 }
 
 /**
