@@ -61,14 +61,11 @@ describe('slider', () => {
     );
   });
 
-  it('rests an empty model at `min`, marked empty', () => {
-    const root = slider(ref<number | undefined>(undefined), {
-      min: 3,
-      max: 9,
-    }) as unknown as FakeElement;
+  it('rests an empty model at `min`', () => {
+    const model = ref<number | undefined>(undefined);
+    const range = rangeOf(slider(model, { min: 3, max: 9 }));
     flush();
-    strictEqual(rangeOf(root).value, '3');
-    strictEqual(root.getAttribute('data-empty'), 'true');
+    strictEqual(range.value, '3');
   });
 
   it('follows `disabled`', () => {
@@ -83,18 +80,18 @@ describe('slider', () => {
 
   it('marks a drag from the press until the release anywhere', () => {
     for (const end of ['pointerup', 'pointercancel']) {
-      const root = slider(ref(1), { min: 0, max: 5 }) as unknown as FakeElement;
-      fire(rangeOf(root), 'pointerdown');
-      strictEqual(root.getAttribute('data-dragging'), 'true');
+      const range = rangeOf(slider(ref(1), { min: 0, max: 5 }));
+      fire(range, 'pointerdown');
+      strictEqual(range.getAttribute('data-dragging'), 'true');
       release(end);
-      strictEqual(root.getAttribute('data-dragging'), null);
+      strictEqual(range.getAttribute('data-dragging'), null);
       strictEqual(global.get(end)?.size, 0);
     }
   });
 
   it('marks no drag while disabled', () => {
-    const root = slider(ref(1), { min: 0, max: 5, disabled: () => true }) as unknown as FakeElement;
-    fire(rangeOf(root), 'pointerdown');
-    strictEqual(root.getAttribute('data-dragging'), null);
+    const range = rangeOf(slider(ref(1), { min: 0, max: 5, disabled: () => true }));
+    fire(range, 'pointerdown');
+    strictEqual(range.getAttribute('data-dragging'), null);
   });
 });

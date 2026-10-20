@@ -99,7 +99,7 @@ css`
     border-radius: 50%;
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
     transition: var(--ohne-transition);
-    transition-property: background-color, border-color, box-shadow, opacity;
+    transition-property: background-color, border-color, box-shadow;
     appearance: none;
   }
 
@@ -112,7 +112,7 @@ css`
     border-radius: 50%;
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
     transition: var(--ohne-transition);
-    transition-property: background-color, border-color, box-shadow, opacity;
+    transition-property: background-color, border-color, box-shadow;
   }
 
   .ohne-slider-input:focus-visible::-webkit-slider-thumb {
@@ -137,22 +137,14 @@ css`
     }
   }
 
-  .ohne-slider[data-dragging] .ohne-slider-input::-webkit-slider-thumb {
+  .ohne-slider-input[data-dragging]::-webkit-slider-thumb {
     background-color: hsl(var(--ohne-primary));
     box-shadow: 0 0 0 0.375rem hsl(var(--ohne-primary) / 0.15);
   }
 
-  .ohne-slider[data-dragging] .ohne-slider-input::-moz-range-thumb {
+  .ohne-slider-input[data-dragging]::-moz-range-thumb {
     background-color: hsl(var(--ohne-primary));
     box-shadow: 0 0 0 0.375rem hsl(var(--ohne-primary) / 0.15);
-  }
-
-  .ohne-slider[data-empty='true'] .ohne-slider-input::-webkit-slider-thumb {
-    opacity: 0.5;
-  }
-
-  .ohne-slider[data-empty='true'] .ohne-slider-input::-moz-range-thumb {
-    opacity: 0.5;
   }
 
   .ohne-slider-input:disabled {
@@ -164,7 +156,7 @@ css`
 /**
  * A range track on the native `input type="range"`, so keyboard, pointer, and `role=slider` come built in.
  * The model follows every move, rounded to the grid's decimals, and writing it moves the thumb.
- * An `undefined` model rests the thumb at `min`, dimmed, with an empty track.
+ * An `undefined` model rests the thumb at `min`, with an empty track.
  * The filled part of the track ends under the thumb's center.
  * The thumb fills on hover and, from press to release, wears a halo.
  *
@@ -190,15 +182,7 @@ export function slider(model: Ref<number | undefined>, options: SliderOptions): 
       model.value = roundTo(Number(input.value), places);
     },
     onPointerdown: () => {
-      if (options.disabled?.() === true) return;
-      root.setAttribute('data-dragging', 'true');
-      const release = (): void => {
-        root.removeAttribute('data-dragging');
-        window.removeEventListener('pointerup', release);
-        window.removeEventListener('pointercancel', release);
-      };
-      window.addEventListener('pointerup', release);
-      window.addEventListener('pointercancel', release);
+      if (options.disabled?.() !== true) markDrag(input);
     },
   }) as HTMLInputElement;
   const root = h(
@@ -213,10 +197,8 @@ export function slider(model: Ref<number | undefined>, options: SliderOptions): 
     const value = model.value;
     const empty = isUndefined(value);
     const at = empty ? min : clamp(value, min, max);
-    const ratio = max > min ? (at - min) / (max - min) : 0;
-    const stop = `calc(var(--ohne-slider-thumb) / 2 + (100% - var(--ohne-slider-thumb)) * ${ratio})`;
+    const stop = trackStop(at, min, max);
     input.value = String(at);
-    root.setAttribute('data-empty', String(empty));
     input.style.setProperty(
       '--ohne-slider-fill',
       empty
@@ -225,4 +207,40 @@ export function slider(model: Ref<number | undefined>, options: SliderOptions): 
     );
   });
   return root;
+}
+
+/**
+ * Marks `input` as dragged from now until the pointer is released anywhere.
+ * `onMove` follows every pointer move until then.
+ *
+ * @example
+ * ```ts
+ * markDrag(input) // input[data-dragging] until pointerup
+ * ```
+ */
+export function markDrag(input: HTMLElement, onMove?: (event: PointerEvent) => void): void {
+  input.setAttribute('data-dragging', 'true');
+  const release = (): void => {
+    input.removeAttribute('data-dragging');
+    if (onMove) window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', release);
+    window.removeEventListener('pointercancel', release);
+  };
+  if (onMove) window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', release);
+  window.addEventListener('pointercancel', release);
+}
+
+/**
+ * The CSS length along a slider track that sits under the thumb's center at `value`.
+ *
+ * @example
+ * ```ts
+ * trackStop(5, 0, 10)
+ * // -> 'calc(var(--ohne-slider-thumb) / 2 + (100% - var(--ohne-slider-thumb)) * 0.5)'
+ * ```
+ */
+export function trackStop(value: number, min: number, max: number): string {
+  const ratio = max > min ? (value - min) / (max - min) : 0;
+  return `calc(var(--ohne-slider-thumb) / 2 + (100% - var(--ohne-slider-thumb)) * ${ratio})`;
 }
