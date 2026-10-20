@@ -16,6 +16,7 @@ const { h } = await import('../../../src/dashboard/render/h.ts');
 await import('../../../src/dashboard/fields/builtin/text.ts');
 await import('../../../src/dashboard/fields/builtin/repeater.ts');
 await import('../../../src/dashboard/fields/builtin/object.ts');
+await import('../../../src/dashboard/fields/builtin/integer.ts');
 
 /**
  * A plain `text` column described as the server describes it.
@@ -257,6 +258,19 @@ describe('createFieldForm', () => {
         language,
       });
       deepStrictEqual(structuredClone(form.read()), { value: {} });
+    });
+  });
+
+  it('asks a value of a field emptied at the top of an edit, defaulted or not', () => {
+    effectScope().run(() => {
+      for (const overrides of [{}, { required: false, options: { default: 3 } }]) {
+        const count = textField('count', { type: 'integer', logicalType: 'integer', ...overrides });
+        const form = createFieldForm([count], { count: 5 }, { mode: 'edit', path: '', language });
+        type(inputOf(form.controlOf('count')!.element), '');
+        const failed = { errors: { count: 'validation.required' } };
+        deepStrictEqual(structuredClone(form.read()), failed);
+        deepStrictEqual(structuredClone(form.readPatch()), failed);
+      }
     });
   });
 

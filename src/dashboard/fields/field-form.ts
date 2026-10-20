@@ -153,7 +153,7 @@ export interface FieldForm {
    * Reads the whole value: every control's current value beside the carried fields.
    * Any control that fails to parse blocks the read with its messages instead.
    * So does a required field left without a value, with `validation.required`, as the server would.
-   * A top-level edit form skips that check, since an update leaves an omitted field as it is.
+   * A top-level edit form asks it only of a changed field, since an update leaves an untouched one as it is.
    * Nothing shows, so a live consumer may read on every change; a save passes the messages to `setErrors`.
    */
   read(): ControlReading;
@@ -404,10 +404,9 @@ export function createFieldForm(
         continue;
       }
       const reading = row.control.read();
+      const asked = checksRequired ? row.field.required : row.control.dirty();
       const failure =
-        checked && checksRequired && row.field.required && isUndefined(reading.errors)
-          ? checkRequired(reading.value)
-          : undefined;
+        checked && asked && isUndefined(reading.errors) ? checkRequired(reading.value) : undefined;
       const failed = isUndefined(failure) ? reading.errors : { '': translateMessage(failure) };
       if (!isUndefined(failed)) {
         for (const [key, message] of Object.entries(failed)) {
