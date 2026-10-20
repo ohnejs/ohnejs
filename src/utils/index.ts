@@ -66,6 +66,7 @@ export * from './content-disposition/content-disposition.ts';
 export * from './content-disposition/parse-content-disposition.ts';
 export * from './cookie/parse-cookies.ts';
 export * from './cookie/serialize-cookie.ts';
+export * from './date/instant-to-ms.ts';
 export * from './date/iso-day-to-ms.ts';
 export * from './date/iso-time-to-ms.ts';
 export * from './date/ms-to-iso-day.ts';
