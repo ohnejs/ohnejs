@@ -55,11 +55,11 @@ export function parseIntegerValue(field: DashboardField, raw: string): ScalarPar
 }
 
 /**
- * A real-number input parsed strictly to a finite double.
+ * A real-number input parsed strictly to a finite double, with `.` or `,` as the decimal mark.
  * Emptied, a nullable field writes `null` and a non-nullable one is omitted.
  */
 export function parseRealValue(field: DashboardField, raw: string): ScalarParse {
-  const text = raw.trim();
+  const text = raw.trim().replace(',', '.');
   if (text === '') return field.nullable ? { value: null } : {};
   if (!isDecimalString(text) || !isRealNumber(Number(text))) {
     return { error: 'dashboard.invalidNumber' };

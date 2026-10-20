@@ -90,6 +90,13 @@ describe('parseRealValue', () => {
     deepStrictEqual(parseRealValue(field(), '1e5x'), { error: 'dashboard.invalidNumber' });
   });
 
+  it('reads `,` as the decimal mark, once', () => {
+    deepStrictEqual(parseRealValue(field(), '72,5'), { value: 72.5 });
+    deepStrictEqual(parseRealValue(field(), '-1,5e3'), { value: -1500 });
+    deepStrictEqual(parseRealValue(field(), '1.000,5'), { error: 'dashboard.invalidNumber' });
+    deepStrictEqual(parseRealValue(field(), '1,000.5'), { error: 'dashboard.invalidNumber' });
+  });
+
   it('resolves an emptied nullable field to null', () => {
     deepStrictEqual(parseRealValue(field({ nullable: true }), ''), { value: null });
   });

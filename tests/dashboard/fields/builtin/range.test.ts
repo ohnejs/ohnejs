@@ -17,8 +17,9 @@ await seedMessages(
     'dashboard.range.start': 'Start',
     'dashboard.range.end': 'End',
     'dashboard.range.noEnd': 'No end',
+    'validation.minSpan': 'At least {min}',
   },
-  'dashboard',
+  ['dashboard', 'validation'],
 );
 const { rangeType } = await import('../../../../src/dashboard/fields/builtin/range.ts');
 const { summaryParts, summaryTitle } = await import('../../../../src/dashboard/fields/_summary.ts');
@@ -104,7 +105,7 @@ describe('rangeType control', () => {
     effectScope().run(() => {
       const window = control(rangeField({ of: 'date', minSpan: '1 day' }), undefined);
       window.restore!({ start: '2008-11-13', end: '2008-11-13' });
-      deepStrictEqual(window.read(), { errors: { '': 'validation.minSpan' } });
+      deepStrictEqual(window.read(), { errors: { '': 'At least 1d' } });
       window.restore!({ start: '2008-11-14', end: '2008-11-13' });
       deepStrictEqual(window.read(), { errors: { '': 'validation.invalidRange' } });
       const shift = control(rangeField({ of: 'time', maxSpan: '8h' }), undefined);
@@ -220,6 +221,21 @@ describe('rangeType numeric control', () => {
     });
   });
 
+  it("names a span bound in the language's decimal mark", () => {
+    effectScope().run(() => {
+      const weight = rangeType.control!({
+        field: rangeField({ of: 'number', minSpan: 0.5 }),
+        initial: undefined,
+        mode: 'edit',
+        path: 'window',
+        language: () => 'de',
+        onInput() {},
+      })!;
+      weight.restore!({ start: 1, end: 1.25 });
+      deepStrictEqual(weight.read(), { errors: { '': 'At least 0,5' } });
+    });
+  });
+
   it('stays pristine over a stored pair and asks for a missing end unless open', () => {
     effectScope().run(() => {
       const stored = { UUID: 'u1', start: 2.5, end: 4 };
@@ -253,7 +269,7 @@ describe('rangeType numeric control', () => {
       const [start, end] = inputs(price);
       type(start!, '5');
       type(end!, '12.50');
-      deepStrictEqual(price.read(), { errors: { '': 'validation.minSpan' } });
+      deepStrictEqual(price.read(), { errors: { '': 'At least €10.00' } });
       type(end!, '15');
       deepStrictEqual(price.read(), { value: { start: 500, end: 1500 } });
     });

@@ -8,6 +8,7 @@ import { isoTimeToMs } from '../../../utils/date/iso-time-to-ms.ts';
 import { msToISODay } from '../../../utils/date/ms-to-iso-day.ts';
 import { msToISOTime } from '../../../utils/date/ms-to-iso-time.ts';
 import { parseWholeDuration } from '../../../utils/duration/parse-whole-duration.ts';
+import { decimalMarkIn } from '../../../utils/i18n/decimal-mark-in.ts';
 import { formatCurrencyIn } from '../../../utils/i18n/format-currency-in.ts';
 import { isCurrencyCode } from '../../../utils/is/is-currency-code.ts';
 import { isInteger } from '../../../utils/is/is-integer.ts';
@@ -499,13 +500,13 @@ function numericControl(
       if (isNull(high) && !open) {
         return { errors: { end: translateMessage('validation.required') } };
       }
-      const amount = isCurrencyCode(currency)
+      const show = isCurrencyCode(currency)
         ? (minor: number) => formatCurrencyIn(minor, currency, language())
-        : undefined;
+        : (bound: number) => String(bound).replace('.', decimalMarkIn(language()));
       const failure =
         isNull(high) || !dirty()
           ? undefined
-          : checkNumberSpan(low, high, { min: minSpan, max: maxSpan }, amount);
+          : checkNumberSpan(low, high, { min: minSpan, max: maxSpan }, show);
       return checkedReading(current(), failure);
     },
     draft() {

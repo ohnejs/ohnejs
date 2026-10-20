@@ -6,6 +6,7 @@ import type { NumberFieldOptions } from '../known-field-types.ts';
 import type { ScalarParse } from '../parse.ts';
 
 import { numericInputMode } from '../../../utils/html/numeric-input-mode.ts';
+import { decimalMarkIn } from '../../../utils/i18n/decimal-mark-in.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
@@ -16,8 +17,7 @@ import { stepValue } from '../../../utils/number/step-value.ts';
 import { computed } from '../../../utils/reactive/computed.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
-import { checkRange } from '../../../utils/validate/check-range.ts';
-import { checkStep } from '../../../utils/validate/check-step.ts';
+import { checkAmount } from '../../../utils/validate/check-amount.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useDashboardLanguage } from '../../runtime/use-dashboard-language.ts';
@@ -150,7 +150,7 @@ css`
  */
 export function numericFieldType<O extends NumberFieldOptions>(kind: NumericKind<O>): FieldType<O> {
   const notationOf = (field: DashboardField<O>, language: string): NumericNotation =>
-    kind.notation?.(field, language) ?? plainNotation(kind, field);
+    kind.notation?.(field, language) ?? plainNotation(kind, field, language);
   return {
     display({ field, value, language }) {
       return () => {
@@ -362,28 +362,31 @@ export function numericFieldType<O extends NumberFieldOptions>(kind: NumericKind
 }
 
 /**
- * The plain notation of a field: the number as typed, its `suffix` unit, and its `step` grid and bounds.
+ * The plain notation of a field: the number in the language's decimal mark, its `suffix`, its grid and bounds.
  */
 function plainNotation<O extends NumberFieldOptions>(
   kind: NumericKind<O>,
   field: DashboardField<O>,
+  language: string,
 ): NumericNotation {
   const { min, max, step, suffix } = field.options ?? {};
   const grid = { min, max, step };
+  const mark = decimalMarkIn(language);
+  const text = (value: number): string => String(value).replace('.', mark);
   const unit = (): string | undefined => translateMessage(suffix);
   // A whole number's arrow keys stop inside a fractional bound, on a value the field can hold.
   const low = kind.decimal ? (min ?? -Infinity) : Math.ceil(min ?? -Infinity);
   const high = kind.decimal ? (max ?? Infinity) : Math.floor(max ?? Infinity);
   return {
     parse: (raw) => kind.parse(field, raw),
-    text: String,
-    show: String,
+    text,
+    show: text,
     unit,
     affix() {
       const symbol = unit();
       return isUndefined(symbol) ? undefined : { side: 'suffix', symbol };
     },
-    check: (value) => checkRange(value, grid) ?? checkStep(value, grid),
+    check: (value) => checkAmount(value, grid, text),
     move: (value, count) =>
       isUndefined(step)
         ? clamp(roundTo(value + count, countDecimals(value)), low, high)

@@ -56,6 +56,25 @@ describe('numberType control', () => {
     });
   });
 
+  it("edits in the language's decimal mark, and reads either mark", () => {
+    effectScope().run(() => {
+      const control = numberType.control!({
+        field: { ...GOLD, options: { min: 0.5, max: 1000 } },
+        initial: 0.75,
+        mode: 'edit',
+        path: 'gold',
+        language: () => 'de',
+        onInput() {},
+      })!;
+      flush();
+      strictEqual((inputOf(control.element) as unknown as { value: string }).value, '0,75');
+      type(inputOf(control.element), '72,5');
+      deepStrictEqual(control.read(), { value: 72.5 });
+      type(inputOf(control.element), '72.5');
+      deepStrictEqual(control.read(), { value: 72.5 });
+    });
+  });
+
   it('drafts the parsed number, or the text as typed while it does not parse', () => {
     effectScope().run(() => {
       const control = numberType.control?.({
@@ -314,6 +333,17 @@ describe('numberType display', () => {
 
   it('shows the value alone without a suffix', () => {
     strictEqual(cell(2.5).getAttribute('title'), '2.5');
+  });
+
+  it("writes the value with the language's decimal mark", () => {
+    const shown = (
+      numberType.display!({
+        field: GOLD,
+        value: () => 1234.5,
+        language: () => 'de',
+      } as never) as unknown as () => FakeElement
+    )();
+    strictEqual(shown.getAttribute('title'), '1234,5');
   });
 
   it('summarizes with the unit', () => {
