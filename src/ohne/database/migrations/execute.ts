@@ -511,6 +511,14 @@ async function runMove(
   assertNotPrimaryKey(meta, source, from);
   const inPlace = from.table === to.table && from.column === to.column;
   const rows = await readRows(engine, source);
+  // SQLite matches column names case-insensitively, so both spellings cannot coexist.
+  if (
+    !inPlace &&
+    from.table === to.table &&
+    from.column.toLowerCase() === to.column.toLowerCase()
+  ) {
+    await dropColumn(engine, source, column);
+  }
   const target = inPlace
     ? await retypeInPlace(engine, source, column, to)
     : await materializeTarget(engine, meta, to);
@@ -543,7 +551,7 @@ async function runFill(
   const parent = requiredChildParent(engine, to.table);
   if (!isUndefined(parent)) await fillChildless(engine, meta, to, parent, transform);
   const schema = present(engine, to.table) ? await describe(engine, to.table) : undefined;
-  const column = schema?.columns.find((item) => item.name === to.column);
+  const column = isUndefined(schema) ? undefined : targetColumn(meta, schema, to);
   if (isUndefined(column) && !(await columnSatisfied(engine, to, later))) {
     throw ohneError({
       title: `Migration \`${meta.name}\` fills a column the schema does not hold`,
@@ -704,7 +712,7 @@ async function materializeTarget(
     engine.claimed[to.table] = claim;
   }
   const schema = await describe(engine, to.table);
-  const column = schema.columns.find((item) => item.name === to.column);
+  const column = targetColumn(meta, schema, to);
   if (!isUndefined(column)) {
     assertColumnMatches(engine, meta, to, column);
     assertNotPrimaryKey(meta, schema, to);
@@ -713,6 +721,29 @@ async function materializeTarget(
   await addColumn(engine, schema, { name: to.column, type: to.type, notNull: false });
   setClaim(engine, to.table, to.column, to.type);
   return describe(engine, to.table);
+}
+
+/**
+ * The live column a move or fill lands on, matched case-insensitively.
+ * A column spelled otherwise refuses: SQLite cannot hold both spellings side by side.
+ */
+function targetColumn(
+  meta: MigrationMeta,
+  schema: TableSchema,
+  to: ColumnAddress,
+): ColumnSchema | undefined {
+  const exact = schema.columns.find((item) => item.name === to.column);
+  if (!isUndefined(exact)) return exact;
+  const column = schema.columns.find((item) => item.name.toLowerCase() === to.column.toLowerCase());
+  if (isUndefined(column)) return undefined;
+  throw ohneError({
+    title: `Migration \`${meta.name}\` lands on an existing column`,
+    body: [
+      `\`${to.table}.${to.column}\` cannot land: \`${column.name}\` already exists.`,
+      'Migrate the occupying column away first, or pick another name.',
+    ],
+    path: meta.file,
+  });
 }
 
 /**

@@ -81,6 +81,93 @@ describe('executeMigrations', () => {
     await db.close();
   });
 
+  it('moves a column onto its case-only rename, values kept', async () => {
+    const db = await connectTest();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID", "title") VALUES (?, ?), (?, ?)', [
+      'a',
+      'A',
+      'b',
+      'B',
+    ]);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-case', {
+          from: { table: 'Posts', column: 'title', type: 'text' },
+          to: { table: 'Posts', column: 'tiTle', type: 'text' },
+        }),
+      ],
+      desired: [],
+      claimed: classifySchema([posts]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [{ name: 'app/001-case', status: 'applied' }]);
+    deepStrictEqual(await columnNames(db, 'Posts'), ['UUID', 'tiTle']);
+    const rows = await db.query<{ tiTle: string }>('SELECT "tiTle" FROM "Posts" ORDER BY "UUID"');
+    deepStrictEqual(
+      rows.map((row) => row.tiTle),
+      ['A', 'B'],
+    );
+    deepStrictEqual(outcome.claimed['Posts'], { columns: { UUID: 'text', tiTle: 'text' } });
+    await db.close();
+  });
+
+  it('refuses a move onto a live column of another spelling', async () => {
+    const db = await connectTest();
+    const posts = table('Posts', {
+      columns: [
+        UUID,
+        { name: 'title', type: 'text', notNull: false },
+        { name: 'other', type: 'text', notNull: false },
+      ],
+    });
+    await materialize(db, [posts]);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-clash', {
+            from: { table: 'Posts', column: 'other', type: 'text' },
+            to: { table: 'Posts', column: 'TITLE', type: 'text' },
+          }),
+        ],
+        desired: [],
+        claimed: classifySchema([posts]),
+        force: false,
+      }),
+      /lands on an existing column/,
+    );
+    await db.close();
+  });
+
+  it('refuses a fill onto a live column of another spelling', async () => {
+    const db = await connectTest();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'title', type: 'text', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-clash', {
+            from: null,
+            to: { table: 'Posts', column: 'TITLE', type: 'text' },
+            transform: () => 'x',
+          }),
+        ],
+        desired: [
+          table('Posts', { columns: [UUID, { name: 'TITLE', type: 'text', notNull: false }] }),
+        ],
+        claimed: classifySchema([posts]),
+        force: false,
+      }),
+      /lands on an existing column/,
+    );
+    await db.close();
+  });
+
   it('retypes a column physically on a same-column move, values carried through', async () => {
     const db = await connectTest();
     const posts = table('Posts', {
