@@ -78,6 +78,22 @@ describe('booleanType control', () => {
     });
   });
 
+  it('reads an untouched new required field as the `false` it shows', () => {
+    effectScope().run(() => {
+      deepStrictEqual(control(undefined, false).read(), { value: false });
+      deepStrictEqual(control(undefined, true).read(), {});
+      const defaulted = booleanType.control!({
+        field: { ...field(false), required: false },
+        initial: undefined,
+        mode: 'create',
+        path: 'featured',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      deepStrictEqual(defaulted.read(), {});
+    });
+  });
+
   it('lands a toggle as a discrete change', () => {
     effectScope().run(() => {
       const seen: (boolean | undefined)[] = [];

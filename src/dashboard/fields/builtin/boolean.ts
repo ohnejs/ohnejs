@@ -21,6 +21,7 @@ import { dimMark, type FieldType, registerFieldType } from '../field-type.ts';
  * The control is a checkbox, a switch under `display: 'switch'`, or a two-choice group under `'buttons'`.
  * The group's choices read `falseLabel` and `trueLabel`, falling back to the catalog's no and yes.
  * It stays pristine until touched; once touched it reads binary.
+ * An untouched new required field reads the `false` it shows; any other leaves its value to the server.
  * A stored `null` therefore returns to `null` only through the row's revert or an undo.
  */
 export const booleanType: FieldType<BooleanFieldOptions> = {
@@ -99,7 +100,7 @@ export const booleanType: FieldType<BooleanFieldOptions> = {
     return {
       element,
       read() {
-        return isUndefined(held.value) ? {} : { value: wire() };
+        return isUndefined(held.value) && !field.required ? {} : { value: wire() };
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
