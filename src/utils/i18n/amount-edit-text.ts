@@ -3,8 +3,8 @@ import { formatNumberIn } from './format-number-in.ts';
 
 /**
  * The text a user edits for an amount in minor units: `language`'s decimal mark, no grouping, ASCII digits.
+ * The mark is `,` where the language writes a comma, else `.`, the two that `parseMinorUnits` reads.
  * A negative amount leads with an ASCII `-`, not the language's own minus or a direction mark.
- * It reads back through `parseMinorUnits` unchanged, whatever the language's own digits are.
  *
  * @example
  * ```ts
@@ -14,14 +14,7 @@ import { formatNumberIn } from './format-number-in.ts';
  * ```
  */
 export function amountEditText(minor: number, digits: number, language: string): string {
-  const sign = minor < 0 ? '-' : '';
-  return (
-    sign +
-    formatNumberIn(minorUnitsToDecimal(Math.abs(minor), digits), language, {
-      numberingSystem: 'latn',
-      useGrouping: false,
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits,
-    })
-  );
+  const text = minorUnitsToDecimal(minor, digits);
+  const comma = formatNumberIn(0.5, language, { numberingSystem: 'latn' }).includes(',');
+  return comma ? text.replace('.', ',') : text;
 }
