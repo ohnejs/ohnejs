@@ -7,6 +7,7 @@ import {
   checkNumberSpan,
   checkSpan,
   coerceToNumber,
+  isCurrencyCode,
   isInteger,
   isoDayToMs,
   isoTimeToMs,
@@ -23,7 +24,7 @@ import {
 import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
 import { field } from '../field.ts';
-import { numericOptionsProblem } from '../numeric.ts';
+import { minorUnitsHint, numericOptionsProblem } from '../numeric.ts';
 import { option } from '../option.ts';
 import { failureMessage } from '../validation-message.ts';
 
@@ -306,9 +307,9 @@ function numericSpanProblem(options: RangeOptions): string[] | undefined {
     if (whole && !isUndefined(span) && !isInteger(span)) {
       return [
         `\`${name}\` is \`${span}\`, but an \`integer\` range spans whole numbers.`,
-        isUndefined(currency)
-          ? `Use a whole \`${name}\`, like \`5\`.`
-          : `Write \`${name}\` in minor units, like \`1999\` for 19.99.`,
+        isCurrencyCode(currency)
+          ? minorUnitsHint(name, currency)
+          : `Use a whole \`${name}\`, like \`5\`.`,
       ];
     }
   }

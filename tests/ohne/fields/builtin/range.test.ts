@@ -435,7 +435,15 @@ describe('range', () => {
       ]);
       strictEqual(
         checkOptions({ of: 'integer', currency: 'EUR', minSpan: 0.5 })?.[1],
-        'Write `minSpan` in minor units, like `1999` for 19.99.',
+        'Write `minSpan` in minor units, like `1999` for 19.99 EUR.',
+      );
+      strictEqual(
+        checkOptions({ of: 'integer', currency: 'KWD', minSpan: 0.5 })?.[1],
+        'Write `minSpan` in minor units, like `1999` for 1.999 KWD.',
+      );
+      strictEqual(
+        checkOptions({ of: 'integer', currency: 'XYZ', minSpan: 0.5 })?.[1],
+        'Use a whole `minSpan`, like `5`.',
       );
       strictEqual(checkOptions({ of: 'number', minSpan: 0.5, maxSpan: 2 }), undefined);
     });

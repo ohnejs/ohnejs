@@ -13,7 +13,7 @@ import {
 } from '../../../utils/index.ts';
 import { boundsProblem } from '../bounds.ts';
 import { defineField } from '../define-field.ts';
-import { numericOptions, numericOptionsProblem } from '../numeric.ts';
+import { minorUnitsHint, numericOptions, numericOptionsProblem } from '../numeric.ts';
 import { option } from '../option.ts';
 import { failureMessage } from '../validation-message.ts';
 
@@ -89,7 +89,7 @@ function currencyProblem(options: {
   if (!isUndefined(fractional)) {
     return [
       `\`${fractional}\` is \`${options[fractional]}\`, but \`currency\` counts whole minor units.`,
-      `Write \`${fractional}\` in minor units, like \`1999\` for 19.99.`,
+      minorUnitsHint(fractional, currency),
     ];
   }
   if (isUndefined(options.suffix)) return undefined;

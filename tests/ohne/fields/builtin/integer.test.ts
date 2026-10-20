@@ -123,14 +123,16 @@ describe('integer currency', () => {
     strictEqual(bounds(1500, ctx({ currency: 'EUR', step: 500 })), undefined);
   });
 
-  it('refuses a bound that is no whole count of minor units', () => {
-    for (const [name, bound] of [
-      ['min', 0.5],
-      ['max', 1e21],
+  it('refuses a bound that is no whole count of minor units, its example in that currency', () => {
+    for (const [currency, name, bound, example] of [
+      ['EUR', 'min', 0.5, '19.99 EUR'],
+      ['EUR', 'max', 1e21, '19.99 EUR'],
+      ['JPY', 'min', 0.5, '1999 JPY'],
+      ['KWD', 'max', 0.5, '1.999 KWD'],
     ] as const) {
-      deepStrictEqual(checkOptions({ currency: 'EUR', [name]: bound }), [
+      deepStrictEqual(checkOptions({ currency, [name]: bound }), [
         `\`${name}\` is \`${bound}\`, but \`currency\` counts whole minor units.`,
-        `Write \`${name}\` in minor units, like \`1999\` for 19.99.`,
+        `Write \`${name}\` in minor units, like \`1999\` for ${example}.`,
       ]);
     }
   });

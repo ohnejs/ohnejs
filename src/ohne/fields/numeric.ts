@@ -1,6 +1,7 @@
+import type { CurrencyCode } from '../../utils/index.ts';
 import type { Message } from '../messages/known-messages.ts';
 
-import { isInteger, isRealNumber, isUndefined } from '../../utils/index.ts';
+import { amountWithCode, isInteger, isRealNumber, isUndefined } from '../../utils/index.ts';
 import { option } from './option.ts';
 
 /**
@@ -99,4 +100,12 @@ export function numericOptionsProblem(
         `\`display: 'slider'\` on a \`number\` ${subject} needs \`min\`, \`max\` and \`step\`.`,
         'Set the range and grid the slider spans, like `min: 0, max: 5, step: 0.5`.',
       ];
+}
+
+/**
+ * The fix row for a `currency` option that is no whole count of minor units.
+ * Its example reads in that currency, so `1999` is 19.99 EUR, 1999 JPY or 1.999 KWD.
+ */
+export function minorUnitsHint(name: string, currency: CurrencyCode): string {
+  return `Write \`${name}\` in minor units, like \`1999\` for ${amountWithCode(1999, currency)}.`;
 }
