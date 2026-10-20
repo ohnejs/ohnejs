@@ -65,6 +65,10 @@ css`
     font-size: 1em;
   }
 
+  .ohne-field-message-has-errors .ohne-prose :where(code) {
+    color: inherit;
+  }
+
   .ohne-field-message-inner .ohne-prose :where(table) {
     width: auto;
   }
