@@ -9,7 +9,7 @@
   "invalidEmail": "Dieser Wert muss eine E-Mail-Adresse wie `thrall@orgrimmar.example` sein",
   "invalidJSON": "Dieser Wert muss gültiges JSON sein",
   "invalidLink": "Dieser Link muss eine Web-, E-Mail- oder Telefonadresse, ein `/Pfad` oder ein `#Fragment` sein",
-  "invalidRange": "Der Anfang darf nicht größer als das Ende sein",
+  "invalidRange": "Der Beginn darf nicht größer als das Ende sein",
   "invalidReference": "Der referenzierte Datensatz existiert nicht",
   "invalidSlug": "Dieser Wert muss mindestens einen lateinischen Buchstaben oder eine Ziffer enthalten",
   "invalidStep": "Dieser Wert muss ein Vielfaches von `{step}` sein",
