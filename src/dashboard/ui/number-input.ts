@@ -302,7 +302,7 @@ function leadingZeros(value: number, width: number): string {
  * Touch keyboards show a digit pad when `min` rules out negatives.
  * A settled value is clamped to the bounds, rounded to `decimalPlaces`, and zero-padded.
  * Writing the model reformats the display, unless the text already reads as the new value.
- * A `null` model shows the input empty, its `placeholder` in view, and a step from empty starts at `min`.
+ * A `null` model shows empty with its `placeholder`, and a step from empty lands on 0 within bounds.
  *
  * @example
  * ```ts
