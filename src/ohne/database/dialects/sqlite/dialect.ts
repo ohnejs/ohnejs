@@ -30,7 +30,7 @@ import {
   type ListMembershipOperator,
   type LogicalType,
   type SchemaTransactionOptions,
-  type UniqueViolationTarget,
+  type IndexViolationTarget,
 } from '../../dialect.ts';
 import { OHNE_REBUILD_PREFIX } from '../../naming/table-names.ts';
 import { describeTable, listTables } from './introspect.ts';
@@ -320,7 +320,7 @@ export class SQLiteDialect extends Dialect {
    * Parses `UNIQUE constraint failed: <table>.<column>[, ...]` into its target.
    * The message shape has been stable in SQLite for years; anything else returns `null`.
    */
-  uniqueViolationTarget(error: unknown): UniqueViolationTarget | null {
+  indexViolationTarget(error: unknown): IndexViolationTarget | null {
     const detail = errorMessage(error).match(/UNIQUE constraint failed: (.+)$/)?.[1];
     if (isUndefined(detail)) return null;
     const parts = detail.split(', ').map((part) => part.split('.'));
@@ -329,6 +329,13 @@ export class SQLiteDialect extends Dialect {
       return null;
     }
     return { table, columns: parts.map((part) => part[1]) };
+  }
+
+  /**
+   * Never: a SQLite b-tree spills a large entry to overflow pages, so no indexed value is too large.
+   */
+  isIndexOverflow(): boolean {
+    return false;
   }
 
   /**

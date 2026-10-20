@@ -60,7 +60,13 @@ import { materializeFailure, planCompanion, splitColumns, upsertCompanion } from
 import { applyReconcile, columnTypes, planReconcile } from './reconcile.ts';
 import { checkReferences } from './references.ts';
 import { runWrite } from './run-write.ts';
-import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
+import {
+  checkChildUnique,
+  checkCompositeUnique,
+  checkUnique,
+  indexOverflowErrors,
+  uniqueRaceErrors,
+} from './unique.ts';
 
 /**
  * The outcome of an update: every matched record re-read in its final state, or the field failures.
@@ -239,7 +245,13 @@ export async function runUpdate(
     (tx) => attemptUpdate(tx, meta, dialect, input, scoped, locale, unscoped, linkResolver),
     (error) => {
       if (dialect.isUniqueViolation(error)) {
-        return { ok: false, errors: uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error)) };
+        return { ok: false, errors: uniqueRaceErrors(meta, dialect.indexViolationTarget(error)) };
+      }
+      if (dialect.isIndexOverflow(error)) {
+        return {
+          ok: false,
+          errors: indexOverflowErrors(meta, dialect.indexViolationTarget(error)),
+        };
       }
       if (dialect.isForeignKeyViolation(error)) {
         return { ok: false, errors: { '': 'validation.invalidReference' } };

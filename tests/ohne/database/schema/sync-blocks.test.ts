@@ -380,7 +380,7 @@ describe('syncDatabase with blocks', () => {
       insertReference(db, 'Posts_content', 'w2', 'p2', 'Hero', 'h1'),
       (error: unknown) => {
         ok(dialect.isUniqueViolation(error));
-        deepStrictEqual(dialect.uniqueViolationTarget(error), {
+        deepStrictEqual(dialect.indexViolationTarget(error), {
           table: 'Posts_content',
           columns: ['_blockUUID'],
         });

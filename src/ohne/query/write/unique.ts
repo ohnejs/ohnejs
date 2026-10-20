@@ -1,5 +1,6 @@
 import type { SQLValue, Transaction } from '../../database/adapter.ts';
-import type { Dialect, LogicalType, UniqueViolationTarget } from '../../database/dialect.ts';
+import type { Dialect, IndexViolationTarget, LogicalType } from '../../database/dialect.ts';
+import type { Message } from '../../messages/known-messages.ts';
 import type { CollectionQueryMeta, FieldQueryMeta } from '../metadata.ts';
 import type { UniqueProbe } from '../pipeline/run-record.ts';
 import type { FieldErrors } from './errors.ts';
@@ -214,9 +215,9 @@ export async function checkChildUnique(
  */
 export function uniqueRaceErrors(
   meta: CollectionQueryMeta,
-  target: UniqueViolationTarget | null,
+  target: IndexViolationTarget | null,
 ): FieldErrors {
-  const mapped = isNull(target) ? null : violationErrors(meta, target);
+  const mapped = isNull(target) ? null : violationErrors(meta, target, 'validation.notUnique');
   if (!isNull(mapped)) return mapped;
   const errors: FieldErrors = {};
   for (const [name, field] of Object.entries(meta.fields)) {
@@ -230,13 +231,28 @@ export function uniqueRaceErrors(
 }
 
 /**
- * Maps a violation's table and columns to field-keyed errors, or `null` when nothing maps.
+ * Keys a write whose value outgrew an index at the field the index names, else at the root.
+ * The dialect names the index for an entry over its size, but not for a row over a page.
+ */
+export function indexOverflowErrors(
+  meta: CollectionQueryMeta,
+  target: IndexViolationTarget | null,
+): FieldErrors {
+  const mapped = isNull(target)
+    ? null
+    : violationErrors(meta, target, 'validation.tooLargeToIndex');
+  return mapped ?? { '': 'validation.tooLargeToIndex' };
+}
+
+/**
+ * Maps a violation's table and columns to field-keyed `message`s, or `null` when nothing maps.
  * The main and companion tables key at top-level field names; derived tables search the field tree.
  * System columns (`_localeCode`, `_parentUUID`) are skipped - the field columns beside them decide.
  */
 function violationErrors(
   meta: CollectionQueryMeta,
-  target: UniqueViolationTarget,
+  target: IndexViolationTarget,
+  message: Message,
 ): FieldErrors | null {
   if (target.table === meta.table || target.table === meta.companionTable) {
     const companion = target.table === meta.companionTable;
@@ -247,11 +263,11 @@ function violationErrors(
         ([, field]) => field.column === column && (field.companion === true) === companion,
       );
       if (isUndefined(named)) return null;
-      errors[named[0]] = 'validation.notUnique';
+      errors[named[0]] = message;
     }
     return isEmpty(errors) ? null : errors;
   }
-  return derivedViolationErrors(meta.fields, '', target, new Set());
+  return derivedViolationErrors(meta.fields, '', target, message, new Set());
 }
 
 /**
@@ -262,21 +278,22 @@ function violationErrors(
 function derivedViolationErrors(
   fields: Record<string, FieldQueryMeta>,
   prefix: string,
-  target: UniqueViolationTarget,
+  target: IndexViolationTarget,
+  message: Message,
   seen: Set<string>,
 ): FieldErrors | null {
   for (const [name, field] of Object.entries(fields)) {
     const path = prefix === '' ? name : `${prefix}.${name}`;
     if (field.kind === 'records' && field.table === target.table) {
-      return { [path]: 'validation.notUnique' };
+      return { [path]: message };
     }
     if (field.kind === 'childOne' || field.kind === 'childMany') {
       const subfields = field.subfields as Record<string, FieldQueryMeta>;
       if (field.table === target.table) {
-        const errors = subfieldErrors(subfields, path, target.columns);
+        const errors = subfieldErrors(subfields, path, target.columns, message);
         if (!isNull(errors)) return errors;
       }
-      const nested = derivedViolationErrors(subfields, path, target, seen);
+      const nested = derivedViolationErrors(subfields, path, target, message, seen);
       if (!isNull(nested)) return nested;
     }
     if (field.kind === 'blocks') {
@@ -285,10 +302,10 @@ function derivedViolationErrors(
         seen.add(type);
         const block = blockQueryMetadata(type);
         if (block.table === target.table) {
-          const errors = subfieldErrors(block.fields, path, target.columns);
+          const errors = subfieldErrors(block.fields, path, target.columns, message);
           if (!isNull(errors)) return errors;
         }
-        const nested = derivedViolationErrors(block.fields, path, target, seen);
+        const nested = derivedViolationErrors(block.fields, path, target, message, seen);
         if (!isNull(nested)) return nested;
       }
     }
@@ -297,19 +314,20 @@ function derivedViolationErrors(
 }
 
 /**
- * Keys a violated table's field columns under `prefix`, or `null` when none maps to a subfield.
+ * Keys a violated table's field columns under `prefix` with `message`, or `null` when none maps to a subfield.
  */
 function subfieldErrors(
   fields: Record<string, FieldQueryMeta>,
   prefix: string,
   columns: readonly string[],
+  message: Message,
 ): FieldErrors | null {
   const errors: FieldErrors = {};
   for (const column of columns) {
     if (column.startsWith('_')) continue;
     const named = Object.entries(fields).find(([, field]) => field.column === column);
     if (isUndefined(named)) return null;
-    errors[`${prefix}.${named[0]}`] = 'validation.notUnique';
+    errors[`${prefix}.${named[0]}`] = message;
   }
   return isEmpty(errors) ? null : errors;
 }

@@ -24,7 +24,13 @@ import { emptyCompanionPlan, splitColumns, upsertCompanion } from './companion.t
 import { applyReconcile, createPlan } from './reconcile.ts';
 import { checkReferences } from './references.ts';
 import { runWrite } from './run-write.ts';
-import { checkChildUnique, checkCompositeUnique, checkUnique, uniqueRaceErrors } from './unique.ts';
+import {
+  checkChildUnique,
+  checkCompositeUnique,
+  checkUnique,
+  indexOverflowErrors,
+  uniqueRaceErrors,
+} from './unique.ts';
 import { attemptUpdate } from './update.ts';
 
 /**
@@ -123,7 +129,11 @@ export async function runCreate(
     (error) => {
       const at = isUndefined(writing.locale) ? {} : { locale: writing.locale };
       if (dialect.isUniqueViolation(error)) {
-        const errors = uniqueRaceErrors(meta, dialect.uniqueViolationTarget(error));
+        const errors = uniqueRaceErrors(meta, dialect.indexViolationTarget(error));
+        return { ok: false, errors, ...at };
+      }
+      if (dialect.isIndexOverflow(error)) {
+        const errors = indexOverflowErrors(meta, dialect.indexViolationTarget(error));
         return { ok: false, errors, ...at };
       }
       if (dialect.isForeignKeyViolation(error)) {

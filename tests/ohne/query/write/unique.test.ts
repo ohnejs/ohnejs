@@ -13,6 +13,7 @@ import {
   checkChildUnique,
   checkCompositeUnique,
   checkUnique,
+  indexOverflowErrors,
   uniqueRaceErrors,
 } from '../../../../src/ohne/query/write/unique.ts';
 import { connectTest, dialect } from '../../../_dialect.ts';
@@ -37,6 +38,28 @@ useCollections().register('URChild', {
   collection: {
     fields: { items: field('repeater', { fields: { slug: field('text', { unique: true }) } }) },
   },
+});
+
+describe('indexOverflowErrors', () => {
+  it('keys a value too large for its index at the field the index names', () => {
+    deepStrictEqual(
+      indexOverflowErrors(queryMetadata('URComposite'), {
+        table: 'URComposite',
+        columns: ['email'],
+      }),
+      { email: 'validation.tooLargeToIndex' },
+    );
+    deepStrictEqual(
+      indexOverflowErrors(queryMetadata('URChild'), { table: 'URChild_items', columns: ['slug'] }),
+      { 'items.slug': 'validation.tooLargeToIndex' },
+    );
+  });
+
+  it('falls back to the root when no index is named', () => {
+    deepStrictEqual(indexOverflowErrors(queryMetadata('URComposite'), null), {
+      '': 'validation.tooLargeToIndex',
+    });
+  });
 });
 
 describe('uniqueRaceErrors', () => {

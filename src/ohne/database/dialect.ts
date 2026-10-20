@@ -43,16 +43,16 @@ export interface DialectFragment {
 }
 
 /**
- * The table and columns a unique-constraint violation names, parsed from the driver's error.
+ * The table and columns of the index a failed write names, parsed from the driver's error.
  */
-export interface UniqueViolationTarget {
+export interface IndexViolationTarget {
   /**
-   * The table whose unique index failed.
+   * The table whose index failed.
    */
   table: string;
 
   /**
-   * The violated index's columns, in the order the driver names them.
+   * The index's columns, in the order the driver names them.
    */
   columns: readonly string[];
 }
@@ -355,16 +355,28 @@ export abstract class Dialect {
   abstract isUniqueViolation(error: unknown): boolean;
 
   /**
-   * The table and columns a unique violation names, or `null` when the message does not parse.
+   * The table and columns of the index a failed write names, or `null` when the error names none.
+   * It reads a unique violation and an index overflow alike.
    * Best-effort: the write layer maps the target back to a field, falling back to a blanket error.
    *
    * @example
    * ```ts
-   * dialect.uniqueViolationTarget(caught)
+   * dialect.indexViolationTarget(caught)
    * // -> { table: 'Posts', columns: ['slug'] }
    * ```
    */
-  abstract uniqueViolationTarget(error: unknown): UniqueViolationTarget | null;
+  abstract indexViolationTarget(error: unknown): IndexViolationTarget | null;
+
+  /**
+   * Whether `error` thrown by the driver is a write whose value is too large for one of the table's indexes.
+   *
+   * @example
+   * ```ts
+   * dialect.isIndexOverflow(caught)
+   * // -> true when an indexed value outgrew an index entry
+   * ```
+   */
+  abstract isIndexOverflow(error: unknown): boolean;
 
   /**
    * Whether `error` thrown by the driver is a foreign-key-constraint violation.
