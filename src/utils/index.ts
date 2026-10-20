@@ -118,6 +118,7 @@ export * from './i18n/currency-affix-in.ts';
 export * from './i18n/currency-codes.ts';
 export * from './i18n/currency-digits.ts';
 export * from './i18n/date-options-from-skeleton.ts';
+export * from './i18n/decimal-mark-in.ts';
 export * from './i18n/display-name.ts';
 export * from './i18n/format-currency-in.ts';
 export * from './i18n/format-date-pattern.ts';
