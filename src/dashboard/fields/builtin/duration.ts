@@ -78,6 +78,9 @@ export const durationType: FieldType<DurationFieldOptions> = {
 
     const error = (): string => (routed.value !== '' ? routed.value : local.value);
     const parse = () => parseDurationValue(field, raw.value);
+    // A stored value the text cannot express, like a negative, reads as stored until you edit it.
+    const untouched = (): boolean =>
+      !isNullish(base.value) && raw.value === durationText(base.value);
     const preview = (): string => {
       const { value } = parse();
       return isNumber(value) ? formatDuration(value, { locale: language(), style: 'long' }) : '';
@@ -95,6 +98,7 @@ export const durationType: FieldType<DurationFieldOptions> = {
       onInput();
     });
     input.addEventListener('blur', () => {
+      if (untouched()) return;
       const parsed = parse();
       local.value = isUndefined(parsed.error) ? '' : translateMessage(parsed.error);
       if (isNumber(parsed.value)) raw.value = stringifyDuration(parsed.value);
@@ -103,6 +107,7 @@ export const durationType: FieldType<DurationFieldOptions> = {
 
     const dirty = (): boolean => {
       if (isUndefined(base.value)) return raw.value.trim() !== '';
+      if (untouched()) return false;
       const parsed = parse();
       return !isUndefined(parsed.error) || parsed.value !== base.value;
     };
@@ -116,6 +121,7 @@ export const durationType: FieldType<DurationFieldOptions> = {
       element: box,
       read() {
         if (isUndefined(base.value) && raw.value.trim() === '') return {};
+        if (untouched()) return { value: base.value };
         const parsed = parse();
         if (!isUndefined(parsed.error)) return { errors: { '': translateMessage(parsed.error) } };
         if (isUndefined(parsed.value)) return {};
@@ -128,6 +134,7 @@ export const durationType: FieldType<DurationFieldOptions> = {
       },
       draft() {
         if (isUndefined(base.value) && raw.value.trim() === '') return undefined;
+        if (untouched()) return base.value;
         const parsed = parse();
         return isUndefined(parsed.error) ? parsed.value : raw.value;
       },

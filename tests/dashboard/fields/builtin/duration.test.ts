@@ -77,9 +77,12 @@ describe('durationType control', () => {
     });
   });
 
-  it('renders a stored negative without throwing', () => {
+  it('renders a stored negative without throwing, and reads it clean until edited', () => {
     effectScope().run(() => {
-      strictEqual(text(control(-1).element), '-1');
+      const cooldown = control(-1);
+      strictEqual(text(cooldown.element), '-1');
+      strictEqual(cooldown.dirty(), false);
+      deepStrictEqual(cooldown.read(), { value: -1 });
     });
   });
 });
