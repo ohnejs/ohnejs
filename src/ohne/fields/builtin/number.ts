@@ -20,7 +20,11 @@ export const number = defineField({
   ],
   search: {
     default: false,
-    match: ({ token }) =>
-      isDecimalString(token) && isRealNumber(Number(token)) ? { equalsTo: Number(token) } : null,
+    match: ({ token }) => {
+      const number = token.replace(',', '.');
+      return isDecimalString(number) && isRealNumber(Number(number))
+        ? { equalsTo: Number(number) }
+        : null;
+    },
   },
 });

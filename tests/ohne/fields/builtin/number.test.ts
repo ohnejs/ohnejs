@@ -49,6 +49,7 @@ describe('number search', () => {
   it('matches a numeric token by equality', () => {
     deepStrictEqual(search('1.5'), { equalsTo: 1.5 });
     deepStrictEqual(search('42'), { equalsTo: 42 });
+    deepStrictEqual(search('1,5'), { equalsTo: 1.5 });
   });
 
   it('gives `null` for a non-numeric or infinite token', () => {
