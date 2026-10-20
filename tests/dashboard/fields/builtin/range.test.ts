@@ -113,16 +113,24 @@ describe('rangeType control', () => {
     });
   });
 
-  it('seeds an empty time range inside its bounds, and stays pristine through a tab', () => {
+  it('seeds an empty time range inside its bounds, read as its value unless nullable', () => {
     effectScope().run(() => {
-      for (const options of [{ minSpan: '1h' }, { min: '09:00' }]) {
-        const shift = control(rangeField({ of: 'time', ...options }), undefined);
-        const [hours] = (shift.element as HTMLElement).querySelectorAll('input.ohne-number-input');
-        fire(hours as never, 'focus');
-        fire(hours as never, 'blur');
-        flush();
-        deepStrictEqual(shift.read(), {}, JSON.stringify(options));
-        strictEqual(shift.dirty(), false);
+      const seeds = [
+        [{ minSpan: '1h' }, { start: '00:00:00', end: '01:00:00' }],
+        [{ min: '09:00' }, { start: '09:00:00', end: '09:00:00' }],
+      ] as const;
+      for (const [options, seed] of seeds) {
+        for (const nullable of [false, true]) {
+          const shift = control(rangeField({ of: 'time', ...options }, nullable), undefined);
+          const [hours] = (shift.element as HTMLElement).querySelectorAll(
+            'input.ohne-number-input',
+          );
+          fire(hours as never, 'focus');
+          fire(hours as never, 'blur');
+          flush();
+          deepStrictEqual(shift.read(), nullable ? {} : { value: seed }, JSON.stringify(options));
+          strictEqual(shift.dirty(), false);
+        }
       }
     });
   });
