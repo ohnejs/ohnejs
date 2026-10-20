@@ -229,7 +229,8 @@ instead of failing at runtime:
 - `textMatch`, `like`, `listMembership`, `paginate`, `sortTerm` - the SQL the query builder needs.
 - `listTables`, `describeTable`, `applyTableDiff`, `renameTable`, `schemaTransaction` - the
   [schema sync](./sync.md).
-- `isUniqueViolation`, `uniqueViolationTarget`, `isForeignKeyViolation`, `isBusy` - driver errors.
+- `isUniqueViolation`, `indexViolationTarget`, `isIndexOverflow`, `isForeignKeyViolation`,
+  `isBusy` - driver errors.
 
 The other members work on any SQL database and a dialect overrides them only when its engine needs
 it. `ensureTable` creates the [reserved tables](#reserved-tables), and the lock and rate-limit
