@@ -11,17 +11,19 @@ import { defineField } from 'ohnejs';
 export default defineField({
   columnType: 'text',
   sanitizers: [(value) => value.trim().toUpperCase()],
-  validators: [(value) => (/^[A-Z]+-\d{4}$/.test(value) ? undefined : 'Must be a code like WOW-0042')],
+  validators: [
+    (value) => (/^[A-Z]+-\d{4}$/.test(value) ? undefined : 'Must be a code like WOW-0042'),
+  ],
 });
 ```
 
 ```ts
-// collections/Posts.ts
+// collections/Products.ts
 import { defineCollection, field } from 'ohnejs';
 
 export default defineCollection({
   fields: {
-    title: field('text'),
+    name: field('text'),
     sku: field('sku', { unique: true }),
   },
 });
@@ -115,9 +117,8 @@ built-in types do.
 `json`. A write converts input to that type and rejects what does not fit before your code runs, so
 the sanitizers and validators of a `text` type always receive a string.
 
-A `json` column accepts any value, so its validators check the shape. For open, unchecked JSON, the
-built-in [`json`](./field-types.md#json) type already does this. Its value has the type `unknown`
-unless `emitType` returns the TypeScript type as source code:
+A `json` column accepts any value, so its validators check the shape. Its value has the type
+`unknown` unless `emitType` returns the TypeScript type as source code:
 
 ```ts
 // fields/labels.ts
@@ -172,9 +173,9 @@ Set `copy: false` when the value a read returns is not valid write input. A
 [copied translation](./translations.md#copying-a-translation) then leaves the field out. The
 `password` type sets it, since its stored hash would be hashed again.
 
-Set `unique: false` when one value can be stored in more than one form, as JSON key order can. A
-unique index would then let equal values through, so no field of the type takes `unique: true`, and a
-unique composite index refuses one. The built-in `json` type sets it.
+Set `unique: false` when one value can be stored in more than one form, as JSON key order can. No
+field of the type then takes `unique: true` or joins a unique composite index. The built-in `json`
+type sets it.
 
 A type that references another collection, like the uploads layer's
 [`image` and `images`](../uploads/fields.md), returns a storage layout from `schema` instead:
@@ -211,13 +212,14 @@ export default defineField({
 });
 ```
 
-For a start and an end of a date or time, the built-in [`range`](./field-types.md#range) already
-compares the ends as they are stored. The validators receive the whole value. A field of this type filters through
+The validators receive the whole value. A field of this type filters through
 [`has`](./reading.md#filtering-relations), like any object.
 
 `orderBy` names the part a query sorts by when it orders by the field itself. A field
 `period: field('span')` then sorts by its `start` in `orderBy('period')`. Without it, the field
 cannot be ordered.
+
+For a span of days, instants, or times of day, use the built-in [`range`](./field-types.md#range).
 
 ## On your website
 
@@ -393,8 +395,8 @@ export default defineField({ ...select, search: false });
 ## In the dashboard
 
 A type with a `text`, `integer`, `real`, `boolean`, or `json` column and no `schema` is edited in
-the dashboard like the matching built-in type, and you do not need to register anything. Any other type
-shows a notice instead of its form control until a
+the dashboard like the matching built-in type, and you do not need to register anything. Any other
+type shows a notice instead of its form control until a
 [dashboard boot file](../dashboard/pages.md#boot-files) registers one with `registerFieldType`.
 The registration names the type in `KnownFieldTypes` beside it, as
 [typing a custom field type](../dashboard/forms.md#typing-a-custom-field-type) shows.
