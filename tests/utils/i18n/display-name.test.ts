@@ -24,6 +24,21 @@ describe('displayName', () => {
     strictEqual(displayName('de', 'region', 'en'), 'de');
   });
 
+  it('names a language in itself even where the engine lacks its date data', () => {
+    const Native = Intl.DateTimeFormat;
+    const Stub = function (locales?: string | string[], options?: Intl.DateTimeFormatOptions) {
+      const tag = Array.isArray(locales) ? locales[0] : locales;
+      return tag === 'hr' ? { format: () => 'M09' } : new Native(tag, options);
+    } as unknown as typeof Intl.DateTimeFormat;
+    Stub.supportedLocalesOf = Native.supportedLocalesOf;
+    Intl.DateTimeFormat = Stub;
+    try {
+      strictEqual(displayName('hr', 'language', 'hr'), 'Hrvatski');
+    } finally {
+      Intl.DateTimeFormat = Native;
+    }
+  });
+
   it('reads the names of a language the engine lacks from its registered `IntlData`', () => {
     const Native = Intl.DateTimeFormat;
     const Stub = function (locales?: string | string[], options?: Intl.DateTimeFormatOptions) {

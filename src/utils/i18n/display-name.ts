@@ -25,7 +25,8 @@ export function displayName(
   language: string,
 ): string {
   try {
-    const tag = intlLanguage(language);
+    // An engine can hold a language's names but not its dates, as Chrome does for Bosnian.
+    const tag = kind === 'language' ? language : intlLanguage(language);
     const stored =
       isUndefined(tag) && kind !== 'language' ? intlData(language)?.names[kind] : undefined;
     const names = getOrSet(
