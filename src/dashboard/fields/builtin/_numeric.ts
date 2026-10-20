@@ -365,6 +365,9 @@ function plainNotation<O extends NumberFieldOptions>(
   const { min, max, step, suffix } = field.options ?? {};
   const grid = { min, max, step };
   const unit = (): string | undefined => translateMessage(suffix);
+  // A whole number's arrow keys stop inside a fractional bound, on a value the field can hold.
+  const low = kind.decimal ? (min ?? -Infinity) : Math.ceil(min ?? -Infinity);
+  const high = kind.decimal ? (max ?? Infinity) : Math.floor(max ?? Infinity);
   return {
     parse: (raw) => kind.parse(field, raw),
     text: String,
@@ -377,7 +380,7 @@ function plainNotation<O extends NumberFieldOptions>(
     check: (value) => checkRange(value, grid) ?? checkStep(value, grid),
     move: (value, count) =>
       isUndefined(step)
-        ? clamp(roundTo(value + count, countDecimals(value)), min ?? -Infinity, max ?? Infinity)
+        ? clamp(roundTo(value + count, countDecimals(value)), low, high)
         : stepValue(value, count, grid),
     decimal: kind.decimal,
     canonical: false,
@@ -411,8 +414,8 @@ function notationFilter(notation: NumericNotation, context: FieldFilterContext):
     prefix: shown?.side === 'prefix' ? symbol : undefined,
     suffix: shown?.side === 'suffix' ? symbol : undefined,
     onBlur: () => {
-      const parsed = notation.parse(text.value).value;
-      if (isNumber(parsed)) text.value = notation.text(parsed);
+      const applied = value();
+      text.value = isNumber(applied) ? notation.text(applied) : '';
       commit();
     },
   });

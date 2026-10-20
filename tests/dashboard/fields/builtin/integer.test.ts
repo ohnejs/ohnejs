@@ -112,6 +112,26 @@ describe('integerType control', () => {
     });
   });
 
+  it('stops the arrow keys on the last whole number inside a fractional bound', () => {
+    effectScope().run(() => {
+      const bounded = (options: DashboardField['options'], initial: number) =>
+        integerType.control!({
+          field: { ...MINUTES, options },
+          initial,
+          mode: 'edit',
+          path: 'minutes',
+          language: () => 'en',
+          onInput() {},
+        })!;
+      const up = bounded({ max: 9.5 }, 9);
+      fire(inputOf(up.element), 'keydown', { key: 'ArrowUp' });
+      deepStrictEqual(up.read(), { value: 9 });
+      const down = bounded({ min: 0.5 }, 1);
+      fire(inputOf(down.element), 'keydown', { key: 'ArrowDown' });
+      deepStrictEqual(down.read(), { value: 1 });
+    });
+  });
+
   it('asks for a digit pad only when `min` rules out negatives', () => {
     effectScope().run(() => {
       const mode = (options: DashboardField['options']): string | null =>
@@ -248,6 +268,26 @@ describe('integerType amounts', () => {
       strictEqual(text(input), '12,34');
       type(inputOf(input), '19,9');
       deepStrictEqual(written, [1990]);
+    });
+  });
+
+  it('shows the applied amount again when a filter blurs cleared or unreadable', () => {
+    effectScope().run(() => {
+      const input = integerType.filter!.input({
+        field: PRICE,
+        operator: () => 'gte',
+        value: () => 1234,
+        set() {},
+        commit() {},
+        inputID: 'price',
+        language: () => 'de',
+      } as never);
+      for (const typed of ['', '19,9x']) {
+        type(inputOf(input), typed);
+        fire(inputOf(input), 'blur');
+        flush();
+        strictEqual(text(input), '12,34', typed);
+      }
     });
   });
 });
