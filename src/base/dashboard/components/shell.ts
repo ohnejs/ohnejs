@@ -424,10 +424,18 @@ function layout(
   let swipeStartX = 0;
   let swipeStartY = 0;
   let swipeScrolled = false;
+  let swipeClaimed = false;
   const onTouchStart = (event: TouchEvent): void => {
     swipeStartX = event.touches[0]?.clientX ?? 0;
     swipeStartY = event.touches[0]?.clientY ?? 0;
     swipeScrolled = false;
+    swipeClaimed = false;
+    // A `touch-action` without `pan-x` marks a control that drags sideways itself, like a slider thumb.
+    let node = event.target as Element | null;
+    while (node && !swipeClaimed) {
+      swipeClaimed = !/^(auto|manipulation)$|pan-x/.test(getComputedStyle(node).touchAction);
+      node = node.parentElement;
+    }
   };
   const onScroll = (): void => {
     swipeScrolled = true;
@@ -435,7 +443,7 @@ function layout(
   const onTouchEnd = (event: TouchEvent): void => {
     if (!overlayViewport.matches || untracked(() => transition.value)) return;
     // A popup sits above the drawer, and a gesture that scrolled content was a scroll, not a swipe.
-    if (overlayCount() > 0 || swipeScrolled) return;
+    if (overlayCount() > 0 || swipeScrolled || swipeClaimed) return;
     const touch = event.changedTouches[0];
     if (isUndefined(touch)) return;
     const deltaX = touch.clientX - swipeStartX;

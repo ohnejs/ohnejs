@@ -118,6 +118,35 @@ describe('the base frame', () => {
     strictEqual(shell.sidebarExpanded(), false);
   });
 
+  it('leaves an edge swipe to a control that drags sideways itself', async () => {
+    const track = new FakeElement('div');
+    const thumb = new FakeElement('input');
+    thumb.parentNode = track;
+    const actions = new Map([[track, 'pan-y']]);
+    const computed = globalThis.getComputedStyle;
+    Object.assign(globalThis, {
+      getComputedStyle: (node: FakeElement) => ({
+        getPropertyValue: () => '1ms',
+        touchAction: actions.get(node) ?? 'auto',
+      }),
+    });
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 320));
+    const swipe = async (target: FakeElement) => {
+      gestures.get('touchstart')?.({ target, touches: [{ clientX: 10, clientY: 300 }] });
+      gestures.get('touchend')?.({ changedTouches: [{ clientX: 220, clientY: 305 }] });
+      await nextTick();
+    };
+    await settle();
+    await swipe(thumb);
+    strictEqual(shell.sidebarExpanded(), false);
+    actions.set(track, 'manipulation');
+    await swipe(thumb);
+    strictEqual(shell.sidebarExpanded(), true);
+    shell.toggleSidebar();
+    await settle();
+    Object.assign(globalThis, { getComputedStyle: computed });
+  });
+
   it('closes the expanded sidebar on a query step', async () => {
     shell.toggleSidebar();
     await nextTick();
