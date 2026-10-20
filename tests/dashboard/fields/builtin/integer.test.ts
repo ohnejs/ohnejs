@@ -242,6 +242,18 @@ describe('integerType amounts', () => {
     });
   });
 
+  it('steps and checks an amount on its `step` grid in minor units', () => {
+    effectScope().run(() => {
+      const price = amount(1000, 'en', { currency: 'EUR', step: 250 });
+      const input = inputOf(price.element);
+      fire(input, 'keydown', { key: 'ArrowUp' });
+      flush();
+      strictEqual(text(price.element), '12.50');
+      type(input, '12.60');
+      deepStrictEqual(price.read(), { errors: { '': 'validation.invalidStep' } });
+    });
+  });
+
   it('shows the amount in the cell and the summary', () => {
     const cell = (
       integerType.display!({
