@@ -71,3 +71,16 @@ describe('dateTime resolved options', () => {
     strictEqual(resolved.timezone, 'Europe/Berlin');
   });
 });
+
+describe('dateTime options', () => {
+  type OptionsCtx = Parameters<NonNullable<typeof dateTime.validateOptions>>[0];
+  const check = (options: Record<string, unknown>) =>
+    dateTime.validateOptions!({ name: 'at', options } as unknown as OptionsCtx);
+
+  it('takes a bound as epoch milliseconds or an ISO 8601 string, and nothing looser', () => {
+    strictEqual(check({ min: 0, max: '2030-01-01T00:00:00Z' }), undefined);
+    for (const min of ['1', 'March 7, 2024']) {
+      strictEqual(check({ min })?.[0], `\`min\` is \`${min}\`, which the field cannot read.`);
+    }
+  });
+});
