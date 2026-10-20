@@ -52,12 +52,19 @@ export const numericOptions = {
  * What makes a numeric field's `step` or `display` unusable, as error body rows, or `undefined` if they hold.
  * A `whole` field holds integers, so its grid, or its slider's, must stay on whole numbers.
  * A slider needs a range, and on a fractional field a grid too.
+ * The rows name the owner as `rule.subject`, a `field` unless a `range` checks its ends.
  */
 export function numericOptionsProblem(
-  options: { min?: number; max?: number; step?: number; display: 'input' | 'slider' },
-  rule: { whole: boolean },
+  options: {
+    min?: number;
+    max?: number;
+    step?: number;
+    display: 'input' | 'slider';
+  },
+  rule: { whole: boolean; subject?: 'field' | 'range' },
 ): string[] | undefined {
   const { min, max, step, display } = options;
+  const { subject = 'field' } = rule;
   if (!isUndefined(step) && (!isRealNumber(step) || step <= 0)) {
     return [
       `\`step\` is \`${String(step)}\`, but it must be a positive number.`,
@@ -66,7 +73,7 @@ export function numericOptionsProblem(
   }
   if (rule.whole && !isUndefined(step) && !isInteger(step)) {
     return [
-      `\`step\` is \`${step}\`, but an \`integer\` field holds whole numbers only.`,
+      `\`step\` is \`${step}\`, but an \`integer\` ${subject} holds whole numbers only.`,
       'Use a whole `step`, like `5`.',
     ];
   }
@@ -89,7 +96,7 @@ export function numericOptionsProblem(
         'Set the range the slider spans, like `min: 0, max: 10`.',
       ]
     : [
-        "`display: 'slider'` on a `number` field needs `min`, `max` and `step`.",
+        `\`display: 'slider'\` on a \`number\` ${subject} needs \`min\`, \`max\` and \`step\`.`,
         'Set the range and grid the slider spans, like `min: 0, max: 5, step: 0.5`.',
       ];
 }

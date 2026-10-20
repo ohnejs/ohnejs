@@ -14,6 +14,7 @@ import { range } from '../../../../src/ohne/fields/builtin/range.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import * as ohne from '../../../../src/ohne/index.ts';
+import { queryMetadata } from '../../../../src/ohne/query/metadata.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../../src/ohne/query/write/errors.ts';
 import { createRegistry } from '../../../../src/utils/index.ts';
@@ -25,7 +26,7 @@ type SchemaCtx = Parameters<NonNullable<typeof range.schema>>[0];
 const checkOptions = (options: Record<string, unknown>) =>
   range.validateOptions!({
     name: 'window',
-    options: { open: false, ...options },
+    options: { open: false, display: 'input', ...options },
   } as unknown as OptionsCtx);
 
 useCollections().register('Sieges', {
@@ -39,6 +40,23 @@ useCollections().register('Sieges', {
     },
   },
 });
+useCollections().register('Bounties', {
+  name: 'Bounties',
+  collection: {
+    fields: {
+      name: field('text'),
+      reward: field('range', {
+        of: 'integer',
+        currency: 'EUR',
+        min: 0,
+        max: 500_000,
+        minSpan: 1000,
+      }),
+      weight: field('range', { of: 'number', step: 0.5, min: 0, max: 50, nullable: true }),
+      floors: field('range', { of: 'integer', open: true, nullable: true, search: true }),
+    },
+  },
+});
 
 const db = await connectTest();
 registerDialect(dialect);
@@ -48,6 +66,8 @@ await syncDatabase(db, dialect, {
 });
 
 const sieges = () => queryUntyped('Sieges');
+const bounties = () => queryUntyped('Bounties');
+const REWARD = { start: 1000, end: 5000 };
 const failsWith = (path: string, key: string) => (error: unknown) =>
   isValidationError(error) && error.errors[path] === key;
 const failsWithParams =
@@ -224,6 +244,106 @@ describe('range', () => {
     deepStrictEqual(await starts('desc'), [5000, 1000]);
   });
 
+  it('builds numeric ends carrying the grid, unit, currency and search, never the slider', () => {
+    const hint = range.schema!({
+      options: {
+        of: 'integer',
+        min: 0,
+        max: 100,
+        step: 5,
+        currency: 'EUR',
+        display: 'slider',
+        open: false,
+        search: true,
+      },
+    } as unknown as SchemaCtx) as { subfields: Record<string, FieldInstance> };
+    deepStrictEqual(
+      hint.subfields.start,
+      field('integer', {
+        min: 0,
+        max: 100,
+        step: 5,
+        currency: 'EUR',
+        suffix: undefined,
+        search: true,
+        nullable: false,
+        label: 'dashboard.range.start',
+      }),
+    );
+    const number = range.schema!({
+      options: { of: 'number', suffix: 'kg', display: 'input', open: true },
+    } as unknown as SchemaCtx) as { subfields: Record<string, FieldInstance> };
+    deepStrictEqual(number.subfields.end?.options, {
+      min: undefined,
+      max: undefined,
+      step: undefined,
+      suffix: 'kg',
+      search: undefined,
+      nullable: true,
+      label: 'dashboard.range.end',
+    });
+  });
+
+  it('stores numeric ends, coercing a numeric string as the column does', async () => {
+    const bounty = await bounties().createOrThrow({
+      name: 'Hogger',
+      reward: { start: '2000', end: 9000 },
+      weight: { start: 0.5, end: 12.5 },
+      floors: { start: 3, end: null },
+    });
+    const ends = (value: unknown) => {
+      const { start, end } = value as { start: unknown; end: unknown };
+      return { start, end };
+    };
+    deepStrictEqual(ends(bounty.reward), { start: 2000, end: 9000 });
+    deepStrictEqual(ends(bounty.weight), { start: 0.5, end: 12.5 });
+    deepStrictEqual(ends(bounty.floors), { start: 3, end: null });
+  });
+
+  it('checks a numeric span, naming a currency bound as an amount', async () => {
+    await rejects(
+      bounties().createOrThrow({ name: 'VanCleef', reward: { start: 5000, end: 5999 } }),
+      failsWithParams('reward', 'validation.minSpan', { min: '10.00 EUR' }),
+    );
+    await rejects(
+      bounties().createOrThrow({ name: 'VanCleef', reward: { start: 5000, end: 1000 } }),
+      failsWith('reward', 'validation.invalidRange'),
+    );
+    await rejects(
+      bounties().createOrThrow({ name: 'VanCleef', reward: REWARD, floors: { start: 2, end: 1 } }),
+      failsWith('floors', 'validation.invalidRange'),
+    );
+  });
+
+  it('holds each numeric end to its bounds and grid', async () => {
+    await rejects(
+      bounties().createOrThrow({ name: 'Edwin', reward: { start: 1000, end: 600_000 } }),
+      failsWithParams('reward.end', 'validation.maxValue', { max: '5000.00 EUR' }),
+    );
+    await rejects(
+      bounties().createOrThrow({ name: 'Edwin', reward: REWARD, weight: { start: 0.25, end: 1 } }),
+      failsWithParams('weight.start', 'validation.invalidStep', { step: 0.5 }),
+    );
+    await rejects(
+      bounties().createOrThrow({ name: 'Edwin', reward: { start: 1.5, end: 5000 } }),
+      (error: unknown) =>
+        isValidationError(error) && 'reward.start' in error.errors && !('reward' in error.errors),
+    );
+  });
+
+  it('filters numeric ends through `has`, sorts by the start, and searches them on `search: true`', async () => {
+    await bounties().createOrThrow({ name: 'Mor', reward: REWARD, floors: { start: 42, end: 50 } });
+    const named = async (where: Record<string, unknown>) =>
+      (await bounties().where(where).orderBy('floors', 'desc').findMany()).map((b) => b.name);
+    deepStrictEqual(await named({ floors: { has: { start: { atLeast: 1 } } } }), ['Mor', 'Hogger']);
+    const search = (name: string) => {
+      const ends = queryMetadata('Bounties').fields[name]?.subfields;
+      return [ends?.start?.search, ends?.end?.search];
+    };
+    deepStrictEqual(search('floors'), [true, true]);
+    deepStrictEqual(search('weight'), [undefined, undefined]);
+  });
+
   it('builds its ends from registered types even for a bad `of`, so codegen never names it a type', () => {
     const hint = range.schema!({
       options: { of: 'week', open: false },
@@ -249,7 +369,7 @@ describe('range', () => {
     it('refuses an unknown kind', () => {
       deepStrictEqual(checkOptions({ of: 'week' }), [
         '`of` is `week`, which is no range kind.',
-        'Use `date`, `dateTime` or `time`.',
+        'Use `date`, `dateTime`, `time`, `integer` or `number`.',
       ]);
     });
 
@@ -282,6 +402,91 @@ describe('range', () => {
         'Drop `open` or `maxSpan`.',
       ]);
       strictEqual(checkOptions({ of: 'date', open: true, minSpan: '1d' }), undefined);
+    });
+
+    it('takes the numeric options on a numeric range only', () => {
+      deepStrictEqual(checkOptions({ of: 'date', step: 1 }), [
+        '`step` applies to an `integer` or `number` range only, and this one is `date`.',
+        'Drop `step`.',
+      ]);
+      deepStrictEqual(checkOptions({ of: 'time', display: 'slider' }), [
+        "`display: 'slider'` applies to an `integer` or `number` range only, and this one is `time`.",
+        "Drop `display: 'slider'`.",
+      ]);
+      deepStrictEqual(checkOptions({ of: 'number', currency: 'EUR' }), [
+        '`currency` applies to an `integer` range only, and this one is `number`.',
+        'Drop `currency`.',
+      ]);
+      strictEqual(checkOptions({ of: 'number', suffix: 'kg', step: 0.5 }), undefined);
+    });
+
+    it('takes a numeric span at or above `0`, whole on an `integer` range', () => {
+      deepStrictEqual(checkOptions({ of: 'number', minSpan: '1 day' }), [
+        '`minSpan` is `1 day`, which the field cannot read.',
+        'Write it as a number at or above `0`.',
+      ]);
+      deepStrictEqual(checkOptions({ of: 'number', minSpan: 5, maxSpan: 2 }), [
+        '`minSpan` is `5`, above `maxSpan` `2`, so no value can pass.',
+        'Swap them, or lower `minSpan`.',
+      ]);
+      deepStrictEqual(checkOptions({ of: 'integer', maxSpan: 2.5 }), [
+        '`maxSpan` is `2.5`, but an `integer` range spans whole numbers.',
+        'Use a whole `maxSpan`, like `5`.',
+      ]);
+      strictEqual(
+        checkOptions({ of: 'integer', currency: 'EUR', minSpan: 0.5 })?.[1],
+        'Write `minSpan` in minor units, like `1999` for 19.99.',
+      );
+      strictEqual(checkOptions({ of: 'number', minSpan: 0.5, maxSpan: 2 }), undefined);
+    });
+
+    it('needs a bounded slider, on a grid on a `number` range', () => {
+      deepStrictEqual(checkOptions({ of: 'integer', display: 'slider', min: 0 }), [
+        "`display: 'slider'` needs `min` and `max`.",
+        'Set the range the slider spans, like `min: 0, max: 10`.',
+      ]);
+      strictEqual(
+        checkOptions({ of: 'number', display: 'slider', min: 0, max: 5 })?.[0],
+        "`display: 'slider'` on a `number` range needs `min`, `max` and `step`.",
+      );
+      strictEqual(
+        checkOptions({ of: 'integer', display: 'slider', min: 0.5, max: 9 })?.[0],
+        '`min` is `0.5`, so the grid it starts holds no whole number.',
+      );
+      deepStrictEqual(checkOptions({ of: 'integer', display: 'slider', min: '0', max: 9 }), [
+        '`min` is `0`, which the field cannot read.',
+        'Write it as a number.',
+      ]);
+      strictEqual(
+        checkOptions({
+          of: 'integer',
+          currency: 'EUR',
+          display: 'slider',
+          min: 0,
+          max: 10_000,
+          step: 500,
+        }),
+        undefined,
+      );
+    });
+
+    it('keeps a slider span on its grid', () => {
+      deepStrictEqual(
+        checkOptions({ of: 'number', display: 'slider', min: 0, max: 5, step: 0.5, minSpan: 0.75 }),
+        [
+          "`minSpan` is `0.75`, off the slider's `step` of `0.5`.",
+          'Use a multiple of `0.5` for `minSpan`.',
+        ],
+      );
+      strictEqual(
+        checkOptions({ of: 'integer', display: 'slider', min: 0, max: 9, minSpan: 3, maxSpan: 6 }),
+        undefined,
+      );
+      strictEqual(checkOptions({ of: 'number', step: 0.5, minSpan: 0.75 }), undefined);
+    });
+
+    it('takes `open` on a numeric range', () => {
+      strictEqual(checkOptions({ of: 'integer', open: true, minSpan: 1 }), undefined);
     });
 
     it('takes a `timezone` on a `dateTime` range only, and a real one', () => {
