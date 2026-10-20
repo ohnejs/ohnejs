@@ -24,10 +24,14 @@ import { parseDurationValue } from '../parse.ts';
 
 css`
   .ohne-input > .ohne-duration-preview {
+    min-width: 0;
+    max-width: 50%;
     margin-left: 0;
+    overflow: hidden;
     color: hsl(var(--ohne-muted-foreground));
     font-size: calc(1em - 0.125rem);
     white-space: nowrap;
+    text-overflow: ellipsis;
   }
 `;
 
