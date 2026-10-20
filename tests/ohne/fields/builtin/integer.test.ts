@@ -96,19 +96,31 @@ describe('integer currency', () => {
     }
   });
 
-  it('refuses a unit suffix, a step grid or a slider beside it', () => {
+  it('refuses a unit suffix beside it', () => {
     deepStrictEqual(checkOptions({ currency: 'EUR', suffix: 'EUR' }), [
       '`currency` and `suffix` cannot meet: an amount reads in its currency.',
       'Drop `suffix`.',
     ]);
+  });
+
+  it('takes a step grid and a slider in minor units', () => {
+    strictEqual(checkOptions({ currency: 'EUR', step: 500 }), undefined);
     strictEqual(
-      checkOptions({ currency: 'EUR', step: 5 })?.[0],
-      '`currency` and `step` cannot meet: an amount reads in its currency.',
+      checkOptions({ currency: 'EUR', display: 'slider', min: 0, max: 10_000 }),
+      undefined,
     );
     strictEqual(
-      checkOptions({ currency: 'EUR', display: 'slider', min: 0, max: 100 })?.[0],
-      "`currency` and `display: 'slider'` cannot meet: an amount reads in its currency.",
+      checkOptions({ currency: 'EUR', step: 0.5 })?.[0],
+      '`step` is `0.5`, but an `integer` field holds whole numbers only.',
     );
+  });
+
+  it('names a value off the grid as an amount', () => {
+    deepStrictEqual(bounds(1250, ctx({ currency: 'EUR', step: 500 })), {
+      key: 'validation.invalidStep',
+      params: { step: '5.00 EUR' },
+    });
+    strictEqual(bounds(1500, ctx({ currency: 'EUR', step: 500 })), undefined);
   });
 
   it('refuses a bound that is no whole count of minor units', () => {
@@ -121,12 +133,5 @@ describe('integer currency', () => {
         `Write \`${name}\` in minor units, like \`1999\` for 19.99.`,
       ]);
     }
-  });
-
-  it('names the currency clash before the grid and slider rules', () => {
-    strictEqual(
-      checkOptions({ currency: 'EUR', display: 'slider' })?.[0],
-      "`currency` and `display: 'slider'` cannot meet: an amount reads in its currency.",
-    );
   });
 });

@@ -1,6 +1,7 @@
 import type { CurrencyCode } from '../../../utils/index.ts';
 
 import {
+  amountWithCode,
   checkAmount,
   checkRange,
   checkStep,
@@ -8,7 +9,6 @@ import {
   isCurrencyCode,
   isInteger,
   isUndefined,
-  minorUnitsToDecimal,
   parseMinorUnits,
 } from '../../../utils/index.ts';
 import { boundsProblem } from '../bounds.ts';
@@ -30,7 +30,7 @@ export const integer = defineField({
 
     /**
      * The ISO 4217 currency the value counts in, as minor units: `1234` with `EUR` is 12.34 €.
-     * `min` and `max` count minor units too.
+     * `min`, `max` and `step` count minor units too.
      * The dashboard reads and writes the amount in major units, formatted for the viewer's language.
      * Changing it reinterprets every stored value, so `1234` in `EUR` would read as ¥1,234 in `JPY`.
      */
@@ -46,9 +46,9 @@ export const integer = defineField({
       if (isUndefined(currency)) {
         return failureMessage(checkRange(value, ctx.options) ?? checkStep(value, ctx.options));
       }
-      const show = (minor: number): string =>
-        `${minorUnitsToDecimal(minor, currencyDigits[currency])} ${currency}`;
-      return failureMessage(checkAmount(value, ctx.options, show));
+      return failureMessage(
+        checkAmount(value, ctx.options, (minor) => amountWithCode(minor, currency)),
+      );
     },
   ],
   search: {
@@ -67,15 +67,13 @@ export const integer = defineField({
 /**
  * What makes a field's `currency` unusable, as error body rows, or `undefined` when it holds.
  * Its bounds count whole minor units.
- * An amount reads in its currency, so it takes no unit `suffix`, `step` grid, or slider.
+ * An amount reads in its currency, so it takes no unit `suffix`.
  */
 function currencyProblem(options: {
   currency?: string;
   min?: number;
   max?: number;
-  step?: number;
   suffix?: unknown;
-  display: 'input' | 'slider';
 }): string[] | undefined {
   const { currency } = options;
   if (isUndefined(currency)) return undefined;
@@ -94,12 +92,9 @@ function currencyProblem(options: {
       `Write \`${fractional}\` in minor units, like \`1999\` for 19.99.`,
     ];
   }
-  const clash =
-    (['suffix', 'step'] as const).find((key) => !isUndefined(options[key])) ??
-    (options.display === 'slider' ? "display: 'slider'" : undefined);
-  if (isUndefined(clash)) return undefined;
+  if (isUndefined(options.suffix)) return undefined;
   return [
-    `\`currency\` and \`${clash}\` cannot meet: an amount reads in its currency.`,
-    `Drop \`${clash}\`.`,
+    '`currency` and `suffix` cannot meet: an amount reads in its currency.',
+    'Drop `suffix`.',
   ];
 }
