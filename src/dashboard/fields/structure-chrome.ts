@@ -216,9 +216,12 @@ export function structureActions(options: StructureActionsOptions): HTMLElement 
     return [up, down];
   };
 
+  const toggleLabel = (): string =>
+    t(options.expanded() ? 'dashboard.menu.collapse' : 'dashboard.menu.expand');
   const toggle = button(() => icon(options.expanded() ? 'maximize' : 'minimize'), {
     size: -2,
     variant: 'ghost',
+    ariaLabel: toggleLabel,
     onClick: () => options.onToggleExpanded(),
   });
   // `button` takes a static variant; the reactive one patches classes, and nothing re-applies over it.
@@ -227,11 +230,7 @@ export function structureActions(options: StructureActionsOptions): HTMLElement 
     toggle.classList.toggle('ohne-button-ghost', expanded);
     toggle.classList.toggle('ohne-button-accent', !expanded);
   });
-  onCleanup(
-    attachTooltip(toggle, () =>
-      t(options.expanded() ? 'dashboard.menu.collapse' : 'dashboard.menu.expand'),
-    ),
-  );
+  onCleanup(attachTooltip(toggle, toggleLabel));
 
   const dots = button(() => t('dashboard.record.moreActions'), {
     icon: 'dots-vertical',

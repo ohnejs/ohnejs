@@ -1,19 +1,18 @@
 import { flush, nextTick } from '../../../src/utils/reactive/_scheduler.ts';
-import { FakeElement, FakeNode, findElement, hasClass } from '../_fake-dom.ts';
+import { FakeElement, FakeNode, findElement } from '../_fake-dom.ts';
 import { fire } from '../ui/_events.ts';
 
 /**
- * Clicks the collapse toggle of the `index`-th card under `root`, the one header button without a label.
+ * Clicks the collapse toggle of the `index`-th card under `root`, named for what it does next.
  */
 export function toggleCard(root: unknown, index: number): void {
+  const names = ['dashboard.menu.collapse', 'dashboard.menu.expand'];
   let seen = 0;
   const button = findElement(
     root as FakeElement,
     (element) =>
       element.tagName === 'BUTTON' &&
-      hasClass(element, 'ohne-button') &&
-      !hasClass(element, 'ohne-button-outline') &&
-      element.getAttribute('aria-label') === null &&
+      names.includes(element.getAttribute('aria-label') ?? '') &&
       seen++ === index,
   ) as FakeElement;
   fire(button, 'click');

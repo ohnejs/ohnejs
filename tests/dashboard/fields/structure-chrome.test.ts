@@ -94,6 +94,12 @@ async function press(button: FakeElement): Promise<void> {
 }
 
 describe('structureActions', () => {
+  it('names the expand toggle for assistive tech, following its state', () => {
+    const root = cluster(0, 2);
+    flush();
+    strictEqual(!!buttonOf(root, 'dashboard.menu.collapse'), true);
+  });
+
   it('hands focus to Move up when Move down lands the item last', async () => {
     const root = cluster(0, 2);
     flush();
