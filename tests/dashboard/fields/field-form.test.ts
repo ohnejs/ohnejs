@@ -274,6 +274,25 @@ describe('createFieldForm', () => {
     });
   });
 
+  it('seeds an untranslated `null` on a non-nullable field as no value, so it stays pristine', () => {
+    effectScope().run(() => {
+      const count = textField('count', { type: 'integer', logicalType: 'integer' });
+      const form = createFieldForm(
+        [
+          textField('name', { translatable: true }),
+          { ...count, translatable: true },
+          textField('tag'),
+        ],
+        { name: null, count: null, tag: 'old' },
+        { mode: 'edit', path: '', language },
+      );
+      strictEqual(form.dirty(), false);
+      type(inputOf(form.controlOf('tag')!.element), 'new');
+      deepStrictEqual(structuredClone(form.read()), { value: { tag: 'new' } });
+      deepStrictEqual(structuredClone(form.readPatch()), { value: { tag: 'new' } });
+    });
+  });
+
   it('checks required fields of a nested item even in edit mode', () => {
     effectScope().run(() => {
       const form = createFieldForm([textField('name')], undefined, {

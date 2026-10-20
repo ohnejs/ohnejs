@@ -7,6 +7,7 @@ import { evaluateCondition } from '../../utils/condition/evaluate-condition.ts';
 import { parseCondition } from '../../utils/condition/parse-condition.ts';
 import { conditionResolver } from '../../utils/condition/resolve-condition.ts';
 import { isEmpty } from '../../utils/is/is-empty.ts';
+import { isNull } from '../../utils/is/is-null.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { deepEqual } from '../../utils/object/deep-equal.ts';
@@ -268,6 +269,7 @@ css`
 /**
  * Builds a `FieldForm` over `fields`, seeded from `initial`, an existing item or `undefined`.
  * A field `initial` holds no value for starts from its `options.default`, as a page form's spec declares.
+ * A `null` on a non-nullable field counts as no value, as an untranslated locale reads it.
  * The item `UUID` renders as a row only under `renderUUID`.
  * `attachUUID` decides whether it rides the read value.
  */
@@ -589,13 +591,15 @@ export function createFieldForm(
 
 /**
  * The value a field's control starts from: `initial`'s own, or the field's declared default.
+ * A `null` on a non-nullable field counts as no value, as an untranslated locale reads it.
  */
 function seedOf(
   field: DashboardField,
   initial: Readonly<Record<string, unknown>> | undefined,
 ): unknown {
   const value = initial?.[field.name];
-  return isUndefined(value) ? field.options?.default : value;
+  const held = isNull(value) && !field.nullable ? undefined : value;
+  return isUndefined(held) ? field.options?.default : held;
 }
 
 /**
