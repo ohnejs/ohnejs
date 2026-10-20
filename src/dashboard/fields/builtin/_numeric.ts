@@ -268,7 +268,13 @@ export function numericFieldType<O extends NumberFieldOptions>(kind: NumericKind
             touch();
           },
         };
-        const track = slider(bridged, { min: min!, max: max!, step, disabled: () => off });
+        const track = slider(bridged, {
+          min: min!,
+          max: max!,
+          step,
+          disabled: () => off,
+          invalid: () => error() !== '',
+        });
         const range = track.querySelector('input') as HTMLInputElement;
         range.tabIndex = -1;
         range.setAttribute('aria-hidden', 'true');

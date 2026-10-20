@@ -449,6 +449,7 @@ function numericControl(
       minRange: minSpan,
       maxRange: maxSpan,
       disabled: () => disabled === true,
+      invalid: (end) => routed.value !== '' || ends[end]!.error() !== '',
     });
     for (const input of slider.querySelectorAll('input')) {
       input.tabIndex = -1;

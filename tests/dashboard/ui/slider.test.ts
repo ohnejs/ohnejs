@@ -78,6 +78,16 @@ describe('slider', () => {
     strictEqual(range.getAttribute('disabled'), '');
   });
 
+  it('follows `invalid`', () => {
+    const failing = ref(true);
+    const range = rangeOf(slider(ref(1), { min: 0, max: 5, invalid: () => failing.value }));
+    flush();
+    strictEqual(range.getAttribute('aria-invalid'), 'true');
+    failing.value = false;
+    flush();
+    strictEqual(range.getAttribute('aria-invalid'), null);
+  });
+
   it('marks a drag from the press until the release anywhere', () => {
     for (const end of ['pointerup', 'pointercancel']) {
       const range = rangeOf(slider(ref(1), { min: 0, max: 5 }));

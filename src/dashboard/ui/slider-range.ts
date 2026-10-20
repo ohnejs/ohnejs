@@ -15,7 +15,7 @@ import './tokens.ts';
 /**
  * Options for `sliderRange`.
  */
-export interface SliderRangeOptions extends Omit<SliderOptions, 'id' | 'name'> {
+export interface SliderRangeOptions extends Omit<SliderOptions, 'id' | 'name' | 'invalid'> {
   /**
    * The smallest gap the thumbs keep, a multiple of `step`.
    *
@@ -31,6 +31,11 @@ export interface SliderRangeOptions extends Omit<SliderOptions, 'id' | 'name'> {
    * Infinity
    */
   maxRange?: number;
+
+  /**
+   * Marks a thumb as errored while it returns `true` for its end, `0` the start and `1` the end.
+   */
+  invalid?: (end: 0 | 1) => boolean;
 }
 
 type Ends = [number | undefined, number | undefined];
@@ -202,6 +207,12 @@ export function sliderRange(model: Ref<Ends>, options: SliderRangeOptions): HTML
             `hsl(var(--ohne-primary)) ${to}, hsl(var(--ohne-border)) ${to})`,
     );
     stack();
+  });
+  thumbs.forEach((input, index) => {
+    batchedEffect(() => {
+      if (options.invalid?.(index as 0 | 1) === true) input.setAttribute('aria-invalid', 'true');
+      else input.removeAttribute('aria-invalid');
+    });
   });
   return root;
 }

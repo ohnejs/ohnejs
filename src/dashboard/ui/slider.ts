@@ -43,6 +43,11 @@ export interface SliderOptions {
   disabled?: () => boolean;
 
   /**
+   * Marks the thumb as errored while it returns `true`, ringed in the destructive color.
+   */
+  invalid?: () => boolean;
+
+  /**
    * The `id` attribute of the range input.
    */
   id?: string;
@@ -147,6 +152,14 @@ css`
     box-shadow: 0 0 0 0.375rem hsl(var(--ohne-primary) / 0.15);
   }
 
+  .ohne-slider-input[aria-invalid='true']::-webkit-slider-thumb {
+    --ohne-primary: var(--ohne-destructive);
+  }
+
+  .ohne-slider-input[aria-invalid='true']::-moz-range-thumb {
+    --ohne-primary: var(--ohne-destructive);
+  }
+
   .ohne-slider-input:disabled {
     cursor: not-allowed;
     opacity: 0.5;
@@ -193,6 +206,10 @@ export function slider(model: Ref<number | undefined>, options: SliderOptions): 
     },
     input,
   );
+  batchedEffect(() => {
+    if (options.invalid?.() === true) input.setAttribute('aria-invalid', 'true');
+    else input.removeAttribute('aria-invalid');
+  });
   batchedEffect(() => {
     const value = model.value;
     const empty = isUndefined(value);

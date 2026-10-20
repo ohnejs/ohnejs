@@ -261,6 +261,26 @@ describe('numberType control', () => {
     });
   });
 
+  it('marks the slider thumb while the value fails', () => {
+    effectScope().run(() => {
+      const control = numberType.control!({
+        field: { ...GOLD, options: { min: 0, max: 5, display: 'slider' } },
+        initial: undefined,
+        mode: 'create',
+        path: 'gold',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      const range = byType(control.element, 'range');
+      control.setErrors({ '': 'This field is required' });
+      flush();
+      strictEqual(range.getAttribute('aria-invalid'), 'true');
+      type(byType(control.element, 'text'), '3');
+      flush();
+      strictEqual(range.getAttribute('aria-invalid'), null);
+    });
+  });
+
   it('renders the input alone when a slider has no range', () => {
     effectScope().run(() => {
       const control = numberType.control!({

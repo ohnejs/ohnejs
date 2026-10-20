@@ -276,6 +276,23 @@ describe('rangeType numeric control', () => {
       );
     });
   });
+
+  it('marks the thumb of the end that failed', () => {
+    effectScope().run(() => {
+      const floors = control(
+        rangeField({ of: 'integer', min: 0, max: 99, display: 'slider' }),
+        undefined,
+      );
+      const [from, to] = inputs(floors);
+      const marks = () => [from, to].map((thumb) => thumb!.getAttribute('aria-invalid'));
+      floors.setErrors({ end: 'Too high' });
+      flush();
+      deepStrictEqual(marks(), [null, 'true']);
+      floors.setErrors({ '': 'Too short' });
+      flush();
+      deepStrictEqual(marks(), ['true', 'true']);
+    });
+  });
 });
 
 describe('rangeType cell and summary', () => {

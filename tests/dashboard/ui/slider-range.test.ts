@@ -177,4 +177,14 @@ describe('sliderRange', () => {
     deepStrictEqual(model.value, [20, 60]);
     strictEqual(start.getAttribute('data-dragging'), null);
   });
+
+  it('marks only the thumbs whose end `invalid` names', () => {
+    const failing = ref<0 | 1 | undefined>(1);
+    const { start, end } = mount([20, 60], { invalid: (index) => index === failing.value });
+    const marks = () => [start, end].map((thumb) => thumb.getAttribute('aria-invalid'));
+    deepStrictEqual(marks(), [null, 'true']);
+    failing.value = undefined;
+    flush();
+    deepStrictEqual(marks(), [null, null]);
+  });
 });
