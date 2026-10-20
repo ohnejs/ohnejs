@@ -9,7 +9,7 @@ import { failureMessage } from '../validation-message.ts';
  * The value type is `unknown`; a custom field type with validators gives the value a typed shape.
  * A top-level `null` is the field's `null`, while a nested `null` is ordinary data.
  * A value JSON would drop or distort, like `NaN`, a `Date` or a key set to `undefined`, is rejected.
- * Key order is not kept, so a `json` field can never be unique.
+ * One value can be stored with its keys in another order, so a `json` field can never be unique.
  * Word search never matches the value.
  */
 export const json = defineField({
