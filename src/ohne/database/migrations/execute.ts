@@ -26,6 +26,7 @@ import {
   groupBy,
   isEmpty,
   isNull,
+  isNullish,
   isUndefined,
   jsonClone,
   last,
@@ -33,6 +34,7 @@ import {
   uuidv7,
 } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
+import { isValidColumn } from '../../query/pipeline/preflight.ts';
 import {
   collectionTableName,
   companionTableName,
@@ -634,7 +636,7 @@ async function fillChildless(
     await db.run(insert, [
       row.UUID ?? null,
       row._parentUUID ?? null,
-      dialect.serialize(column.type, out),
+      storable(engine, meta, to.table, to.column, column.type, out),
     ]);
   }
   await deleteOwnedRows(engine, meta, parentSchema, doomed);
@@ -1231,7 +1233,14 @@ async function runFanOutScalar(
         path: meta.file,
       });
     }
-    const serialized = dialect.serialize(flip.type, isUndefined(out) ? value : out);
+    const serialized = storable(
+      engine,
+      meta,
+      companion.name,
+      column,
+      flip.type,
+      isUndefined(out) ? value : out,
+    );
     const parent = row.UUID ?? null;
     const { changes } = await db.run(update, [serialized, parent, engine.defaultLocale]);
     if (changes === 0 && !isNull(serialized)) {
@@ -1328,7 +1337,10 @@ async function runFanInScalar(
       });
     }
     promoted.add(String(parent));
-    const { changes } = await db.run(update, [dialect.serialize(targetType, out), parent]);
+    const { changes } = await db.run(update, [
+      storable(engine, meta, main, column, targetType, out),
+      parent,
+    ]);
     if (changes === 0) unmatched++;
   }
   if (unmatched > 0) {
@@ -1465,7 +1477,7 @@ async function runValuePass(
     }
     if (isUndefined(out)) continue;
     const key = schema.primaryKey.map((name) => row[name] ?? null);
-    await db.run(update, [dialect.serialize(columnDef.type, out), ...key]);
+    await db.run(update, [storable(engine, meta, table, column, columnDef.type, out), ...key]);
   }
   await deleteOwnedRows(engine, meta, schema, doomed);
 }
@@ -1820,7 +1832,7 @@ async function writeValues(
         path: meta.file,
       });
     }
-    const serialized = dialect.serialize(to.type, output);
+    const serialized = storable(engine, meta, to.table, to.column, to.type, output);
     if (isNull(serialized) && notNull) {
       throw ohneError({
         title: `Migration \`${meta.name}\` moves \`NULL\` into a \`NOT NULL\` column`,
@@ -2111,6 +2123,39 @@ function refuseUnrunnable(meta: MigrationMeta, from: string, to: string): never 
     ],
     path: meta.file,
   });
+}
+
+/**
+ * Codes a transformed or carried value for `table.column`, whose logical type is `type`.
+ * Refuses a value the logical type cannot hold, or one the dialect cannot store.
+ */
+function storable(
+  engine: Engine,
+  meta: MigrationMeta,
+  table: string,
+  column: string,
+  type: LogicalType,
+  value: unknown,
+): SQLValue {
+  if (isNullish(value)) return null;
+  const refuse = (): never => {
+    throw ohneError({
+      title: `Migration \`${meta.name}\` writes a value \`${table}.${column}\` cannot hold`,
+      body: [
+        `A \`${table}\` row received a value that is not \`${type}\`.`,
+        `Return \`${type}\` values from a \`transform\`, or \`null\`.`,
+      ],
+      path: meta.file,
+    });
+  };
+  if (!isValidColumn(value, type)) return refuse();
+  let serialized: SQLValue | undefined;
+  try {
+    serialized = engine.dialect.serialize(type, value);
+  } catch {
+    return refuse();
+  }
+  return isUndefined(serialized) ? refuse() : serialized;
 }
 
 /**

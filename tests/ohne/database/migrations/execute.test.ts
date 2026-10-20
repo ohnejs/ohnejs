@@ -2380,3 +2380,152 @@ describe('executeMigrations with fills', () => {
     await db.close();
   });
 });
+
+describe('executeMigrations refuses a value the target cannot hold', () => {
+  const refused = /Migration `app\/001-x` writes a value `Posts\.n` cannot hold/;
+
+  async function cells(db: DatabaseAdapter, sql: string): Promise<unknown[]> {
+    const rows = await db.query<Record<string, unknown>>(sql);
+    return rows.map((row) => Object.values(row)[0]);
+  }
+
+  it('refuses a fill returning text into an integer column', async () => {
+    const db = await connectTest();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'n', type: 'integer', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-x', {
+            from: null,
+            to: { collection: 'Posts', field: 'n' },
+            transform: () => 'abc',
+          }),
+        ],
+        desired: [
+          table('Posts', { columns: [UUID, { name: 'n', type: 'integer', notNull: true }] }),
+        ],
+        claimed: classifySchema([posts]),
+        force: false,
+      }),
+      refused,
+    );
+    deepStrictEqual(await cells(db, 'SELECT "n" FROM "Posts"'), [null]);
+    await db.close();
+  });
+
+  it('refuses an untransformed move from integer to text', async () => {
+    const db = await connectTest();
+    const posts = table('Posts', {
+      columns: [UUID, { name: 'count', type: 'integer', notNull: false }],
+    });
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID", "count") VALUES (?, ?)', ['a', 42]);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-x', {
+            from: { table: 'Posts', column: 'count', type: 'integer' },
+            to: { table: 'Posts', column: 'n', type: 'text' },
+          }),
+        ],
+        desired: [],
+        claimed: classifySchema([posts]),
+        force: false,
+      }),
+      refused,
+    );
+    deepStrictEqual(await cells(db, 'SELECT "count" FROM "Posts"'), [42]);
+    await db.close();
+  });
+
+  it('refuses a switch returning an object into a text column', async () => {
+    const db = await connectTest();
+    const posts = table('Posts', { columns: [UUID, { name: 'n', type: 'text', notNull: false }] });
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-x', {
+            from: { collection: 'Posts', field: 'n', nullable: true },
+            transform: () => ({ title: 'x' }),
+          }),
+        ],
+        desired: [table('Posts', { columns: [UUID, { name: 'n', type: 'text', notNull: true }] })],
+        claimed: classifySchema([posts]),
+        force: false,
+      }),
+      refused,
+    );
+    deepStrictEqual(await cells(db, 'SELECT "n" FROM "Posts"'), [null]);
+    await db.close();
+  });
+
+  it('refuses a fill returning a value JSON cannot store', async () => {
+    for (const value of [() => 1, Symbol('x'), 1n]) {
+      const db = await connectTest();
+      const posts = table('Posts', {
+        columns: [UUID, { name: 'n', type: 'json', notNull: false }],
+      });
+      await materialize(db, [posts]);
+      await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['a']);
+      await rejects(
+        executeMigrations(db, dialect, {
+          migrations: [
+            meta('app/001-x', {
+              from: null,
+              to: { collection: 'Posts', field: 'n' },
+              transform: () => value,
+            }),
+          ],
+          desired: [posts],
+          claimed: classifySchema([posts]),
+          force: false,
+        }),
+        refused,
+      );
+      deepStrictEqual(await cells(db, 'SELECT "n" FROM "Posts"'), [null]);
+      await db.close();
+    }
+  });
+
+  it('refuses a fan-in promoting a number into a text column', async () => {
+    const db = await connectTest();
+    const posts = table('Posts');
+    const companion = table('Posts__translations', {
+      columns: [
+        { name: '_parentUUID', type: 'text', notNull: true },
+        { name: '_localeCode', type: 'text', notNull: true },
+        { name: 'n', type: 'text', notNull: true },
+      ],
+      primaryKey: ['_parentUUID', '_localeCode'],
+      companion: 'Posts',
+    });
+    await materialize(db, [posts, companion]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['p1']);
+    await db.run(
+      'INSERT INTO "Posts__translations" ("_parentUUID", "_localeCode", "n") VALUES (?, ?, ?)',
+      ['p1', 'en', 'Hello'],
+    );
+    await rejects(
+      executeMigrations(db, dialect, {
+        migrations: [
+          meta('app/001-x', {
+            from: { collection: 'Posts', field: 'n', translatable: true },
+            transform: () => 42,
+          }),
+        ],
+        desired: [table('Posts', { columns: [UUID, { name: 'n', type: 'text', notNull: true }] })],
+        claimed: classifySchema([posts, companion]),
+        force: false,
+      }),
+      refused,
+    );
+    deepStrictEqual(await cells(db, 'SELECT "n" FROM "Posts__translations"'), ['Hello']);
+    await db.close();
+  });
+});
