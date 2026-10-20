@@ -317,7 +317,9 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
           setTimeout(
             () =>
               handle.root
-                .querySelector<HTMLElement>('input:not([type="hidden"]), textarea, [tabindex="0"]')
+                .querySelector<HTMLElement>(
+                  'input:not([type="hidden"]):not([tabindex="-1"]), textarea, [tabindex="0"]',
+                )
                 ?.focus(),
             overlayTransitionDuration(),
           );
