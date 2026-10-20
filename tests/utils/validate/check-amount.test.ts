@@ -17,6 +17,17 @@ describe('checkAmount', () => {
     });
   });
 
+  it('writes the grid of an amount off its step', () => {
+    deepStrictEqual(checkAmount(150, { step: 100 }, show), {
+      key: 'validation.invalidStep',
+      params: { step: '1 EUR' },
+    });
+    deepStrictEqual(checkAmount(200, { step: 100, min: 50 }, show), {
+      key: 'validation.invalidStepFrom',
+      params: { step: '1 EUR', min: '0.5 EUR' },
+    });
+  });
+
   it('passes an amount within bounds', () => {
     strictEqual(checkAmount(150, { min: 100, max: 200 }, show), undefined);
   });
