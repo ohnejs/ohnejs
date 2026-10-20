@@ -44,7 +44,8 @@ export function isoCodeField<TCode extends string>(spec: IsoCodeSpec<TCode>) {
         ? ctx.importType('ohnejs/utils', spec.typeName)
         : literalUnion(ctx.options.only),
     emitJSONType: (ctx) => literalUnion(ctx.options.only ?? spec.codes),
-    sanitizers: [(value) => value.toUpperCase()],
+    // Only ASCII letters upper-case, so `ß` never turns into `SS`, a code it never was.
+    sanitizers: [(value) => (/^[a-z]+$/i.test(value) ? value.toUpperCase() : value)],
     validators: [
       (value) => (spec.isCode(value) ? undefined : spec.invalid),
       (value, ctx) =>

@@ -63,6 +63,14 @@ describe('country writes', () => {
     }
   });
 
+  it('refuses text that only upper-cases into a code', async () => {
+    for (const homeland of ['ß', 'ﬁ', 'ın']) {
+      const result = await queryUntyped('Heroes').create({ name: homeland, homeland });
+      ok(!result.ok, homeland);
+      strictEqual(result.errors.homeland, 'validation.invalidCountry');
+    }
+  });
+
   it('admits only the listed codes under `only`', async () => {
     const hero = await queryUntyped('Heroes').createOrThrow({ name: 'Anduin', realm: 'at' });
     strictEqual(hero.realm, 'AT');
