@@ -49,6 +49,17 @@ describe('chipTouch', () => {
     deepStrictEqual([calls, end.prevented], [['hold'], true]);
   });
 
+  it('leaves a tap whose touchstart a child kept, like a remove button, to that child', (t) => {
+    const { touch, scope } = wired();
+    t.after(() => (mock.timers.reset(), scope.dispose()));
+    touch.onTouchstart(touchAt(10));
+    mock.timers.tick(500);
+    touch.onTouchend(touchAt(10));
+    const childTap = touchAt(10);
+    touch.onTouchend(childTap);
+    deepStrictEqual(childTap.prevented, false);
+  });
+
   it('drops the hold once the finger moves past the slop, so the swipe scrolls', (t) => {
     t.after(() => mock.timers.reset());
     const { touch, calls } = wired();

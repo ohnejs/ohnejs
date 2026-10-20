@@ -67,6 +67,8 @@ export function chipTouch(
       if (!press.pending()) lastTap = -Infinity;
     },
     onTouchend: (event) => {
+      // A child that kept its touchstart, like the remove button, owns the tap that ends here.
+      if (!down) return;
       const tapped = press.pending();
       down = false;
       if (press.end()) {
