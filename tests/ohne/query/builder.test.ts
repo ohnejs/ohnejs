@@ -213,6 +213,19 @@ describe('the typed builder narrows in a consumer app', () => {
     );
     write(
       app,
+      'fields/mixed.ts',
+      "import { defineField } from 'ohnejs';\n" +
+        "export default defineField({ columnType: 'json', jsonList: true, defaultValue: () => [],\n" +
+        "  emitType: () => '(string | number | null)[]' });\n",
+    );
+    write(
+      app,
+      'fields/bag.ts',
+      "import { defineField } from 'ohnejs';\n" +
+        "export default defineField({ columnType: 'json', jsonList: true, defaultValue: () => [] });\n",
+    );
+    write(
+      app,
       'collections/Posts.ts',
       "import { defineCollection, field } from 'ohnejs';\n" +
         'export default defineCollection({ fields: {\n' +
@@ -227,6 +240,8 @@ describe('the typed builder narrows in a consumer app', () => {
         "  sections: field('repeater', { fields: { heading: field('text') } }),\n" +
         "  content: field('blocks'),\n" +
         "  span: field('span', { nullable: true }),\n" +
+        "  labels: field('mixed'),\n" +
+        "  bag: field('bag'),\n" +
         '} });\n',
     );
 
@@ -610,6 +625,15 @@ query('Tags').where('posts', (w) => w.includesAny(['p1']));
 query('Posts').where('tags', (w) => w.includesAll(['t1']));
 // @ts-expect-error records membership takes target UUIDs
 query('Posts').where('tags', (w) => w.includes(1));
+query('Posts').where('labels', (w) => w.includes('x'));
+query('Posts').where('labels', (w) => w.includesAny([1, 'x']));
+query('Posts').where('bag', (w) => w.includes(true));
+// @ts-expect-error null is never a value; use isNull
+query('Posts').where('labels', (w) => w.includes(null));
+// @ts-expect-error null is never a value; use isNull
+query('Posts').where('labels', (w) => w.includesAll(['x', null]));
+// @ts-expect-error list membership takes a scalar
+query('Posts').where('bag', (w) => w.includes({ a: 1 }));
 // @ts-expect-error a callback must apply an operator
 query('Posts').where('views', (c) => c);
 // @ts-expect-error unknown field

@@ -205,7 +205,10 @@ type TextOps<M extends QueryFieldMeta> = [PlainScalar<M>] extends [never]
 /**
  * The element type a `jsonList` column's membership operators take.
  */
-type JsonElement<M extends QueryFieldMeta> = ScalarOf<M> extends readonly (infer E)[] ? E : unknown;
+type JsonElement<M extends QueryFieldMeta> = (ScalarOf<M> extends readonly (infer E)[]
+  ? E
+  : unknown) &
+  (string | number | boolean);
 
 /**
  * The list-membership operators, admitted for a `json` column flagged as a list.
