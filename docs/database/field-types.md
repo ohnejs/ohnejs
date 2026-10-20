@@ -292,7 +292,7 @@ units, so `1999` in `EUR` is 19.99 €.
 
 | Option            | Default   | What it does                                                                                                                                                            |
 | ----------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `currency`        | -         | The ISO 4217 currency the value counts in, like `'EUR'`. `min` and `max` count minor units too.                                                                         |
+| `currency`        | -         | The ISO 4217 currency the value counts in, like `'EUR'`. `min`, `max` and `step` count minor units too.                                                                 |
 | `default`         | -         | The value a [create](./writing.md#defaults) stores when its input leaves the field out. A value, or a function that computes one.                                       |
 | `description`     | -         | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
 | `display`         | `'input'` | The editor: `'input'`, or `'slider'` for an input beside a range track. A slider needs `min` and `max`. The stored value is the same either way.                        |
@@ -477,31 +477,35 @@ holds one group, or none when the field is `nullable`.
   <img alt="The range field in the dashboard" src="../images/field-types/range-light.png">
 </picture>
 
-A start and an end of one kind, picked by `of`: two days, two instants, or two times of day. A
-record reads it as `{ UUID, start, end }`, each end stored as a field of its `of` type stores it.
-The start must not lie after the end, and ordering by the field sorts by its start.
+A start and an end of one kind, picked by `of`: two days, two instants, two times of day, or two
+numbers. A record reads it as `{ UUID, start, end }`, each end stored as a field of its `of` type
+stores it. The start must not exceed the end, and ordering by the field sorts by its start.
 
-| Option         | Default  | What it does                                                                                                                                                            |
-| -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `default`      | -        | A function that returns the range a [create](./writing.md#defaults) stores when its input leaves the field out.                                                         |
-| `description`  | -        | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
-| `immutable`    | `false`  | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
-| `label`        | -        | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
-| `max`          | -        | The latest end, in the form the `of` type takes for its own `max`.                                                                                                      |
-| `maxSpan`      | -        | The longest `end - start`, as milliseconds or text like `'2 weeks'`. Not with `open`.                                                                                   |
-| `min`          | -        | The earliest start, in the form the `of` type takes for its own `min`.                                                                                                  |
-| `minSpan`      | -        | The shortest `end - start`, as milliseconds or text like `'1 day'`. Whole days for a `date` range.                                                                      |
-| `nullable`     | `false`  | Lets the record hold no range, read as `null`.                                                                                                                          |
-| `of`           | required | The kind of both ends: `date`, `dateTime`, or `time`.                                                                                                                   |
-| `open`         | `false`  | Lets the `end` stay `null`. Not for a `time` range.                                                                                                                     |
-| `readable`     | `true`   | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
-| `sanitizers`   | -        | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
-| `search`       | `true`   | Lets [search](./collections.md#search) match an end, as a field of its `of` type would.                                                                                 |
-| `timezone`     | -        | A fixed IANA zone the dashboard shows and edits a `dateTime` range in. Omitted, the viewer's own zone applies.                                                          |
-| `translatable` | `false`  | Keeps [one range per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
-| `validators`   | -        | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
-| `when`         | -        | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
-| `writable`     | `true`   | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
+| Option         | Default   | What it does                                                                                                                                                            |
+| -------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `currency`     | -         | An `integer` range only: the ISO 4217 currency both ends count in, like `'EUR'`. `min`, `max`, `step` and the spans count minor units too.                              |
+| `default`      | -         | A function that returns the range a [create](./writing.md#defaults) stores when its input leaves the field out.                                                         |
+| `description`  | -         | Help text below the label, as markdown. A string, a [message key](../i18n/messages.md), or an [object](./collections.md#dashboard-appearance) that starts it collapsed. |
+| `display`      | `'input'` | A numeric range only: `'slider'` adds a two-thumb track above the inputs. A slider needs `min` and `max`, and each span must be a multiple of `step`.                   |
+| `immutable`    | `false`   | Locks the field after create: creates accept it, updates reject it. Top-level collection fields only.                                                                   |
+| `label`        | -         | The label the dashboard shows, as a string or a [message key](../i18n/messages.md). Omitted, the field name is sentence-cased.                                          |
+| `max`          | -         | The latest end, in the form the `of` type takes for its own `max`.                                                                                                      |
+| `maxSpan`      | -         | The longest `end - start`. A number for a numeric range, else milliseconds or text like `'2 weeks'`. Not with `open`.                                                   |
+| `min`          | -         | The earliest start, in the form the `of` type takes for its own `min`.                                                                                                  |
+| `minSpan`      | -         | The shortest `end - start`. A number for a numeric range, else milliseconds or text like `'1 day'`. Whole days for a `date` range.                                      |
+| `nullable`     | `false`   | Lets the record hold no range, read as `null`.                                                                                                                          |
+| `of`           | required  | The kind of both ends: `date`, `dateTime`, `time`, `integer`, or `number`.                                                                                              |
+| `open`         | `false`   | Lets the `end` stay `null`. Not for a `time` range.                                                                                                                     |
+| `readable`     | `true`    | `false` makes the field [write-only](./collections.md#write-only-and-locked-fields): no read returns it.                                                                |
+| `sanitizers`   | -         | Functions that [clean the value](./writing.md#sanitizers-and-validators) before it is validated.                                                                        |
+| `search`       | `true`    | Lets [search](./collections.md#search) match a `date` or `time` end. A numeric range needs `search: true`, as its `of` type does.                                       |
+| `step`         | -         | A numeric range only: the grid both ends lie on, as for an `integer` or `number`.                                                                                       |
+| `suffix`       | -         | A numeric range only: a unit shown after the values, like `'kg'`, as a string or a [message key](../i18n/messages.md).                                                  |
+| `timezone`     | -         | A fixed IANA zone the dashboard shows and edits a `dateTime` range in. Omitted, the viewer's own zone applies.                                                          |
+| `translatable` | `false`   | Keeps [one range per locale](./translations.md#marking-fields). Top-level collection fields only.                                                                       |
+| `validators`   | -         | Functions that [reject a value](./writing.md#sanitizers-and-validators) by returning a message.                                                                         |
+| `when`         | -         | A [condition](./conditional-fields.md) that turns the field on or off per record.                                                                                       |
+| `writable`     | `true`    | `false` removes the field from write inputs, so its value comes from `default`.                                                                                         |
 
 ### `record`
 
