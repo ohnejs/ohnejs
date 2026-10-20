@@ -18,7 +18,11 @@ import { text } from '../../../src/ohne/fields/builtin/text.ts';
 import { defineField } from '../../../src/ohne/fields/define-field.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../src/ohne/fields/use-fields.ts';
-import { blockQueryMetadata, queryMetadata } from '../../../src/ohne/query/metadata.ts';
+import {
+  blockQueryMetadata,
+  queryMetadata,
+  warmQueryMetadata,
+} from '../../../src/ohne/query/metadata.ts';
 
 function plain(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(plain);
@@ -814,5 +818,32 @@ describe('queryMetadata search flag', () => {
   it('keeps the type hook reachable beside the flag', () => {
     const { fields } = queryMetadata('QSearchPosts');
     strictEqual(typeof fields.year.fieldType?.search, 'function');
+  });
+});
+
+describe('warmQueryMetadata', () => {
+  it('names the collection file a malformed `when` lives in', () => {
+    const file = '/srv/app/collections/WarmWhen.ts';
+    const fields = {
+      a: field('text'),
+      b: field('text', { when: { a: { $bogus: 1 } } as never }),
+    };
+    const others = Object.entries(useCollections().all());
+    for (const [name] of others) useCollections().delete(name);
+    useCollections().register('WarmWhen', {
+      name: 'WarmWhen',
+      file,
+      collection: { fields },
+    } as never);
+    try {
+      throws(warmQueryMetadata, (error: unknown) => {
+        ok(isOhneError(error));
+        strictEqual(error.path, file);
+        return true;
+      });
+    } finally {
+      useCollections().delete('WarmWhen');
+      for (const [name, meta] of others) useCollections().register(name, meta);
+    }
   });
 });

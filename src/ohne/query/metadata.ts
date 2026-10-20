@@ -27,7 +27,7 @@ import {
   companionTableName,
   derivedTableName,
 } from '../database/naming/table-names.ts';
-import { ohneError } from '../error/ohne-error.ts';
+import { locateError, ohneError } from '../error/ohne-error.ts';
 import { resolveFieldSearch } from '../fields/field-search.ts';
 import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
@@ -302,10 +302,23 @@ export function clearQueryMetadata(): void {
  *
  * Run at boot so a malformed or misaddressed `when` fails before the server serves, not on a first write.
  * The build is memoized, so this warms the cache every later read and write then reuses.
+ * A failure names the owner's file in its corner.
  */
 export function warmQueryMetadata(): void {
-  for (const meta of Object.values(useCollections().all())) queryMetadata(meta.name);
-  for (const name of useBlocks().keys()) blockQueryMetadata(name);
+  for (const meta of Object.values(useCollections().all())) {
+    try {
+      queryMetadata(meta.name);
+    } catch (error) {
+      throw locateError(error, meta.file);
+    }
+  }
+  for (const meta of Object.values(useBlocks().all())) {
+    try {
+      blockQueryMetadata(meta.name);
+    } catch (error) {
+      throw locateError(error, meta.file);
+    }
+  }
 }
 
 /**

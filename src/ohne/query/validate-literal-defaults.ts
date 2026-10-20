@@ -7,7 +7,7 @@ import { literalString } from '../../utils/codegen/index.ts';
 import { first, hasKey, isFunction, isNull, isString, isUndefined } from '../../utils/index.ts';
 import { useBlocks } from '../blocks/use-blocks.ts';
 import { useCollections } from '../collections/use-collections.ts';
-import { ohneError } from '../error/ohne-error.ts';
+import { locateError, ohneError } from '../error/ohne-error.ts';
 import { resolveMessage } from '../http/translate.ts';
 import { blockQueryMetadata, queryMetadata } from './metadata.ts';
 import { prefixErrors } from './pipeline/prefix-errors.ts';
@@ -38,15 +38,28 @@ interface Owner {
  * The walk covers every collection and every block, composite subfields included.
  * A block has no host here, so its fields see the block's name as `ctx.collection`.
  * A rejected default throws `ohneError`, naming the field, its owner, and the message a create would return.
+ * A failure names the owner's file in its corner.
  */
 export async function validateLiteralDefaults(tx: Transaction): Promise<void> {
   for (const meta of Object.values(useCollections().all())) {
     const home = `collection \`${meta.name}\``;
-    await walkScope(queryMetadata(meta.name).fields, '', { tx, collection: meta.name, home });
+    try {
+      await walkScope(queryMetadata(meta.name).fields, '', { tx, collection: meta.name, home });
+    } catch (error) {
+      throw locateError(error, meta.file);
+    }
   }
-  for (const name of useBlocks().keys()) {
-    const home = `block \`${name}\``;
-    await walkScope(blockQueryMetadata(name).fields, '', { tx, collection: name, home });
+  for (const meta of Object.values(useBlocks().all())) {
+    const home = `block \`${meta.name}\``;
+    try {
+      await walkScope(blockQueryMetadata(meta.name).fields, '', {
+        tx,
+        collection: meta.name,
+        home,
+      });
+    } catch (error) {
+      throw locateError(error, meta.file);
+    }
   }
 }
 

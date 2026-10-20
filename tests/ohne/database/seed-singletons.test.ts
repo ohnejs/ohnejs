@@ -88,14 +88,20 @@ describe('seedSingletons', () => {
     strictEqual(seededAtSync, 1);
   });
 
-  it('throws naming the field when a hook rejects the seed', async () => {
+  it('throws naming the field and the collection file when a hook rejects the seed', async () => {
     useEnv().set('DATABASE', memoryURL);
-    register('SSSettings', settings);
+    const file = '/srv/app/collections/SSSettings.ts';
+    useCollections().register('SSSettings', {
+      name: 'SSSettings',
+      file,
+      collection: settings,
+    } as never);
     hook('record:validate', () => ({ title: 'No.' }));
     await rejects(syncProjectDatabase(), (error: unknown) => {
       ok(isOhneError(error));
       strictEqual(error.title, 'Cannot seed singleton `SSSettings`');
       ok([error.body].flat().includes('- `title`: No.'));
+      strictEqual(error.path, file);
       return true;
     });
   });

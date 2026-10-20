@@ -17,12 +17,13 @@ export async function seedSingletons(): Promise<void> {
   );
   if (singletons.length === 0) return;
   await withLock('seed', async () => {
-    for (const { name } of singletons) {
+    for (const { name, file } of singletons) {
       if (await queryUntyped(name).exists()) continue;
       const outcome = await runCreate(name, {}, null);
       if (outcome.ok) continue;
       throw ohneError({
         title: `Cannot seed singleton \`${name}\``,
+        path: file,
         body: [
           'The record is created from the field defaults, and the create failed validation.',
           '',

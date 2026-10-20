@@ -39,6 +39,37 @@ function rejectsTitled(run: Promise<void>, title: string, body?: RegExp): Promis
 }
 
 describe('validateLiteralDefaults', () => {
+  it('names the file of the collection or block a rejected default lives in', async () => {
+    const fields = { n: field('integer', { min: 1, default: 0 }) };
+    const corner = (file: string) => (error: unknown) => {
+      ok(isOhneError(error));
+      ok(error.path === file, `path was: ${error.path}`);
+      return true;
+    };
+    const collection = '/srv/app/collections/LDFile.ts';
+    useCollections().register('LDFile', {
+      name: 'LDFile',
+      file: collection,
+      collection: { fields },
+    } as never);
+    try {
+      await rejects(validateLiteralDefaults(tx), corner(collection));
+    } finally {
+      useCollections().delete('LDFile');
+    }
+    const block = '/srv/app/blocks/LDFileHero.ts';
+    useBlocks().register('LDFileHero', {
+      name: 'LDFileHero',
+      file: block,
+      block: { fields },
+    } as never);
+    try {
+      await rejects(validateLiteralDefaults(tx), corner(block));
+    } finally {
+      useBlocks().delete('LDFileHero');
+    }
+  });
+
   it('accepts a literal default the tiers accept', async () => {
     await doesNotReject(checkCollection('LDOk', { title: field('text', { default: 'x' }) }));
   });
