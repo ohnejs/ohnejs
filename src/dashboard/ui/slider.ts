@@ -70,6 +70,7 @@ css`
     margin: 0;
     background: transparent;
     cursor: pointer;
+    touch-action: pan-y;
     appearance: none;
   }
 
@@ -94,11 +95,11 @@ css`
     height: var(--ohne-slider-thumb);
     margin-top: calc((var(--ohne-slider-track) - var(--ohne-slider-thumb)) / 2);
     background-color: hsl(var(--ohne-card));
-    border: 1px solid hsl(var(--ohne-input));
+    border: 0.125rem solid hsl(var(--ohne-primary));
     border-radius: 50%;
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
     transition: var(--ohne-transition);
-    transition-property: border-color, box-shadow, opacity;
+    transition-property: background-color, border-color, box-shadow, opacity;
     appearance: none;
   }
 
@@ -107,11 +108,11 @@ css`
     width: var(--ohne-slider-thumb);
     height: var(--ohne-slider-thumb);
     background-color: hsl(var(--ohne-card));
-    border: 1px solid hsl(var(--ohne-input));
+    border: 0.125rem solid hsl(var(--ohne-primary));
     border-radius: 50%;
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
     transition: var(--ohne-transition);
-    transition-property: border-color, box-shadow, opacity;
+    transition-property: background-color, border-color, box-shadow, opacity;
   }
 
   .ohne-slider-input:focus-visible::-webkit-slider-thumb {
@@ -124,6 +125,26 @@ css`
     box-shadow:
       0 0 0 0.125rem hsl(var(--ohne-background)),
       0 0 0 0.25rem hsl(var(--ohne-ring));
+  }
+
+  @media (hover: hover) {
+    .ohne-slider-input:enabled:hover::-webkit-slider-thumb {
+      background-color: hsl(var(--ohne-primary));
+    }
+
+    .ohne-slider-input:enabled:hover::-moz-range-thumb {
+      background-color: hsl(var(--ohne-primary));
+    }
+  }
+
+  .ohne-slider[data-dragging] .ohne-slider-input::-webkit-slider-thumb {
+    background-color: hsl(var(--ohne-primary));
+    box-shadow: 0 0 0 0.375rem hsl(var(--ohne-primary) / 0.15);
+  }
+
+  .ohne-slider[data-dragging] .ohne-slider-input::-moz-range-thumb {
+    background-color: hsl(var(--ohne-primary));
+    box-shadow: 0 0 0 0.375rem hsl(var(--ohne-primary) / 0.15);
   }
 
   .ohne-slider[data-empty='true'] .ohne-slider-input::-webkit-slider-thumb {
@@ -145,6 +166,7 @@ css`
  * The model follows every move, rounded to the grid's decimals, and writing it moves the thumb.
  * An `undefined` model rests the thumb at `min`, dimmed, with an empty track.
  * The filled part of the track ends under the thumb's center.
+ * The thumb fills on hover and, from press to release, wears a halo.
  *
  * @example
  * ```ts
@@ -166,6 +188,17 @@ export function slider(model: Ref<number | undefined>, options: SliderOptions): 
     class: 'ohne-slider-input',
     onInput: () => {
       model.value = roundTo(Number(input.value), places);
+    },
+    onPointerdown: () => {
+      if (options.disabled?.() === true) return;
+      root.setAttribute('data-dragging', 'true');
+      const release = (): void => {
+        root.removeAttribute('data-dragging');
+        window.removeEventListener('pointerup', release);
+        window.removeEventListener('pointercancel', release);
+      };
+      window.addEventListener('pointerup', release);
+      window.addEventListener('pointercancel', release);
     },
   }) as HTMLInputElement;
   const root = h(

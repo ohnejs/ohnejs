@@ -6,6 +6,17 @@ import { ref } from '../../../src/utils/reactive/ref.ts';
 import { type FakeElement, findElement } from '../_fake-dom.ts';
 import { fire } from './_events.ts';
 
+type Listener = (event: unknown) => void;
+const global = new Map<string, Set<Listener>>();
+Object.assign(window, {
+  addEventListener: (type: string, listener: Listener) =>
+    global.set(type, (global.get(type) ?? new Set()).add(listener)),
+  removeEventListener: (type: string, listener: Listener) => global.get(type)?.delete(listener),
+});
+const release = (type: string): void => {
+  for (const listener of global.get(type) ?? []) listener({ type });
+};
+
 const { slider } = await import('../../../src/dashboard/ui/slider.ts');
 
 const rangeOf = (root: unknown): FakeElement & { value: string } =>
@@ -68,5 +79,22 @@ describe('slider', () => {
     off.value = true;
     flush();
     strictEqual(range.getAttribute('disabled'), '');
+  });
+
+  it('marks a drag from the press until the release anywhere', () => {
+    for (const end of ['pointerup', 'pointercancel']) {
+      const root = slider(ref(1), { min: 0, max: 5 }) as unknown as FakeElement;
+      fire(rangeOf(root), 'pointerdown');
+      strictEqual(root.getAttribute('data-dragging'), 'true');
+      release(end);
+      strictEqual(root.getAttribute('data-dragging'), null);
+      strictEqual(global.get(end)?.size, 0);
+    }
+  });
+
+  it('marks no drag while disabled', () => {
+    const root = slider(ref(1), { min: 0, max: 5, disabled: () => true }) as unknown as FakeElement;
+    fire(rangeOf(root), 'pointerdown');
+    strictEqual(root.getAttribute('data-dragging'), null);
   });
 });
