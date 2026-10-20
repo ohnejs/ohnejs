@@ -63,7 +63,7 @@ field out of word search. It also lists the records that use it, see
 - Each collection shows its five newest matches. "Load more" under it shows the next five.
 - Quotes keep a phrase together: `"new york"` is one word.
 - Punctuation around a word, a lone ASCII letter, and a repeated word are ignored, and only the first
-  ten words count.
+  ten words count. A sign before a number stays, so `-300` finds -300.
 - A query starting with `/` is a command for a layer's own rows, like the assistant's skills, and
   searches nothing.
 
