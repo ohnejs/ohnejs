@@ -27,6 +27,22 @@ const SITE: DashboardField = {
 };
 
 describe('linkType control', () => {
+  it('asks a touch keyboard for an address, uncapitalized', () => {
+    effectScope().run(() => {
+      const control = linkType.control!({
+        field: SITE,
+        initial: null,
+        mode: 'edit',
+        path: 'site',
+        language: () => 'en',
+        onInput: () => {},
+      })!;
+      const input = inputOf(control.element);
+      strictEqual(input.getAttribute('inputmode'), 'url');
+      strictEqual(input.getAttribute('autocapitalize'), 'off');
+    });
+  });
+
   it('reads an unsafe address as its message without showing it, and shows it on blur', () => {
     effectScope().run(() => {
       const control = linkType.control!({

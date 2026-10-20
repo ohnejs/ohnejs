@@ -253,6 +253,8 @@ function addressInput(
     placeholder: () => t('dashboard.link.urlPlaceholder'),
   });
   const input = element.querySelector('input') as HTMLInputElement;
+  input.setAttribute('inputmode', 'url');
+  input.setAttribute('autocapitalize', 'off');
   input.addEventListener('input', () => {
     invalid.value = '';
     const next = read();
