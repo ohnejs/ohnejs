@@ -6,11 +6,12 @@ import type { DashboardField } from '../../../../src/dashboard/runtime/meta-type
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
 import { type FakeElement, findElement, hasClass } from '../../_fake-dom.ts';
+import { fire } from '../../ui/_events.ts';
 import '../_controls.ts';
 
 const { timeType } = await import('../../../../src/dashboard/fields/builtin/time.ts');
 
-const field = (nullable: boolean): DashboardField => ({
+const field = (nullable: boolean, options: Record<string, unknown> = {}): DashboardField => ({
   name: 'sendAt',
   type: 'time',
   kind: 'column',
@@ -22,12 +23,12 @@ const field = (nullable: boolean): DashboardField => ({
   readable: true,
   writable: true,
   immutable: false,
-  options: {},
+  options,
 });
 
-function control(initial: unknown, nullable = true) {
+function control(initial: unknown, nullable = true, options: Record<string, unknown> = {}) {
   return timeType.control!({
-    field: field(nullable),
+    field: field(nullable, options),
     initial,
     mode: 'edit',
     path: 'sendAt',
@@ -35,6 +36,18 @@ function control(initial: unknown, nullable = true) {
     onInput() {},
   })!;
 }
+
+const clearOf = (root: unknown): FakeElement | undefined =>
+  findElement(root as FakeElement, (element) => hasClass(element, 'ohne-time-clear'));
+
+const tab = (root: unknown): void => {
+  const hours = findElement(root as FakeElement, (element) =>
+    hasClass(element, 'ohne-number-input'),
+  )!;
+  fire(hours, 'focus');
+  fire(hours, 'blur');
+  flush();
+};
 
 const segments = (root: unknown): string[] => {
   const values: string[] = [];
@@ -73,6 +86,53 @@ describe('timeType control', () => {
       fresh.restore?.(undefined);
       deepStrictEqual(fresh.read(), {});
       strictEqual(fresh.dirty(), false);
+    });
+  });
+
+  it('seeds a required clock at `min`, reads the time it shows, and stays pristine through a tab', () => {
+    effectScope().run(() => {
+      const sendAt = control(undefined, false, { min: '08:00' });
+      flush();
+      deepStrictEqual(segments(sendAt.element), ['08', '00', '00']);
+      tab(sendAt.element);
+      deepStrictEqual(sendAt.read(), { value: '08:00:00' });
+      strictEqual(sendAt.dirty(), false);
+      strictEqual(clearOf(sendAt.element), undefined);
+      const defaulted = timeType.control!({
+        field: { ...field(false, { min: '08:00' }), required: false },
+        initial: undefined,
+        mode: 'create',
+        path: 'sendAt',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      deepStrictEqual(defaulted.read(), {});
+    });
+  });
+
+  it('shows a nullable empty clock empty, and keeps a stored `null` through a tab', () => {
+    effectScope().run(() => {
+      for (const initial of [undefined, null]) {
+        const sendAt = control(initial);
+        flush();
+        deepStrictEqual(segments(sendAt.element), ['', '', '']);
+        tab(sendAt.element);
+        deepStrictEqual(sendAt.read(), initial === null ? { value: null } : {});
+        strictEqual(sendAt.dirty(), false);
+        strictEqual(clearOf(sendAt.element), undefined);
+      }
+    });
+  });
+
+  it('clears a nullable clock to `null`', () => {
+    effectScope().run(() => {
+      const sendAt = control('10:00:00');
+      fire(clearOf(sendAt.element)!, 'click');
+      flush();
+      deepStrictEqual(sendAt.read(), { value: null });
+      strictEqual(sendAt.dirty(), true);
+      deepStrictEqual(segments(sendAt.element), ['', '', '']);
+      strictEqual(clearOf(sendAt.element), undefined);
     });
   });
 });

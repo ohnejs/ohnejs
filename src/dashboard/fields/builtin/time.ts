@@ -2,10 +2,12 @@ import type { Ref } from '../../../utils/reactive/ref.ts';
 import type { DateFieldOptions } from '../known-field-types.ts';
 
 import { msToISOTime } from '../../../utils/date/ms-to-iso-time.ts';
+import { isNull } from '../../../utils/is/is-null.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isString } from '../../../utils/is/is-string.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
+import { untracked } from '../../../utils/reactive/untracked.ts';
 import { h } from '../../render/h.ts';
 import { formatTime } from '../../runtime/date-time.ts';
 import { parseTime } from '../../ui/time-model.ts';
@@ -27,7 +29,8 @@ function storedClock(value: unknown): number | null {
  * The `time` field type: cell display, form control, and filter.
  * The wire value is an `HH:MM:SS` time of day; the segment input edits it as ms within the day.
  * The cell formats the clock in the user's time format; a malformed value shows as its raw text, dim.
- * The input has no empty state, so the model seeds `00:00:00` when the stored value is nullish.
+ * A nullable control shows a nullish value empty and clears through its clear button.
+ * Any other has no empty state, so it shows the earliest time `min` allows, and reads it when required.
  * The control stays pristine until touched; an untouched nullish base wires `null` on a nullable field.
  */
 export const timeType: FieldType<DateFieldOptions> = {
@@ -44,18 +47,21 @@ export const timeType: FieldType<DateFieldOptions> = {
   },
   control({ field, initial, path, disabled, onInput }) {
     let base = initial;
+    const seed = field.nullable ? null : (storedClock(field.options?.min) ?? 0);
     const held = ref(initial);
-    const clock = ref(storedClock(initial) ?? 0);
+    const clock = ref(storedClock(initial) ?? seed);
     const routed = ref('');
 
     const error = (): string => routed.value;
-    const model: Ref<number> = {
+    const model: Ref<number | null> = {
       get value() {
         return clock.value;
       },
       set value(next) {
+        // A blur settles the shown time again, which is no edit while nothing is stored.
+        if (isNullish(held.value) && next === untracked(() => clock.value)) return;
         clock.value = next;
-        held.value = msToISOTime(next);
+        held.value = isNull(next) ? null : msToISOTime(next);
         routed.value = '';
         onInput();
       },
@@ -65,25 +71,26 @@ export const timeType: FieldType<DateFieldOptions> = {
       labels: timeLabels(),
       min: field.options?.min,
       max: field.options?.max,
+      clearable: field.nullable,
       disabled: () => disabled === true,
     });
     const input = element.querySelector('input.ohne-number-input') as HTMLInputElement;
     describeControl(input, field, path, error);
 
     const wire = (): unknown => {
-      if (isNullish(held.value)) return field.nullable ? null : msToISOTime(clock.value);
+      if (isNullish(held.value)) return isNull(clock.value) ? null : msToISOTime(clock.value);
       return held.value;
     };
     const show = (value: unknown): void => {
       held.value = value;
-      clock.value = storedClock(value) ?? 0;
+      clock.value = storedClock(value) ?? seed;
       routed.value = '';
     };
 
     return {
       element,
       read() {
-        return isUndefined(held.value) ? {} : { value: wire() };
+        return isUndefined(held.value) && !field.required ? {} : { value: wire() };
       },
       setErrors(errors) {
         routed.value = errors[''] ?? '';

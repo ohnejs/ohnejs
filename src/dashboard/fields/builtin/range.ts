@@ -134,19 +134,18 @@ export const rangeType: FieldType<RangeFieldOptions> = {
     const minRange = parseWholeDuration(minSpan);
     const maxRange = parseWholeDuration(maxSpan);
 
-    // A required time range reads the seed it shows.
     let seeded: Pair | undefined;
     let element: HTMLElement;
     if (of === 'time') {
       const min = field.options?.min;
       const first = (isString(min) ? isoTimeToMs(min) : undefined) ?? 0;
-      // The inputs have no empty state, so an empty pair shows the earliest pair its bounds allow.
+      // A non-nullable range has no empty state, so it shows the earliest pair its bounds allow.
       const seed: [number, number] = [first, Math.min(first + (minRange ?? 0), LAST_SECOND)];
-      if (!field.nullable) seeded = seed;
-      const clock: Ref<[number, number]> = {
-        get value(): [number, number] {
+      if (field.required) seeded = seed;
+      const clock: Ref<Pair> = {
+        get value(): Pair {
           const [start, end] = pair.value;
-          return [start ?? seed[0], end ?? seed[1]];
+          return field.nullable ? [start, end] : [start ?? seed[0], end ?? seed[1]];
         },
         set value(next) {
           if (
@@ -166,6 +165,7 @@ export const rangeType: FieldType<RangeFieldOptions> = {
         max: field.options?.max,
         minRange,
         maxRange,
+        clearable: field.nullable,
         disabled: off,
       });
     } else {

@@ -2,10 +2,10 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { DashboardField } from '../../../../src/dashboard/runtime/meta-types.ts';
-import type { FakeElement } from '../../_fake-dom.ts';
 
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
+import { type FakeElement, findElement, hasClass } from '../../_fake-dom.ts';
 import { seedMessages } from '../../_fake-messages.ts';
 import { fire } from '../../ui/_events.ts';
 import { type } from '../_controls.ts';
@@ -132,6 +132,49 @@ describe('rangeType control', () => {
           strictEqual(shift.dirty(), false);
         }
       }
+      const defaulted = { ...rangeField({ of: 'time', min: '09:00' }), required: false };
+      deepStrictEqual(control(defaulted, undefined).read(), {});
+    });
+  });
+
+  it('clears a nullable time range one end at a time, and shows an empty one empty', () => {
+    effectScope().run(() => {
+      const shift = control(rangeField({ of: 'time' }, true), {
+        UUID: 'u1',
+        start: '09:00:00',
+        end: '10:00:00',
+      });
+      const clears = () => {
+        const found: FakeElement[] = [];
+        findElement(shift.element as unknown as FakeElement, (element) => {
+          if (hasClass(element, 'ohne-time-clear')) found.push(element);
+          return false;
+        });
+        return found;
+      };
+      strictEqual(clears().length, 2);
+      fire(clears()[0]! as never, 'click');
+      flush();
+      deepStrictEqual(shift.read(), { errors: { start: 'validation.required' } });
+      fire(clears()[0]! as never, 'click');
+      flush();
+      deepStrictEqual(shift.read(), { value: null });
+      strictEqual(shift.dirty(), true);
+      const empty = control(rangeField({ of: 'time' }, true), undefined);
+      flush();
+      const values: string[] = [];
+      findElement(empty.element as unknown as FakeElement, (element) => {
+        if (hasClass(element, 'ohne-number-input'))
+          values.push((element as unknown as { value: string }).value);
+        return false;
+      });
+      deepStrictEqual(values, ['', '', '', '', '', '']);
+      strictEqual(
+        (control(rangeField({ of: 'time' }), undefined).element as HTMLElement).querySelector(
+          '.ohne-time-clear',
+        ),
+        null,
+      );
     });
   });
 
