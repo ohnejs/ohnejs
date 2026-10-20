@@ -161,7 +161,8 @@ export class SQLiteDialect extends Dialect {
 
   /**
    * List membership through `json_each` over the stored JSON text.
-   * One probe per distinct element: `includesAll` counts the distinct matches, the others exist-check.
+   * The probes bind as one JSON array, so `json_each` decodes them exactly as it decodes the stored list.
+   * `includesAll` counts the distinct matches, the others exist-check.
    * Boolean elements probe as `1`/`0`, exactly as SQLite's JSON functions surface them.
    * Normalization runs before the dedup, so a boolean and its integer twin collapse to one probe.
    * That is documented dialect drift: the in-memory evaluator keeps `true` and `1` apart.
@@ -175,18 +176,16 @@ export class SQLiteDialect extends Dialect {
       values.map((value): SQLValue => (isBoolean(value) ? (value ? 1 : 0) : (value as SQLValue))),
     );
     if (elements.length === 0) return { sql: op === 'includesAll' ? '1 = 1' : '1 = 0', params: [] };
-    const marks = elements.map(() => '?').join(', ');
     const each = `json_each(${quotedColumn})`;
+    const match = `json_each.value IN (SELECT value FROM json_each(?))`;
+    const params = [JSON.stringify(elements)];
     if (op === 'includesAll') {
       return {
-        sql: `(SELECT COUNT(DISTINCT json_each.value) FROM ${each} WHERE json_each.value IN (${marks})) = ${elements.length}`,
-        params: elements,
+        sql: `(SELECT COUNT(DISTINCT json_each.value) FROM ${each} WHERE ${match}) = ${elements.length}`,
+        params,
       };
     }
-    return {
-      sql: `EXISTS (SELECT 1 FROM ${each} WHERE json_each.value IN (${marks}))`,
-      params: elements,
-    };
+    return { sql: `EXISTS (SELECT 1 FROM ${each} WHERE ${match})`, params };
   }
 
   /**

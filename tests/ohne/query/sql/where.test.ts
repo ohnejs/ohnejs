@@ -954,3 +954,36 @@ describe('compileWhere records membership behavior', () => {
     deepStrictEqual(await postTitles({ sections: { has: { UUID: 's1' } } }), ['Three']);
   });
 });
+
+await db.run('INSERT INTO "WJPosts" ("UUID", "_updatedAt", "labels") VALUES (?, ?, ?)', [
+  'j1',
+  0,
+  JSON.stringify(['x', 'a\ud800b', 1055665110430944500]),
+]);
+
+/**
+ * Runs `condition` against `WJPosts` and returns the matching UUIDs.
+ */
+async function listUUIDs(condition: Record<string, unknown>): Promise<string[]> {
+  const parsed = parseCondition(condition);
+  if (!parsed.ok) throw new Error(`parse failed: ${parsed.error.code}`);
+  const fragment = compileWhere(parsed.node, queryMetadata('WJPosts'), dialect, 'en');
+  const rows = await db.query<{ UUID: string }>(
+    `SELECT "UUID" FROM "WJPosts" WHERE ${fragment.sql}`,
+    fragment.params,
+  );
+  return rows.map((row) => row.UUID);
+}
+
+describe('compileWhere list membership behavior', () => {
+  it('a probe matches the stored element exactly, a lone surrogate or an unsafe integer included', async () => {
+    deepStrictEqual(await listUUIDs({ labels: { includes: 'a\ud800b' } }), ['j1']);
+    deepStrictEqual(await listUUIDs({ labels: { includes: 1055665110430944500 } }), ['j1']);
+    deepStrictEqual(
+      await listUUIDs({ labels: { includesAll: ['x', 'a\ud800b', 1055665110430944500] } }),
+      ['j1'],
+    );
+    deepStrictEqual(await listUUIDs({ labels: { includesAny: ['a\ud800b', 'zz'] } }), ['j1']);
+    deepStrictEqual(await listUUIDs({ labels: { includes: 'a\ufffdb' } }), []);
+  });
+});

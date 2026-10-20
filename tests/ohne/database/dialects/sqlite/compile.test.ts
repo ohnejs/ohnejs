@@ -74,36 +74,36 @@ describe('SQLite text match compilation', () => {
 describe('SQLite list membership compilation', () => {
   it('`includes` probes `json_each`', () => {
     deepStrictEqual(compileOn('SCLists', { labels: { includes: 'a' } }), {
-      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?)))',
-      params: ['a'],
+      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (SELECT value FROM json_each(?))))',
+      params: ['["a"]'],
     });
   });
 
   it('a boolean element probes as `1`', () => {
     deepStrictEqual(compileOn('SCLists', { labels: { includes: true } }), {
-      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?)))',
-      params: [1],
+      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (SELECT value FROM json_each(?))))',
+      params: ['[1]'],
     });
   });
 
   it('`includesAll` counts distinct matches against the list length', () => {
     deepStrictEqual(compileOn('SCLists', { labels: { includesAll: ['a', 'b'] } }), {
-      sql: '("labels" IS NOT NULL AND (SELECT COUNT(DISTINCT json_each.value) FROM json_each("labels") WHERE json_each.value IN (?, ?)) = 2)',
-      params: ['a', 'b'],
+      sql: '("labels" IS NOT NULL AND (SELECT COUNT(DISTINCT json_each.value) FROM json_each("labels") WHERE json_each.value IN (SELECT value FROM json_each(?))) = 2)',
+      params: ['["a","b"]'],
     });
   });
 
-  it('`includesAny` exist-checks a placeholder per value', () => {
+  it('`includesAny` exist-checks the bound list', () => {
     deepStrictEqual(compileOn('SCLists', { labels: { includesAny: ['a', 'b'] } }), {
-      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?, ?)))',
-      params: ['a', 'b'],
+      sql: '("labels" IS NOT NULL AND EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (SELECT value FROM json_each(?))))',
+      params: ['["a","b"]'],
     });
   });
 
   it('negation wraps the `json_each` probe', () => {
     deepStrictEqual(compileOn('SCLists', { labels: { not: { includes: 'a' } } }), {
-      sql: '("labels" IS NOT NULL AND NOT (EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (?))))',
-      params: ['a'],
+      sql: '("labels" IS NOT NULL AND NOT (EXISTS (SELECT 1 FROM json_each("labels") WHERE json_each.value IN (SELECT value FROM json_each(?)))))',
+      params: ['["a"]'],
     });
   });
 });

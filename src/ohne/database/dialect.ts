@@ -235,7 +235,7 @@ export abstract class Dialect {
    * @example
    * ```ts
    * dialect.listMembership('"labels"', 'includes', ['urgent'])
-   * // -> { sql: 'EXISTS (SELECT 1 FROM json_each("labels") ...)', params: ['urgent'] } on SQLite
+   * // -> { sql: 'EXISTS (SELECT 1 FROM json_each("labels") ...)', params: ['["urgent"]'] } on SQLite
    * ```
    */
   abstract listMembership(
