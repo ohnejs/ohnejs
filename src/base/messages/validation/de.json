@@ -33,6 +33,7 @@
   "required": "Dieses Feld ist erforderlich",
   "singleParagraph": "Dieser Wert enthält einen einzelnen Absatz",
   "singleRecord": "Element-Updates betreffen einen einzelnen Datensatz",
+  "tooLargeToIndex": "Dieser Wert ist zu groß für den Index des Felds",
   "unknownBlock": "Unbekannter Block `{block}`",
   "unknownField": "Dieses Feld wird nicht erkannt"
 }

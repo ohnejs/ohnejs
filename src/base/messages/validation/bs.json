@@ -33,6 +33,7 @@
   "required": "Ovo polje je obavezno",
   "singleParagraph": "Ova vrijednost sadrži jedan pasus",
   "singleRecord": "Ažuriranje stavki se odnosi na jedan zapis",
+  "tooLargeToIndex": "Ova vrijednost je prevelika za indeks polja",
   "unknownBlock": "Nepoznat blok `{block}`",
   "unknownField": "Ovo polje nije prepoznato"
 }

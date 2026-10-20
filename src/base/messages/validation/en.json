@@ -33,6 +33,7 @@
   "required": "This field is required",
   "singleParagraph": "This value holds a single paragraph",
   "singleRecord": "Item updates address a single record",
+  "tooLargeToIndex": "This value is too large for the field's index",
   "unknownBlock": "Unknown block `{block}`",
   "unknownField": "This field is not recognized"
 }
