@@ -836,6 +836,7 @@ describe('POST /search', () => {
     deepStrictEqual(await found('2026-03'), [paint]);
     deepStrictEqual(await found('2026-03-14'), [paint]);
     deepStrictEqual(await found('42'), [paint]);
+    deepStrictEqual(await found('-42'), []);
   });
 
   it('never matches a field with `search: false`, nor inside a composite with it', async () => {

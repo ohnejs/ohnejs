@@ -46,6 +46,17 @@ describe('searchTokens', () => {
     deepStrictEqual(searchTokens('(foo), «bar»! $baz€ ...'), ['foo', 'bar', 'baz']);
   });
 
+  it('keeps a leading sign before a digit', () => {
+    deepStrictEqual(searchTokens('-300 (+2.50) "-1e3" -5 --7'), [
+      '-300',
+      '+2.50',
+      '-1e3',
+      '-5',
+      '-7',
+    ]);
+    deepStrictEqual(searchTokens('-foo --bar -- - well-known'), ['foo', 'bar', 'well-known']);
+  });
+
   it('keeps inner punctuation', () => {
     deepStrictEqual(searchTokens('sea.jpg a@b.c q-3'), ['sea.jpg', 'a@b.c', 'q-3']);
   });
