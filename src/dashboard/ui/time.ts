@@ -1,12 +1,16 @@
 import type { ComputedRef } from '../../utils/reactive/computed.ts';
 import type { Ref } from '../../utils/reactive/ref.ts';
+import type { Child } from '../render/insert.ts';
 
 import { isFunction } from '../../utils/is/is-function.ts';
+import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { button } from './button.ts';
+import { icon } from './icon.ts';
 import { numberInput } from './number-input.ts';
 import { composeTime, parseTime, timeSegmentBounds } from './time-model.ts';
 import { listenTrigger } from './trigger.ts';
@@ -42,6 +46,15 @@ export interface TimeLabels {
    * 's'
    */
   secondsSuffix?: string | (() => string);
+
+  /**
+   * The title of the clear button.
+   * A getter reads reactively.
+   *
+   * @default
+   * 'Clear'
+   */
+  clear?: string | (() => string);
 }
 
 /**
@@ -98,7 +111,15 @@ export interface TimeOptions {
   showSeconds?: boolean;
 
   /**
-   * Suffix labels of the segment inputs.
+   * Shows a clear button while the model holds a time, writing `null` when pressed.
+   *
+   * @default
+   * false
+   */
+  clearable?: boolean;
+
+  /**
+   * Suffix labels of the segment inputs, and the clear button's title.
    */
   labels?: TimeLabels;
 
@@ -126,6 +147,10 @@ css`
     color: hsl(var(--ohne-muted-foreground));
   }
 
+  .ohne-time-inner > .ohne-time-clear {
+    color: inherit;
+  }
+
   /* One invalid segment marks the whole time, as one value. */
   :where(.ohne-time:has([aria-invalid='true'])) .ohne-number {
     --ohne-ring: var(--ohne-destructive);
@@ -138,6 +163,7 @@ css`
  * The model holds ms within a day, an integer between `0` (00:00:00) and `86399000` (23:59:59).
  * Segment bounds cascade from `min` and `max`, and a settled segment clamps the composed value into them.
  * A trailing hidden input carries `id`, `name`, and the composed value for label linkage and forms.
+ * A `null` model shows every segment empty; typing into one composes the time from `min`.
  *
  * @example
  * ```ts
@@ -145,34 +171,61 @@ css`
  * time(value, { min: '09:00', max: '17:00', onCommit: save })
  * ```
  */
-export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement {
+export function time(model: Ref<number | null>, options: TimeOptions = {}): HTMLElement {
   const disabled = (): boolean => options.disabled?.() ?? false;
   const showSeconds = options.showSeconds ?? true;
   const resolve = (bound: number | string | (() => number | string)): number =>
     parseTime(isFunction<() => number | string>(bound) ? bound() : bound);
   const min = computed(() => resolve(options.min ?? 0));
   const max = computed(() => resolve(options.max ?? 86399000));
-  const bounds = computed(() => timeSegmentBounds(model.value, min.value, max.value));
-  const hours = computed(() => Math.floor(model.value / 1000 / 3600));
-  const minutes = computed(() => Math.floor(((model.value / 1000) % 3600) / 60));
-  const seconds = computed(() => Math.floor((model.value / 1000) % 60));
+  const at = (): number => model.value ?? min.value;
+  const bounds = computed(() => timeSegmentBounds(at(), min.value, max.value));
+  const part = (read: (ms: number) => number) =>
+    computed(() => (isNull(model.value) ? null : read(model.value)));
+  const hours = part((ms) => Math.floor(ms / 1000 / 3600));
+  const minutes = part((ms) => Math.floor(((ms / 1000) % 3600) / 60));
+  const seconds = part((ms) => Math.floor((ms / 1000) % 60));
+  const hour = (): number => Math.floor(at() / 1000 / 3600);
+  const minute = (): number => Math.floor(((at() / 1000) % 3600) / 60);
+  const second = (): number => Math.floor((at() / 1000) % 60);
 
   const toModelValue = (hours: number, minutes: number, seconds: number): number =>
     composeTime(hours, minutes, seconds, 0, 86399000);
 
   const settle = (): void => {
+    if (isNull(model.value)) return;
     model.value = clamp(model.value, min.value, max.value);
     options.onCommit?.(model.value);
   };
 
-  const segment = (part: ComputedRef<number>, write: (value: number) => number): Ref<number> => ({
+  const segment = (
+    part: ComputedRef<number | null>,
+    write: (value: number) => number,
+  ): Ref<number | null> => ({
     get value() {
       return part.value;
     },
     set value(next) {
-      model.value = write(next);
+      if (!isNull(next)) model.value = write(next);
     },
   });
+
+  const resolveLabel = (label: string | (() => string) | undefined, fallback: string): string =>
+    (isFunction<() => string>(label) ? label() : label) ?? fallback;
+
+  const clear = (): Child =>
+    options.clearable === true && !isNull(model.value) && !disabled()
+      ? button(icon('x'), {
+          variant: 'ghost',
+          iconOnly: true,
+          size: -2,
+          class: 'ohne-time-clear',
+          ariaLabel: () => resolveLabel(options.labels?.clear, 'Clear'),
+          onClick: () => {
+            model.value = null;
+          },
+        })
+      : null;
 
   const root = h(
     'div',
@@ -184,7 +237,7 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
       'div',
       { class: 'ohne-time-inner' },
       numberInput(
-        segment(hours, (value) => toModelValue(value, minutes.value, seconds.value)),
+        segment(hours, (value) => toModelValue(value, minute(), second())),
         {
           disabled: options.disabled,
           id: options.id ? `${options.id}--hours` : undefined,
@@ -203,7 +256,7 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
       ),
       h('span', null, ':'),
       numberInput(
-        segment(minutes, (value) => toModelValue(hours.value, value, seconds.value)),
+        segment(minutes, (value) => toModelValue(hour(), value, second())),
         {
           disabled: options.disabled,
           id: options.id ? `${options.id}--minutes` : undefined,
@@ -223,7 +276,7 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
       showSeconds ? h('span', null, ':') : null,
       showSeconds
         ? numberInput(
-            segment(seconds, (value) => toModelValue(hours.value, minutes.value, value)),
+            segment(seconds, (value) => toModelValue(hour(), minute(), value)),
             {
               disabled: options.disabled,
               id: options.id ? `${options.id}--seconds` : undefined,
@@ -241,8 +294,14 @@ export function time(model: Ref<number>, options: TimeOptions = {}): HTMLElement
             },
           )
         : null,
+      clear,
     ),
-    h('input', { id: options.id, name: options.name, value: () => model.value, hidden: true }),
+    h('input', {
+      id: options.id,
+      name: options.name,
+      value: () => model.value ?? '',
+      hidden: true,
+    }),
   );
 
   if (options.id) {

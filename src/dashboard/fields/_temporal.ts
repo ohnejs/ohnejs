@@ -39,7 +39,7 @@ export function boundInstant(bound: unknown): number | undefined {
 }
 
 /**
- * The segment suffixes of a time input, live in the dashboard language.
+ * The segment suffixes and clear title of a time input, live in the dashboard language.
  */
 export function timeLabels(): TimeLabels {
   const t = useT();
@@ -47,5 +47,6 @@ export function timeLabels(): TimeLabels {
     hoursSuffix: () => t('dashboard.time.hours'),
     minutesSuffix: () => t('dashboard.time.minutes'),
     secondsSuffix: () => t('dashboard.time.seconds'),
+    clear: () => t('dashboard.clear'),
   };
 }

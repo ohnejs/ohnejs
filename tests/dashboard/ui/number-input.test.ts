@@ -27,6 +27,22 @@ const inputOf = (root: FakeElement): FakeElement & { value: string } =>
 const { numberInput } = await import('../../../src/dashboard/ui/number-input.ts');
 
 describe('numberInput', () => {
+  it('shows a `null` model empty, and steps from empty to `min`', () => {
+    const model = ref<number | null>(null);
+    const root = numberInput(model, { min: 8, max: 20 }) as unknown as FakeElement;
+    const input = inputOf(root);
+    flush();
+    strictEqual(input.value, '');
+    fire(input, 'blur');
+    flush();
+    strictEqual(input.value, '');
+    strictEqual(model.value, null);
+    fire(input, 'keydown', { key: 'ArrowUp', preventDefault() {}, stopPropagation() {} });
+    flush();
+    strictEqual(input.value, '8');
+    strictEqual(model.value, 8);
+  });
+
   it('follows a suffix getter', () => {
     const suffix = ref('h');
     const root = numberInput(ref(1), { suffix: () => suffix.value }) as unknown as FakeElement;

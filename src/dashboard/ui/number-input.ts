@@ -1,6 +1,7 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 
 import { numericInputMode } from '../../utils/html/numeric-input-mode.ts';
+import { isNull } from '../../utils/is/is-null.ts';
 import { isRealNumber } from '../../utils/is/is-real-number.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { clamp } from '../../utils/number/clamp.ts';
@@ -301,6 +302,7 @@ function leadingZeros(value: number, width: number): string {
  * Touch keyboards show a digit pad when `min` rules out negatives.
  * A settled value is clamped to the bounds, rounded to `decimalPlaces`, and zero-padded.
  * Writing the model reformats the display, unless the text already reads as the new value.
+ * A `null` model shows the input empty, its `placeholder` in view, and a step from empty starts at `min`.
  *
  * @example
  * ```ts
@@ -308,7 +310,10 @@ function leadingZeros(value: number, width: number): string {
  * numberInput(amount, { min: 0, showSteppers: true, suffix: 'px' })
  * ```
  */
-export function numberInput(model: Ref<number>, options: NumberInputOptions = {}): HTMLElement {
+export function numberInput(
+  model: Ref<number | null>,
+  options: NumberInputOptions = {},
+): HTMLElement {
   const decimalPlaces = options.decimalPlaces ?? 0;
   const padZeros = options.padZeros ?? 0;
   const increment = options.increment ?? 1;
@@ -317,9 +322,12 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
   const stringified = ref('');
   const typed = (): number => (stringified.value.trim() ? +stringified.value : NaN);
 
+  const shown = (value: number | null): string =>
+    isNull(value) ? '' : leadingZeros(value, padZeros);
+
   effect(() => {
     const value = model.value;
-    if (untracked(typed) !== value) stringified.value = leadingZeros(value, padZeros);
+    if (untracked(typed) !== value) stringified.value = shown(value);
   });
 
   const numericValue = (): number =>
@@ -347,6 +355,10 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
   };
 
   const add = (amount: number): void => {
+    if (stringified.value.trim() === '') {
+      stringified.value = shown(clamp(0, options.min ?? -Infinity, options.max ?? Infinity));
+      return;
+    }
     const value = numericValue();
     if (!isRealNumber(value)) return;
     // Steps are whole multiples of `increment`, so the exact sum has no more decimals than it or `value`.
@@ -375,7 +387,7 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
   });
   input.addEventListener('blur', () => {
     if (normalize()) maybeEmit(true);
-    else stringified.value = leadingZeros(model.value, padZeros);
+    else stringified.value = shown(model.value);
   });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
@@ -485,7 +497,8 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
       h(
         'button',
         {
-          disabled: () => !isUndefined(options.max) && model.value >= options.max,
+          disabled: () =>
+            !isUndefined(options.max) && !isNull(model.value) && model.value >= options.max,
           tabindex: '-1',
           type: 'button',
           class: 'ohne-raw',
@@ -496,7 +509,8 @@ export function numberInput(model: Ref<number>, options: NumberInputOptions = {}
       h(
         'button',
         {
-          disabled: () => !isUndefined(options.min) && model.value <= options.min,
+          disabled: () =>
+            !isUndefined(options.min) && !isNull(model.value) && model.value <= options.min,
           tabindex: '-1',
           type: 'button',
           class: 'ohne-raw',

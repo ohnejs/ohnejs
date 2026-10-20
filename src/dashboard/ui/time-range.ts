@@ -3,6 +3,7 @@ import type { TimeSpanValue } from './time-model.ts';
 import type { TimeLabels } from './time.ts';
 
 import { isFunction } from '../../utils/is/is-function.ts';
+import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { computed } from '../../utils/reactive/computed.ts';
 import { css } from '../render/css.ts';
@@ -85,7 +86,27 @@ export interface TimeRangeOptions {
   showSeconds?: boolean;
 
   /**
-   * Suffix labels of the segment inputs, forwarded to both `time` inputs.
+   * Whether the clear buttons render while a side holds a time.
+   *
+   * @default
+   * false
+   */
+  clearable?: boolean;
+
+  /**
+   * Whether the start input's clear button renders while it holds a time.
+   * Omitted, `clearable` decides.
+   */
+  clearableFrom?: boolean;
+
+  /**
+   * Whether the end input's clear button renders while it holds a time.
+   * Omitted, `clearable` decides.
+   */
+  clearableTo?: boolean;
+
+  /**
+   * Suffix labels of the segment inputs and the clear title, forwarded to both `time` inputs.
    */
   labels?: TimeLabels;
 
@@ -100,7 +121,7 @@ export interface TimeRangeOptions {
   /**
    * Called with the replaced `[from, to]` tuple in ms whenever a segment settles.
    */
-  onCommit?: (value: [number, number]) => void;
+  onCommit?: (value: [number | null, number | null]) => void;
 }
 
 css`
@@ -160,6 +181,7 @@ css`
  * Two stacked `time` inputs with mutual bounds.
  * The model holds a `[from, to]` tuple of ms within a day, each between `0` and `86399000`.
  * Each side's bounds derive from the other side, `min`/`max`, and `minRange`/`maxRange`.
+ * A `null` side shows empty and bounds the other side by nothing.
  * A side decorator visually connects the two inputs.
  *
  * @example
@@ -169,7 +191,7 @@ css`
  * ```
  */
 export function timeRange(
-  model: Ref<[number, number]>,
+  model: Ref<[number | null, number | null]>,
   options: TimeRangeOptions = {},
 ): HTMLElement {
   const resolveTime = (bound: number | string | (() => number | string)): number =>
@@ -180,11 +202,24 @@ export function timeRange(
   const max = computed(() => resolveTime(options.max ?? 86399000));
   const minRange = computed(() => resolveSpan(options.minRange ?? 0));
   const maxRange = computed(() => resolveSpan(options.maxRange ?? 86399000));
-  const bounds = computed(() =>
-    timeRangeBounds(model.value, min.value, max.value, minRange.value, maxRange.value),
-  );
+  const bounds = computed(() => {
+    const [from, to] = model.value;
+    const reach = timeRangeBounds(
+      [from ?? min.value, to ?? max.value],
+      min.value,
+      max.value,
+      isNull(from) || isNull(to) ? 0 : minRange.value,
+      isNull(from) || isNull(to) ? 86399000 : maxRange.value,
+    );
+    return {
+      minFrom: isNull(to) ? min.value : reach.minFrom,
+      maxFrom: isNull(to) ? max.value : reach.maxFrom,
+      minTo: isNull(from) ? min.value : reach.minTo,
+      maxTo: isNull(from) ? max.value : reach.maxTo,
+    };
+  });
 
-  const side = (index: 0 | 1): Ref<number> => ({
+  const side = (index: 0 | 1): Ref<number | null> => ({
     get value() {
       return model.value[index];
     },
@@ -207,6 +242,7 @@ export function timeRange(
       max: () => bounds.value.maxFrom,
       name: options.name ? `${options.name}--1` : undefined,
       showSeconds: options.showSeconds,
+      clearable: options.clearableFrom ?? options.clearable,
       onCommit: (value) => options.onCommit?.([value, model.value[1]]),
     }),
     time(side(1), {
@@ -217,6 +253,7 @@ export function timeRange(
       max: () => bounds.value.maxTo,
       name: options.name ? `${options.name}--2` : undefined,
       showSeconds: options.showSeconds,
+      clearable: options.clearableTo ?? options.clearable,
       onCommit: (value) => options.onCommit?.([model.value[0], value]),
     }),
     h('span', { class: 'ohne-time-range-decorator' }),
