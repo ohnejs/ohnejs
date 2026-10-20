@@ -82,10 +82,15 @@ describe('field', () => {
     const sieges = {
       window: field('range', { of: 'date' }),
       raid: field('range', { of: 'dateTime', open: true, nullable: true }),
+      bounty: field('range', { of: 'integer', currency: 'EUR', open: true }),
     };
     assertType<
       FormValue<typeof sieges>,
-      { window: { start: string; end: string }; raid: { start: number; end: number | null } | null }
+      {
+        window: { start: string; end: string };
+        raid: { start: number; end: number | null } | null;
+        bounty: { start: number; end: number | null };
+      }
     >(true);
   });
 

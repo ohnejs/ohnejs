@@ -8,7 +8,7 @@ import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
 import { seedMessages } from '../../_fake-messages.ts';
 import { fire } from '../../ui/_events.ts';
-import '../_controls.ts';
+import { type } from '../_controls.ts';
 
 await seedMessages(
   {
@@ -155,6 +155,129 @@ describe('rangeType control', () => {
   });
 });
 
+describe('rangeType numeric control', () => {
+  const inputs = (shown: ReturnType<typeof control>) =>
+    (shown.element as HTMLElement).querySelectorAll('input') as unknown as FakeElement[];
+  const value = (input: FakeElement): string => (input as unknown as { value: string }).value;
+
+  it('pairs an end control per end, each parsing and checking its own text', () => {
+    effectScope().run(() => {
+      const floors = control(rangeField({ of: 'integer', max: 99 }), undefined);
+      deepStrictEqual(floors.read(), {});
+      const [start, end] = inputs(floors);
+      type(start!, '1e1');
+      type(end!, '20');
+      deepStrictEqual(floors.read(), { value: { start: 10, end: 20 } });
+      strictEqual(floors.dirty(), true);
+      type(start!, '1.5');
+      deepStrictEqual(floors.read(), { errors: { start: 'dashboard.invalidInteger' } });
+      type(start!, '1');
+      type(end!, '100');
+      deepStrictEqual(floors.read(), { errors: { end: 'validation.maxValue' } });
+    });
+  });
+
+  it('stays pristine over a stored pair and asks for a missing end unless open', () => {
+    effectScope().run(() => {
+      const stored = { UUID: 'u1', start: 2.5, end: 4 };
+      const weight = control(rangeField({ of: 'number' }), stored);
+      deepStrictEqual(weight.read(), { value: { start: 2.5, end: 4 } });
+      strictEqual(weight.dirty(), false);
+      weight.restore!({ start: 2.5, end: null });
+      deepStrictEqual(weight.read(), { errors: { end: 'validation.required' } });
+      const open = control(rangeField({ of: 'number', open: true }), undefined);
+      open.restore!({ start: 3, end: null });
+      deepStrictEqual(open.read(), { value: { start: 3, end: null } });
+      const nullable = control(rangeField({ of: 'number' }, true), stored);
+      nullable.restore!(null);
+      deepStrictEqual(nullable.read(), { value: null });
+      nullable.restore!(undefined);
+      strictEqual(nullable.dirty(), false);
+    });
+  });
+
+  it('checks a changed span exactly, in minor units with a currency', () => {
+    effectScope().run(() => {
+      const weight = control(rangeField({ of: 'number', maxSpan: 0.2 }), undefined);
+      weight.restore!({ start: 0.1, end: 0.3 });
+      deepStrictEqual(weight.read(), { value: { start: 0.1, end: 0.3 } });
+      weight.restore!({ start: 0.3, end: 0.1 });
+      deepStrictEqual(weight.read(), { errors: { '': 'validation.invalidRange' } });
+      const price = control(
+        rangeField({ of: 'integer', currency: 'EUR', minSpan: 1000 }),
+        undefined,
+      );
+      const [start, end] = inputs(price);
+      type(start!, '5');
+      type(end!, '12.50');
+      deepStrictEqual(price.read(), { errors: { '': 'validation.minSpan' } });
+      type(end!, '15');
+      deepStrictEqual(price.read(), { value: { start: 500, end: 1500 } });
+    });
+  });
+
+  it('names each end after the label and marks the end that failed', () => {
+    effectScope().run(() => {
+      const floors = control(rangeField({ of: 'integer' }), undefined);
+      const [start, end] = inputs(floors);
+      strictEqual(
+        start!.getAttribute('aria-labelledby'),
+        'field-window-label field-window-input-start-name',
+      );
+      strictEqual((end as unknown as HTMLElement).id, 'field-window-input-end');
+      strictEqual(
+        end!.getAttribute('aria-labelledby'),
+        'field-window-label field-window-input-end-name',
+      );
+      strictEqual(floors.setErrors({ start: 'Too low', other: 'Elsewhere' }), 'Elsewhere');
+      flush();
+      strictEqual(floors.error(), 'Start: Too low');
+      strictEqual(start!.getAttribute('aria-invalid'), 'true');
+      strictEqual(end!.getAttribute('aria-invalid'), null);
+      floors.setErrors({ '': 'Too short' });
+      flush();
+      strictEqual(floors.error(), 'Too short');
+      strictEqual(start!.getAttribute('aria-invalid'), 'true');
+      strictEqual(end!.getAttribute('aria-invalid'), 'true');
+    });
+  });
+
+  it('puts a hidden two-thumb track over the inputs under `display: slider`', () => {
+    effectScope().run(() => {
+      const options = {
+        of: 'integer',
+        currency: 'EUR',
+        min: 0,
+        max: 10000,
+        step: 100,
+        minSpan: 500,
+        display: 'slider',
+      };
+      const price = control(rangeField(options), { start: 1000, end: 2000 });
+      flush();
+      const [from, to, start, end] = inputs(price);
+      strictEqual(from!.getAttribute('aria-hidden'), 'true');
+      strictEqual((to as unknown as HTMLElement).tabIndex, -1);
+      (to as unknown as { value: string }).value = '1200';
+      fire(to!, 'input');
+      flush();
+      strictEqual(value(start!), '10.00');
+      strictEqual(value(end!), '15.00');
+      deepStrictEqual(price.read(), { value: { start: 1000, end: 1500 } });
+      (to as unknown as { value: string }).value = '1100';
+      fire(to!, 'input');
+      flush();
+      strictEqual(value(to!), '1500');
+      type(start!, '3');
+      strictEqual(value(from!), '300');
+      strictEqual(
+        inputs(control(rangeField({ of: 'integer', display: 'slider' }), undefined)).length,
+        2,
+      );
+    });
+  });
+});
+
 describe('rangeType cell and summary', () => {
   const cell = (field: DashboardField, value: unknown) =>
     (
@@ -173,6 +296,20 @@ describe('rangeType cell and summary', () => {
     ok(/ - /.test(shown.textContent ?? ''));
     const open = rangeField({ of: 'dateTime', open: true });
     ok(rangeType.summary!({ start: 0, end: null }, open).startsWith('From '));
+  });
+
+  it('reads numeric ends in their notation, the unit once at the end', () => {
+    const weight = rangeField({ of: 'number', suffix: 'kg' });
+    strictEqual(rangeType.summary!({ start: 2.5, end: 4 }, weight), '2.5 - 4 kg');
+    strictEqual(
+      (cell(weight, { start: 2.5, end: 4 }) as FakeElement).getAttribute('title'),
+      '2.5 - 4 kg',
+    );
+    const open = rangeField({ of: 'integer', open: true });
+    strictEqual(rangeType.summary!({ start: 10, end: null }, open), 'From 10');
+    const price = rangeField({ of: 'integer', currency: 'EUR' });
+    strictEqual(rangeType.summary!({ start: 500, end: 1250 }, price), '€5.00 - €12.50');
+    strictEqual(rangeType.summary!({ start: 1.5, end: 2 }, rangeField({ of: 'integer' })), '');
   });
 
   it('dims a malformed end as raw text', () => {

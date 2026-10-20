@@ -100,6 +100,11 @@ describe('specField', () => {
     const open = specField('open', field('range', { of: 'dateTime', nullable: true }));
     strictEqual(open.required, false);
     strictEqual(open.options?.default, null);
+    const price = specField(
+      'price',
+      field('range', { of: 'integer', display: 'slider', min: 0, max: 9 }),
+    );
+    deepStrictEqual(price.options, { of: 'integer', display: 'slider', min: 0, max: 9 });
   });
 
   it('splits an expandable description and fills its toggle labels', () => {

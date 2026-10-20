@@ -572,9 +572,9 @@ export interface RepeaterFieldOptions extends ObjectFieldOptions {
  */
 export interface RangeFieldOptions {
   /**
-   * The kind of both ends: a `date` day, a `dateTime` instant, or a `time` of day.
+   * The kind of both ends: a `date` day, a `dateTime` instant, a `time` of day, an `integer` or a `number`.
    */
-  of: 'date' | 'dateTime' | 'time';
+  of: 'date' | 'dateTime' | 'time' | 'integer' | 'number';
 
   /**
    * The earliest legal start, in the form the `of` type takes for its own `min`.
@@ -587,14 +587,39 @@ export interface RangeFieldOptions {
   max?: number | string;
 
   /**
-   * The shortest legal span from start to end, as milliseconds or text like `'1 day'`.
+   * The shortest legal span from start to end.
+   * A temporal range takes milliseconds or text like `'1 day'`, a numeric one a number.
    */
   minSpan?: number | string;
 
   /**
-   * The longest legal span from start to end, as milliseconds or text like `'2 weeks'`.
+   * The longest legal span from start to end.
+   * A temporal range takes milliseconds or text like `'2 weeks'`, a numeric one a number.
    */
   maxSpan?: number | string;
+
+  /**
+   * The grid both ends of a numeric range lie on, as the `of` type takes its own `step`.
+   */
+  step?: number;
+
+  /**
+   * The ISO 4217 currency an `integer` range counts in, as minor units, as the `integer` type takes it.
+   */
+  currency?: CurrencyCode;
+
+  /**
+   * A fixed unit label shown after a numeric range, like `'kg'` or a message key.
+   */
+  suffix?: Text;
+
+  /**
+   * The control of a numeric range: two inputs, or the inputs under a two-thumb track from `min` to `max`.
+   *
+   * @default
+   * 'input'
+   */
+  display?: 'input' | 'slider';
 
   /**
    * Whether the end may stay `null`, for a range that has begun but not ended.
@@ -816,7 +841,7 @@ type Substitute<V, O> = V extends ChoiceValue
         : V;
 
 type RangeOf<O> = O extends { readonly of: infer K }
-  ? (K extends 'dateTime' ? number : string) extends infer T
+  ? (K extends 'date' | 'time' ? string : number) extends infer T
     ? { start: T; end: O extends { readonly open: true } ? T | null : T }
     : never
   : never;
