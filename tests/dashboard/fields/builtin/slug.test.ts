@@ -224,6 +224,23 @@ describe('slugType in a form', () => {
   });
 });
 
+describe('slugType editor', () => {
+  it('clears a nullable slug to `null`, and refuses an empty required one', () => {
+    for (const nullable of [true, false]) {
+      const commits: unknown[] = [];
+      const input = slugType.editor!({
+        field: field({}, nullable),
+        value: () => 'arthas',
+        commit: (next: unknown) => void commits.push(next),
+        cancel() {},
+      } as never) as unknown as FakeElement & { value: string };
+      input.value = '';
+      fire(input, 'keydown', { key: 'Enter', preventDefault() {} });
+      deepStrictEqual(commits, nullable ? [null] : []);
+    }
+  });
+});
+
 describe('slugType filter', () => {
   const filterInput = (nested: boolean, operator: string, initial: string) => {
     const value = ref(initial);

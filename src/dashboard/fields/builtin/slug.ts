@@ -43,6 +43,7 @@ export const slugType: FieldType<SlugFieldOptions> = {
       initial: isNullish(current) ? '' : String(current as string),
       mono: true,
       commit(text) {
+        if (field.nullable && text.trim() === '') return commit(null);
         const canonical = canonicalSlug(text, field.options);
         return canonical === '' ? false : commit(canonical);
       },
