@@ -1,4 +1,5 @@
 import type { CollectionName } from '../collections/known-collections.ts';
+import type { LocaleCode } from '../collections/known-locales.ts';
 import type { Transaction } from '../database/adapter.ts';
 import type { LogicalType } from '../database/dialect.ts';
 import type { Message } from '../messages/known-messages.ts';
@@ -131,6 +132,12 @@ export interface FieldWriteContext<
    * Whether the record is being created or updated.
    */
   operation: FieldOperation;
+
+  /**
+   * The locale the write stores translatable values in: the explicit `.locale()`, else the default.
+   * Each `locales` entry of a create runs at its own locale; a shared field lands in every locale.
+   */
+  locale: LocaleCode;
 
   /**
    * The record's raw input, frozen: sibling values as the caller passed them, never a sanitized read.

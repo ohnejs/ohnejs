@@ -9,6 +9,7 @@ import { useBlocks } from '../blocks/use-blocks.ts';
 import { useCollections } from '../collections/use-collections.ts';
 import { locateError, ohneError } from '../error/ohne-error.ts';
 import { resolveMessage } from '../http/translate.ts';
+import { effectiveLocale } from './locale.ts';
 import { blockQueryMetadata, queryMetadata } from './metadata.ts';
 import { prefixErrors } from './pipeline/prefix-errors.ts';
 import { isValidColumn } from './pipeline/preflight.ts';
@@ -130,6 +131,7 @@ async function failuresOf(
   const ctx = {
     operation: 'create',
     collection: owner.collection,
+    locale: effectiveLocale(null),
     tx: owner.tx,
     path,
     ancestors: [],

@@ -1,4 +1,5 @@
 import type { CollectionName } from '../../collections/known-collections.ts';
+import type { LocaleCode } from '../../collections/known-locales.ts';
 import type { Transaction } from '../../database/adapter.ts';
 import type { LogicalType } from '../../database/dialect.ts';
 import type { FieldOperation, FieldWriteContext } from '../../fields/context.ts';
@@ -43,6 +44,11 @@ export interface RecordWriteContext {
   operation: FieldOperation;
 
   /**
+   * The locale the write stores translatable values in, as `FieldWriteContext.locale` describes.
+   */
+  locale: LocaleCode;
+
+  /**
    * The open write transaction, so a callback reads or writes in the same atomic bracket.
    */
   tx: Transaction;
@@ -56,7 +62,7 @@ declare module 'ohnejs' {
      * A create with `locales` fires it once more per locale, as an `update` carrying that locale's values.
      * One site covers every caller, so a timestamps, tenant, or audit layer stamps input everywhere.
      * Return a replacement record, or mutate the passed object in place and return nothing.
-     * The `ctx` carries the `collection`, the `operation`, and the open `tx`.
+     * The `ctx` carries the `collection`, the `operation`, the `locale`, and the open `tx`.
      */
     'record:before-change': (
       input: Record<string, unknown>,
@@ -79,6 +85,11 @@ export interface ScopeContext {
    * The owning collection, by name.
    */
   collection: string;
+
+  /**
+   * The locale the write stores translatable values in.
+   */
+  locale: string;
 
   /**
    * The open write transaction.
@@ -537,11 +548,12 @@ function mergeOutput(scope: ProcessedScope, errors: FieldErrors, output: FieldOu
 export async function runRecord(
   collectionMeta: CollectionQueryMeta,
   input: Readonly<Record<string, unknown>>,
-  options: { operation: FieldOperation; tx: Transaction; reach?: LinkReach },
+  options: { operation: FieldOperation; locale: string; tx: Transaction; reach?: LinkReach },
 ): Promise<RunRecordResult> {
   const ctx: ScopeContext = {
     operation: options.operation,
     collection: collectionMeta.collection,
+    locale: options.locale,
     tx: options.tx,
     path: '',
     ancestors: [],
@@ -550,6 +562,7 @@ export async function runRecord(
   const changeCtx: RecordWriteContext = {
     collection: collectionMeta.collection as CollectionName,
     operation: options.operation,
+    locale: options.locale as LocaleCode,
     tx: options.tx,
   };
   const callbacks = useHooks().get('record:before-change');

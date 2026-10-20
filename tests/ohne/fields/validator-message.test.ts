@@ -95,6 +95,7 @@ describe('validator message at runtime', () => {
       { title: 'bad' },
       {
         operation: 'create',
+        locale: 'en',
         tx: {} as Transaction,
       },
     );

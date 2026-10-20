@@ -159,7 +159,7 @@ useCollections().register('PMalformed', {
 const tx = {} as Transaction;
 
 async function create(input: Record<string, unknown>) {
-  return runRecord(queryMetadata('PPost'), input, { operation: 'create', tx });
+  return runRecord(queryMetadata('PPost'), input, { operation: 'create', locale: 'en', tx });
 }
 
 const full = {
@@ -228,7 +228,7 @@ describe('runRecord (create)', () => {
     const updated = await runRecord(
       queryMetadata('PPost'),
       { title: undefined },
-      { operation: 'update', tx },
+      { operation: 'update', locale: 'en', tx },
     );
     ok(updated.ok);
     deepStrictEqual(updated.scope.columns, {});
@@ -240,7 +240,11 @@ describe('runRecord (create)', () => {
     ok(result.ok);
     ok(!Object.isFrozen(input));
     strictEqual(input.title, 'Hello');
-    const seen = await runRecord(queryMetadata('PFrozen'), { a: 'x' }, { operation: 'create', tx });
+    const seen = await runRecord(
+      queryMetadata('PFrozen'),
+      { a: 'x' },
+      { operation: 'create', locale: 'en', tx },
+    );
     ok(seen.ok);
   });
 
@@ -287,7 +291,7 @@ describe('runRecord (create)', () => {
     const result = await runRecord(
       queryMetadata('PList'),
       { items: [{ code: 'a' }, { code: 'a' }] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(!result.ok);
     strictEqual(result.errors['items[1].code'], 'validation.notUnique');
@@ -297,7 +301,7 @@ describe('runRecord (create)', () => {
     const result = await runRecord(
       queryMetadata('PGlobal'),
       { items: [{ code: 'a' }, { code: 'b' }] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(result.ok);
     deepStrictEqual(
@@ -338,6 +342,7 @@ describe('runRecord (create)', () => {
       { title: 'Edit' },
       {
         operation: 'update',
+        locale: 'en',
         tx,
       },
     );
@@ -353,7 +358,7 @@ describe('runRecord list emptiness', () => {
     const blocky = await runRecord(
       queryMetadata('PBlocky'),
       { content: [] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(blocky.ok);
   });
@@ -362,7 +367,7 @@ describe('runRecord list emptiness', () => {
     const result = await runRecord(
       queryMetadata('PStrict'),
       { tags: [], sections: [], content: [] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(!result.ok);
     strictEqual(result.errors.tags, 'validation.emptyValue');
@@ -374,7 +379,7 @@ describe('runRecord list emptiness', () => {
     const result = await runRecord(
       queryMetadata('PGatedList'),
       { kind: 'lite' },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(result.ok);
     deepStrictEqual(result.scope.children[0].items, []);
@@ -384,7 +389,7 @@ describe('runRecord list emptiness', () => {
     const result = await runRecord(
       queryMetadata('PGatedList'),
       { kind: 'lite', items: [] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(result.ok);
     deepStrictEqual(result.scope.children[0].items, []);
@@ -394,14 +399,18 @@ describe('runRecord list emptiness', () => {
     const result = await runRecord(
       queryMetadata('PGatedList'),
       { kind: 'full', items: [] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(!result.ok);
     strictEqual(result.errors.items, 'validation.emptyValue');
   });
 
   it('requires a list that forbids empty when a create omits it, per kind', async () => {
-    const result = await runRecord(queryMetadata('PStrict'), {}, { operation: 'create', tx });
+    const result = await runRecord(
+      queryMetadata('PStrict'),
+      {},
+      { operation: 'create', locale: 'en', tx },
+    );
     ok(!result.ok);
     deepStrictEqual(
       { ...result.errors },
@@ -417,14 +426,18 @@ describe('runRecord list emptiness', () => {
     const result = await runRecord(
       queryMetadata('PGatedList'),
       { kind: 'full' },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(!result.ok);
     strictEqual(result.errors.items, 'validation.required');
   });
 
   it('requires a multiSelect with a `min` when a create omits it', async () => {
-    const result = await runRecord(queryMetadata('PChoices'), {}, { operation: 'create', tx });
+    const result = await runRecord(
+      queryMetadata('PChoices'),
+      {},
+      { operation: 'create', locale: 'en', tx },
+    );
     ok(!result.ok);
     deepStrictEqual({ ...result.errors }, { tags: 'validation.required' });
   });
@@ -433,7 +446,7 @@ describe('runRecord list emptiness', () => {
     const result = await runRecord(
       queryMetadata('PChoices'),
       { tags: ['a'], gated: ['b'] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(result.ok);
     deepStrictEqual(result.scope.columns.gated, []);
@@ -445,9 +458,13 @@ describe('runRecord list emptiness', () => {
     const sent = await runRecord(
       meta,
       { tags: ['a'], gated: ['b'], gatedLoose: ['c'] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
-    const omitted = await runRecord(meta, { tags: ['a'] }, { operation: 'create', tx });
+    const omitted = await runRecord(
+      meta,
+      { tags: ['a'] },
+      { operation: 'create', locale: 'en', tx },
+    );
     ok(sent.ok);
     ok(omitted.ok);
     deepStrictEqual(sent.scope.columns.gated, []);
@@ -460,7 +477,7 @@ describe('runRecord list emptiness', () => {
     const result = await runRecord(
       queryMetadata('PChoices'),
       { kind: 'full', tags: [], gated: [] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(!result.ok);
     deepStrictEqual(result.errors.tags, { key: 'validation.minItems', params: { min: 1 } });
@@ -471,7 +488,7 @@ describe('runRecord list emptiness', () => {
     const result = await runRecord(
       queryMetadata('PDeclaredEmpty'),
       {},
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(!result.ok);
     deepStrictEqual(result.errors.tags, { key: 'validation.minItems', params: { min: 1 } });
@@ -483,7 +500,7 @@ describe('runRecord nested items that omit a required list', () => {
     const result = await runRecord(
       queryMetadata('PNestedStrict'),
       { sections: [{ links: undefined }] },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(!result.ok);
     deepStrictEqual({ ...result.errors }, { 'sections[0].links': 'validation.required' });
@@ -492,7 +509,11 @@ describe('runRecord nested items that omit a required list', () => {
 
 describe('runRecord declared composite defaults', () => {
   it("runs each field's own tiers over its declared default", async () => {
-    const result = await runRecord(queryMetadata('PDefaults'), {}, { operation: 'create', tx });
+    const result = await runRecord(
+      queryMetadata('PDefaults'),
+      {},
+      { operation: 'create', locale: 'en', tx },
+    );
     ok(!result.ok);
     deepStrictEqual(result.errors.tags, { key: 'validation.maxItems', params: { max: 1 } });
     strictEqual(result.errors.meta, 'object-validator-ran');
@@ -503,7 +524,7 @@ describe('runRecord declared composite defaults', () => {
     const result = await runRecord(
       queryMetadata('PDefaults'),
       { tags: ['t1'], meta: null },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(result.ok);
     const sections = result.scope.children.find((child) => child.path === 'sections');
@@ -511,7 +532,11 @@ describe('runRecord declared composite defaults', () => {
   });
 
   it('rejects a declared default of the wrong shape at the field', async () => {
-    const result = await runRecord(queryMetadata('PMalformed'), {}, { operation: 'create', tx });
+    const result = await runRecord(
+      queryMetadata('PMalformed'),
+      {},
+      { operation: 'create', locale: 'en', tx },
+    );
     ok(!result.ok);
     strictEqual(result.errors.tags, 'validation.invalidValue');
   });
@@ -519,7 +544,7 @@ describe('runRecord declared composite defaults', () => {
 
 describe('runRecord (blocks)', () => {
   async function createBlocky(input: Record<string, unknown>) {
-    return runRecord(queryMetadata('PBlocky'), input, { operation: 'create', tx });
+    return runRecord(queryMetadata('PBlocky'), input, { operation: 'create', locale: 'en', tx });
   }
 
   it('processes blocks items into tagged child scopes, in input order', async () => {
@@ -595,7 +620,7 @@ describe('runRecord nested item identity', () => {
     const result = await runRecord(
       queryMetadata('PNested'),
       { sections: [{ items: [{ label: 'x' }, { UUID: 5, label: 'y' }] }] },
-      { operation: 'update', tx },
+      { operation: 'update', locale: 'en', tx },
     );
     ok(!result.ok);
     deepStrictEqual(Object.keys(result.errors), ['sections[0].items[1].UUID']);
@@ -639,7 +664,7 @@ describe('runRecord link provenance', () => {
         sections: [{ who: 'u2' }],
         content: [{ block: 'PLinkBlock', fields: { who: 'u3' } }],
       },
-      { operation: 'create', tx },
+      { operation: 'create', locale: 'en', tx },
     );
     ok(result.ok);
     const refs = result.scope.refs
@@ -664,7 +689,11 @@ describe('runRecord link provenance', () => {
       hook('record:before-change', (input) => {
         input.pick = 'u-hook';
       });
-      const result = await runRecord(queryMetadata('PLinks'), {}, { operation: 'create', tx });
+      const result = await runRecord(
+        queryMetadata('PLinks'),
+        {},
+        { operation: 'create', locale: 'en', tx },
+      );
       ok(result.ok);
       const pick = result.scope.refs.find((ref) => ref.path === 'pick');
       strictEqual(pick?.provided, true);

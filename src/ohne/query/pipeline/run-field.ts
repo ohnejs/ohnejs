@@ -1,4 +1,5 @@
 import type { CollectionName } from '../../collections/known-collections.ts';
+import type { LocaleCode } from '../../collections/known-locales.ts';
 import type { LogicalType } from '../../database/dialect.ts';
 import type {
   FieldSanitizer,
@@ -42,6 +43,7 @@ export function writeContext(
     options: (meta.options ?? {}) as FieldWriteContext['options'],
     collection: ctx.collection as CollectionName,
     operation: ctx.operation,
+    locale: ctx.locale as LocaleCode,
     input,
     tx: ctx.tx,
     reachable: ctx.reachable,

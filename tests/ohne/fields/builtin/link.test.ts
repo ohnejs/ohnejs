@@ -33,7 +33,7 @@ async function create(input: Record<string, unknown>) {
   return runRecord(
     queryMetadata('LKPost'),
     { target: { url: '/t' }, ...input },
-    { operation: 'create', tx },
+    { operation: 'create', locale: 'en', tx },
   );
 }
 

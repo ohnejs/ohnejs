@@ -94,6 +94,7 @@ export async function planCompanion(
   const ctx = {
     operation: 'update' as const,
     collection: meta.collection,
+    locale,
     tx,
     path: '',
     ancestors: [],

@@ -290,7 +290,7 @@ export async function attemptUpdate(
   const reach: LinkReach | undefined = isNull(linkResolver)
     ? undefined
     : { resolve: linkResolver, locale: code };
-  const processed = await runRecord(meta, input, { operation: 'update', tx, reach });
+  const processed = await runRecord(meta, input, { operation: 'update', locale: code, tx, reach });
   if (!processed.ok) return { ok: false, errors: processed.errors };
   const scope = processed.scope;
 
@@ -299,6 +299,7 @@ export async function attemptUpdate(
     const errors = await applyHook('record:validate', {} as FieldErrors, scope, {
       collection: meta.collection as CollectionName,
       operation: 'update',
+      locale: code as LocaleCode,
       tx,
     });
     if (!isEmpty(errors)) return { ok: false, errors };

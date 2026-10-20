@@ -70,8 +70,8 @@ declare module 'ohnejs' {
      * The threaded value is the errors so far: spread it to add keys, or return your own to replace.
      * A non-empty result aborts the write as `{ ok: false, errors }`, and nothing is written.
      * Returning `undefined` or an empty map lets the write proceed.
-     * A create with `locales` fires it once more per locale, as an `update`.
-     * The `ctx` carries the `collection`, the `operation`, and the open `tx`.
+     * A create with `locales` fires it once more per locale, as an `update` at that locale.
+     * The `ctx` carries the `collection`, the `operation`, the `locale`, and the open `tx`.
      */
     'record:validate': (
       errors: FieldErrors,
@@ -221,7 +221,7 @@ async function attemptCreate(
   const reach: LinkReach | undefined = isNull(linkResolver)
     ? undefined
     : { resolve: linkResolver, locale: code };
-  const processed = await runRecord(meta, input, { operation: 'create', tx, reach });
+  const processed = await runRecord(meta, input, { operation: 'create', locale: code, tx, reach });
   if (!processed.ok) return { ok: false, errors: processed.errors };
   const scope = processed.scope;
 
@@ -230,6 +230,7 @@ async function attemptCreate(
     const errors = await applyHook('record:validate', {} as FieldErrors, scope, {
       collection: meta.collection as CollectionName,
       operation: 'create',
+      locale: code as LocaleCode,
       tx,
     });
     if (!isEmpty(errors)) return { ok: false, errors };
