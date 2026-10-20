@@ -171,6 +171,7 @@ css`
  * The model follows every move, rounded to the grid's decimals, and writing it moves the thumb.
  * An `undefined` model rests the thumb at `min`, with an empty track.
  * The filled part of the track ends under the thumb's center.
+ * A touch the browser takes as a vertical scroll puts the value back where it was.
  * The thumb fills on hover and, from press to release, wears a halo.
  *
  * @example
@@ -195,7 +196,11 @@ export function slider(model: Ref<number | undefined>, options: SliderOptions): 
       model.value = roundTo(Number(input.value), places);
     },
     onPointerdown: () => {
-      if (options.disabled?.() !== true) markDrag(input);
+      if (options.disabled?.() === true) return;
+      const before = model.value;
+      markDrag(input, undefined, () => {
+        model.value = before;
+      });
     },
   }) as HTMLInputElement;
   const root = h(
@@ -229,15 +234,21 @@ export function slider(model: Ref<number | undefined>, options: SliderOptions): 
 /**
  * Marks `input` as dragged from now until the pointer is released anywhere.
  * `onMove` follows every pointer move until then.
+ * `onCancel` runs when the browser cancels the pointer, as it does when it takes the gesture as a scroll.
  *
  * @example
  * ```ts
  * markDrag(input) // input[data-dragging] until pointerup
  * ```
  */
-export function markDrag(input: HTMLElement, onMove?: (event: PointerEvent) => void): void {
+export function markDrag(
+  input: HTMLElement,
+  onMove?: (event: PointerEvent) => void,
+  onCancel?: () => void,
+): void {
   input.setAttribute('data-dragging', 'true');
-  const release = (): void => {
+  const release = (event: Event): void => {
+    if (event.type === 'pointercancel') onCancel?.();
     input.removeAttribute('data-dragging');
     if (onMove) window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', release);

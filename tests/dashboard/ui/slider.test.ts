@@ -99,6 +99,22 @@ describe('slider', () => {
     }
   });
 
+  it('restores the value when the browser takes the gesture as a scroll', () => {
+    const model = ref<number | undefined>(1);
+    const range = rangeOf(slider(model, { min: 0, max: 5 }));
+    fire(range, 'pointerdown');
+    range.value = '4';
+    fire(range, 'input');
+    strictEqual(model.value, 4);
+    release('pointercancel');
+    strictEqual(model.value, 1);
+    fire(range, 'pointerdown');
+    range.value = '3';
+    fire(range, 'input');
+    release('pointerup');
+    strictEqual(model.value, 3);
+  });
+
   it('marks no drag while disabled', () => {
     const range = rangeOf(slider(ref(1), { min: 0, max: 5, disabled: () => true }));
     fire(range, 'pointerdown');

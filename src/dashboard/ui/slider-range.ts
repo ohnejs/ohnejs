@@ -99,6 +99,7 @@ css`
  * Each thumb is a native `input type="range"`, so keyboard and `role=slider` come built in.
  * A thumb stops at the gap limits instead of crossing or pushing the other one.
  * A press on the track moves the nearer thumb there and drags it until release.
+ * A touch the browser takes as a vertical scroll puts both ends back where they were.
  * An `undefined` start rests at `min` and an `undefined` end at `max`.
  * The last thumb moved sits on top, unless the thumbs meet at an end of the track.
  *
@@ -148,7 +149,7 @@ export function sliderRange(model: Ref<Ends>, options: SliderRangeOptions): HTML
         if (off()) return;
         raised = end;
         stack();
-        markDrag(input);
+        markDrag(input, undefined, restore(model.value));
       },
     }) as HTMLInputElement;
     return input;
@@ -164,6 +165,9 @@ export function sliderRange(model: Ref<Ends>, options: SliderRangeOptions): HTML
     const top = start === end && start === max ? 0 : start === end && end === min ? 1 : raised;
     thumbs[top].setAttribute('data-raised', 'true');
     thumbs[top === 0 ? 1 : 0].removeAttribute('data-raised');
+  };
+  const restore = (before: Ends) => (): void => {
+    model.value = before;
   };
   const pick = (x: number): number => {
     const box = root.getBoundingClientRect();
@@ -185,8 +189,9 @@ export function sliderRange(model: Ref<Ends>, options: SliderRangeOptions): HTML
           Math.abs(value - start) < Math.abs(value - end) || (start === end && value < start)
             ? 0
             : 1;
+        const cancel = restore(model.value);
         move(nearer, value);
-        markDrag(thumbs[nearer], (drag) => move(nearer, pick(drag.clientX)));
+        markDrag(thumbs[nearer], (drag) => move(nearer, pick(drag.clientX)), cancel);
       },
     },
     ...thumbs,

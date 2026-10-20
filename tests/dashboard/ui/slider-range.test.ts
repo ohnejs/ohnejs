@@ -131,6 +131,21 @@ describe('sliderRange', () => {
     deepStrictEqual(model.value, [60, 60]);
   });
 
+  it('restores both ends when the browser takes a press as a scroll', () => {
+    const { model, root, start } = mount([20, 60]);
+    fire(root, 'pointerdown', { target: root, clientX: 35 });
+    flush();
+    deepStrictEqual(model.value, [30, 60]);
+    dispatch('pointercancel');
+    flush();
+    deepStrictEqual(model.value, [20, 60]);
+    fire(start, 'pointerdown');
+    slide(start, 40);
+    dispatch('pointercancel');
+    flush();
+    deepStrictEqual(model.value, [20, 60]);
+  });
+
   it('picks a thumb by side when both share a value', () => {
     const { model, root } = mount([50, 50]);
     fire(root, 'pointerdown', { target: root, clientX: 75 });
