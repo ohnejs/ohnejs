@@ -32,6 +32,7 @@ import { resolveFieldSearch } from '../fields/field-search.ts';
 import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
 import { validateSingleton } from './validate-singleton.ts';
+import { validateTableOrder } from './validate-table-order.ts';
 import { validateBlockWhen, validateWhen } from './validate-when.ts';
 
 /**
@@ -267,6 +268,7 @@ const ACCEPTED_VALUES: Readonly<Record<OperatorValueKind, string>> = {
  * It therefore partitions fields exactly as the desired schema does.
  * Building validates every declared `when` against the field graph, so a bad condition throws here.
  * A singleton's fields must each land a value without input, so a bare required field throws here too.
+ * A declared `dashboard.table.order` must sort by sortable fields, or it throws here as well.
  * An unknown collection throws.
  *
  * @example
@@ -283,6 +285,7 @@ export function queryMetadata(collection: string): CollectionQueryMeta {
   const built = buildCollectionMeta(meta);
   validateWhen(built);
   validateSingleton(built, Object.keys(meta.collection.fields));
+  validateTableOrder(built, meta.collection.dashboard?.table?.order);
   cache.set(collection, built);
   return built;
 }

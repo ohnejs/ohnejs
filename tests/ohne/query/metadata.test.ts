@@ -721,6 +721,48 @@ describe('queryMetadata singletons', () => {
   });
 });
 
+describe('queryMetadata table order', () => {
+  const register = (name: string, fields: Record<string, FieldInstance>, order: string[]) =>
+    useCollections().register(name, {
+      name,
+      collection: { fields, dashboard: { table: { order } } },
+    });
+
+  it('accepts a column, a reference, a system field, and a composite with a sort key', () => {
+    register(
+      'QOrderOpen',
+      {
+        title: field('text'),
+        owner: field('record', { collection: 'QUsers' }),
+        window: field('range', { of: 'integer' }),
+      },
+      ['title', '-owner', 'window', '-_updatedAt', 'UUID'],
+    );
+    ok(queryMetadata('QOrderOpen'));
+  });
+
+  for (const [type, instance] of [
+    ['json', field('json')],
+    ['records', field('records', { collection: 'QTags' })],
+    ['repeater', field('repeater', { fields: { url: field('text') } })],
+    ['object', field('object', { fields: { city: field('text') } })],
+    ['blocks', field('blocks', { allow: ['QHero'] })],
+  ] as const) {
+    it(`rejects a \`${type}\` field, which the table cannot sort by`, () => {
+      const name = `QOrder${type}`;
+      register(name, { title: field('text'), held: instance as FieldInstance }, ['title', '-held']);
+      throws(
+        () => queryMetadata(name),
+        (error: unknown) => {
+          ok(isOhneError(error));
+          strictEqual(error.title, '`dashboard.table.order` names unsortable field `held`');
+          return true;
+        },
+      );
+    });
+  }
+});
+
 describe('queryMetadata search flag', () => {
   useFields().register('qQuiet', {
     name: 'qQuiet' as FieldTypeName,

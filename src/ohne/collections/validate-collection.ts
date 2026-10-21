@@ -5,11 +5,13 @@ import {
   deepEqual,
   didYouMean,
   fillRoute,
+  hasKey,
   isArray,
   isBoolean,
   isCSSLength,
   isEmpty,
   isFunction,
+  isMessage,
   isNull,
   isPlainObject,
   isString,
@@ -32,6 +34,7 @@ const SAMPLE_UUID = '00000000-0000-0000-0000-000000000000';
 /**
  * Validates a collection definition.
  *
+ * - `label` must be a message key, a plain string, or a `{ key, params }` object.
  * - Field names must be camelCase, non-reserved, and case-insensitively unique.
  * - Each composite index must cover only declared fields, at least one, with no repeat.
  * - No two composite indexes may be identical.
@@ -46,6 +49,8 @@ const SAMPLE_UUID = '00000000-0000-0000-0000-000000000000';
  * - `dashboard.recordPath` must be a dashboard path holding `[uuid]` and no other param.
  * - `dashboard.table.columns` must be a non-empty list naming distinct, readable fields.
  * - A column is a declared field, `UUID`, `_updatedAt`, or `_translations` beside a translatable field.
+ * - `dashboard.table.order` must be a non-empty list naming distinct, readable fields, `-` for descending.
+ * - An order entry is a declared field, `UUID`, or `_updatedAt`; the boot pass refuses an unsortable one.
  * - `dashboard.layout` must name declared fields, each once, in the node grammar `validateLayout` sets.
  * - `dashboard.search` must be `false` or `{ via: false }`.
  * - A known collection name sharpens the messages; omit it before the name is known.
@@ -54,6 +59,7 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   definition: CollectionDefinition<TFields>,
   collection?: string,
 ): void {
+  validateLabel(definition.label, collection);
   const fieldNames = Object.keys(definition.fields);
   for (const name of fieldNames) validateFieldName(name, collection);
   validateUniqueNames(fieldNames, 'field', collection);
@@ -63,6 +69,20 @@ export function validateCollectionDefinition<TFields extends Record<string, Fiel
   validateCopyTranslation(definition.copyTranslation, definition.fields, collection);
   validateDuplicate(definition.duplicate, definition.singleton, collection);
   validateDashboard(definition.dashboard, definition.fields, collection);
+}
+
+/**
+ * Rejects a declared `label` that is not a message.
+ */
+function validateLabel(label: unknown, collection?: string): void {
+  if (isUndefined(label) || isMessage(label)) return;
+  const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
+  throw ohneError({
+    title: 'Invalid `label` declaration',
+    body: [
+      `The \`label\` option${scope} must be a message key, a plain string, or a \`{ key, params }\` object.`,
+    ],
+  });
 }
 
 const DASHBOARD_KEYS = new Set(['icon', 'recordLabel', 'recordPath', 'table', 'layout', 'search']);
@@ -387,13 +407,8 @@ function validateRecordLabel(
   }
 }
 
-// Must stay in sync with the width grammar the dashboard's column parser accepts.
 /**
- * Rejects a malformed `dashboard.table` declaration.
- * A failure is a non-object `table` or a `columns` that is not a non-empty array of strings.
- * An entry fails naming no field, an unknown or write-only field, or a repeat.
- * It also fails with more parts than a width and a min width, or with an invalid width.
- * `_translations` is known only beside a translatable field, so elsewhere it is the unknown-field failure.
+ * Rejects a malformed `dashboard.table` declaration: a non-object, or a bad `columns` or `order`.
  */
 function validateTable(
   table: unknown,
@@ -411,7 +426,22 @@ function validateTable(
       ],
     });
   }
-  const columns = table.columns;
+  validateTableColumns(table.columns, fields, scope);
+  validateTableOrder(table.order, fields, scope);
+}
+
+// Must stay in sync with the width grammar the dashboard's column parser accepts.
+/**
+ * Rejects a malformed `dashboard.table.columns`: not a non-empty array of strings, or a bad entry.
+ * An entry fails naming no field, an unknown or write-only field, or a repeat.
+ * It also fails with more parts than a width and a min width, or with an invalid width.
+ * `_translations` is known only beside a translatable field, so elsewhere it is the unknown-field failure.
+ */
+function validateTableColumns(
+  columns: unknown,
+  fields: Record<string, FieldInstance>,
+  scope: string,
+): void {
   if (isUndefined(columns)) return;
   if (!isArray(columns) || !columns.every(isString)) {
     throw ohneError({
@@ -490,6 +520,64 @@ function validateTable(
         });
       }
     }
+  }
+}
+
+/**
+ * Rejects a malformed `dashboard.table.order`: not a non-empty list of strings, or a bad entry.
+ * An entry fails naming an unknown or write-only field, or one another entry already sorts by.
+ * Whether the field can sort reads its storage, so the query metadata build checks that at boot.
+ */
+function validateTableOrder(
+  order: unknown,
+  fields: Record<string, FieldInstance>,
+  scope: string,
+): void {
+  if (isUndefined(order)) return;
+  if (!isArray(order) || !order.every(isString)) {
+    throw ohneError({
+      title: 'Invalid `dashboard.table.order` declaration',
+      body: [
+        `The \`dashboard.table.order\` option${scope} must be an array of field names.`,
+        "Write `order: ['done', '-due']`, a leading `-` sorting descending.",
+      ],
+    });
+  }
+  if (isEmpty(order)) {
+    throw ohneError({
+      title: 'The `dashboard.table.order` list is empty',
+      body: [
+        `An empty \`table.order\`${scope} would silently sort newest updated first.`,
+        'Omit the key instead.',
+      ],
+    });
+  }
+  const seen = new Set<string>();
+  for (const entry of order) {
+    const name = entry.startsWith('-') ? entry.slice(1) : entry;
+    if (!hasKey(fields, name) && name !== 'UUID' && name !== '_updatedAt') {
+      const near = didYouMean(name, Object.keys(fields));
+      throw ohneError({
+        title: `\`dashboard.table.order\` references unknown field \`${name}\``,
+        body: [
+          `No field \`${name}\` is declared${scope}, and it is not \`UUID\` or \`_updatedAt\`.`,
+          ...(isUndefined(near) ? [] : [`Did you mean \`${near}\`?`]),
+        ],
+      });
+    }
+    if (fields[name]?.options.readable === false) {
+      throw ohneError({
+        title: `\`dashboard.table.order\` references write-only field \`${name}\``,
+        body: [`The field \`${name}\`${scope} is \`readable: false\`, so it can never sort.`],
+      });
+    }
+    if (seen.has(name)) {
+      throw ohneError({
+        title: `\`dashboard.table.order\` repeats field \`${name}\``,
+        body: [`A field${scope} sorts once; a repeat, in either direction, adds nothing.`],
+      });
+    }
+    seen.add(name);
   }
 }
 

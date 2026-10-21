@@ -1,6 +1,7 @@
 import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { FieldInstance } from '../fields/field.ts';
 import type { FieldLayout } from '../fields/layout.ts';
+import type { Message } from '../messages/known-messages.ts';
 import type { NamedMiddlewareKey } from '../middleware/known-middleware.ts';
 import type { QueryScope } from '../query/wire/apply.ts';
 import type { LocaleCode } from './known-locales.ts';
@@ -197,6 +198,18 @@ export type TableColumnEntry<TField extends string = string> =
   | `${TField | TableSystemField} | ${string}`;
 
 /**
+ * A field a `table.order` entry may sort by: a declared one, `UUID`, or `_updatedAt`.
+ */
+type TableOrderField<TField extends string> = TField | Exclude<TableSystemField, '_translations'>;
+
+/**
+ * One `table.order` entry: a field name, a leading `-` sorting it descending.
+ */
+export type TableOrderEntry<TField extends string = string> =
+  | TableOrderField<TField>
+  | `-${TableOrderField<TField>}`;
+
+/**
  * A collection's record-label declaration.
  * One field name, several whose values join in order, or a template naming fields in `{braces}`.
  */
@@ -227,6 +240,18 @@ export interface CollectionTable<TField extends string = string> {
    * ```
    */
   columns?: readonly TableColumnEntry<TField>[];
+
+  /**
+   * The sort the list view opens with, in query `order` form: a leading `-` sorts a field descending.
+   * Each field must be readable and sortable; anything else fails at boot.
+   * Omitted, the table sorts newest updated first.
+   *
+   * @example
+   * ```ts
+   * ['done', '-due', 'title']
+   * ```
+   */
+  order?: readonly TableOrderEntry<TField>[];
 }
 
 /**
@@ -276,12 +301,12 @@ export interface CollectionDashboard<TField extends string = string> {
 
   /**
    * The list view's defaults for this collection.
-   * A viewer's own choice, carried in the `columns` query param, overrides them.
+   * A viewer's own choice, carried in the `columns` and `order` query params, overrides them.
    * A column entry is `name`, `name | width`, or `name | width | minWidth`.
    *
    * @example
    * ```ts
-   * { columns: ['title | 25% | 256px', 'views', '_updatedAt | 150px'] }
+   * { columns: ['title | 25% | 256px', 'views', '_updatedAt | 150px'], order: ['-views'] }
    * ```
    */
   table?: CollectionTable<TField>;
@@ -386,6 +411,20 @@ export interface DuplicateContext {
 export interface CollectionDefinition<
   TFields extends Record<string, FieldInstance> = Record<string, FieldInstance>,
 > {
+  /**
+   * A short label for the collection, shown wherever the dashboard names it.
+   * Pass a message key to translate it per the viewer's language.
+   * A `{ key, params }` object supplies a parameterized message; a plain string is shown as-is.
+   * Omitted, the collection name is sentence-cased: `BlogPosts` becomes `Blog posts`.
+   *
+   * @example
+   * ```ts
+   * 'Articles'
+   * 'app.posts.label'
+   * ```
+   */
+  label?: Message;
+
   /**
    * The fields, keyed by their camelCase name.
    *
@@ -517,6 +556,11 @@ export interface CollectionDefinition<
  * Registries and codegen hold this widened view instead.
  */
 export interface AnyCollectionDefinition {
+  /**
+   * A short label for the collection, shown wherever the dashboard names it.
+   */
+  label?: Message;
+
   /**
    * The fields, keyed by their camelCase name.
    */

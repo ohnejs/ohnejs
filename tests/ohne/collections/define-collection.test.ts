@@ -623,6 +623,85 @@ describe('defineCollection', () => {
     );
   });
 
+  it('accepts a table order of declared and system fields, either direction', () => {
+    const fields = { title: field('text'), due: field('date'), done: field('boolean') };
+    for (const order of [['done', '-due', 'title'], ['-_updatedAt'], ['UUID']] as const) {
+      const definition = defineCollection({ fields, dashboard: { table: { order } } });
+      deepStrictEqual(definition.dashboard?.table?.order, order);
+    }
+  });
+
+  it('rejects a table order that is not a non-empty list of strings', () => {
+    const fields = { title: field('text') };
+    throws(
+      // @ts-expect-error an order is a list
+      () => defineCollection({ fields, dashboard: { table: { order: 'title' } } }),
+      /Invalid `dashboard\.table\.order`/,
+    );
+    throws(
+      // @ts-expect-error an entry must be a string
+      () => defineCollection({ fields, dashboard: { table: { order: [42] } } }),
+      /Invalid `dashboard\.table\.order`/,
+    );
+    throws(
+      () => defineCollection({ fields, dashboard: { table: { order: [] } } }),
+      /The `dashboard\.table\.order` list is empty/,
+    );
+  });
+
+  it('rejects a table order naming an unknown field, `_translations` included', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text') },
+          // @ts-expect-error `titel` is not a field of this collection
+          dashboard: { table: { order: ['-titel'] } },
+        }),
+      /`dashboard\.table\.order` references unknown field `titel`/,
+    );
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text', { translatable: true }) },
+          // @ts-expect-error `_translations` cannot sort
+          dashboard: { table: { order: ['_translations'] } },
+        }),
+      /unknown field `_translations`/,
+    );
+  });
+
+  it('rejects a table order naming a write-only field', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { title: field('text'), secret: field('text', { readable: false }) },
+          dashboard: { table: { order: ['secret'] } },
+        }),
+      /`dashboard\.table\.order` references write-only field `secret`/,
+    );
+  });
+
+  it('rejects a table order repeating a field in either direction', () => {
+    throws(
+      () =>
+        defineCollection({
+          fields: { due: field('date') },
+          dashboard: { table: { order: ['due', '-due'] } },
+        }),
+      /`dashboard\.table\.order` repeats field `due`/,
+    );
+  });
+
+  it('accepts a label and rejects one that is not a message', () => {
+    const fields = { title: field('text') };
+    strictEqual(defineCollection({ label: 'app.posts.label', fields }).label, 'app.posts.label');
+    throws(
+      // @ts-expect-error a label is a message
+      () => defineCollection({ label: 42, fields }),
+      /Invalid `label` declaration/,
+    );
+  });
+
   it('accepts a layout unchanged', () => {
     const layout = [
       { card: [{ row: ['title', 'views | 8rem'] }] },
