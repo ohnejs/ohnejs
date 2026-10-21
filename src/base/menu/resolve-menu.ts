@@ -1,4 +1,11 @@
-import { applyHook, type DashboardMenuNode, useCollections, useConfig, useLayers } from 'ohnejs';
+import {
+  applyHook,
+  type DashboardMenuNode,
+  type Message,
+  useCollections,
+  useConfig,
+  useLayers,
+} from 'ohnejs';
 import {
   getOrSet,
   isEmpty,
@@ -95,7 +102,8 @@ function resolveMenu(user: User, collections: DashboardCollection[]): DashboardM
           node.to ?? (isUndefined(collection) ? undefined : `/collections/${collection.segment}`);
         const nested = build(id);
         if (isUndefined(to) && isEmpty(nested)) return [];
-        const label = node.label ?? collection?.label ?? (isNull(parent) ? '' : toSentenceCase(id));
+        const label: Message =
+          node.label ?? (collection ? collection.label : isNull(parent) ? '' : toSentenceCase(id));
         const item: DashboardMenuItem = { id, label };
         if (!isUndefined(to)) item.to = to;
         const icon = node.icon ?? collection?.icon;

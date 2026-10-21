@@ -87,6 +87,12 @@ describe('resolveDashboardMenu', () => {
     });
   });
 
+  it("labels a collection's node with the collection's declared label", async () => {
+    const label = { key: 'menuTest.reports', params: { n: 1 } } as const;
+    const [node] = await resolve([], [{ ...posts, label }]);
+    deepStrictEqual(node?.label, label);
+  });
+
   it('lets a closer layer move, reorder and relabel a node by id', async () => {
     const menu = await resolve([
       { ...base, reports: { parent: 'general', order: 2, to: '/reports', label: 'Reports' } },

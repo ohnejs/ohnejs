@@ -495,6 +495,19 @@ describe('collectionTable refused views', () => {
     return [...bodies];
   };
 
+  /**
+   * Runs `go` while the posts collection declares `order` over a sortable `title`.
+   */
+  const withOrder = async <T>(order: readonly string[], go: () => Promise<T>): Promise<T> => {
+    const title = { name: 'title', kind: 'column', logicalType: 'text', readable: true };
+    Object.assign(POSTS, { fields: [title], table: { order } });
+    try {
+      return await go();
+    } finally {
+      Object.assign(POSTS, { fields: [], table: undefined });
+    }
+  };
+
   before(async () => {
     Object.assign(globalThis, {
       fetch: async (url: string, init?: RequestInit) => {
@@ -531,6 +544,27 @@ describe('collectionTable refused views', () => {
       [['title'], ['-_updatedAt']],
     );
     strictEqual(location.search, '');
+  });
+
+  it('sorts by the declared default, keeping it out of the URL', async () => {
+    refuse = () => undefined;
+    const sent = await withOrder(['-title'], () => open('/collections/posts?page=2'));
+    deepStrictEqual(
+      sent.map((body) => body.order),
+      [['-title']],
+    );
+    strictEqual(location.search, '?page=2');
+  });
+
+  it('heals a refused declared default to newest updated first, instead of stalling', async () => {
+    refuse = (body) => (String(body.order) === '-_updatedAt' ? undefined : 'order[0]');
+    const shown = toasts().length;
+    const sent = await withOrder(['-title'], () => open('/collections/posts?page=3'));
+    deepStrictEqual(
+      sent.map((body) => body.order),
+      [['-title'], ['-_updatedAt']],
+    );
+    strictEqual(toasts().length, shown + 1);
   });
 
   it('restores the declared columns once, then stops when those are refused too', async (t) => {

@@ -44,9 +44,10 @@ import {
 
 import {
   columnFields,
-  DEFAULT_ORDER,
+  defaultOrder,
   displayFor,
   droppedMessage,
+  healTableView,
   loadTablePage,
   PER_PAGE,
   readableFields,
@@ -59,7 +60,6 @@ import {
 } from './collection-table-data.ts';
 import { admitsRow, pageUUIDs } from './collection-table-selection.ts';
 import {
-  healView,
   parseTableState,
   resolveTableColumns,
   serializeTableColumns,
@@ -155,8 +155,9 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   const collection = options.collection;
   const segment = collection.segment;
   const multiple = options.multiple ?? false;
+  const defaults = defaultOrder(collection);
 
-  const state = pickerState(collection);
+  const state = pickerState(collection, defaults);
   const revision = ref(0);
   const columnsRevision = ref(0);
   let scrollTop = false;
@@ -165,7 +166,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     if (!isUndefined(patch.page)) state.page = patch.page;
     // An emptied order falls back to the default, exactly as `parseTableState` reads one.
     if (!isUndefined(patch.order)) {
-      state.order = isEmpty(patch.order) ? [...DEFAULT_ORDER] : patch.order;
+      state.order = isEmpty(patch.order) ? [...defaults] : patch.order;
     }
     if (hasKey(patch, 'where')) state.where = patch.where;
     if (hasKey(patch, 'columns')) state.columns = patch.columns;
@@ -189,7 +190,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   });
   const orderDirty = computed(() => {
     void revision.value;
-    return state.order.join(',') !== DEFAULT_ORDER.join(',');
+    return state.order.join(',') !== defaults.join(',');
   });
   const columnsDirty = computed(() => {
     void revision.value;
@@ -227,7 +228,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
       if (isUndefined(loaded) || 'refused' in loaded) {
         const patch = isUndefined(loaded)
           ? undefined
-          : healView(state, loaded.refused, DEFAULT_ORDER);
+          : healTableView(state, loaded.refused, defaults);
         if (!isUndefined(patch)) {
           toast(t(droppedMessage(patch)), { type: 'warning' });
           push(patch);
@@ -508,7 +509,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
       sortingPopup({
         fields: () => sortableFields(collection),
         order: state.order,
-        defaults: DEFAULT_ORDER,
+        defaults,
         onApply: (order) => {
           pending = order;
           apply = true;
@@ -605,13 +606,13 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
 
 /**
  * The popup's starting view state for the collection: its own remembered view, or a fresh seed.
- * A fresh seed reads the collection page's own remembered view, back on page one.
+ * A fresh seed reads the collection page's own remembered view, back on page one, sorted by `defaults`.
  * Always a private copy, so stacked pickers of one collection never mutate each other's state.
  */
-function pickerState(collection: DashboardCollection): TableURLState {
+function pickerState(collection: DashboardCollection, defaults: readonly string[]): TableURLState {
   const remembered = rememberedPickerView(collection.segment);
   if (!isUndefined(remembered)) return cloneState(remembered);
-  const state = parseTableState(rememberedView(collection), DEFAULT_ORDER);
+  const state = parseTableState(rememberedView(collection), defaults);
   state.page = 1;
   return state;
 }

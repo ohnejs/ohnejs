@@ -238,6 +238,11 @@ export interface DashboardTable {
    * The declared column entries, one `name|width|minWidth` string per column.
    */
   columns?: readonly string[];
+
+  /**
+   * The declared default sort, in query `order` form.
+   */
+  order?: readonly string[];
 }
 
 /**
@@ -262,9 +267,9 @@ export interface DashboardCollection {
   segment: string;
 
   /**
-   * The display label: the sentence-cased collection name.
+   * The display label: the declared `label`, or the sentence-cased collection name.
    */
-  label: string;
+  label: Message;
 
   /**
    * The Tabler icon the sidebar menu shows, as declared; absent when the collection declares none.
@@ -375,7 +380,7 @@ export function describeCollections(user: User): DashboardCollection[] {
     const collection: DashboardCollection = {
       name: meta.name,
       segment,
-      label: toSentenceCase(meta.name),
+      label: declaredLabelOf(meta.name, meta.collection.label),
       translatable: query.translatable === true,
       singleton: query.singleton === true,
       duplicable: duplicableOf(meta.collection, query),
@@ -534,6 +539,13 @@ function wireOptions(
     if (!isUndefined(value) && isJSONValue(value)) wire[name] = value;
   }
   return isEmpty(wire) ? undefined : wire;
+}
+
+/**
+ * A file-named declaration's display label: its declared `label`, or the name sentence-cased.
+ */
+export function declaredLabelOf(name: string, label: Message | undefined): Message {
+  return label ?? toSentenceCase(name);
 }
 
 /**

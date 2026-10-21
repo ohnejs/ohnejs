@@ -18,6 +18,7 @@
     }
   },
   "users": {
+    "label": "Korisnici",
     "email": {
       "label": "Email",
       "description": "Adresa kojom se korisnik prijavljuje. Pohranjuje se malim slovima, pa je jedinstvena bez obzira na velika i mala slova."
@@ -64,6 +65,7 @@
     }
   },
   "sessions": {
+    "label": "Sesije",
     "user": {
       "label": "Korisnik",
       "description": "Račun kojem ova sesija pripada."

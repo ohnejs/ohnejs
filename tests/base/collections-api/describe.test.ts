@@ -40,8 +40,12 @@ useCollections().register('DescNotes', {
 useCollections().register('DescOwners', {
   name: 'DescOwners',
   collection: {
+    label: 'desc.owners.label',
     api: { read: true, update: true },
-    dashboard: { layout: [{ card: ['name | 50%', 'ghost'] }] },
+    dashboard: {
+      table: { order: ['-name', 'UUID'] },
+      layout: [{ card: ['name | 50%', 'ghost'] }],
+    },
     fields: { name: field('text') },
   },
 });
@@ -208,6 +212,14 @@ describe('describeCollections', () => {
       ['UUID', '_updatedAt', 'title', 'note', 'owner', 'steps'],
     );
     deepStrictEqual(notes.labelFields, ['title']);
+  });
+
+  it('ships a declared label as its message, for the dashboard to translate', () => {
+    strictEqual(collectionOf(editor, 'DescOwners').label, 'desc.owners.label');
+  });
+
+  it('ships the declared default sort unchanged', () => {
+    deepStrictEqual(collectionOf(editor, 'DescOwners').table?.order, ['-name', 'UUID']);
   });
 
   it('offers a duplicate only where a copy can succeed without input', () => {

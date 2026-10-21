@@ -525,6 +525,7 @@ function paletteMeta(meta: DashboardMeta | undefined): PaletteMeta {
   return {
     collections: meta.collections.map((collection) => ({
       ...collection,
+      label: translateMessage(collection.label),
       fields: paletteFields(collection.fields),
     })),
     menu: menuSections(meta.menu).map((section) => ({

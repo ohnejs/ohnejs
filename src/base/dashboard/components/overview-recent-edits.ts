@@ -13,6 +13,8 @@ import {
   icon,
   joinLabel,
   relativeTime,
+  type Text,
+  translateMessage,
   useT,
   when,
 } from 'ohnejs/dashboard';
@@ -40,7 +42,7 @@ import type { OverviewSearch } from '../pages/overview.ts';
  */
 interface RecentEdit {
   collectionName: string;
-  collectionLabel: string;
+  collectionLabel: Text;
   uuid: string;
   label: string;
   updatedAt: number;
@@ -236,7 +238,7 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
 
   const filtered = computed(() =>
     entries.value.filter((entry) =>
-      search.matches(entry.label, entry.collectionLabel, entry.collectionName),
+      search.matches(entry.label, translateMessage(entry.collectionLabel), entry.collectionName),
     ),
   );
 
@@ -309,7 +311,7 @@ function recentRow(entry: () => RecentEdit): Child {
   return h(
     'li',
     { class: 'o-overview-recent-row' },
-    badge(() => entry().collectionLabel, { size: -2, tone: 'secondary' }),
+    badge(() => translateMessage(entry().collectionLabel), { size: -2, tone: 'secondary' }),
     h(
       'a',
       {
@@ -332,7 +334,7 @@ function bucketsOf(meta: DashboardMeta, tokens: readonly string[]): Bucket[] {
   const buckets: Bucket[] = [];
   for (const collection of meta.collections) {
     if (collection.operations.read?.allowed !== true) continue;
-    const own = `${collection.label} ${collection.name}`.toLowerCase();
+    const own = `${translateMessage(collection.label)} ${collection.name}`.toLowerCase();
     const rest = tokens.filter((token) => !own.includes(token));
     const { singleton, labelFields } = collection;
     if (!isEmpty(rest) && (singleton || isEmpty(labelFields))) continue;
@@ -417,7 +419,9 @@ async function fillBucket(bucket: Bucket): Promise<void> {
       const updatedAt = row._updatedAt;
       if (!isString(uuid) || !isNumber(updatedAt)) continue;
       const { singleton, segment } = bucket.collection;
-      const label = singleton ? bucket.collection.label : joinLabel(row, bucket.collection);
+      const label = singleton
+        ? translateMessage(bucket.collection.label)
+        : joinLabel(row, bucket.collection);
       bucket.rows.push({
         collectionName: bucket.collection.name,
         collectionLabel: bucket.collection.label,

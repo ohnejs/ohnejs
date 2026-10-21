@@ -25,6 +25,7 @@ const ownSessions = async (): Promise<AccessScope<'expiresAt' | 'tokenHash' | 'u
  * The API exposes `read` and `delete` to the session's own user alone, scoped by `access`.
  */
 const sessions = defineCollection({
+  label: 'auth.sessions.label',
   api: {
     read: { public: true, access: ownSessions },
     delete: { public: true, access: ownSessions },

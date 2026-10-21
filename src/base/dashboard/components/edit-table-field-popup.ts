@@ -281,7 +281,7 @@ export function editTableFieldPopup(options: EditTableFieldPopupOptions): Popup 
       header: h(
         'span',
         { class: 'o-edit-field-title ohne-row' },
-        h('span', { class: 'ohne-truncate' }, collection.label),
+        h('span', { class: 'ohne-truncate' }, () => translateMessage(collection.label)),
         h(
           'span',
           { class: 'ohne-muted ohne-truncate' },

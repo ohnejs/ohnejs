@@ -18,6 +18,7 @@
     }
   },
   "users": {
+    "label": "Benutzer",
     "email": {
       "label": "E-Mail",
       "description": "Die Adresse, mit der sich der Benutzer anmeldet. Wird kleingeschrieben gespeichert und ist daher unabhängig von der Groß- und Kleinschreibung eindeutig."
@@ -64,6 +65,7 @@
     }
   },
   "sessions": {
+    "label": "Sitzungen",
     "user": {
       "label": "Benutzer",
       "description": "Das Konto, zu dem diese Sitzung gehört."

@@ -884,7 +884,7 @@ describe('menu', () => {
     ]);
   });
 
-  it('resolves a collection node to its list route, sentence-cased label, and declared icon', async () => {
+  it('resolves a collection node to its list route, sentence-cased or declared label, and icon', async () => {
     const { menu } = (await call(admin)).body;
     deepStrictEqual(menu[0]?.children?.[0], {
       id: 'DashNotes',
@@ -893,7 +893,7 @@ describe('menu', () => {
     });
     deepStrictEqual(menu.at(-1), {
       id: 'Users',
-      label: 'Users',
+      label: 'auth.users.label',
       to: '/collections/users',
       icon: 'users',
     });

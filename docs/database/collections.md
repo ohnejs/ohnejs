@@ -568,9 +568,30 @@ export default defineCollection({
 - `recordPath` - where the dashboard opens a record, like `'/media?details=[uuid]'`. Every record
   link fills `[uuid]` with the record's `UUID`, and the record's editor page redirects there. If you
   omit it, a record opens in its editor.
-- `table` - the list view's [default columns](#table-columns).
+- `table` - the list view's [default columns and sort](#table-columns).
 - `layout` - how the record editor [arranges the fields](../dashboard/field-layouts.md).
 - `search` - whether the collection takes part in [search](#a-collection-in-search).
+
+### Naming a collection
+
+The dashboard names a collection by sentence-casing it, so `BlogPosts` reads as `Blog posts`. Give
+it a `label` to use a different name, or to translate the name into every language you ship:
+
+```ts
+// collections/Tasks.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  label: 'todo.tasks.label',
+  fields: {
+    title: field('text'),
+  },
+});
+```
+
+A plain string shows as written. A message key is replaced by its text in the viewer's language, so
+the label lives in your [catalogs](../i18n/messages.md#catalogs) with the rest of your UI strings.
+The sidebar menu shows it too, unless your `dashboard.menu` relabels the row.
 
 ### Record labels
 
@@ -599,6 +620,10 @@ widths as `name|width|minWidth`, each a CSS length or percentage like `320px` or
   `_translations`.
 - If you omit it, the list view shows the first four readable fields, with `_updatedAt` as the last
   column. A translatable collection shows three, then `_translations`.
+
+`table.order` sets the sort the list view opens with, written like a query
+[`order`](../api/url-queries.md#ordering): `['done', '-due']` sorts by `done`, then by `due`
+descending. If you omit it, the list view sorts newest updated first.
 
 A viewer can rearrange the columns in the dashboard. Their choice is stored in the URL and overrides
 the declared defaults until they restore them. To keep it with a sort order and a filter, they save

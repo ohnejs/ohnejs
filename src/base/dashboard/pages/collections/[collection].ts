@@ -5,6 +5,7 @@ import {
   dashboardMeta,
   defineDashboardPage,
   h,
+  translateMessage,
   useDocumentTitle,
   useFrame,
   useT,
@@ -43,7 +44,7 @@ function pane(segment: () => string): Child {
   const t = useT();
   const entry = (): DashboardCollection | undefined =>
     dashboardMeta()?.collections.find((candidate) => candidate.segment === segment());
-  useDocumentTitle(() => entry()?.label);
+  useDocumentTitle(() => translateMessage(entry()?.label));
   return when(
     () => !isUndefined(dashboardMeta()),
     () =>

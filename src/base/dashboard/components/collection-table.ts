@@ -62,9 +62,10 @@ import { bookmarksPopup } from './bookmarks-popup.ts';
 import { clearSelectionButton } from './clear-selection-button.ts';
 import {
   columnFields,
-  DEFAULT_ORDER,
+  defaultOrder,
   displayFor,
   droppedMessage,
+  healTableView,
   loadPage,
   loadTablePage,
   PER_PAGE,
@@ -84,7 +85,6 @@ import {
   selectedCountOf,
 } from './collection-table-selection.ts';
 import {
-  healView,
   parseTableState,
   resolveTableColumns,
   serializeTableColumns,
@@ -214,9 +214,10 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
 
   rememberView(segment, search);
 
-  const state = parseTableState(search, DEFAULT_ORDER);
+  const defaults = defaultOrder(collection);
+  const state = parseTableState(search, defaults);
   const whereDirty = !isUndefined(state.where);
-  const orderDirty = state.order.join(',') !== DEFAULT_ORDER.join(',');
+  const orderDirty = state.order.join(',') !== defaults.join(',');
 
   const push = (patch: Partial<TableURLState>, replace = false): void => {
     const next: TableURLState = {
@@ -225,7 +226,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
       where: hasKey(patch, 'where') ? patch.where : state.where,
       columns: hasKey(patch, 'columns') ? patch.columns : state.columns,
     };
-    const query = serializeTableState(next, DEFAULT_ORDER, search);
+    const query = serializeTableState(next, defaults, search);
     const target = query === '' ? '' : `?${query}`;
     rememberView(segment, target);
     navigate(location.pathname + target, { replace });
@@ -240,7 +241,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
   const columnsDirty = !deepEqual(currentEntries, defaultEntries);
   const view = serializeTableState(
     { ...state, page: 1, columns: columnsDirty ? currentEntries : undefined },
-    DEFAULT_ORDER,
+    defaults,
   );
 
   const data = ref<TableRecord[] | undefined>(undefined);
@@ -294,7 +295,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
       if (isUndefined(loaded) || 'refused' in loaded) {
         const patch = isUndefined(loaded)
           ? undefined
-          : healView(state, loaded.refused, DEFAULT_ORDER);
+          : healTableView(state, loaded.refused, defaults);
         if (!isUndefined(patch)) {
           toast(t(droppedMessage(patch)), { type: 'warning' });
           push(patch, true);
@@ -798,7 +799,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
       sortingPopup({
         fields: () => sortableFields(collection),
         order: state.order,
-        defaults: DEFAULT_ORDER,
+        defaults,
         onApply: (order) => {
           pending = order;
           apply = true;
@@ -826,8 +827,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
         onClose: (close) =>
           void close().then(() => {
             bookmarksOpen.value = false;
-            if (!isUndefined(pending))
-              push({ ...parseTableState(pending, DEFAULT_ORDER), page: 1 });
+            if (!isUndefined(pending)) push({ ...parseTableState(pending, defaults), page: 1 });
           }),
       });
       return null;

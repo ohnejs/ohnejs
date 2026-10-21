@@ -8,6 +8,7 @@ import {
   h,
   icon,
   type IconName,
+  translateMessage,
   useT,
   when,
 } from 'ohnejs/dashboard';
@@ -67,7 +68,7 @@ export function overviewQuickCreate(search: OverviewSearch): Child {
       if (collection.operations.create?.allowed !== true) continue;
       items.push({
         name: collection.name,
-        label: collection.label,
+        label: translateMessage(collection.label),
         icon: collection.icon,
         to: `/collections/${collection.segment}/new`,
       });

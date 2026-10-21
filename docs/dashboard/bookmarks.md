@@ -20,8 +20,8 @@ Bookmarks need nothing in your code. Anyone signed in who can read a collection,
 "+ Bookmark" asks for a name and saves the view you are looking at. The check button applies a
 bookmark, and every bookmark that matches the current view is marked applied.
 
-- A view keeps only what you changed. Columns left as declared follow your code when it changes
-  later, and an unchanged sort stays newest updated first.
+- A view keeps only what you changed. Columns and a sort left as declared follow your code when it
+  changes later.
 - The page number, an open record, and any other query parameters are not part of a view. Applying
   one starts on the first page.
 - Your own bookmarks have a menu to update one to the current view, share it, rename it, or delete

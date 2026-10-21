@@ -4,6 +4,7 @@ import { before, describe, it } from 'node:test';
 import type { TableURLState } from '../../../../src/base/dashboard/components/collection-table-state.ts';
 import type {
   DashboardCollection,
+  DashboardField,
   DashboardMeta,
 } from '../../../../src/dashboard/runtime/meta-types.ts';
 
@@ -183,5 +184,41 @@ describe('loadTablePage', () => {
     });
     strictEqual(await data.loadTablePage('posts', {}), undefined);
     strictEqual(await data.loadPage('posts', {}), undefined);
+  });
+});
+
+describe('defaultOrder', () => {
+  let data!: typeof import('../../../../src/base/dashboard/components/collection-table-data.ts');
+  const column = (name: string, readable = true) =>
+    ({ name, kind: 'column', logicalType: 'text', readable }) as DashboardField;
+  const fields = [
+    column('_updatedAt'),
+    column('title'),
+    column('due'),
+    column('secret', false),
+    { name: 'tags', kind: 'records', readable: true } as DashboardField,
+  ];
+  const ordered = (order?: readonly string[]): DashboardCollection => ({
+    ...POSTS,
+    fields,
+    ...(order ? { table: { order } } : {}),
+  });
+
+  before(async () => {
+    baseBrowser('/collections/posts');
+    data = await import('../../../../src/base/dashboard/components/collection-table-data.ts');
+  });
+
+  it('returns the declared order', () => {
+    deepStrictEqual(data.defaultOrder(ordered(['title', '-due'])), ['title', '-due']);
+  });
+
+  it('drops an entry the viewer cannot read or the table cannot sort by', () => {
+    deepStrictEqual(data.defaultOrder(ordered(['-secret', 'tags', 'due', 'gone'])), ['due']);
+  });
+
+  it('falls back to newest updated first when nothing is declared or nothing is left', () => {
+    deepStrictEqual(data.defaultOrder(ordered()), ['-_updatedAt']);
+    deepStrictEqual(data.defaultOrder(ordered(['secret'])), ['-_updatedAt']);
   });
 });

@@ -27,6 +27,7 @@ import {
   seedLabel,
   signInCount,
   toast,
+  translateMessage,
   useDashboardLanguage,
   useHotkeys,
   useRoute,
@@ -588,10 +589,12 @@ export function recordEditorHeader(editor: RecordEditor): Child {
 export function recordEditorHeading(editor: RecordEditor): Child[] {
   const t = useT();
   const { collection } = editor;
-  const heading: Child[] = [h('span', { class: 'ohne-truncate' }, collection.label)];
+  const heading: Child[] = [
+    h('span', { class: 'ohne-truncate' }, () => translateMessage(collection.label)),
+  ];
   if (!collection.singleton) {
     const backLabel = (): string =>
-      t('dashboard.record.collectionOverview', { collection: collection.label });
+      t('dashboard.record.collectionOverview', { collection: translateMessage(collection.label) });
     const backButton = button(backLabel, {
       icon: 'folder',
       iconOnly: true,

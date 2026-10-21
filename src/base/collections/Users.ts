@@ -21,6 +21,7 @@ import { manageUsers } from '../auth/manage-users.ts';
  * You can edit or delete a user only when you could grant every role they hold.
  */
 const users = defineCollection({
+  label: 'auth.users.label',
   api: {
     read: {},
     create: { access: manageUsers },

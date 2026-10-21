@@ -8,6 +8,7 @@ import {
   h,
   knownLabel,
   navigate,
+  translateMessage,
   useDocumentTitle,
   useFrame,
   useT,
@@ -59,7 +60,7 @@ function pane(segment: () => string, uuid: () => string): Child {
       id === 'new'
         ? t('dashboard.new')
         : (knownLabel(collection.name, id, activeContentLocale()) ?? fallbackLabel(id));
-    return `${label} - ${collection.label}`;
+    return `${label} - ${translateMessage(collection.label)}`;
   });
   return when(
     () => !isUndefined(dashboardMeta()),

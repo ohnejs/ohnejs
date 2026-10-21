@@ -13,15 +13,7 @@ import {
   useRoles,
   useRoutes,
 } from 'ohnejs';
-import {
-  hasRoute,
-  isEmpty,
-  isUndefined,
-  naturalCompare,
-  pick,
-  toSentenceCase,
-  uniqueArray,
-} from 'ohnejs/utils';
+import { hasRoute, isEmpty, isUndefined, naturalCompare, pick, uniqueArray } from 'ohnejs/utils';
 
 import type { IconName } from '../../utils/icon/icon-name.ts';
 import type { User } from '../auth/types.ts';
@@ -38,7 +30,12 @@ import { accountFields, accountLayout } from '../auth/account-layout.ts';
 import { userCapabilities } from '../auth/capabilities.ts';
 import { requireUser } from '../auth/require-user.ts';
 import { bookmarkTarget } from '../bookmarks/bookmark-target.ts';
-import { describeCollections, describeFields, resolveLayout } from '../collections-api/describe.ts';
+import {
+  declaredLabelOf,
+  describeCollections,
+  describeFields,
+  resolveLayout,
+} from '../collections-api/describe.ts';
 import { resolveDashboardMenu } from '../menu/resolve-menu.ts';
 
 /**
@@ -365,11 +362,4 @@ function describeRoles(): DashboardRole[] {
     if (!isUndefined(role.description)) described.description = role.description;
     return described;
   });
-}
-
-/**
- * A file-named declaration's display label: its declared `label`, or the name sentence-cased.
- */
-function declaredLabelOf(name: string, label: Message | undefined): Message {
-  return label ?? toSentenceCase(name);
 }

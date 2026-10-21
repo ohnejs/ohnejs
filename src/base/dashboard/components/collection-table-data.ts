@@ -28,7 +28,7 @@ import {
   untracked,
 } from 'ohnejs/utils';
 
-import { sortableFieldsOf, type TableURLState } from './collection-table-state.ts';
+import { healView, sortableFieldsOf, type TableURLState } from './collection-table-state.ts';
 import { translationsCell } from './translations-cell.ts';
 
 /**
@@ -104,6 +104,32 @@ export function readableFields(collection: DashboardCollection): DashboardField[
  */
 export function sortableFields(collection: DashboardCollection): DashboardField[] {
   return sortableFieldsOf(collection.fields);
+}
+
+/**
+ * The order the collection's table sorts by when the state declares none.
+ * It is the declared `table.order`, less any entry the viewer cannot read or sort by.
+ * Without a declared order, or with no entry left, it is `DEFAULT_ORDER`.
+ */
+export function defaultOrder(collection: DashboardCollection): readonly string[] {
+  const sortable = new Set(sortableFields(collection).map((field) => field.name));
+  const order = (collection.table?.order ?? []).filter((entry) =>
+    sortable.has(entry.startsWith('-') ? entry.slice(1) : entry),
+  );
+  return isEmpty(order) ? DEFAULT_ORDER : order;
+}
+
+/**
+ * The patch that drops the part of `state` a query refused at `path`, as `healView` sets it.
+ * A refused order that already is the collection's `defaults` falls back to `DEFAULT_ORDER`.
+ * A declared default the wire refuses, past `maxOrder` say, therefore never stalls the table.
+ */
+export function healTableView(
+  state: TableURLState,
+  path: string,
+  defaults: readonly string[],
+): Partial<TableURLState> | undefined {
+  return healView(state, path, defaults) ?? healView(state, path, DEFAULT_ORDER);
 }
 
 /**
