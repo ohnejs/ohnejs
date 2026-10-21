@@ -162,6 +162,7 @@ await query('Posts').create({ title: 'Hello' }, { locales: { de: { title: 'Hallo
 - Each locale is written as an update at that locale, in the create's own transaction, so the
   record lands with every locale or not at all.
 - A failure at one locale names it in `locale` beside `errors`.
+- Validators and the record hooks see the locale being written as `ctx.locale`.
 
 When a record has no translation at the update's locale, the update creates it:
 

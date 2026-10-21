@@ -264,7 +264,7 @@ export default defineField({ columnType: 'integer', defaultValue: 0 });
 ```
 
 Pass a value, or a callback that computes one from `ctx`: the field's `options`, the record's raw
-`input`, and the `operation`. A field's own `default` replaces the type's, in the
+`input`, the `operation`, and the `locale` it writes. A field's own `default` replaces the type's, in the
 [order writing records describes](./writing.md#defaults). A default runs through the type's
 sanitizers and validators like any value, so it must be one they accept. A literal default that they
 reject fails at boot. A callback default that they reject fails the create that computes it.
@@ -287,6 +287,8 @@ validators: [
 - A message is a [message key](../i18n/messages.md#validation-messages), a `{ key, params }`
   object, or a plain string.
 - `null` skips both lists: a nullable field's `null` is stored as it is.
+- `ctx.locale` is the locale the write stores, so a rule can differ per
+  [locale](./translations.md#writing).
 
 Every function receives `ctx` as its second argument:
 

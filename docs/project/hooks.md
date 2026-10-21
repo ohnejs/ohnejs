@@ -259,6 +259,7 @@ hook('record:before-change', (input, ctx) => {
   transaction, before the input is frozen.
 - A create with [`locales`](../database/translations.md#writing) fires it once more per locale, as
   an `update` carrying that locale's values.
+- `ctx.locale` is the locale the write stores.
 
 ### `record:validate`
 
@@ -286,7 +287,8 @@ hook('record:validate', (errors, scope, ctx) => {
   [`{ ok: false, errors }`](../database/writing.md#the-result), and nothing is written. Returning
   `undefined` or an empty map lets the write continue.
 - Read the coerced values from `scope.values`.
-- A create with `locales` fires it once more per locale, as an `update`.
+- A create with `locales` fires it once more per locale, as an `update` at that locale.
+- `ctx.locale` is the locale the write stores.
 
 ### `record:after-create`
 
