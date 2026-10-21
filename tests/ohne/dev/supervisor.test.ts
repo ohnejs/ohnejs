@@ -395,6 +395,50 @@ describe('dev', () => {
     await waitFor(async () => (await getBody(port, '/lang')) === 'Hello');
   });
 
+  it('reloads the API when a JSON file it imports changes', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('json-import', port);
+    mkdirSync(join(app, 'content'), { recursive: true });
+    writeFileSync(join(app, 'content', 'data.json'), JSON.stringify({ v: 1 }));
+    writeFileSync(
+      join(app, 'api', 'data.get.ts'),
+      "import data from '../content/data.json' with { type: 'json' }\nexport default () => data\n",
+    );
+
+    servers.push(await dev(app, { entry: BIN, dashboard: false }));
+    await waitFor(async () => (await getBody(port, '/data')) === '{"v":1}');
+
+    writeFileSync(join(app, 'content', 'data.json'), JSON.stringify({ v: 2 }));
+    await waitFor(async () => (await getBody(port, '/data')) === '{"v":2}');
+  });
+
+  it('does not reload the API on a non-script, non-JSON change', TIMEOUT, async () => {
+    const port = await freePort();
+    const app = writeProject('notes-noreload', port);
+    writeRoute(app, 'health.ts');
+
+    const out: string[] = [];
+    useEnv().set('SILENT', false);
+    usePrinter().configure({ stream: { write: (s) => out.push(s) } });
+    try {
+      servers.push(await dev(app, { entry: BIN, dashboard: false }));
+      await waitFor(async () => (await get(port, '/health')) === 200);
+      await waitFor(async () => out.join('').includes('Waiting for changes'));
+      out.length = 0;
+
+      writeFileSync(join(app, 'notes.md'), '# Notes\n');
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      strictEqual(out.join('').includes('Reloading API'), false);
+      strictEqual(await get(port, '/health'), 200);
+
+      writeRoute(app, 'users.get.ts');
+      await waitFor(async () => (await get(port, '/users')) === 200);
+      ok(out.join('').includes('Reloading API'));
+    } finally {
+      usePrinter().configure({ stream: process.stderr });
+    }
+  });
+
   it(
     'reruns layer codegen after a collection edit, reading the edited schema',
     TIMEOUT,

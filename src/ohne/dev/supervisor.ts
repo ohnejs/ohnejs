@@ -35,7 +35,7 @@ import { watchLayers } from './watch-layers.ts';
 
 const DEBOUNCE = 100;
 const REVIVE_UPTIME = 5_000;
-const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts']);
+const SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.json']);
 
 /**
  * A running dev supervisor.
