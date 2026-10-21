@@ -6,6 +6,7 @@ import { useEnv } from 'ohnejs';
 import type { DatabaseAdapter } from '../../../src/ohne/database/adapter.ts';
 import type { Event, Route } from '../../../src/ohne/index.ts';
 
+import { afterCommit, committing } from '../../../src/ohne/database/after-commit.ts';
 import { connect } from '../../../src/ohne/database/connect.ts';
 import {
   bindDatabase,
@@ -79,7 +80,7 @@ describe('bindDatabase', () => {
         return useDatabase();
       })();
     });
-    strictEqual(seen, bound);
+    strictEqual(seen, committing(bound));
   });
 
   it('leaves a named helper untouched', async () => {
@@ -90,7 +91,7 @@ describe('bindDatabase', () => {
       bindDatabase(useDatabase());
       return useDatabase('cache');
     });
-    strictEqual(seen, helper);
+    strictEqual(seen, committing(helper));
   });
 
   it('keeps two concurrent requests on their own adapters across `await`', async () => {
@@ -107,8 +108,8 @@ describe('bindDatabase', () => {
     const seen = Promise.all([run(first), run(second)]);
     gate.resolve();
     const [a, b] = await seen;
-    strictEqual(a, first);
-    strictEqual(b, second);
+    strictEqual(a, committing(first));
+    strictEqual(b, committing(second));
   });
 
   it('writes through the bound adapter, not the main connection', async () => {
@@ -122,6 +123,16 @@ describe('bindDatabase', () => {
     });
     strictEqual((await bound.query('SELECT id FROM t')).length, 1);
     strictEqual((await main.query('SELECT id FROM t')).length, 0);
+  });
+
+  it('holds commit effects on a transaction of the bound adapter', async () => {
+    await open();
+    const bound = await another();
+    const queued = await runWithEvent(event(), () => {
+      bindDatabase(bound);
+      return useDatabase().transaction(async (tx) => afterCommit(tx, async () => undefined));
+    });
+    strictEqual(queued, true);
   });
 
   it('throws outside a request', async () => {
@@ -156,6 +167,6 @@ describe('bindDatabase', () => {
       {},
     );
     await drain();
-    strictEqual(seen, bound);
+    strictEqual(seen, committing(bound));
   });
 });

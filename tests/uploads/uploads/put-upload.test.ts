@@ -10,6 +10,8 @@ import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { createRouter } from '../../../src/ohne/http/router.ts';
 import { createServer } from '../../../src/ohne/http/server.ts';
 import { shutdownServer } from '../../../src/ohne/http/shutdown-server.ts';
@@ -19,6 +21,7 @@ import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { createFSStorage } from '../../../src/uploads/storage/fs.ts';
 import { useStorages } from '../../../src/uploads/storage/use-storages.ts';
+import { drainJournal } from '../../../src/uploads/storage/journal.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
 import { sleep } from '../../../src/utils/index.ts';
 import { bytes, JPEG_HEAD, png, route, storage, stream, text } from '../_fixture.ts';
@@ -192,6 +195,20 @@ describe('putUpload', () => {
     deepStrictEqual(temps(), []);
     deepStrictEqual(await queryUntyped('UploadsJournal').findMany(), []);
     strictEqual(storage.objects.has('orphan.txt'), false);
+  });
+
+  it('keeps the bytes of a committed row when a `record:committed` callback throws', async () => {
+    hook('record:committed', ({ collection }) => {
+      if (collection === 'Uploads') throw new Error('webhook down');
+    });
+    try {
+      await rejects(putUpload({ directory: 'webhook', name: 'kept.txt', body: stream(bytes('hi')) }));
+    } finally {
+      useHooks().clear();
+    }
+    await drainJournal();
+    ok(await queryUntyped('Uploads').where({ directory: 'webhook', name: 'kept.txt' }).exists());
+    strictEqual(text(storage.objects.get('webhook/kept.txt')), 'hi');
   });
 
   it('lands a file inside a private folder as private, locking its object', async () => {

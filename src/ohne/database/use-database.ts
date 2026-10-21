@@ -6,6 +6,7 @@ import type { DatabaseName } from './known-databases.ts';
 import { createRegistry, isUndefined, type Registry } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { tryUseEvent, useEvent } from '../http/use-event.ts';
+import { committing } from './after-commit.ts';
 
 let mainConnection: DatabaseAdapter | undefined;
 let activeDialect: Dialect | undefined;
@@ -17,8 +18,8 @@ const boundConnections = new WeakMap<Event, DatabaseAdapter>();
  * `connect` calls this after opening; re-registering replaces, so a re-synced connection swaps in cleanly.
  */
 export function registerDatabase(adapter: DatabaseAdapter, name?: string): void {
-  if (isUndefined(name)) mainConnection = adapter;
-  else helperConnections.register(name, adapter);
+  if (isUndefined(name)) mainConnection = committing(adapter);
+  else helperConnections.register(name, committing(adapter));
 }
 
 /**
@@ -70,7 +71,7 @@ export async function closeDatabases(): Promise<void> {
  * ```
  */
 export function bindDatabase(adapter: DatabaseAdapter): void {
-  boundConnections.set(useEvent(), adapter);
+  boundConnections.set(useEvent(), committing(adapter));
 }
 
 /**
@@ -79,6 +80,7 @@ export function bindDatabase(adapter: DatabaseAdapter): void {
  * `useDatabase()` is the main connection; `useDatabase('cache')` a helper declared in `database.helpers`.
  * Inside a request that called `bindDatabase`, `useDatabase()` answers the bound adapter instead.
  * Both expose the same `DatabaseAdapter`.
+ * A builder write joined to one of its transactions with `.use(tx)` fires `record:committed` once it commits.
  * Throws when the database is not connected or the helper is unknown.
  *
  * @example

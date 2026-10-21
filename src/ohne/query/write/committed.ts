@@ -2,6 +2,7 @@ import type { CollectionName } from '../../collections/known-collections.ts';
 import type { Transaction } from '../../database/adapter.ts';
 
 import { isUndefined } from '../../../utils/index.ts';
+import { afterCommit } from '../../database/after-commit.ts';
 import { applyHook } from '../../hooks/apply-hook.ts';
 import { useHooks } from '../../hooks/use-hooks.ts';
 
@@ -35,8 +36,8 @@ declare module 'ohnejs' {
     /**
      * Runs after a write commits, for external effects that must never fire on a rollback.
      * Fires post-commit, outside the transaction, so a cache bust, a webhook, or an external index is safe.
-     * A joined `.use(tx)` write inside another write's hook fires once that write commits.
-     * A joined write unwound by its savepoint never fires, nor does one on a transaction you opened yourself.
+     * A joined `.use(tx)` write fires once its transaction commits, another write's or a `useDatabase()` one.
+     * A joined write unwound by its savepoint never fires.
      * A `deleteTranslation` reports an `update` of the records that lost the locale.
      * A create with `locales` reports one `create`, every locale included.
      * An action: its return is ignored.
@@ -50,18 +51,35 @@ const held = new WeakMap<Transaction, RecordCommitted[]>();
 
 /**
  * Fires the `record:committed` effects for a write that just committed, skipping when nothing subscribes.
- * A write joined to `joinedTx` holds its effect until the write that opened `joinedTx` commits.
+ * A write joined to `joinedTx` holds its effect until `joinedTx` commits.
  * A write that affected no rows fires nothing, so a no-op update or delete stays silent.
  */
 export async function commitEffects(event: RecordCommitted, joinedTx?: Transaction): Promise<void> {
   if (event.uuids.length === 0) return;
-  if (!isUndefined(joinedTx)) {
-    held.get(joinedTx)?.push(event);
+  if (isUndefined(joinedTx)) return announce(event);
+  const pending = held.get(joinedTx);
+  if (!isUndefined(pending)) {
+    pending.push(event);
     return;
   }
+  const own = [event];
+  if (afterCommit(joinedTx, () => announceAll(own))) held.set(joinedTx, own);
+}
+
+/**
+ * Fires `record:committed` for `event`, skipping when nothing subscribes.
+ */
+async function announce(event: RecordCommitted): Promise<void> {
   const callbacks = useHooks().get('record:committed');
   if (isUndefined(callbacks) || callbacks.length === 0) return;
   await applyHook('record:committed', event);
+}
+
+/**
+ * Fires `record:committed` for each of `events`, in write order.
+ */
+async function announceAll(events: readonly RecordCommitted[]): Promise<void> {
+  for (const event of events) await announce(event);
 }
 
 /**

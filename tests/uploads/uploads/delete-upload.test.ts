@@ -2,8 +2,11 @@ import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { useEnv } from '../../../src/ohne/env/use-env.ts';
+import { hook } from '../../../src/ohne/hooks/hook.ts';
+import { useHooks } from '../../../src/ohne/hooks/use-hooks.ts';
 import { HTTPError } from '../../../src/ohne/http/http-error.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
+import { createFolder } from '../../../src/uploads/uploads/create-folder.ts';
 import { deleteUpload } from '../../../src/uploads/uploads/delete-upload.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
 import { updateUpload } from '../../../src/uploads/uploads/update-upload.ts';
@@ -30,6 +33,20 @@ function objects(prefix: string): string[] {
 }
 
 describe('deleteUpload', () => {
+  it('fires `record:committed` for each committed `Uploads` write, a delete included', async () => {
+    const operations: string[] = [];
+    hook('record:committed', ({ collection, operation }) => {
+      if (collection === 'Uploads') operations.push(operation);
+    });
+    try {
+      await createFolder({ directory: '', name: 'committed' });
+      await deleteUpload(await put('committed', 'one.txt'));
+      deepStrictEqual(operations, ['create', 'create', 'delete']);
+    } finally {
+      useHooks().clear();
+    }
+  });
+
   it('removes a file row and its object', async () => {
     const uuid = await put('gone', 'one.txt');
     await put('gone', 'two.txt');

@@ -6,7 +6,11 @@ import type { RecordCommitted } from '../../../../src/ohne/query/write/committed
 import { useCollections } from '../../../../src/ohne/collections/use-collections.ts';
 import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired.ts';
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
-import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
+import {
+  registerDatabase,
+  registerDialect,
+  useDatabase,
+} from '../../../../src/ohne/database/use-database.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { hook } from '../../../../src/ohne/hooks/hook.ts';
@@ -243,16 +247,63 @@ describe('runCreate hooks', () => {
     deepStrictEqual(events[0].uuids, [(result.record as { UUID: string }).UUID]);
   });
 
-  it('skips `record:committed` for a joined create', async () => {
+  it('fires `record:committed` for a create joined to your own transaction once it commits', async () => {
     const events: RecordCommitted[] = [];
     hook('record:committed', (event) => {
       events.push(event);
     });
-    await db.transaction(async (tx) => {
-      const result = await runCreate('CPost', { ...base, title: 'HookJoined' }, null, tx);
-      ok(result.ok);
+    const result = await useDatabase().transaction(async (tx) => {
+      const joined = await runCreate('CPost', { ...base, title: 'HookJoined' }, null, tx);
+      strictEqual(events.length, 0);
+      return joined;
     });
+    ok(result.ok);
+    deepStrictEqual(events, [
+      {
+        collection: 'CPost',
+        operation: 'create',
+        uuids: [(result.record as { UUID: string }).UUID],
+      },
+    ]);
+  });
+
+  it('fires nothing for a create joined to your own transaction that rolled back', async () => {
+    const events: RecordCommitted[] = [];
+    hook('record:committed', (event) => {
+      events.push(event);
+    });
+    await rejects(
+      useDatabase().transaction(async (tx) => {
+        ok((await runCreate('CPost', { ...base, title: 'HookRolledBack' }, null, tx)).ok);
+        throw new Error('roll back');
+      }),
+      /roll back/,
+    );
     strictEqual(events.length, 0);
+  });
+
+  it('fires only the joined creates of your own transaction that survived their savepoint', async () => {
+    const events: RecordCommitted[] = [];
+    hook('record:committed', (event) => {
+      events.push(event);
+    });
+    hook('record:after-create', async (record, { collection, tx }) => {
+      if (collection !== 'CUser' || record.name !== 'Unwound') return;
+      ok((await runCreate('CPost', { ...base, title: 'HookNested' }, null, tx)).ok);
+      throw new Error('unwind');
+    });
+    const survived = await useDatabase().transaction(async (tx) => {
+      await rejects(runCreate('CUser', { name: 'Unwound' }, null, tx), /unwind/);
+      return runCreate('CPost', { ...base, title: 'HookSurvived' }, null, tx);
+    });
+    ok(survived.ok);
+    deepStrictEqual(events, [
+      {
+        collection: 'CPost',
+        operation: 'create',
+        uuids: [(survived.record as { UUID: string }).UUID],
+      },
+    ]);
   });
 
   it('fires `record:committed` for a write joined in a hook once the outer write commits', async () => {

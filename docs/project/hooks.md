@@ -444,10 +444,9 @@ hook('record:committed', async ({ collection, operation, uuids }) => {
 ```
 
 - It fires after the commit, outside the transaction.
-- A [`.use(tx)`](../database/engine.md#transactions) write inside another write's hook, like a
-  revision row written in `record:after-update`, fires it once that write commits.
-- A `.use(tx)` write on a transaction you opened yourself never fires it, and neither does a write
-  that rolled back.
+- A [`.use(tx)`](../database/engine.md#transactions) write fires it once the transaction it joined
+  commits, whether you opened it with `useDatabase().transaction` or it belongs to another write,
+  like a revision row written in `record:after-update`. A write that rolled back never fires it.
 - The payload carries the `collection`, the `operation`, and the affected `uuids`.
 - A `deleteTranslation` reports an `update` of the records that lost the locale.
 - A create with `locales` reports one `create`, every locale included.
