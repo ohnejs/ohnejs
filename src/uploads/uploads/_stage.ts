@@ -169,6 +169,8 @@ export async function claimStaged(tx: Transaction, temp: string): Promise<void> 
 /**
  * Deletes the staged object `temp` and its `stage` entry, for an upload that failed before its row committed.
  * A failed delete keeps the entry for `sweepStaged` and never replaces the failure that led here.
+ * An object with no `stage` entry is left alone, since a committed row claimed it and its journal moves it.
+ * So a failure after the commit, such as a `record:committed` callback that threw, keeps the row's bytes.
  *
  * @example
  * ```ts
@@ -176,12 +178,14 @@ export async function claimStaged(tx: Transaction, temp: string): Promise<void> 
  * ```
  */
 export async function discardStaged(temp: string): Promise<void> {
+  const entry = () => queryUntyped('UploadsJournal').unscoped().where({ op: 'stage', from: temp });
+  if (!(await entry().exists())) return;
   try {
     await useStorage().delete(temp);
   } catch {
     return;
   }
-  await queryUntyped('UploadsJournal').unscoped().where({ op: 'stage', from: temp }).delete();
+  await entry().delete();
 }
 
 /**

@@ -65,7 +65,17 @@ describe('staging', () => {
 
     strictEqual(text(storage.objects.get(temp)), 'hello');
     await db.transaction((tx) => claimStaged(tx, temp), 'immediate');
+    await storage.delete(temp);
+  });
+
+  it('leaves a claimed object to the row that claimed it', async () => {
+    const { temp } = await stage();
+    await db.transaction((tx) => claimStaged(tx, temp), 'immediate');
+
     await discardStaged(temp);
+
+    strictEqual(text(storage.objects.get(temp)), 'hello');
+    await storage.delete(temp);
   });
 
   it('fails the commit of a staged object a sweep claimed first', async () => {
