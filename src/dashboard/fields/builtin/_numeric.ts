@@ -6,7 +6,7 @@ import type { NumberFieldOptions } from '../known-field-types.ts';
 import type { ScalarParse } from '../parse.ts';
 
 import { numericInputMode } from '../../../utils/html/numeric-input-mode.ts';
-import { decimalMarkIn } from '../../../utils/i18n/decimal-mark-in.ts';
+import { plainNumberIn } from '../../../utils/i18n/plain-number-in.ts';
 import { isNullish } from '../../../utils/is/is-nullish.ts';
 import { isNumber } from '../../../utils/is/is-number.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
@@ -17,7 +17,8 @@ import { stepValue } from '../../../utils/number/step-value.ts';
 import { computed } from '../../../utils/reactive/computed.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
-import { checkAmount } from '../../../utils/validate/check-amount.ts';
+import { checkRange } from '../../../utils/validate/check-range.ts';
+import { checkStep } from '../../../utils/validate/check-step.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { useDashboardLanguage } from '../../runtime/use-dashboard-language.ts';
@@ -371,8 +372,7 @@ function plainNotation<O extends NumberFieldOptions>(
 ): NumericNotation {
   const { min, max, step, suffix } = field.options ?? {};
   const grid = { min, max, step };
-  const mark = decimalMarkIn(language);
-  const text = (value: number): string => String(value).replace('.', mark);
+  const text = (value: number): string => plainNumberIn(value, language);
   const unit = (): string | undefined => translateMessage(suffix);
   // A whole number's arrow keys stop inside a fractional bound, on a value the field can hold.
   const low = kind.decimal ? (min ?? -Infinity) : Math.ceil(min ?? -Infinity);
@@ -386,7 +386,7 @@ function plainNotation<O extends NumberFieldOptions>(
       const symbol = unit();
       return isUndefined(symbol) ? undefined : { side: 'suffix', symbol };
     },
-    check: (value) => checkAmount(value, grid, text),
+    check: (value) => checkRange(value, grid) ?? checkStep(value, grid),
     move: (value, count) =>
       isUndefined(step)
         ? clamp(roundTo(value + count, countDecimals(value)), low, high)

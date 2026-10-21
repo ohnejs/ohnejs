@@ -1,4 +1,5 @@
 import type { MessageAST } from '../../utils/i18n/message-ast.ts';
+import type { MessageParams } from '../../utils/i18n/message-params.ts';
 import type { KnownMessages } from './known-messages.ts';
 import type { Text } from './text-type.ts';
 
@@ -13,10 +14,7 @@ import { dashboardConfig } from './config.ts';
 import { messageCatalog } from './messages.ts';
 import { useDashboardLanguage } from './use-dashboard-language.ts';
 
-/**
- * Value types a message parameter may take, matching the Node-side `MessageParams`.
- */
-export type MessageParams = Record<string, string | number | Date>;
+export type { MessageParams };
 
 /**
  * Translates a known message key to a string in the dashboard's active language.

@@ -221,7 +221,7 @@ describe('rangeType numeric control', () => {
     });
   });
 
-  it("names a span bound in the language's decimal mark", () => {
+  it('names a span bound in the language of the message it lands in', () => {
     effectScope().run(() => {
       const weight = rangeType.control!({
         field: rangeField({ of: 'number', minSpan: 0.5 }),
@@ -232,7 +232,7 @@ describe('rangeType numeric control', () => {
         onInput() {},
       })!;
       weight.restore!({ start: 1, end: 1.25 });
-      deepStrictEqual(weight.read(), { errors: { '': 'At least 0,5' } });
+      deepStrictEqual(weight.read(), { errors: { '': 'At least 0.5' } });
     });
   });
 

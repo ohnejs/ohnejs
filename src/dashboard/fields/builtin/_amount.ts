@@ -34,7 +34,7 @@ export function amountNotation(
     show,
     unit: () => undefined,
     affix: () => currencyAffixIn(currency, language),
-    check: (minor) => checkAmount(minor, { min, max, step }, show),
+    check: (minor) => checkAmount(minor, { min, max, step }, currency),
     move: (minor, count) =>
       isUndefined(step)
         ? clamp(minor + count * 10 ** digits, min ?? -Infinity, max ?? Infinity)

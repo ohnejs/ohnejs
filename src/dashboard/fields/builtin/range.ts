@@ -8,8 +8,6 @@ import { isoTimeToMs } from '../../../utils/date/iso-time-to-ms.ts';
 import { msToISODay } from '../../../utils/date/ms-to-iso-day.ts';
 import { msToISOTime } from '../../../utils/date/ms-to-iso-time.ts';
 import { parseWholeDuration } from '../../../utils/duration/parse-whole-duration.ts';
-import { decimalMarkIn } from '../../../utils/i18n/decimal-mark-in.ts';
-import { formatCurrencyIn } from '../../../utils/i18n/format-currency-in.ts';
 import { isCurrencyCode } from '../../../utils/is/is-currency-code.ts';
 import { isInteger } from '../../../utils/is/is-integer.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
@@ -379,7 +377,7 @@ function numericControl(
   context: FieldControlContext<RangeFieldOptions>,
   of: 'integer' | 'number',
 ): FieldControl {
-  const { field, initial, path, disabled, language, onInput } = context;
+  const { field, initial, path, disabled, onInput } = context;
   const t = useT();
   const { step, currency, suffix, display, open = false } = field.options ?? {};
   const { min, max, minSpan, maxSpan } = (field.options ?? {}) as Partial<Record<Bound, number>>;
@@ -500,13 +498,15 @@ function numericControl(
       if (isNull(high) && !open) {
         return { errors: { end: translateMessage('validation.required') } };
       }
-      const show = isCurrencyCode(currency)
-        ? (minor: number) => formatCurrencyIn(minor, currency, language())
-        : (bound: number) => String(bound).replace('.', decimalMarkIn(language()));
       const failure =
         isNull(high) || !dirty()
           ? undefined
-          : checkNumberSpan(low, high, { min: minSpan, max: maxSpan }, show);
+          : checkNumberSpan(
+              low,
+              high,
+              { min: minSpan, max: maxSpan },
+              isCurrencyCode(currency) ? currency : undefined,
+            );
       return checkedReading(current(), failure);
     },
     draft() {
