@@ -11,7 +11,6 @@ import { hasKey, pick } from 'ohnejs/utils';
 import type { User } from '../../auth/types.ts';
 
 import { translate } from '../../../ohne/http/translate.ts';
-import { commitEffects } from '../../../ohne/query/write/committed.ts';
 import { accountLayout } from '../../auth/account-layout.ts';
 import { createSession } from '../../auth/create-session.ts';
 import { toUser } from '../../auth/to-user.ts';
@@ -42,7 +41,6 @@ export default defineHandler(async (): Promise<User> => {
         roles: ['admin'],
       });
   }, 'immediate');
-  await commitEffects({ collection: 'Users', operation: 'create', uuids: [record.UUID as string] });
 
   await createSession(record.UUID as string);
   return toUser(record, await accountLayout(toUser(record)));
