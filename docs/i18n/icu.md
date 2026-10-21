@@ -35,6 +35,17 @@ formatMessage('{verb} the {kind}.', { verb: 'Open', kind: 'door' }, 'en');
 // -> 'Open the door.'
 ```
 
+A number takes the language's decimal mark, ungrouped. Money passed as `{ minor, currency }` reads as
+the language writes it. To group digits, use [`{n, number}`](#numbers).
+
+```ts
+formatMessage('At most {max}.', { max: 0.5 }, 'de');
+// -> 'At most 0,5.'
+
+formatMessage('At least {min}.', { min: { minor: 1234, currency: 'EUR' } }, 'de');
+// -> 'At least 12,34 €.'
+```
+
 ## Plurals
 
 English has two number forms (one apple, two apples). Russian has three. Arabic has six. Hard-coding
