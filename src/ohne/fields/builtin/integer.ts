@@ -1,7 +1,6 @@
 import type { CurrencyCode } from '../../../utils/index.ts';
 
 import {
-  amountWithCode,
   checkAmount,
   checkRange,
   checkStep,
@@ -46,9 +45,7 @@ export const integer = defineField({
       if (isUndefined(currency)) {
         return failureMessage(checkRange(value, ctx.options) ?? checkStep(value, ctx.options));
       }
-      return failureMessage(
-        checkAmount(value, ctx.options, (minor) => amountWithCode(minor, currency)),
-      );
+      return failureMessage(checkAmount(value, ctx.options, currency));
     },
   ],
   search: {

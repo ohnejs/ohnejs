@@ -303,7 +303,7 @@ describe('range', () => {
   it('checks a numeric span, naming a currency bound as an amount', async () => {
     await rejects(
       bounties().createOrThrow({ name: 'VanCleef', reward: { start: 5000, end: 5999 } }),
-      failsWithParams('reward', 'validation.minSpan', { min: '10.00 EUR' }),
+      failsWithParams('reward', 'validation.minSpan', { min: { minor: 1000, currency: 'EUR' } }),
     );
     await rejects(
       bounties().createOrThrow({ name: 'VanCleef', reward: { start: 5000, end: 1000 } }),
@@ -318,7 +318,9 @@ describe('range', () => {
   it('holds each numeric end to its bounds and grid', async () => {
     await rejects(
       bounties().createOrThrow({ name: 'Edwin', reward: { start: 1000, end: 600_000 } }),
-      failsWithParams('reward.end', 'validation.maxValue', { max: '5000.00 EUR' }),
+      failsWithParams('reward.end', 'validation.maxValue', {
+        max: { minor: 500000, currency: 'EUR' },
+      }),
     );
     await rejects(
       bounties().createOrThrow({ name: 'Edwin', reward: REWARD, weight: { start: 0.25, end: 1 } }),

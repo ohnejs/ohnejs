@@ -3,7 +3,6 @@ import type { Message } from '../../messages/known-messages.ts';
 import type { FieldInstance } from '../field.ts';
 
 import {
-  amountWithCode,
   checkNumberSpan,
   checkSpan,
   coerceToNumber,
@@ -267,11 +266,8 @@ function spanFailure(
 ): ValidationFailure | undefined {
   const { of, minSpan, maxSpan, currency } = options;
   if (!NUMERIC.includes(of)) return checkSpan(start, end, { min: minSpan, max: maxSpan });
-  const show = isUndefined(currency)
-    ? undefined
-    : (minor: number) => amountWithCode(minor, currency);
   const bounds = { min: minSpan as number | undefined, max: maxSpan as number | undefined };
-  return checkNumberSpan(start, end, bounds, show);
+  return checkNumberSpan(start, end, bounds, currency);
 }
 
 /**

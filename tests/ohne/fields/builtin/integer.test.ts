@@ -67,11 +67,11 @@ describe('integer currency', () => {
   it('names a failing bound as an amount in the currency', () => {
     deepStrictEqual(bounds(999, ctx({ currency: 'EUR', min: 1234 })), {
       key: 'validation.minValue',
-      params: { min: '12.34 EUR' },
+      params: { min: { minor: 1234, currency: 'EUR' } },
     });
     deepStrictEqual(bounds(5000, ctx({ currency: 'JPY', max: 4999 })), {
       key: 'validation.maxValue',
-      params: { max: '4999 JPY' },
+      params: { max: { minor: 4999, currency: 'JPY' } },
     });
     strictEqual(bounds(1234, ctx({ currency: 'EUR', min: 0 })), undefined);
   });
@@ -118,7 +118,7 @@ describe('integer currency', () => {
   it('names a value off the grid as an amount', () => {
     deepStrictEqual(bounds(1250, ctx({ currency: 'EUR', step: 500 })), {
       key: 'validation.invalidStep',
-      params: { step: '5.00 EUR' },
+      params: { step: { minor: 500, currency: 'EUR' } },
     });
     strictEqual(bounds(1500, ctx({ currency: 'EUR', step: 500 })), undefined);
   });
