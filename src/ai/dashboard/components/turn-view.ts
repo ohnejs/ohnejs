@@ -530,7 +530,7 @@ function pageLabel(path: string, t: AITranslate): string {
   if (!isUndefined(link)) return translateMessage(link.label);
   const uuid = path.split(/[/?&=#]/).find(isUUID);
   for (const collection of meta?.collections ?? []) {
-    if (path === `/collections/${collection.segment}`) return collection.label;
+    if (path === `/collections/${collection.segment}`) return translateMessage(collection.label);
     if (!isUndefined(uuid) && recordHref(collection, uuid) === path) {
       return labelOf(collection.name, uuid) ?? fallbackLabel(uuid);
     }
@@ -620,7 +620,7 @@ function readLine(proposal: Proposal, result: ReadOutcome['result'], t: AITransl
   if (isUndefined(collection)) {
     return line(icon('eye'), stripCodeSpans(t('ai.dashboard.read.app', { route: proposal.route })));
   }
-  const name = collection.label;
+  const name = translateMessage(collection.label);
   if (result.status < 200 || result.status >= 300) {
     const text =
       result.status === 0
@@ -827,16 +827,20 @@ function searchLines(proposal: Proposal, result: ReadOutcome['result'], t: AITra
   }
   const collections = dashboardMeta()?.collections ?? [];
   const find = (name: string) => collections.find((candidate) => candidate.name === name);
+  const collectionLabel = (name: string): string => {
+    const found = find(name);
+    return isUndefined(found) ? name : translateMessage(found.label);
+  };
   return groups.flatMap(({ collection: name, via, hits, total }) => {
     const collection = find(name);
     if (isUndefined(collection)) return [];
     for (const { UUID, label } of hits) {
       if (isString(label) && label !== '') seedLabel(collection.name, UUID, label);
     }
-    const params = { count: total, collection: collection.label, query };
+    const params = { count: total, collection: translateMessage(collection.label), query };
     const text = isUndefined(via)
       ? t('ai.dashboard.read.found', params)
-      : t('ai.dashboard.read.foundVia', { ...params, target: find(via)?.label ?? via });
+      : t('ai.dashboard.read.foundVia', { ...params, target: collectionLabel(via) });
     return [line(icon('search'), stripCodeSpans(text), refs(collection, hits, total, undefined))];
   });
 }

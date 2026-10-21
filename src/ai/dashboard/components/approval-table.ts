@@ -381,7 +381,10 @@ function headerLine(
     if (isUndefined(collection)) {
       return stripCodeSpans(t('ai.dashboard.batch.request', { route: proposal.route }));
     }
-    const head = t(`ai.dashboard.batch.${verb}`, { count: count(), collection: collection.label });
+    const head = t(`ai.dashboard.batch.${verb}`, {
+      count: count(),
+      collection: translateMessage(collection.label),
+    });
     return isString(locale) ? `${head} ${t('ai.dashboard.batch.locale', { locale })}` : head;
   };
   const filter = (): string => {

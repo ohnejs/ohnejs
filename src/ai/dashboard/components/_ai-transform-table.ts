@@ -287,7 +287,7 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
     const count = reached.value;
     const head = t('ai.dashboard.transform.header', {
       count,
-      collection: collection?.label ?? proposal.route,
+      collection: isNull(collection) ? proposal.route : translateMessage(collection.label),
     });
     return isString(locale) ? `${head} ${t('ai.dashboard.batch.locale', { locale })}` : head;
   };
