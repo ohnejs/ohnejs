@@ -116,6 +116,13 @@ Under `/[...slug]`, these slugs are special:
 - `index` is the home page. It shows at `/`, and `/index` redirects there.
 - `404` is the page your website shows when nothing else matches.
 
+A slug must fit the route it shows under:
+
+- Under `[slug]` it holds no `/`, so `a/b` is refused there.
+- A translatable slug fits its own locale's route, and a shared one fits every locale's.
+- A page whose slug no longer fits, like `a/b` after you change `[...slug]` to `[slug]`, has no
+  address there until you change its slug.
+
 ### Routes per locale
 
 With several [locales](../database/translations.md#configuring-locales), give a route per locale.
