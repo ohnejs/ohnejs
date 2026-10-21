@@ -31,6 +31,10 @@ The grammar:
 - A key with no value is `true`: `?draft` is `{ draft: true }`.
 - A repeated key becomes an array: `?t=1&t=2` is `{ t: [1, 2] }`.
 
+The grammar reads the query as written, so `?tags=%5Bnew%5D` is the string `'[new]'`, not a list.
+`URLSearchParams` and `encodeURIComponent` encode brackets, braces, `:`, `,` and the backtick, so
+build such a URL with `stringifySearchParams` from `ohnejs/utils`.
+
 Typed values are not always what you want: `?id=42` arrives as the number `42`, not the string
 `'42'`. When a value must arrive as text, whatever it looks like, send it with the backtick:
 ``?id=`42`` is `'42'`.
