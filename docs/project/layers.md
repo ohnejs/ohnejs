@@ -169,7 +169,7 @@ export default defineConfig({
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "ohnejs": ">=0.2.0 <0.3.0-0"
+    "ohnejs": ">=0.3.0 <0.4.0-0"
   }
 }
 ```
@@ -215,7 +215,7 @@ line, since the next line may break it:
 
 ```json
 {
-  "peerDependencies": { "ohnejs": ">=0.2.0 <0.3.0-0" }
+  "peerDependencies": { "ohnejs": ">=0.3.0 <0.4.0-0" }
 }
 ```
 
