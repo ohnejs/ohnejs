@@ -6,6 +6,7 @@ import { requireCapability } from 'ohnejs/auth';
 import { hasKey, isNull, isPlainObject, isString, isUndefined, isUUID } from 'ohnejs/utils';
 
 import type { ResolvedAIConfig } from '../../../config.ts';
+import type { Provider } from '../../../providers/provider.ts';
 import type { Turn } from '../../../turns/state.ts';
 
 import { translate } from '../../../../ohne/http/translate.ts';
@@ -75,6 +76,7 @@ const BODY_KEYS = new Set(['input', 'page', 'model', 'skill', 'flow', 'after']);
  * A body that is not an object, an unknown key, an empty or over-long `input`, or a bad `page` is a `400`.
  * So is an `after` that is not a string.
  * A person past `ai.limits.turns` or `ai.limits.tokens`, or already streaming two steps, is a `429`.
+ * Only a turn that starts counts toward `ai.limits.turns`.
  * A turn that starts also prunes the turns `ai.audit.retain` no longer keeps, in the background.
  */
 export default defineHandler(async (): Promise<ReadableStream<Uint8Array>> => {
@@ -102,12 +104,13 @@ export default defineHandler(async (): Promise<ReadableStream<Uint8Array>> => {
   }
   const after = isUndefined(body.after) ? undefined : await followedTurn(body.after, user);
   await probeTokens(user);
-  await enforceTurnsLimit(user);
-  useEvent().waitUntil(pruneTurns());
-  const provider = await useProvider(model, user);
   const release = await acquireStepPermit(user);
+  let provider: Provider;
   let turn: Turn;
   try {
+    await enforceTurnsLimit(user);
+    useEvent().waitUntil(pruneTurns());
+    provider = await useProvider(model, user);
     turn = await openTurn({
       user: user.UUID,
       model,

@@ -349,6 +349,22 @@ describe('POST /ai/turns', () => {
     });
   });
 
+  it('counts no turn the step permit refuses', async () => {
+    await withAI(ai({ limits: { turns: { limit: 3, window: '1h' } } }), async () => {
+      const streaming = [
+        await call(TURNS, { path: '/ai/turns', body: ask, token: asker.token }),
+        await call(TURNS, { path: '/ai/turns', body: ask, token: asker.token }),
+      ];
+      strictEqual((await open(ask, asker.token)).status, 429);
+      for (const { response, drain } of streaming) {
+        await response.body?.cancel();
+        await drain();
+      }
+      server.answer({ body: says('Free again.') });
+      strictEqual((await open(ask, asker.token)).status, 200);
+    });
+  });
+
   it('follows up on a closed turn: the new turn starts from its transcript', async () => {
     server.answer({ body: says('Nobody yet.') }, { body: says('Still nobody.') });
     await withAI(ai(), async () => {
