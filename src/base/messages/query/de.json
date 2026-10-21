@@ -2,6 +2,7 @@
   "unknownParam": "Unbekannter Abfrageparameter `{param}`",
   "invalidField": "Unbekanntes oder unbrauchbares Feld `{field}`",
   "invalidFieldSuggestion": "Unbekanntes oder unbrauchbares Feld `{field}`. Meintest du `{suggestion}`?",
+  "fieldNameRequired": "`{path}` muss ein Feldname sein",
   "blockTypeRequired": "Ein `has` auf dem Blocks-Feld `{field}` muss den Typ mit einer einfachen `block`-Gleichheit nennen",
   "unknownBlockType": "Unbekannter Blocktyp `{block}`",
   "unknownBlockTypeSuggestion": "Unbekannter Blocktyp `{block}`. Meintest du `{suggestion}`?",
