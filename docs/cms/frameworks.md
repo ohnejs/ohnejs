@@ -31,7 +31,8 @@ export default defineNuxtConfig({
 - `NUXT_OHNE_API` replaces it when the server starts, so one build serves every environment.
 - The module types every page from the `ohne.ts` next to `nuxt.config.ts`.
 
-One catch-all page renders every path:
+One catch-all page renders every path. An `app/app.vue` hides it unless it renders `<NuxtPage />`,
+so delete the one Nuxt's starter ships:
 
 ```vue
 <!-- app/pages/[...slug].vue -->
@@ -90,8 +91,9 @@ defineProps<{ fields: Blocks['Hero'] }>();
   `link` field as a `NuxtLink`.
 - `nuxt typecheck` names a block that has no component.
 
-`nuxt typecheck` runs `vue-tsc`, which needs TypeScript 6, so keep your Nuxt app on it. The module's
-[README](https://github.com/ohnejs/nuxt#readme) covers layouts and reading other paths.
+`nuxt typecheck` runs `vue-tsc`, which needs TypeScript 6. Install both with
+`pnpm add -D typescript@6 vue-tsc`. The module's [README](https://github.com/ohnejs/nuxt#readme)
+covers layouts and reading other paths.
 
 ## Next
 
