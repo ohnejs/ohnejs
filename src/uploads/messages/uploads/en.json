@@ -204,6 +204,7 @@
       "description": "The destination of a move; empty for every other operation."
     }
   },
+  "label": "Uploads",
   "menu": {
     "media": "Media"
   },

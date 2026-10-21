@@ -204,6 +204,7 @@
       "description": "Odredište premještanja; prazno za svaku drugu operaciju."
     }
   },
+  "label": "Otpremanja",
   "menu": {
     "media": "Mediji"
   },

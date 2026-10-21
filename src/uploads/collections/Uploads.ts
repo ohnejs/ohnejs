@@ -21,6 +21,7 @@ import type {} from '../fields/_augment.ts';
  * Words find a row by its `name` and `directory` as typed, never by its `hash` or `author`.
  */
 const uploads = defineCollection({
+  label: 'uploads.label',
   api: { read: true },
   duplicate: false,
   compositeIndexes: [{ fields: ['directory', 'name'], unique: true }],

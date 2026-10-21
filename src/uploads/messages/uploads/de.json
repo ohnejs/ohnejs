@@ -204,6 +204,7 @@
       "description": "Das Ziel eines Verschiebens; bei jedem anderen Vorgang leer."
     }
   },
+  "label": "Uploads",
   "menu": {
     "media": "Medien"
   },
