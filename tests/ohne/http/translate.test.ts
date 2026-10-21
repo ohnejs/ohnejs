@@ -18,10 +18,12 @@ import {
   useLayers,
   useMessages,
 } from '../../../src/ohne/index.ts';
+import { type Amount, formatCurrencyIn } from '../../../src/utils/index.ts';
 
 declare module 'ohnejs' {
   interface KnownMessages {
     'translateTest.maxLevel': { max: number };
+    'translateTest.atMost': { max: string | number | Amount };
   }
 }
 
@@ -126,6 +128,21 @@ describe('resolveFieldErrors', () => {
 
     strictEqual(Object.getPrototypeOf(resolved), null);
     deepStrictEqual({ ...resolved }, { name: 'Required', level: 'At most `60`' });
+  });
+
+  it('writes numbers and amounts as the request language does', () => {
+    useMessages().register('en', { 'translateTest.atMost': 'At most `{max}`' });
+    useMessages().register('de', { 'translateTest.atMost': 'Höchstens `{max}`' });
+    runWithEvent(makeEvent('de'), () => {
+      const resolved = resolveFieldErrors({
+        rate: { key: 'translateTest.atMost', params: { max: 0.5 } },
+        fee: { key: 'translateTest.atMost', params: { max: { minor: 1234, currency: 'EUR' } } },
+      });
+      deepStrictEqual(
+        { ...resolved },
+        { rate: 'Höchstens `0,5`', fee: `Höchstens \`${formatCurrencyIn(1234, 'EUR', 'de')}\`` },
+      );
+    });
   });
 
   it('keeps a `__proto__` path', () => {

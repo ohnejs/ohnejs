@@ -64,11 +64,11 @@ export async function generateMessages(from: string = process.cwd()): Promise<st
   const messages = await collectMessages(stackedLayers(), {
     disable: useConfig().disable.messages,
   });
-  const keyTypes = unifyKeyTypes(messages);
+  const keyParams = unifyKeyParams(messages);
   const languages = uniqueArray(messages.map((message) => message.language)).sort();
 
   return Promise.all([
-    writeShared(joinPath(dir, 'shared'), keyTypes, languages),
+    writeShared(joinPath(dir, 'shared'), keyParams, languages),
     writeNode(joinPath(dir, 'node'), messages),
     writeBrowser(joinPath(dir, 'browser')),
   ]);
@@ -77,18 +77,23 @@ export async function generateMessages(from: string = process.cwd()): Promise<st
 /**
  * Writes `shared/messages.ts`: the pure `GeneratedMessages` and `GeneratedLanguages` types.
  * `GeneratedLanguage` follows: the union of the language tags, or `string` when there are none.
- * It holds no runtime and references no module, so both the node and browser programs include it.
+ * It holds no runtime and imports only isomorphic types, so both the node and browser programs include it.
  */
 async function writeShared(
   dir: string,
-  keyTypes: Map<string, string>,
+  keyParams: Map<string, Record<string, MessageParamType>>,
   languages: string[],
 ): Promise<string> {
   const code = createCodeBuilder();
+  const kinds = [...keyParams.values()].flatMap((params) => Object.values(params));
+  if (kinds.some((type) => type.kind === 'value')) {
+    code.line("import type { Amount } from 'ohnejs/utils';");
+    code.line();
+  }
   emitInterface(
     code,
     'export interface GeneratedMessages',
-    [...keyTypes].map(([key, type]) => `${propertyKey(key)}: ${type};`),
+    [...keyParams].map(([key, params]) => `${propertyKey(key)}: ${renderParamObject(params)};`),
   );
   code.line();
   emitInterface(
@@ -179,11 +184,13 @@ function emitInterface(code: CodeBuilder, head: string, members: string[]): void
 }
 
 /**
- * Maps each key to its rendered TypeScript parameter type, sorted by key for deterministic output.
+ * Maps each key to its parameter types, sorted by key for deterministic output.
  * Each language may write a parameter differently; its type narrows to one every language accepts.
  * Throws when two languages name different parameters, or use one with no common type.
  */
-function unifyKeyTypes(messages: readonly MessageMeta[]): Map<string, string> {
+function unifyKeyParams(
+  messages: readonly MessageMeta[],
+): Map<string, Record<string, MessageParamType>> {
   const seen = new Map<string, Translation[]>();
   const unified = new Map<string, Record<string, MessageParamType>>();
   for (const message of messages) {
@@ -207,9 +214,7 @@ function unifyKeyTypes(messages: readonly MessageMeta[]): Map<string, string> {
     unified.set(message.key, current ? unifyMessageParamTypes(current, params)! : params);
   }
 
-  return new Map(
-    [...unified.keys()].sort().map((key) => [key, renderParamObject(unified.get(key)!)]),
-  );
+  return new Map([...unified.keys()].sort().map((key) => [key, unified.get(key)!]));
 }
 
 /**
@@ -243,7 +248,7 @@ function renderParamObject(params: Record<string, MessageParamType>): string {
 function renderParamType(type: MessageParamType): string {
   switch (type.kind) {
     case 'value':
-      return 'string | number';
+      return 'string | number | Amount';
     case 'number':
       return 'number';
     case 'date':

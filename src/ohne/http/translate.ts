@@ -1,4 +1,4 @@
-import type { MessageAST } from '../../utils/index.ts';
+import type { MessageAST, MessageParams } from '../../utils/index.ts';
 import type { Message } from '../messages/known-messages.ts';
 import type { FieldErrors } from '../query/write/errors.ts';
 
@@ -30,10 +30,7 @@ declare module 'ohnejs' {
   }
 }
 
-/**
- * Value types a message parameter may take.
- */
-export type MessageParams = Record<string, string | number | Date>;
+export type { MessageParams };
 
 const cache = new Map<string, MessageAST>();
 

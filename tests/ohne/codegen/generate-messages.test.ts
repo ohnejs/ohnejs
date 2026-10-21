@@ -131,6 +131,20 @@ describe('generateMessages', () => {
     strictEqual(shared.includes("status: { state: 'active' | 'paused' };"), true);
   });
 
+  it('types a plain parameter as a string, a number, or an `Amount`', async () => {
+    const app = join(root, 'plain');
+    writePackage(app, { name: 'plain', ohne: true });
+    writeMessages(app, 'en.json', { fee: 'At least `{min}`', title: 'Fees' });
+
+    await loadLayers(app);
+    const shared = bucket(await generateMessages(app), 'shared');
+    strictEqual(
+      shared.startsWith(`${BANNER}\nimport type { Amount } from 'ohnejs/utils';\n\n`),
+      true,
+    );
+    strictEqual(shared.includes('fee: { min: string | number | Amount };'), true);
+  });
+
   it('throws when a key has different parameters across languages', async () => {
     const app = join(root, 'mismatch');
     writePackage(app, { name: 'mismatch', ohne: true });
