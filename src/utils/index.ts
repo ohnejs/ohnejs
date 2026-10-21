@@ -298,6 +298,7 @@ export * from './rich-text/text-to-rich-text.ts';
 export * from './route/compile-route.ts';
 export * from './route/decode-route-params.ts';
 export * from './route/fill-route.ts';
+export * from './route/fits-route.ts';
 export * from './route/has-route.ts';
 export * from './route/is-local-path.ts';
 export * from './route/normalize-base-path.ts';

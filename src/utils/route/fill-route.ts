@@ -1,9 +1,7 @@
 import type { RouteParams } from './compile-route.ts';
 
 import { isUndefined } from '../is/is-undefined.ts';
-import { ROUTE_PARAM_RE } from './_route-param.ts';
-
-const DOT_SEGMENT = /^\.{0,2}$/;
+import { fitsParam, ROUTE_PARAM_RE } from './_route-param.ts';
 
 /**
  * Fills each param of a route pattern with its value from `params`, percent-encoded.
@@ -31,9 +29,9 @@ export function fillRoute(pattern: string, params: RouteParams): string {
     const name: string = bracketed ?? colon;
     const value = params[name];
     if (isUndefined(value)) throw new Error(`Missing route param \`${name}\``);
-    const segments = catchAll ? value.split('/') : [value];
-    if (segments.some((segment) => segment.includes('/') || DOT_SEGMENT.test(segment)))
+    if (!fitsParam(value, catchAll === '...')) {
       throw new Error(`Invalid route param \`${name}\`: ${JSON.stringify(value)}`);
-    return segments.map(encodeURIComponent).join('/');
+    }
+    return value.split('/').map(encodeURIComponent).join('/');
   });
 }
