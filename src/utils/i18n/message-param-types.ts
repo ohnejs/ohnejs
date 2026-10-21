@@ -10,7 +10,7 @@ import { parseMessage } from './parse-message.ts';
  * The TypeScript type of one message parameter, inferred from how an ICU template uses it.
  * Each kind stands for a concrete annotation:
  *
- * - `value`  -> `string | number` (a plain `{name}` placeholder)
+ * - `value`  -> `string | number | Amount` (a plain `{name}` placeholder)
  * - `number` -> `number` (`{n, number}`, `{n, plural}`, `{n, selectordinal}`)
  * - `date`   -> `Date | number` (`{d, date}`, `{d, time}`)
  * - `choice` -> a union of its `options` literals (`{g, select, a {} b {} other {}}` -> `'a' | 'b'`)

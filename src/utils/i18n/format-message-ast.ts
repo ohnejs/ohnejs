@@ -15,16 +15,19 @@ import { codeSpan } from '../ansi/code-span.ts';
 import { codeSpans } from '../ansi/code-spans.ts';
 import { coerceToDate } from '../coerce/coerce-to-date.ts';
 import { coerceToNumber } from '../coerce/coerce-to-number.ts';
+import { isAmount } from '../is/is-amount.ts';
 import { isDate } from '../is/is-date.ts';
 import { isNull } from '../is/is-null.ts';
 import { isNullish } from '../is/is-nullish.ts';
 import { isNumber } from '../is/is-number.ts';
 import { hasKey } from '../object/has-key.ts';
 import { dateOptionsFromSkeleton } from './date-options-from-skeleton.ts';
+import { formatCurrencyIn } from './format-currency-in.ts';
 import { formatNumberIn } from './format-number-in.ts';
 import { intlLanguage } from './intl-language.ts';
 import { MessageFormatError } from './message-errors.ts';
 import { numberOptionsFromSkeleton } from './number-options-from-skeleton.ts';
+import { plainNumberIn } from './plain-number-in.ts';
 
 type Context = {
   params: Record<string, unknown> | undefined;
@@ -161,11 +164,14 @@ function renderNode(node: MessageNode, ctx: Context): string {
 }
 
 /**
- * Renders a simple argument as its string value, or its `{name}` placeholder when the param is missing.
+ * Renders a simple argument: a number in the language's decimal mark, an `Amount` as money, else its string.
+ * A missing param renders its `{name}` placeholder.
  */
 function renderArgument(node: MessageArgumentNode, ctx: Context): string {
   const value = lookup(node.name, ctx);
   if (isNullish(value)) return missing(node.name, ctx);
+  if (isNumber(value)) return plainNumberIn(value, ctx.language);
+  if (isAmount(value)) return formatCurrencyIn(value.minor, value.currency, ctx.language);
   return String(value);
 }
 

@@ -2,6 +2,7 @@ import { deepStrictEqual, strictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import { applyANSIMarkup, escapeControls, pickANSIColors } from '../../../src/utils/ansi/index.ts';
+import { formatCurrencyIn } from '../../../src/utils/i18n/format-currency-in.ts';
 import { formatMessageAST } from '../../../src/utils/i18n/format-message-ast.ts';
 import { MessageFormatError } from '../../../src/utils/i18n/message-errors.ts';
 import { parseMessage } from '../../../src/utils/i18n/parse-message.ts';
@@ -20,6 +21,28 @@ describe('formatMessageAST - literals and arguments', () => {
 
   it('coerces numeric arguments to string via String()', () => {
     strictEqual(render('count={n}', { n: 7 }), 'count=7');
+  });
+
+  it('writes a fractional number with the language decimal mark, ungrouped', () => {
+    strictEqual(render('at most {max}', { max: 0.5 }, 'de'), 'at most 0,5');
+    strictEqual(render('at most {max}', { max: 0.5 }), 'at most 0.5');
+    strictEqual(render('at most {max}', { max: 12345 }, 'de'), 'at most 12345');
+  });
+
+  it('writes an `Amount` as the language writes money', () => {
+    const min = { minor: 1234, currency: 'EUR' };
+    strictEqual(
+      render('at least {min}', { min }, 'de'),
+      `at least ${formatCurrencyIn(1234, 'EUR', 'de')}`,
+    );
+    strictEqual(render('at least `{min}`', { min }), 'at least `€12.34`');
+  });
+
+  it('writes an object that is no `Amount` via String()', () => {
+    strictEqual(
+      render('{min}', { min: { minor: 1234, currency: 'EUR', label: 'fee' } }),
+      '[object Object]',
+    );
   });
 
   it('coerces bigint via String()', () => {
