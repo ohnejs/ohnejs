@@ -90,6 +90,17 @@ export function invalidFieldError(
 }
 
 /**
+ * A field list element that is not a string, where a field name belongs.
+ * The code stays `invalidField`; the message names the position instead of echoing the value.
+ */
+export function fieldNameRequiredError(path: string): HTTPError {
+  return badRequest(translate('query.fieldNameRequired', { path }), {
+    code: 'invalidField',
+    path,
+  } satisfies WireErrorData);
+}
+
+/**
  * A blocks `has` scope that names no type; the scope must open with a bare `block` equality.
  */
 export function blockTypeRequiredError(field: string, path: string): HTTPError {

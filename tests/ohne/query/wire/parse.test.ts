@@ -884,3 +884,19 @@ describe('`_translations` over the wire', () => {
     strictEqual(open, translatableMeta);
   });
 });
+
+describe('parseQueryParams names a non-string field by its position', () => {
+  for (const [params, path] of [
+    [{ order: [{ title: 'desc' }] }, 'order[0]'],
+    [{ order: [['title', 'desc']] }, 'order[0]'],
+    [{ select: ['title', null] }, 'select[1]'],
+    [{ populate: [1] }, 'populate[0]'],
+  ] as const) {
+    it(`refuses ${JSON.stringify(params)} at \`${path}\``, () => {
+      const error = caught(() => parseQueryParams(params as never, meta, DEFAULT_QUERY_GUARDS));
+      strictEqual(error.status, 400);
+      strictEqual(error.message, 'query.fieldNameRequired');
+      deepStrictEqual(error.data, { code: 'invalidField', path });
+    });
+  }
+});

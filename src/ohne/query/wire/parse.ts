@@ -39,6 +39,7 @@ import {
   duplicateOrderFieldError,
   duplicatePopulateFieldError,
   emptySelectError,
+  fieldNameRequiredError,
   invalidFieldError,
   invalidLocaleError,
   invalidNumberError,
@@ -480,7 +481,7 @@ function parsePopulateLevel(
       return entry;
     }
     if (!isPlainObject(entry)) {
-      throw invalidFieldError(String(entry), `${path}[${index}]`, undefined);
+      throw fieldNameRequiredError(`${path}[${index}]`);
     }
     const normalized: PopulateSpec = {};
     for (const [field, spec] of Object.entries(entry)) {
@@ -675,7 +676,7 @@ function wholeNumber(
 function toStringList(value: SearchParamValue, param: string): string[] {
   const items = toArray(value);
   return items.map((item, index) => {
-    if (!isString(item)) throw invalidFieldError(String(item), `${param}[${index}]`, undefined);
+    if (!isString(item)) throw fieldNameRequiredError(`${param}[${index}]`);
     return item;
   });
 }
