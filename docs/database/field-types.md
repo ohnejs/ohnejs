@@ -769,8 +769,9 @@ A time of day, stored as `HH:MM:SS` text. `HH:MM` input is stored with `:00` sec
 </picture>
 
 An absolute `https://` or `http://` address on a public domain, stored with its scheme and host
-lowercased and a default port dropped. For a `mailto:` or `tel:` address or a `/path`, use
-[`link`](#link).
+lowercased and a default port dropped, along with a path that is only `/`. A `where` compares its
+value as you pass it, so normalize it first with `normalizeHTTPURL` from `ohnejs/utils`. For a
+`mailto:` or `tel:` address or a `/path`, use [`link`](#link).
 
 | Option            | Default | What it does                                                                                                                                                            |
 | ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
