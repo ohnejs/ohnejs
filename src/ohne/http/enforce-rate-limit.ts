@@ -1,9 +1,7 @@
-import { isIPv6 } from 'node:net';
-
 import type { RateLimiter } from '../../utils/index.ts';
 
 import { isEmpty } from '../../utils/index.ts';
-import { ipPrefix } from '../../utils/net/index.ts';
+import { clientNetwork } from '../../utils/net/index.ts';
 import { tooManyRequests } from './http-error.ts';
 import { useEvent } from './use-event.ts';
 import { useResponse } from './use-response.ts';
@@ -36,11 +34,4 @@ export async function enforceRateLimit(
   if (wait === 0) return;
   useResponse().headers.set('Retry-After', String(Math.ceil(wait / 1000)));
   throw tooManyRequests();
-}
-
-/**
- * The key a client IP is counted under: its `/64` for IPv6, the address itself otherwise.
- */
-function clientNetwork(ip: string): string {
-  return isIPv6(ip) ? ipPrefix(ip, 64) : ip;
 }
