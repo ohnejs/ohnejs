@@ -1,3 +1,4 @@
+export * from './client-network.ts';
 export * from './create-cidr-matcher.ts';
 export * from './create-host-matcher.ts';
 export * from './fetch-public.ts';
