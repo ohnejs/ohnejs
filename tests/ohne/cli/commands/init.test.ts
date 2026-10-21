@@ -93,6 +93,17 @@ describe('ohne init', () => {
     strictEqual(manifest.scripts.typecheck, 'tsc');
   });
 
+  it('scripts `test` to prepare, then run the tests under Node with `ohnejs/register`', async () => {
+    const dir = join(freshDir('app'), 'tested');
+
+    await runCommand(ohne, ['init', dir, '--yes']);
+    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    strictEqual(
+      manifest.scripts.test,
+      'ohne prepare && node --test --import ohnejs/register "tests/**/*.test.ts"',
+    );
+  });
+
   it('lets `--name` override the package name', async () => {
     const dir = join(freshDir('app'), 'widgets');
 

@@ -28,6 +28,7 @@ project extend another.
   produces.
 - [Layers](./project/layers.md) - stack projects as packages and override what they ship.
 - [Monorepo](./project/monorepo.md) - your ohne app and your Nuxt or Next website in one repository.
+- [Testing](./project/testing.md) - run your app's tests with Node's test runner.
 
 ## Database
 

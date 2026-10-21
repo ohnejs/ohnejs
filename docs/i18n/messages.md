@@ -69,6 +69,7 @@ export default defineConfig({
     "serve:api": "ohne serve api",
     "serve:dashboard": "ohne serve dashboard",
     "prepare": "ohne prepare",
+    "test": "ohne prepare && node --test --import ohnejs/register \"tests/**/*.test.ts\"",
     "typecheck": "tsc"
   },
   "dependencies": {

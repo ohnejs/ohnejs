@@ -278,6 +278,7 @@ async function scaffold(target: string, name: string, ohne: string): Promise<voi
       'serve:api': 'ohne serve api',
       'serve:dashboard': 'ohne serve dashboard',
       prepare: 'ohne prepare',
+      test: 'ohne prepare && node --test --import ohnejs/register "tests/**/*.test.ts"',
       typecheck: 'tsc',
     },
     dependencies: { ohnejs: ohne },

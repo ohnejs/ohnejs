@@ -17,7 +17,7 @@ npx ohne --help
 ```
 
 The scaffold also adds the everyday commands to `package.json`, so `npm run dev` and the other
-scripts there run without `npx`.
+scripts there run without `npx`. `npm test` runs your [tests](./testing.md).
 
 ## Every command
 
