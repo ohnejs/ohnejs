@@ -88,17 +88,22 @@ To write your own signup, use the `Users` collection and the same helpers the si
 
 ```ts
 // api/signup.post.ts
-import { defineHandler, query, readJSONBody } from 'ohnejs';
-import { createSession, toUser } from 'ohnejs/auth';
+import { badRequest, defineHandler, forbidden, query, queryUntyped, readJSONBody } from 'ohnejs';
+import { accountLayout, createSession, toUser } from 'ohnejs/auth';
+import { isString } from 'ohnejs/utils';
 
 export default defineHandler(async () => {
-  const { email, password } = await readJSONBody<{ email: string; password: string }>();
+  const body = await readJSONBody<{ email?: unknown; password?: unknown } | null>();
+  const email = body?.email;
+  const password = body?.password;
+  if (!isString(email) || !isString(password)) throw badRequest();
+  if (!(await queryUntyped('Users').unscoped().exists())) throw forbidden();
   // enforce whatever your app wants here: a length rule, an invite, a captcha...
 
   const record = await query('Users').createOrThrow({ email, password });
 
   await createSession(record.UUID);
-  return toUser(record);
+  return toUser(record, await accountLayout(toUser(record)));
 });
 ```
 
@@ -110,8 +115,11 @@ read returns the hash, not even `record` here.
 
 - [`createOrThrow`](../database/writing.md#the-result) runs the collection's own email validation
   and its unique constraint, so a bad or duplicate email answers `422` with per-field messages.
+- The route refuses with `403` until the first account exists, so the [install page](#the-endpoints)
+  creates the administrator first. Install only runs while `Users` is empty, so a sign-up that lands
+  first would leave the app without one.
 - `createSession` writes the session cookie, exactly as `login` does.
-- `toUser` returns the same `User` shape that `login` returns.
+- `toUser`, given `accountLayout`, returns the same `User` that `login` returns.
 
 A new account holds no [roles](./roles.md#assigning-roles) unless you pass some, like
 `roles: ['editor']`. The first administrator comes from the [install routes](#the-endpoints).
