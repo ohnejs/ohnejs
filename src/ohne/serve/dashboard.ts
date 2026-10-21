@@ -273,9 +273,11 @@ function resolveAPIURL(): string {
 }
 
 /**
- * Warns when the app's dashboard directory exists without a `tsconfig.json`, printing the one to create.
- * It only extends the generated browser bucket config, which carries the `app/*` paths and the includes.
+ * Warns when the app's dashboard directory exists without a `tsconfig.json`.
+ * It prints the file to create and the `typecheck` command that checks it.
+ * The file only extends the generated browser bucket config, which carries the `app/*` paths and includes.
  * The `extends` path is relative to the dashboard directory, so a nested `dirs.dashboard` still resolves.
+ * The command's path is relative to the app directory, where `package.json` scripts run.
  */
 async function warnMissingTSConfig(dashboardDir: string, appDir: string): Promise<void> {
   if (!(await exists(dashboardDir))) return;
@@ -285,12 +287,14 @@ async function warnMissingTSConfig(dashboardDir: string, appDir: string): Promis
   if (isNull(codegen)) return;
 
   const base = relativePath(dashboardDir, joinPath(codegen, 'browser/tsconfig.json'));
+  const program = relativePath(appDir, joinPath(dashboardDir, 'tsconfig.json'));
   usePrinter().warnBlock({
     title: 'Dashboard has no `tsconfig.json`',
     body: [
       'Without it the editor lacks DOM types and the generated types for dashboard code.',
       'Create a `tsconfig.json` inside it with:',
       `{\n  "extends": ${JSON.stringify(base)}\n}`,
+      `Then add its check to the \`typecheck\` script in \`package.json\`: \`tsc && tsc -p ${program}\`.`,
     ],
     path: relativePath(process.cwd(), dashboardDir),
   });

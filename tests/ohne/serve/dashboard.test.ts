@@ -335,6 +335,7 @@ describe('serveDashboard', () => {
     const out = buf.join('');
     strictEqual(out.includes('Dashboard has no tsconfig.json'), true);
     strictEqual(out.includes('"extends": "../.ohne/browser/tsconfig.json"'), true);
+    strictEqual(out.includes('tsc && tsc -p dashboard/tsconfig.json'), true);
   });
 
   it('derives the suggested tsconfig from the configured dirs', async () => {
@@ -347,7 +348,9 @@ describe('serveDashboard', () => {
     const buf = captureWarnings();
     http = await serveDashboard(dir);
 
-    strictEqual(buf.join('').includes('"extends": "../../generated/browser/tsconfig.json"'), true);
+    const out = buf.join('');
+    strictEqual(out.includes('"extends": "../../generated/browser/tsconfig.json"'), true);
+    strictEqual(out.includes('tsc -p src/ui/tsconfig.json'), true);
   });
 
   it('does not warn when the dashboard tsconfig exists or the folder is absent', async () => {

@@ -412,5 +412,8 @@ The file exists once `prepare` has run, which an install does for you. Your own 
 `compilerOptions`; an `include` of your own would replace the generated one, so leave that to
 codegen.
 
+Plain `tsc` skips this program, so set the `typecheck` script in `package.json` to
+`tsc && tsc -p dashboard/tsconfig.json`.
+
 The dashboard server warns at boot when the file is missing. The warning prints the `extends` line
-with the path adjusted to your `dirs`.
+and the `typecheck` command, with paths adjusted to your `dirs`.
