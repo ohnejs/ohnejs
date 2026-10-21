@@ -234,9 +234,10 @@ export interface DashboardCollection {
   segment: string;
 
   /**
-   * The display label: the sentence-cased collection name.
+   * The display label, translated where it renders through `translateMessage`.
+   * The declared `label`, or the sentence-cased collection name.
    */
-  label: string;
+  label: Text;
 
   /**
    * The Tabler icon the sidebar menu shows, as declared; absent when the collection declares none.

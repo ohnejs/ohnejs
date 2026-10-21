@@ -16,7 +16,7 @@ import { getOrSet } from '../../../utils/map/get-or-set.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { untracked } from '../../../utils/reactive/untracked.ts';
 import { recordHref } from '../../../utils/route/record-href.ts';
-import { useT } from '../../runtime/use-t.ts';
+import { translateMessage, useT } from '../../runtime/use-t.ts';
 import {
   dashboardRecordTarget,
   linkChoiceValue,
@@ -98,7 +98,7 @@ export function linkChoices(links: boolean | readonly string[] = true): LinkChoi
   ): DynamicSelectChoice => ({
     value: linkChoiceValue({ collection: collection.name, record: String(choice.value) }),
     label: choice.label,
-    ...(detailed ? { detail: collection.label } : {}),
+    ...(detailed ? { detail: translateMessage(collection.label) } : {}),
   });
 
   const keywordChoice = async ({ target, safe }: KeywordTarget): Promise<DynamicSelectChoice> => {

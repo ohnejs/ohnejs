@@ -102,6 +102,15 @@ describe('useRecordEditor', () => {
 
   before(async () => {
     baseBrowser('/collections/showcase/u1');
+    Object.assign(document, {
+      getElementById: () => ({
+        textContent: JSON.stringify({
+          apiURL: 'http://api',
+          defaultLanguage: 'en',
+          messageGroups: ['app'],
+        }),
+      }),
+    });
     Object.assign(FakeElement.prototype, { querySelector });
     editor = await import('../../../../src/base/dashboard/components/record-editor.ts');
     ({ hasUnsavedChanges } = await import('../../../../src/dashboard/router/unsaved-changes.ts'));
@@ -135,6 +144,11 @@ describe('useRecordEditor', () => {
     Object.assign(globalThis, {
       fetch: async (url: string, init?: RequestInit) => {
         requests.push(`${init?.method ?? 'GET'} ${url}`);
+        if (url.endsWith('/messages/app/en')) {
+          return Response.json({
+            'app.showcase.label': { template: 'Showcases ({n})', language: 'en' },
+          });
+        }
         if (url.endsWith('/dashboard')) {
           const collections = [SHOWCASE, QUEST_LOG];
           return Response.json({ collections, locales: [], menu: [], blocks: [] });
@@ -167,6 +181,21 @@ describe('useRecordEditor', () => {
     strictEqual(record.dirty(), false);
     return { record, scope };
   }
+
+  it('heads the page with the collection label translated, a message object included', async () => {
+    const { loadLanguage } = await import('../../../../src/dashboard/runtime/messages.ts');
+    await loadLanguage('en');
+    const label = { key: 'app.showcase.label', params: { n: 1 } };
+    const { record, scope } = await open({ ...SHOWCASE, label });
+    const view = effectScope();
+    const [, heading] = view.run(() =>
+      editor.recordEditorHeading(record),
+    ) as unknown as FakeElement[];
+    flush();
+    strictEqual(heading?.textContent, 'Showcases (1)');
+    view.dispose();
+    scope.dispose();
+  });
 
   it('guards leaving on form dirt the history cannot see, and lands a draft it can', async () => {
     const { record, scope } = await open();
