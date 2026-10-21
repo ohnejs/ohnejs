@@ -20,8 +20,8 @@ import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { isValidationError } from '../../../src/ohne/query/write/errors.ts';
 import { createFSStorage } from '../../../src/uploads/storage/fs.ts';
-import { useStorages } from '../../../src/uploads/storage/use-storages.ts';
 import { drainJournal } from '../../../src/uploads/storage/journal.ts';
+import { useStorages } from '../../../src/uploads/storage/use-storages.ts';
 import { putUpload } from '../../../src/uploads/uploads/put-upload.ts';
 import { sleep } from '../../../src/utils/index.ts';
 import { bytes, JPEG_HEAD, png, route, storage, stream, text } from '../_fixture.ts';
@@ -202,7 +202,9 @@ describe('putUpload', () => {
       if (collection === 'Uploads') throw new Error('webhook down');
     });
     try {
-      await rejects(putUpload({ directory: 'webhook', name: 'kept.txt', body: stream(bytes('hi')) }));
+      await rejects(
+        putUpload({ directory: 'webhook', name: 'kept.txt', body: stream(bytes('hi')) }),
+      );
     } finally {
       useHooks().clear();
     }
