@@ -205,6 +205,11 @@ export interface DashboardTable {
    * The declared column entries, one `name|width|minWidth` string per column.
    */
   columns?: readonly string[];
+
+  /**
+   * The declared default sort, in query `order` form.
+   */
+  order?: readonly string[];
 }
 
 /**
