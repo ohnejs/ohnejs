@@ -3,32 +3,30 @@ import { describe, it } from 'node:test';
 
 import { checkAmount } from '../../../src/utils/index.ts';
 
-const show = (minor: number): string => `${minor / 100} EUR`;
-
 describe('checkAmount', () => {
-  it('writes the failing bound as an amount', () => {
-    deepStrictEqual(checkAmount(50, { min: 100 }, show), {
+  it('names the failing bound as an `Amount`', () => {
+    deepStrictEqual(checkAmount(50, { min: 100 }, 'EUR'), {
       key: 'validation.minValue',
-      params: { min: '1 EUR' },
+      params: { min: { minor: 100, currency: 'EUR' } },
     });
-    deepStrictEqual(checkAmount(2500, { max: 1999 }, show), {
+    deepStrictEqual(checkAmount(2500, { max: 1999 }, 'EUR'), {
       key: 'validation.maxValue',
-      params: { max: '19.99 EUR' },
+      params: { max: { minor: 1999, currency: 'EUR' } },
     });
   });
 
-  it('writes the grid of an amount off its step', () => {
-    deepStrictEqual(checkAmount(150, { step: 100 }, show), {
+  it('names the grid of an amount off its step as `Amount`s', () => {
+    deepStrictEqual(checkAmount(150, { step: 100 }, 'EUR'), {
       key: 'validation.invalidStep',
-      params: { step: '1 EUR' },
+      params: { step: { minor: 100, currency: 'EUR' } },
     });
-    deepStrictEqual(checkAmount(200, { step: 100, min: 50 }, show), {
+    deepStrictEqual(checkAmount(200, { step: 100, min: 50 }, 'EUR'), {
       key: 'validation.invalidStepFrom',
-      params: { step: '1 EUR', min: '0.5 EUR' },
+      params: { step: { minor: 100, currency: 'EUR' }, min: { minor: 50, currency: 'EUR' } },
     });
   });
 
   it('passes an amount within bounds', () => {
-    strictEqual(checkAmount(150, { min: 100, max: 200 }, show), undefined);
+    strictEqual(checkAmount(150, { min: 100, max: 200 }, 'EUR'), undefined);
   });
 });

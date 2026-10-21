@@ -29,13 +29,10 @@ describe('checkNumberSpan', () => {
     });
   });
 
-  it('writes the bound through `show`', () => {
-    deepStrictEqual(
-      checkNumberSpan(0, 900, { max: 500 }, (minor) => `${minor / 100} EUR`),
-      {
-        key: 'validation.maxSpan',
-        params: { max: '5 EUR' },
-      },
-    );
+  it('names the bound of a currency span as an `Amount`', () => {
+    deepStrictEqual(checkNumberSpan(0, 900, { max: 500 }, 'EUR'), {
+      key: 'validation.maxSpan',
+      params: { max: { minor: 500, currency: 'EUR' } },
+    });
   });
 });

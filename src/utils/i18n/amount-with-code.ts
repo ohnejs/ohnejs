@@ -5,7 +5,7 @@ import { currencyDigits } from './currency-digits.ts';
 
 /**
  * Writes an amount held in minor units as its exact major decimal and its ISO 4217 code.
- * It reads the same in every language, so it suits a message the server words.
+ * It reads the same in every language, so it suits text for the app author, like a config hint.
  *
  * @example
  * ```ts
