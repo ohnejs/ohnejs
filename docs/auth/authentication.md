@@ -303,9 +303,9 @@ network can lock you out of your account.
 Change the limit with [`auth.loginRateLimit`](#configuration). Set it to `false` when your proxy
 already limits `/auth/login`.
 
-It also runs one password check per client IP at a time, and at most half of Node's thread pool per
-process. A sign-in past that gets a `503` with `Retry-After: 1`. The dashboard's login form waits
-out either answer.
+It also runs one password check per client network at a time, and at most half of Node's thread
+pool per process. A sign-in past that gets a `503` with `Retry-After: 1`, which costs no attempt.
+The dashboard's login form waits out either answer.
 
 Behind a proxy, set [`api.trustProxy`](../production/deployment.md#behind-a-proxy), or every client
 shares one IP. Attempts count where [rate limits](../api/rate-limiting.md#across-processes) do,

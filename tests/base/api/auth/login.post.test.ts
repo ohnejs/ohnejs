@@ -99,6 +99,44 @@ describe('POST /auth/login', () => {
     strictEqual((await attempt('198.51.100.2', undefined, 'grunt-10@horde.gg')).status, 401);
   });
 
+  it('counts no attempt for a 503', async () => {
+    const answers = await Promise.all(Array.from({ length: 12 }, () => attempt('198.51.100.3')));
+    deepStrictEqual(answers.map((answer) => answer.status).sort(), [
+      401,
+      ...Array.from({ length: 11 }, () => 503),
+    ]);
+    strictEqual((await attempt('198.51.100.3')).status, 401);
+  });
+
+  it('counts no attempt for a 400', async () => {
+    for (let i = 0; i < 11; i++) {
+      const request = new Request('http://localhost/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'thrall@horde.gg' }),
+      });
+      const { response } = await dispatch(
+        login,
+        request,
+        new URL(request.url),
+        {},
+        {
+          ip: '198.51.100.4',
+        },
+      );
+      strictEqual(response.status, 400);
+    }
+    strictEqual((await attempt('198.51.100.4')).status, 401);
+  });
+
+  it('runs one password check per IPv6 /64', async () => {
+    const [first, second] = await Promise.all([
+      attempt('2001:db8:5:6::1'),
+      attempt('2001:db8:5:6::2'),
+    ]);
+    deepStrictEqual([first.status, second.status].sort(), [401, 503]);
+  });
+
   it('answers 400 to an email carrying U+0000', async () => {
     strictEqual((await attempt('203.0.113.40', undefined, 'thrall\u0000@horde.gg')).status, 400);
   });

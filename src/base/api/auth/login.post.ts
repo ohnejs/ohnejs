@@ -30,12 +30,12 @@ import { toUser } from '../../auth/to-user.ts';
  * A success whose stored hash predates the configured scrypt cost rehashes it at the current one.
  * Stored costs so converge to the cost `dummyVerify` equalizes at, keeping sign-in timing uniform.
  * Past `auth.loginRateLimit` attempts from one client network, it answers `429`.
- * A process already running its share of password checks, or one IP already running one, answers `503`.
+ * A process already running its share of password checks, or one client network running one, answers `503`.
+ * A `503` or a `400` costs no attempt.
  * A body past 4 KB is a `413`.
  */
 export default defineHandler(
   async (): Promise<User> => {
-    await enforceLoginRateLimit();
     const body = await readJSONBody<{
       email?: unknown;
       password?: unknown;
@@ -48,7 +48,9 @@ export default defineHandler(
       throw badRequest(translate('auth.invalidCredentials'));
 
     const release = acquirePasswordPermit();
-    const user = await verifyCredentials(email, password).finally(release);
+    const user = await enforceLoginRateLimit()
+      .then(() => verifyCredentials(email, password))
+      .finally(release);
 
     await createSession(user.UUID, remember);
     return toUser(user, await accountLayout(toUser(user)));
