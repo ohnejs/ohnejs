@@ -47,12 +47,13 @@ export const dateTime = defineField({
     }),
   validators: [
     (value, ctx) => {
-      const { min, max } = ctx.options;
-      if (!isUndefined(min) && value < instantToMs(min)!) {
-        return validationMessage('validation.minValue', { min });
+      const min = instantToMs(ctx.options.min);
+      const max = instantToMs(ctx.options.max);
+      if (!isUndefined(min) && value < min) {
+        return validationMessage('validation.minValue', { min: new Date(min).toISOString() });
       }
-      if (!isUndefined(max) && value > instantToMs(max)!) {
-        return validationMessage('validation.maxValue', { max });
+      if (!isUndefined(max) && value > max) {
+        return validationMessage('validation.maxValue', { max: new Date(max).toISOString() });
       }
       return undefined;
     },

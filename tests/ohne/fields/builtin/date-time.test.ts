@@ -11,25 +11,25 @@ const ctx = (options: Record<string, unknown> = {}) => ({ options, errors: {} })
 const bounds = dateTime.validators![0];
 
 describe('dateTime bounds', () => {
-  it('rejects an instant before a numeric `min`', () => {
+  it('rejects an instant before a numeric `min`, naming it as a UTC ISO instant', () => {
     deepStrictEqual(bounds(500, ctx({ min: 1000 })), {
       key: 'validation.minValue',
-      params: { min: 1000 },
+      params: { min: '1970-01-01T00:00:01.000Z' },
     });
   });
 
-  it('rejects an instant after a numeric `max`', () => {
+  it('rejects an instant after a numeric `max`, naming it as a UTC ISO instant', () => {
     deepStrictEqual(bounds(2500, ctx({ max: 2000 })), {
       key: 'validation.maxValue',
-      params: { max: 2000 },
+      params: { max: '1970-01-01T00:00:02.000Z' },
     });
   });
 
-  it('rejects an instant before an ISO-string `min`', () => {
-    const min = '2024-01-01T00:00:00Z';
+  it('rejects an instant before an ISO-string `min`, naming it in UTC', () => {
+    const min = '2024-01-01T01:00:00+01:00';
     deepStrictEqual(bounds(Date.parse('2023-12-31T23:59:59Z'), ctx({ min })), {
       key: 'validation.minValue',
-      params: { min },
+      params: { min: '2024-01-01T00:00:00.000Z' },
     });
   });
 
@@ -37,7 +37,7 @@ describe('dateTime bounds', () => {
     const max = '2024-12-31T00:00:00Z';
     deepStrictEqual(bounds(Date.parse('2025-01-01T00:00:00Z'), ctx({ max })), {
       key: 'validation.maxValue',
-      params: { max },
+      params: { max: '2024-12-31T00:00:00.000Z' },
     });
   });
 
