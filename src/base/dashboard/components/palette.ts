@@ -112,7 +112,7 @@ css`
     margin-top: 12dvh;
   }
 
-  .o-palette .ohne-popup-footer {
+  .o-palette .ohne-popup-footer:not(:empty) {
     display: flex;
     gap: 0.5rem;
     align-items: center;
