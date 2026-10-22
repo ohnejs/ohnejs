@@ -14,7 +14,16 @@ import {
   type VerticalMenuItemModel,
   when,
 } from 'ohnejs/dashboard';
-import { flattenTree, isEmpty, isUndefined, ref, type Ref, withTrailingSlash } from 'ohnejs/utils';
+import {
+  flattenTree,
+  isEmpty,
+  isUndefined,
+  type RecordHrefTarget,
+  recordHref,
+  ref,
+  type Ref,
+  withTrailingSlash,
+} from 'ohnejs/utils';
 
 import { type MenuSection, menuSections } from './menu-sections.ts';
 
@@ -101,4 +110,17 @@ export function activeTarget(menu: readonly DashboardMenuItem[], path: string): 
     if (holds && to.length > (best?.length ?? -1)) best = to;
   }
   return best;
+}
+
+/**
+ * Whether the menu leads to `collection`: a link to its list, or one its record pages open under.
+ * A collection the menu hides is reached by neither, so the overview page leaves it out too.
+ */
+export function menuReaches(
+  menu: readonly DashboardMenuItem[],
+  collection: RecordHrefTarget,
+): boolean {
+  const [record = ''] = recordHref(collection, 'record').split('?');
+  const paths = [`/collections/${collection.segment}`, record];
+  return paths.some((path) => !isUndefined(activeTarget(menu, path)));
 }

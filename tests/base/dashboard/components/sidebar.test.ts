@@ -51,3 +51,31 @@ describe('activeTarget', () => {
     assert.equal(activeTarget(menu, '/overview'), '/overview');
   });
 });
+
+describe('menuReaches', () => {
+  let menuReaches!: Sidebar['menuReaches'];
+
+  before(async () => {
+    baseBrowser('/');
+    ({ menuReaches } = await import('../../../../src/base/dashboard/components/sidebar.ts'));
+  });
+
+  it('reaches a collection through its own link', () => {
+    const menu = [group('collections', link('/collections/posts'))];
+    assert.equal(menuReaches(menu, { segment: 'posts' }), true);
+  });
+
+  it('misses a collection the menu leaves out', () => {
+    const menu = [group('collections', link('/collections/posts'))];
+    assert.equal(menuReaches(menu, { segment: 'sessions' }), false);
+  });
+
+  it('reaches a collection through the page its records open on', () => {
+    const uploads = { segment: 'uploads', recordPath: '/media?details=[uuid]' };
+    assert.equal(menuReaches([link('/media')], uploads), true);
+  });
+
+  it('matches whole segments only', () => {
+    assert.equal(menuReaches([link('/collections/post')], { segment: 'posts' }), false);
+  });
+});

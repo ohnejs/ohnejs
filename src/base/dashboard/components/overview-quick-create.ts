@@ -16,6 +16,8 @@ import { computed, effect, isUndefined, naturalCompare, onCleanup } from 'ohnejs
 
 import type { OverviewSearch } from '../pages/overview.ts';
 
+import { menuReaches } from './sidebar.ts';
+
 interface QuickCreateShortcut {
   name: string;
   label: string;
@@ -55,7 +57,7 @@ css`
 
 /**
  * The Quick create widget.
- * A card of outline buttons, one per creatable collection, each linking to its create page.
+ * A card of outline buttons, one per creatable collection the menu reaches, each linking to its create page.
  * A collection's declared icon renders before its label.
  * The shared `search` filters them and the card hides while nothing matches.
  */
@@ -64,8 +66,10 @@ export function overviewQuickCreate(search: OverviewSearch): Child {
 
   const shortcuts = computed<QuickCreateShortcut[]>(() => {
     const items: QuickCreateShortcut[] = [];
-    for (const collection of dashboardMeta()?.collections ?? []) {
+    const meta = dashboardMeta();
+    for (const collection of meta?.collections ?? []) {
       if (collection.operations.create?.allowed !== true) continue;
+      if (!menuReaches(meta?.menu ?? [], collection)) continue;
       items.push({
         name: collection.name,
         label: translateMessage(collection.label),

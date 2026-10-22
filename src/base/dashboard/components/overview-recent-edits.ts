@@ -37,6 +37,8 @@ import {
 
 import type { OverviewSearch } from '../pages/overview.ts';
 
+import { menuReaches } from './sidebar.ts';
+
 /**
  * One recently updated record, flattened for the list row.
  */
@@ -326,7 +328,8 @@ function recentRow(entry: () => RecentEdit): Child {
 }
 
 /**
- * One cursor per readable collection that can match every search token, each starting empty at offset zero.
+ * One cursor per readable collection the menu reaches that can match every search token.
+ * Each starts empty at offset zero.
  * A token in the collection's label or name holds for all its records, so only the rest narrow its read.
  * The rest must each appear in a label field, so a singleton or a collection without one drops out.
  */
@@ -334,6 +337,7 @@ function bucketsOf(meta: DashboardMeta, tokens: readonly string[]): Bucket[] {
   const buckets: Bucket[] = [];
   for (const collection of meta.collections) {
     if (collection.operations.read?.allowed !== true) continue;
+    if (!menuReaches(meta.menu, collection)) continue;
     const own = `${translateMessage(collection.label)} ${collection.name}`.toLowerCase();
     const rest = tokens.filter((token) => !own.includes(token));
     const { singleton, labelFields } = collection;

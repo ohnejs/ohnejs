@@ -290,6 +290,7 @@ export default defineConfig({
 
 - `hidden: true` hides a node and everything under it. A layer closer to your app can set
   `hidden: false` to bring it back.
+- A collection the menu does not reach is left off the overview page too.
 - `parent: null` moves a node to the root, even when a layer gave it a parent.
 - A `to` or an `icon` a layer set cannot be removed. Hide the node and declare your own instead.
 
