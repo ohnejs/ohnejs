@@ -3,6 +3,7 @@ import type { FieldForm } from '../field-form.ts';
 import type { RepeaterFieldOptions } from '../known-field-types.ts';
 
 import { isArray } from '../../../utils/is/is-array.ts';
+import { isEmpty } from '../../../utils/is/is-empty.ts';
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isPlainObject } from '../../../utils/is/is-plain-object.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
@@ -73,6 +74,7 @@ css`
  *
  * Cells digest the first item's values on one line, a dim `+N` counting the rest.
  * A first item with nothing to show keeps the dim item count.
+ * Each card header digests its own item the same way, or reads `#N` when it has nothing to show.
  * There is no inline cell editor: the list edits on the record page as structure cards.
  * Cards drag-reorder across matching repeaters and collapse.
  * Kept items ride their `UUID`.
@@ -91,7 +93,7 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       const first = items[0];
       if (!isPlainObject<Record<string, unknown>>(first)) return dimMark(`${items.length} ×`);
       const parts = summaryParts(first, subfields);
-      if (parts.length === 0) return dimMark(`${items.length} ×`);
+      if (isEmpty(parts)) return dimMark(`${items.length} ×`);
       return [
         summarySpan(parts, summaryTitle(first, subfields, t)),
         items.length > 1 ? dimMark(` +${items.length - 1}`) : null,
@@ -283,7 +285,13 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
         isDraggable: !off,
         dropItemsHereLabel: () => t('dashboard.dropItemsHere'),
         header: (entry, index) => [
-          h('span', { class: 'ohne-muted ohne-truncate' }, () => `#${index() + 1}`),
+          h('span', { class: 'ohne-muted ohne-truncate' }, () => {
+            const item = valueOf(entry().form);
+            const parts = summaryParts(item, subfields);
+            return isEmpty(parts)
+              ? `#${index() + 1}`
+              : summarySpan(parts, summaryTitle(item, subfields, t));
+          }),
           off
             ? null
             : trackItemFocus(

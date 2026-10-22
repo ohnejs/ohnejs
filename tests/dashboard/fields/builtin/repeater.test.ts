@@ -79,6 +79,20 @@ function bodyOf(root: unknown, index: number): FakeElement {
   ) as FakeElement;
 }
 
+/**
+ * Each card header's item name under `root`, in document order.
+ */
+function headersOf(root: unknown): string[] {
+  const names: string[] = [];
+  findElement(root as FakeElement, (element) => {
+    if (hasClass(element, 'ohne-structure-item-header')) {
+      names.push(findElement(element, (child) => hasClass(child, 'ohne-muted'))?.textContent ?? '');
+    }
+    return false;
+  });
+  return names;
+}
+
 trackFocus();
 
 const ACTS: DashboardField = {
@@ -119,6 +133,20 @@ describe('repeaterType control', () => {
       deepStrictEqual(form.controlOf('faq')?.draft?.(), [
         { question: 'How?', answer: 'Because.', UUID: 'q1' },
       ]);
+    });
+  });
+
+  it('names each card by its item, live as the user types, and by its number while it is blank', () => {
+    effectScope().run(() => {
+      const stored = { quests: [{ UUID: 'q1', question: 'Why' }, { UUID: 'q2' }] };
+      const form = createFieldForm([QUESTS], stored, { mode: 'edit', path: '', language });
+      const element = h('div', null, form.render());
+      flush();
+      deepStrictEqual(headersOf(element), ['Why', '#2']);
+      type(inputsOf(element)[1] as FakeElement, 'How');
+      deepStrictEqual(headersOf(element), ['Why', 'How']);
+      type(inputsOf(element)[0] as FakeElement, '');
+      deepStrictEqual(headersOf(element), ['#1', 'How']);
     });
   });
 
