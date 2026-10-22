@@ -454,6 +454,35 @@ css`
     padding-top: 0.75rem;
   }
 
+  /* A flush card does not clip its body, so the table rounds the corners it shares with the card. */
+  .ohne-card
+    > :is(.ohne-card-body-flush:first-child, :empty + .ohne-card-body-flush)
+    > .ohne-table:first-child
+    > .ohne-table-viewport {
+    overflow: clip;
+    border-top-left-radius: calc(var(--ohne-radius) - 1px);
+    border-top-right-radius: calc(var(--ohne-radius) - 1px);
+  }
+
+  .ohne-card
+    > .ohne-card-body-flush:is(:last-child, :has(+ :empty:last-child))
+    > .ohne-table:last-child
+    > .ohne-table-viewport:last-child {
+    overflow: clip;
+    border-bottom-left-radius: calc(var(--ohne-radius) - 1px);
+    border-bottom-right-radius: calc(var(--ohne-radius) - 1px);
+  }
+
+  .ohne-card
+    > .ohne-card-body-flush
+    > .ohne-table:last-child
+    > .ohne-table-viewport:last-child
+    tbody
+    > tr:last-child
+    > td {
+    border-bottom-width: 0;
+  }
+
   @container (max-width: 30rem) {
     .ohne-table-grid:not(.ohne-table-fixed) :where(th, td).ohne-table-first {
       max-width: 10rem;
