@@ -19,6 +19,7 @@ export default defineLayer({
           icon: 'layout-dashboard',
         },
         Users: { parent: 'management', order: 1 },
+        Sessions: { hidden: true },
       },
     },
   },
