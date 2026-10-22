@@ -34,7 +34,7 @@ import {
   placeBlocks,
   stepBlocks,
 } from './_block-tree.ts';
-import { blockIcon, blocksOf } from './_blocks.ts';
+import { blockIcon, blocksOf, blockTitle } from './_blocks.ts';
 import { blockNamed } from './_items.ts';
 import { openBlockPicker } from './block-picker-popup.ts';
 import { blocksHandleOf } from './builtin/blocks.ts';
@@ -421,12 +421,7 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
       );
     }
     const block = blockNamed(blocksOf(), row.node.block);
-    const label = (): string => {
-      const field = block?.titleField;
-      const value = isUndefined(field) ? undefined : valueOf(row.node, field);
-      const name = isUndefined(block) ? row.node.block : translateMessage(block.label);
-      return isUndefined(value) || value === '' ? name : `${name} (${value})`;
-    };
+    const label = (): string => blockTitle(block, row.node.block, row.node.form);
     const errored = h('span', { class: 'ohne-shrink-0' }, () =>
       row.node.own.value !== '' || row.node.form.errored()
         ? bubble('!', { variant: 'destructive' })

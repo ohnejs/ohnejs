@@ -17,7 +17,7 @@ import { translateMessage, useT } from '../../runtime/use-t.ts';
 import { button } from '../../ui/button.ts';
 import { icon } from '../../ui/icon.ts';
 import { structure, type StructureHandle } from '../../ui/structure.ts';
-import { blocksOf } from '../_blocks.ts';
+import { blocksOf, blockTitle } from '../_blocks.ts';
 import { itemFolds, listFolds } from '../_folds.ts';
 import { blockNamed, entryKey, identityOf, itemFormSupports, uuidOf } from '../_items.ts';
 import { openBlockPicker } from '../block-picker-popup.ts';
@@ -386,7 +386,9 @@ export const blocksType: FieldType = {
             surface = handle;
           },
           header: (node, index) => [
-            h('span', { class: 'ohne-muted ohne-truncate' }, () => labelOf(node().block, blocks)),
+            h('span', { class: 'ohne-muted ohne-truncate' }, () =>
+              blockTitle(blockNamed(blocks, node().block), node().block, node().form),
+            ),
             off
               ? null
               : trackItemFocus(

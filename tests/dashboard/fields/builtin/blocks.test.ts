@@ -92,6 +92,20 @@ function bodyOf(root: unknown, index: number): FakeElement {
 }
 
 /**
+ * Each card header's block name under `root`, in document order.
+ */
+function headersOf(root: unknown): string[] {
+  const names: string[] = [];
+  findElement(root as FakeElement, (element) => {
+    if (hasClass(element, 'ohne-structure-item-header')) {
+      names.push(findElement(element, (child) => hasClass(child, 'ohne-muted'))?.textContent ?? '');
+    }
+    return false;
+  });
+  return names;
+}
+
+/**
  * Lets the discovery fetches land and runs the effects they queued.
  */
 async function fetched(): Promise<void> {
@@ -112,7 +126,7 @@ describe('blocksType control', () => {
     });
     mock.method(globalThis, 'fetch', async (url: string) => {
       if (!url.endsWith('/dashboard')) return new Response(JSON.stringify(ADMIN));
-      const blocks = [{ name: 'Hero', label: 'Hero', fields: [TITLE] }];
+      const blocks = [{ name: 'Hero', label: 'Hero', fields: [TITLE], titleField: 'title' }];
       return new Response(JSON.stringify({ collections: [], locales: [], menu: [], blocks }));
     });
     sessionUser();
@@ -139,6 +153,27 @@ describe('blocksType control', () => {
       strictEqual(form.controlOf('sections')?.errored?.(), true);
       strictEqual(form.setErrors({}), '');
       strictEqual(form.errored(), false);
+    });
+  });
+
+  it('names each card by its block and its live title, the bare label while the title is empty', () => {
+    effectScope().run(() => {
+      const stored = {
+        sections: [
+          { block: 'Hero', UUID: 'b1', fields: { title: 'Fall' } },
+          { block: 'Hero', UUID: 'b2', fields: {} },
+        ],
+      };
+      const form = createFieldForm([SECTIONS], stored, {
+        mode: 'edit',
+        path: '',
+        language: () => 'en',
+      });
+      const element = h('div', null, form.render());
+      flush();
+      deepStrictEqual(headersOf(element), ['Hero (Fall)', 'Hero']);
+      type(inputsOf(element)[1] as FakeElement, 'Rise');
+      deepStrictEqual(headersOf(element), ['Hero (Fall)', 'Hero (Rise)']);
     });
   });
 
