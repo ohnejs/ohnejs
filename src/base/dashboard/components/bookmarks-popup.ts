@@ -73,6 +73,12 @@ css`
     font-weight: 500;
   }
 
+  .o-bookmarks-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ohne-gap);
+  }
+
   .o-bookmarks .ohne-field > * + * {
     margin-top: 0.75rem;
   }
@@ -411,7 +417,7 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
     onClick: () => options.onClose(handle.close),
   });
 
-  const handle = popup(h('div', null, loaded(list, sections), nameHost), {
+  const handle = popup(h('div', { class: 'o-bookmarks-body' }, loaded(list, sections), nameHost), {
     size: -1,
     fullHeight: 'auto',
     header: h(

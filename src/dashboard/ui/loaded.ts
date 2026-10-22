@@ -45,18 +45,29 @@ export interface LoadedOptions<T> {
 type Phase = 'forbidden' | 'error' | 'loading' | 'empty' | 'ready';
 
 css`
-  .ohne-loaded {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--ohne-gap);
+  .ohne-loaded,
+  .ohne-loaded-content {
+    display: contents;
   }
 
-  .ohne-loaded-stale > .ohne-loaded-content {
+  :where(.ohne-card-body) > .ohne-loaded > :where(*),
+  :where(.ohne-card-body > .ohne-loaded) > .ohne-loaded-content > :where(*) {
+    margin-top: 1em;
+  }
+
+  :where(.ohne-card-body) > .ohne-loaded:first-child > :where(:first-child),
+  :where(.ohne-card-body > .ohne-loaded:first-child)
+    > .ohne-loaded-content:first-child
+    > :where(:first-child) {
+    margin-top: 0;
+  }
+
+  .ohne-loaded-stale > .ohne-loaded-content > * {
     opacity: 0.6;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .ohne-loaded-content {
+    :where(.ohne-loaded-content) > * {
       transition: opacity 0.15s ease;
     }
   }
@@ -68,6 +79,7 @@ css`
  * `render` builds once per arrival at the ready state and receives a live getter of the value.
  * A reload or a poll therefore updates the region in place, keeping focus and scroll.
  * A stale value dims and reads as busy; an error over a shown value raises an alert above it.
+ * The region adds no box, so the blocks `render` returns take the spacing of the layout around them.
  * A throw inside `render` shows an error state in this region only.
  * A plain getter has only the loading, empty, and ready states; a `Resource` adds the rest.
  *
