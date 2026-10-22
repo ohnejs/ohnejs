@@ -584,9 +584,8 @@ function requiredOf(meta: FieldQueryMeta): boolean {
 }
 
 /**
- * The fields that name a record: the declared `recordLabel` as a list, or the first plain text field.
+ * The fields that name a record: the declared `recordLabel` as a list, or the `firstTextField`.
  * A declared template contributes its `{field}` tokens in order.
- * The fallback is the first readable plain `text` column, never `UUID` or a password.
  */
 function labelFieldsOf(
   declared: RecordLabel | undefined,
@@ -596,13 +595,21 @@ function labelFieldsOf(
     if (isRecordLabelTemplate(declared)) return templateFields(declared) ?? [];
     return isString(declared) ? [declared] : declared;
   }
-  const fallback = fields.find(
+  const fallback = firstTextField(fields);
+  return isUndefined(fallback) ? [] : [fallback];
+}
+
+/**
+ * The name of the first readable plain `text` column, never `UUID` or a password.
+ * It names a record or a block instance that declares no field of its own for that.
+ */
+export function firstTextField(fields: readonly DashboardField[]): string | undefined {
+  return fields.find(
     (field) =>
       field.readable &&
       field.kind === 'column' &&
       field.logicalType === 'text' &&
       field.type !== 'password' &&
       field.name !== 'UUID',
-  );
-  return isUndefined(fallback) ? [] : [fallback.name];
+  )?.name;
 }

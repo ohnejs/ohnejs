@@ -34,6 +34,7 @@ import {
   declaredLabelOf,
   describeCollections,
   describeFields,
+  firstTextField,
   resolveLayout,
 } from '../collections-api/describe.ts';
 import { resolveDashboardMenu } from '../menu/resolve-menu.ts';
@@ -67,7 +68,8 @@ export interface DashboardBlock {
   icon?: IconName | { field: string; map: Record<string, IconName>; default?: IconName };
 
   /**
-   * The field whose value names one instance beside the label; absent when the block declares none.
+   * The field whose value names one instance beside the label: the declared one, else the first text field.
+   * Absent when the block declares none and has no plain text field.
    */
   titleField?: string;
 
@@ -334,7 +336,8 @@ function describeBlocks(roots: readonly DashboardField[]): DashboardBlock[] {
     const block: DashboardBlock = { name, label: declaredLabelOf(name, meta.block.label), fields };
     if (!isUndefined(description)) block.description = description;
     if (!isUndefined(dashboard?.icon)) block.icon = dashboard.icon;
-    if (!isUndefined(dashboard?.titleField)) block.titleField = dashboard.titleField;
+    const titleField = dashboard?.titleField ?? firstTextField(fields);
+    if (!isUndefined(titleField)) block.titleField = titleField;
     const layout = resolveLayout(dashboard?.layout, fields);
     if (!isUndefined(layout)) block.layout = layout;
     described.set(name, block);

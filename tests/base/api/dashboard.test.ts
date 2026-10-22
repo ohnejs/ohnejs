@@ -1117,7 +1117,20 @@ describe('blocks', () => {
     deepStrictEqual(hero.icon, { field: 'heading', map: { big: 'photo' }, default: 'cube' });
     strictEqual(hero.titleField, 'heading');
     const aside = block(body, 'DashAside');
-    strictEqual('description' in aside || 'icon' in aside || 'titleField' in aside, false);
+    strictEqual('description' in aside || 'icon' in aside, false);
+  });
+
+  it('names a block without a declared title field by its first plain text field', async () => {
+    strictEqual(block((await call(user)).body, 'DashAside').titleField, 'words');
+    hook('auth:account-layout', (layout) => {
+      layout.push({ card: ['badges'] });
+    });
+    try {
+      const { body } = await call(user);
+      strictEqual('titleField' in block(body, 'DashBadge'), false);
+    } finally {
+      useHooks().delete('auth:account-layout');
+    }
   });
 
   it("describes a block's own fields, led by `UUID` and without `_updatedAt`", async () => {

@@ -334,7 +334,8 @@ export interface DashboardBlock {
   icon?: IconName | { field: string; map: Record<string, IconName>; default?: IconName };
 
   /**
-   * The field whose value names one instance beside the label; absent when the block declares none.
+   * The field whose value names one instance beside the label: the declared one, else the first text field.
+   * Absent when the block declares none and has no plain text field.
    */
   titleField?: string;
 

@@ -134,6 +134,9 @@ export default defineBlock({
 A plain string shows as written. A message key is replaced by its text in the viewer's language, so
 the label lives in your [catalogs](../i18n/messages.md#catalogs) with the rest of your UI strings.
 
+In the editor, each block shows its first text field beside the name, like `Pricing card (Team plan)`.
+Set `dashboard.titleField` to show another field instead, a rich text heading included.
+
 A block also takes a `dashboard.layout`, the same [field layout](../dashboard/field-layouts.md) a
 collection declares, to arrange its fields in the editor.
 
