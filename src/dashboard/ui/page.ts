@@ -35,7 +35,8 @@ export interface PageOptions {
   back?: string;
 
   /**
-   * Content at the header's end, usually buttons; it moves under the heading in a narrow page.
+   * Content on the title's line at the header's end, usually buttons.
+   * It moves under the heading in a narrow page.
    */
   actions?: Child;
 }
@@ -49,17 +50,10 @@ css`
   }
 
   .ohne-page-header {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75em 1em;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.25em;
     align-items: center;
-    justify-content: space-between;
-  }
-
-  .ohne-page-heading {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25em;
   }
 
   /* The second class outranks the base link chrome while keeping its focus ring. */
@@ -67,7 +61,7 @@ css`
     display: inline-flex;
     gap: 0.25em;
     align-items: center;
-    align-self: flex-start;
+    justify-self: start;
     margin-bottom: 0.25em;
     color: hsl(var(--ohne-muted-foreground));
     font-size: calc(1em - 0.125rem);
@@ -105,12 +99,28 @@ css`
     flex-wrap: wrap;
     gap: 0.5em;
     align-items: center;
+    margin-top: 0.5em;
   }
 
-  @container ohne-page (width < 48rem) {
+  @container ohne-page (width >= 48rem) {
     .ohne-page-header {
-      flex-direction: column;
-      align-items: stretch;
+      grid-template-columns: minmax(0, 1fr) fit-content(50%);
+    }
+
+    .ohne-page-back,
+    .ohne-page-title-row,
+    .ohne-page-description {
+      grid-column: 1;
+    }
+
+    .ohne-page-actions {
+      grid-area: 1 / 2;
+      justify-content: flex-end;
+      margin: 0 0 0 1em;
+    }
+
+    .ohne-page-back ~ .ohne-page-actions {
+      grid-row: 2;
     }
   }
 `;
@@ -118,7 +128,7 @@ css`
 /**
  * A dashboard page's content: one header with the `h1`, then the children stacked with gap step `2`.
  * The title also names the browser tab while the page lives, so the two never drift apart.
- * The header's actions sit on the right and move under the heading in a page narrower than `md`.
+ * The header's actions sit at the right of the title's line and move under the heading below `md`.
  *
  * @example
  * ```ts
@@ -139,24 +149,20 @@ export function page(options: PageOptions, ...children: Child[]): HTMLElement {
     h(
       'header',
       { class: 'ohne-page-header' },
+      isUndefined(back)
+        ? null
+        : h('a', { class: 'ohne-page-back', href: back }, icon('arrow-left'), () =>
+            defaultText('dashboard.back', 'Back'),
+          ),
       h(
         'div',
-        { class: 'ohne-page-heading' },
-        isUndefined(back)
-          ? null
-          : h('a', { class: 'ohne-page-back', href: back }, icon('arrow-left'), () =>
-              defaultText('dashboard.back', 'Back'),
-            ),
-        h(
-          'div',
-          { class: 'ohne-page-title-row' },
-          h('h1', { class: 'ohne-page-title' }, () => resolveText(title)),
-          badge,
-        ),
-        isUndefined(description)
-          ? null
-          : h('div', { class: 'ohne-page-description' }, proseChild(description)),
+        { class: 'ohne-page-title-row' },
+        h('h1', { class: 'ohne-page-title' }, () => resolveText(title)),
+        badge,
       ),
+      isUndefined(description)
+        ? null
+        : h('div', { class: 'ohne-page-description' }, proseChild(description)),
       isUndefined(actions) ? null : h('div', { class: 'ohne-page-actions' }, actions),
     ),
     ...children,
