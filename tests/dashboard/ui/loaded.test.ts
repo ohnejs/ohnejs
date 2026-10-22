@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import type { EffectScope } from '../../../src/utils/reactive/effect-scope.ts';
 
-import { type FakeElement, findElement, hasClass } from '../_fake-dom.ts';
+import { type FakeElement, FakeText, findElement, hasClass } from '../_fake-dom.ts';
 import { requests, resetFetch, settle } from '../_fake-fetch.ts';
 
 const { h } = await import('../../../src/dashboard/render/h.ts');
@@ -140,5 +140,22 @@ describe('loaded', () => {
     flush();
     const region = findElement(root, (element) => hasClass(element, 'ohne-loaded'));
     strictEqual(region?.getAttribute('class'), 'ohne-loaded ohne-loaded-stale');
+  });
+
+  it('boxes text, so a stale dim reaches it', () => {
+    const zone = ref('Durotar');
+    const root = mount(() =>
+      loaded(
+        () => zone.value,
+        (value) => ['Zone ', () => value()],
+      ),
+    );
+    flush();
+    const content = findElement(root, (element) => hasClass(element, 'ohne-loaded-content'));
+    const bare = () => content?.childNodes.filter((node) => node instanceof FakeText).length;
+    strictEqual(bare(), 0);
+    zone.value = 'Barrens';
+    strictEqual(text(root), 'Zone Barrens');
+    strictEqual(bare(), 0);
   });
 });

@@ -1,6 +1,9 @@
 import type { Child } from '../render/insert.ts';
 
 import { isArray } from '../../utils/is/is-array.ts';
+import { isFunction } from '../../utils/is/is-function.ts';
+import { isNumber } from '../../utils/is/is-number.ts';
+import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
@@ -158,7 +161,7 @@ function readyView<T>(
   };
   let content: Child;
   try {
-    content = render(value);
+    content = boxText(render(value));
   } catch (error) {
     console.error(error);
     content = errorState();
@@ -188,6 +191,16 @@ function readyView<T>(
       content,
     ),
   );
+}
+
+/**
+ * `child` with each text run it holds, directly or through a getter, in a `span` the stale dim reaches.
+ */
+function boxText(child: Child): Child {
+  if (isString(child) || isNumber(child) || child instanceof Text) return h('span', null, child);
+  if (isArray(child)) return child.map(boxText);
+  if (isFunction<() => Child>(child)) return () => boxText(child());
+  return child;
 }
 
 /**
