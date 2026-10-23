@@ -7,6 +7,7 @@ import {
   type DashboardCollection,
   type DashboardMeta,
   dashboardMeta,
+  dataChangeCount,
   each,
   fallbackLabel,
   h,
@@ -229,6 +230,7 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
   effect(() => {
     const meta = dashboardMeta();
     const tokens = search.tokens();
+    void dataChangeCount();
     if (isUndefined(meta)) return;
     const initial = isUndefined(buckets);
     const feed = bucketsOf(meta, tokens);

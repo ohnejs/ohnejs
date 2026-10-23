@@ -9,6 +9,7 @@ import {
   type DashboardCollection,
   type DashboardField,
   dashboardMeta,
+  dataChangeCount,
   dropdown,
   dropdownItem,
   fallbackLabel,
@@ -233,6 +234,8 @@ export interface RecordEditor {
  * A `422` routes onto the rows it names and raises the error count toast.
  * A vanished record redirects to the collection with a toast, a singleton's to the overview.
  * A load that failed retries once the user signs in again in place, after an expired session.
+ * A `markDataChanged` reloads a clean record in place and starts its undo history over.
+ * A draft with unsaved edits stays as it is.
  * An edit asks the record's verdicts too: update refused opens read-only, delete refused hides Delete.
  * Fields outside the update scope's `select` lock, and a save names the sent fields the scope dropped.
  * Create posts the touched fields so server defaults apply, then navigates to the new record.
@@ -362,6 +365,22 @@ export function useRecordEditor(
     state.value = 'ready';
     settleHash(form.value);
   };
+  const refresh = async (): Promise<void> => {
+    const live = form.value;
+    if (isUndefined(live) || state.value !== 'ready' || busy.value || dirty()) return;
+    const locale = collection.translatable ? activeContentLocale() : undefined;
+    const row = await readRecord(collection.segment, isEmpty(id) ? undefined : id, locale);
+    if (isNull(row)) {
+      redirectGone();
+      return;
+    }
+    if (isUndefined(row) || form.value !== live || busy.value || dirty()) return;
+    loaded.value = row;
+    seedRecordLabel(collection, row, locale);
+    live.restore(row);
+    history.clear();
+    settle(live);
+  };
   const applyLinkedLocale = (): void => {
     const params = untracked(() => useRoute()?.query) ?? {};
     const linked = params.locale;
@@ -384,6 +403,10 @@ export function useRecordEditor(
     const signedIn = untracked(signInCount);
     effect(() => {
       if (signInCount() !== signedIn && untracked(() => state.value) === 'failed') void load();
+    });
+    const changed = untracked(dataChangeCount);
+    effect(() => {
+      if (dataChangeCount() !== changed) untracked(() => void refresh());
     });
     if (collection.translatable) {
       let applied = untracked(activeContentLocale);

@@ -12,6 +12,7 @@ import { h } from '../../../../src/dashboard/render/h.ts';
 import { defineDashboardPage } from '../../../../src/dashboard/router/define-dashboard-page.ts';
 import { navigate, startRouter } from '../../../../src/dashboard/router/router.ts';
 import { startSession } from '../../../../src/dashboard/runtime/_request.ts';
+import { markDataChanged } from '../../../../src/dashboard/runtime/data-changes.ts';
 import { dashboardMeta, invalidateDashboardMeta } from '../../../../src/dashboard/runtime/meta.ts';
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
@@ -460,6 +461,18 @@ describe('collectionTable sheet', () => {
     await idle();
     deepStrictEqual(checked(root), ['true', 'true', 'true']);
     lastPage = 1;
+  });
+
+  it('reloads the page in place once the data changed', async () => {
+    const root = await sheet();
+    records = [{ ...RECORDS[0], name: "Go'el" }, ...RECORDS.slice(1)];
+    markDataChanged();
+    flush();
+    answer();
+    await idle();
+    deepStrictEqual(names(root), ["Go'el", 'Jaina', 'Anduin']);
+    records = RECORDS;
+    scope?.dispose();
   });
 
   it('shows the empty state for a page without records', async () => {

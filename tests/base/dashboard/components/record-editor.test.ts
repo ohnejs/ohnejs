@@ -6,6 +6,7 @@ import type {
   DashboardField,
 } from '../../../../src/dashboard/runtime/meta-types.ts';
 
+import { markDataChanged } from '../../../../src/dashboard/runtime/data-changes.ts';
 import { effectScope } from '../../../../src/utils/index.ts';
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { FakeElement, findElement, hasClass } from '../../../dashboard/_fake-dom.ts';
@@ -99,6 +100,7 @@ describe('useRecordEditor', () => {
   let editor!: Editor;
   let hasUnsavedChanges!: Guard['hasUnsavedChanges'];
   const requests: string[] = [];
+  let stored = 'thrall@x.example';
 
   before(async () => {
     baseBrowser('/collections/showcase/u1');
@@ -160,7 +162,7 @@ describe('useRecordEditor', () => {
           });
         }
         if (url.endsWith('/collections/showcase/query')) {
-          return Response.json({ records: [{ UUID: 'u1', contactEmail: 'thrall@x.example' }] });
+          return Response.json({ records: [{ UUID: 'u1', contactEmail: stored }] });
         }
         return Response.json(ADMIN);
       },
@@ -211,6 +213,33 @@ describe('useRecordEditor', () => {
     deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'bob@' });
     scope.dispose();
     strictEqual(hasUnsavedChanges(), false);
+  });
+
+  it('reloads a clean record in place once the data changed', async () => {
+    const { record, scope } = await open();
+    const control = record.form.value!.controlOf('contactEmail')!;
+    stored = 'jaina@x.example';
+    markDataChanged();
+    await settle();
+    strictEqual(record.form.value!.controlOf('contactEmail'), control);
+    deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'jaina@x.example' });
+    strictEqual(record.dirty(), false);
+    strictEqual(record.history.canUndo.value, false);
+    stored = 'thrall@x.example';
+    scope.dispose();
+  });
+
+  it('keeps a draft with unsaved edits once the data changed', async () => {
+    const { record, scope } = await open();
+    const control = record.form.value!.controlOf('contactEmail')!;
+    type(inputOf(control.element), 'bob@x.example');
+    record.history.flush();
+    const sent = requests.length;
+    markDataChanged();
+    await settle();
+    strictEqual(requests.length, sent);
+    deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'bob@x.example' });
+    scope.dispose();
   });
 
   it('settles a save whose draft writes the stored value, without a request', async () => {

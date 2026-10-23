@@ -10,6 +10,7 @@ import {
   type DashboardCollection,
   type DashboardField,
   dashboardMeta,
+  dataChangeCount,
   h,
   hasModifierKey,
   icon,
@@ -287,6 +288,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
     void reload.value;
     // A sign-in in place refetches the page an expired session failed to load.
     void signInCount();
+    void dataChangeCount();
     const mine = (generation += 1);
     // Read inside the load effect, so a content-language switch reloads the page at that locale.
     const locale = activeLocale();
