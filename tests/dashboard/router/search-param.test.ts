@@ -4,10 +4,11 @@ import { before, describe, it } from 'node:test';
 import type { Ref } from '../../../src/utils/reactive/ref.ts';
 
 import { defineDashboardPage } from '../../../src/dashboard/router/define-dashboard-page.ts';
-import { navigate, startRouter } from '../../../src/dashboard/router/router.ts';
-import { useSearchParam } from '../../../src/dashboard/router/search-param.ts';
 import { FakeElement } from '../_fake-dom.ts';
 import { fakeBrowser, pageModule, settle, type FakeBrowser } from './_browser.ts';
+
+const { navigate, startRouter } = await import('../../../src/dashboard/router/router.ts');
+const { useSearchParam } = await import('../../../src/dashboard/router/search-param.ts');
 
 describe('useSearchParam', () => {
   let browser: FakeBrowser;

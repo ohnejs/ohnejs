@@ -8,7 +8,6 @@ import type {
 import type { FakeBrowser } from '../../../dashboard/router/_browser.ts';
 
 import { defineDashboardPage } from '../../../../src/dashboard/router/define-dashboard-page.ts';
-import { navigate, startRouter, useRoute } from '../../../../src/dashboard/router/router.ts';
 import { effect, effectScope, onCleanup, untracked } from '../../../../src/utils/index.ts';
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { FakeElement, findElement } from '../../../dashboard/_fake-dom.ts';
@@ -17,6 +16,9 @@ import { pageModule, settle } from '../../../dashboard/router/_browser.ts';
 import { fire } from '../../../dashboard/ui/_events.ts';
 import { baseBrowser } from '../_browser.ts';
 import { OMEN, registerOmen } from './_omen.ts';
+
+const { navigate, startRouter, useRoute } =
+  await import('../../../../src/dashboard/router/router.ts');
 
 // `baseBrowser` blanks `querySelector`; the controls need the one `_controls.ts` installs.
 const { querySelector } = FakeElement.prototype as unknown as { querySelector: unknown };

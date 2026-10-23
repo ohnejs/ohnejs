@@ -6,7 +6,6 @@ import type { RouteContext } from '../../../src/dashboard/router/router.ts';
 import { h } from '../../../src/dashboard/render/h.ts';
 import { defineDashboardPage } from '../../../src/dashboard/router/define-dashboard-page.ts';
 import { registerPageFrame, useFrame } from '../../../src/dashboard/router/page-frame.ts';
-import { navigate, startRouter } from '../../../src/dashboard/router/router.ts';
 import { loadLanguage } from '../../../src/dashboard/runtime/messages.ts';
 import {
   requestDashboardLanguage,
@@ -16,6 +15,8 @@ import { useDashboardLanguage } from '../../../src/dashboard/runtime/use-dashboa
 import { translateMessage } from '../../../src/dashboard/runtime/use-t.ts';
 import { FakeElement, FakeText, findElement } from '../_fake-dom.ts';
 import { fakeBrowser, pageModule, settle, type FakeBrowser } from './_browser.ts';
+
+const { navigate, startRouter } = await import('../../../src/dashboard/router/router.ts');
 
 const WORDS: Record<string, [home: string, required: string]> = {
   en: ['Home', 'Required'],
@@ -181,6 +182,7 @@ describe('startRouter with a page frame', () => {
         { pattern: '/logout', url: pageModule('logout') },
         { pattern: '/plain', url: pageModule('plain') },
         { pattern: '/slow', url: `data:text/javascript,${encodeURIComponent(slow)}` },
+        { pattern: '/broken', url: `data:text/javascript,${encodeURIComponent('throw 0;')}` },
       ],
       container as unknown as Element,
     );
@@ -224,6 +226,26 @@ describe('startRouter with a page frame', () => {
     await settle();
     strictEqual(container.textContent, '[Not found]');
     strictEqual(router.useRoute(), null);
+  });
+
+  it('renders a page whose module fails to load as a load failure on its route', async () => {
+    const logged = mock.method(console, 'error', () => {});
+    await router.navigate('/broken');
+    await settle();
+    logged.mock.restore();
+    strictEqual(logged.mock.callCount(), 1);
+    strictEqual(container.textContent, '[Failed to loadRetry]');
+    strictEqual(router.useRoute()?.path, '/broken');
+  });
+
+  it('keeps a bare page bare when the next page fails to load', async () => {
+    const logged = mock.method(console, 'error', () => {});
+    await router.navigate('/logout');
+    await settle();
+    await router.navigate('/broken');
+    await settle();
+    logged.mock.restore();
+    strictEqual(container.textContent, 'Failed to loadRetry');
   });
 
   it('keeps the page on a query step and updates `query` synchronously', async () => {

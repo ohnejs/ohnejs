@@ -10,7 +10,6 @@ import type { FakeBrowser } from '../../../dashboard/router/_browser.ts';
 
 import { h } from '../../../../src/dashboard/render/h.ts';
 import { defineDashboardPage } from '../../../../src/dashboard/router/define-dashboard-page.ts';
-import { navigate, startRouter } from '../../../../src/dashboard/router/router.ts';
 import { startSession } from '../../../../src/dashboard/runtime/_request.ts';
 import { markDataChanged } from '../../../../src/dashboard/runtime/data-changes.ts';
 import { dashboardMeta, invalidateDashboardMeta } from '../../../../src/dashboard/runtime/meta.ts';
@@ -25,6 +24,8 @@ import {
 } from '../../../dashboard/_fake-dom.ts';
 import { pageModule, settle } from '../../../dashboard/router/_browser.ts';
 import { baseBrowser } from '../_browser.ts';
+
+const { navigate, startRouter } = await import('../../../../src/dashboard/router/router.ts');
 
 type Listener = (event: unknown) => void;
 

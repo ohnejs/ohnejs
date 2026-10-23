@@ -5,12 +5,13 @@ import type { FakeBrowser } from '../../../dashboard/router/_browser.ts';
 
 import { defineDashboardPage } from '../../../../src/dashboard/router/define-dashboard-page.ts';
 import { useFrame } from '../../../../src/dashboard/router/page-frame.ts';
-import { navigate, startRouter } from '../../../../src/dashboard/router/router.ts';
 import { logout } from '../../../../src/dashboard/runtime/session.ts';
 import { nextTick } from '../../../../src/utils/index.ts';
 import { FakeElement, findElement, hasClass } from '../../../dashboard/_fake-dom.ts';
 import { pageModule, settle } from '../../../dashboard/router/_browser.ts';
 import { baseBrowser } from '../_browser.ts';
+
+const { navigate, startRouter } = await import('../../../../src/dashboard/router/router.ts');
 
 type Shell = typeof import('../../../../src/base/dashboard/components/shell.ts');
 

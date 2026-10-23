@@ -16,6 +16,8 @@ import { mount } from '../render/mount.ts';
 import { when } from '../render/when.ts';
 import { loadLanguage } from '../runtime/messages.ts';
 import { commitDashboardLanguage, requestedLanguage } from '../runtime/use-dashboard-language.ts';
+import { errorState } from '../ui/states.ts';
+import { defineDashboardPage } from './define-dashboard-page.ts';
 import { compilePages, matchPages, type CompiledPage, type MatchedRoute } from './match-route.ts';
 import { frameOptions, registeredFrame } from './page-frame.ts';
 
@@ -316,8 +318,18 @@ function notFound(): Child {
 }
 
 /**
+ * The page standing in for one whose module failed to load.
+ * The browser keeps a failed module failed for the document's life, so its retry reloads the page.
+ */
+function loadFailed(): Child {
+  return errorState(undefined, { retry: () => location.reload() });
+}
+
+/**
  * Matches the current location, loads its page module on demand, and publishes it as the active route.
  * A render superseded by a newer navigation publishes nothing, so a slow module never wins over a later page.
+ * A module that fails to load still publishes its route, with `loadFailed` in place of the page.
+ * Whether the page wants the frame is unknown then, so the failure keeps the frame on screen as it is.
  */
 async function render(): Promise<void> {
   const mine = ++token;
@@ -328,21 +340,20 @@ async function render(): Promise<void> {
     publish(mine, null);
     return;
   }
-  let module: { default: Active['component'] };
+  let component: Active['component'];
   try {
-    module = (await import(match.url)) as { default: Active['component'] };
+    component = ((await import(match.url)) as { default: Active['component'] }).default;
   } catch (error) {
     if (mine !== token) return;
     console.error(error);
-    publish(mine, null);
-    return;
+    component = defineDashboardPage(loadFailed, { frame: untracked(() => framed.value) });
   }
   if (mine !== token) return;
   const search = ref(location.search);
   const query = computed(() => parseSearchParams(search.value));
   publish(mine, {
     ...match,
-    component: module.default,
+    component,
     search,
     get query() {
       return query.value;
