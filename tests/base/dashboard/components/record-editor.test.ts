@@ -229,16 +229,52 @@ describe('useRecordEditor', () => {
     scope.dispose();
   });
 
-  it('keeps a draft with unsaved edits once the data changed', async () => {
-    const { record, scope } = await open();
-    const control = record.form.value!.controlOf('contactEmail')!;
-    type(inputOf(control.element), 'bob@x.example');
-    record.history.flush();
-    const sent = requests.length;
+  /**
+   * The editor over `u1` with `bob@x.example` typed, after the stored address changed under it.
+   */
+  async function changedUnderDraft(): Promise<{
+    record: ReturnType<Editor['useRecordEditor']>;
+    scope: { dispose(): void };
+  }> {
+    const opened = await open();
+    type(inputOf(opened.record.form.value!.controlOf('contactEmail')!.element), 'bob@x.example');
+    opened.record.history.flush();
+    stored = 'jaina@x.example';
     markDataChanged();
     await settle();
-    strictEqual(requests.length, sent);
+    stored = 'thrall@x.example';
+    return opened;
+  }
+
+  it('holds a newer record back under unsaved edits and names the fields it changed', async () => {
+    const { record, scope } = await changedUnderDraft();
+    deepStrictEqual(record.changedElsewhere(), ['contactEmail']);
     deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'bob@x.example' });
+    strictEqual(record.dirty(), true);
+    record.keepDraft();
+    deepStrictEqual(record.changedElsewhere(), []);
+    deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'bob@x.example' });
+    scope.dispose();
+  });
+
+  it('drops the draft for the held record on `takeChanges`', async () => {
+    const { record, scope } = await changedUnderDraft();
+    record.takeChanges();
+    flush();
+    deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'jaina@x.example' });
+    deepStrictEqual(record.changedElsewhere(), []);
+    strictEqual(record.dirty(), false);
+    strictEqual(record.history.canUndo.value, false);
+    scope.dispose();
+  });
+
+  it('takes the held record once an undo leaves the draft clean', async () => {
+    const { record, scope } = await changedUnderDraft();
+    record.restore(record.history.undo()!);
+    flush();
+    deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'jaina@x.example' });
+    deepStrictEqual(record.changedElsewhere(), []);
+    strictEqual(record.dirty(), false);
     scope.dispose();
   });
 

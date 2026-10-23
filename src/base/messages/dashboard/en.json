@@ -329,11 +329,15 @@
     "start": "Start"
   },
   "record": {
+    "changed": "This record changed",
+    "changedElsewhere": "Changed elsewhere while you were editing: {fields}. Your unsaved edits are kept.",
     "collectionOverview": "`{collection}` overview",
     "confirmDelete": "Are you sure you want to delete this entry?",
     "deleted": "Deleted",
     "gone": "This record no longer exists",
-    "moreActions": "More actions"
+    "keepDraft": "Keep editing",
+    "moreActions": "More actions",
+    "takeChanges": "Load the new version"
   },
   "recordNotFound": "Record not found",
   "records": "{count, plural, one {# record} other {# records}}",

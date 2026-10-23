@@ -329,11 +329,15 @@
     "start": "Beginn"
   },
   "record": {
+    "changed": "Dieser Datensatz wurde geändert",
+    "changedElsewhere": "Während der Bearbeitung anderswo geändert: {fields}. Ungespeicherte Änderungen bleiben erhalten.",
     "collectionOverview": "`{collection}`-Übersicht",
     "confirmDelete": "Diesen Eintrag wirklich löschen?",
     "deleted": "Gelöscht",
     "gone": "Dieser Datensatz existiert nicht mehr",
-    "moreActions": "Weitere Aktionen"
+    "keepDraft": "Weiter bearbeiten",
+    "moreActions": "Weitere Aktionen",
+    "takeChanges": "Neue Version laden"
   },
   "recordNotFound": "Datensatz nicht gefunden",
   "records": "{count, plural, one {# Datensatz} other {# Datensätze}}",

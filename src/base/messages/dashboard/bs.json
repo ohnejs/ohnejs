@@ -329,11 +329,15 @@
     "start": "Početak"
   },
   "record": {
+    "changed": "Ovaj zapis je promijenjen",
+    "changedElsewhere": "Promijenjeno na drugom mjestu tokom uređivanja: {fields}. Nesačuvane izmjene ostaju.",
     "collectionOverview": "Pregled `{collection}`",
     "confirmDelete": "Da li zaista želite obrisati ovaj unos?",
     "deleted": "Obrisano",
     "gone": "Ovaj zapis više ne postoji",
-    "moreActions": "Više radnji"
+    "keepDraft": "Nastavi uređivati",
+    "moreActions": "Više radnji",
+    "takeChanges": "Učitaj novu verziju"
   },
   "recordNotFound": "Zapis nije pronađen",
   "records": "{count, plural, one {# zapis} few {# zapisa} other {# zapisa}}",

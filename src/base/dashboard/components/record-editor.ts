@@ -37,6 +37,7 @@ import {
   when,
 } from 'ohnejs/dashboard';
 import {
+  computed,
   deepEqual,
   effect,
   hasKey,
@@ -220,6 +221,22 @@ export interface RecordEditor {
    * Takes a state the history restored into the live form, control by control.
    */
   restore: (state: RecordRow) => void;
+
+  /**
+   * The fields a write from outside the page changed under the unsaved edits, `[]` while none did.
+   * Reactive.
+   */
+  changedElsewhere: () => readonly string[];
+
+  /**
+   * Discards the unsaved edits and takes the record as it now stands on the server.
+   */
+  takeChanges: () => void;
+
+  /**
+   * Hides `changedElsewhere` and keeps the unsaved edits; a save then sends only the edited fields.
+   */
+  keepDraft: () => void;
 }
 
 /**
@@ -235,7 +252,8 @@ export interface RecordEditor {
  * A vanished record redirects to the collection with a toast, a singleton's to the overview.
  * A load that failed retries once the user signs in again in place, after an expired session.
  * A `markDataChanged` reloads a clean record in place and starts its undo history over.
- * A draft with unsaved edits stays as it is.
+ * Under unsaved edits it holds the newer record back and names the changed fields in `changedElsewhere`.
+ * The held record lands once the draft is clean again, or at once through `takeChanges`.
  * An edit asks the record's verdicts too: update refused opens read-only, delete refused hides Delete.
  * Fields outside the update scope's `select` lock, and a save names the sent fields the scope dropped.
  * Create posts the touched fields so server defaults apply, then navigates to the new record.
@@ -249,6 +267,8 @@ export function useRecordEditor(
   const create = isUndefined(uuid) && !collection.singleton;
   let id = uuid ?? '';
   const loaded = ref<RecordRow>({});
+  const incoming = ref<RecordRow | undefined>(undefined);
+  const dismissed = ref(false);
   const listPath = `/collections/${collection.segment}`;
   const canCreate = collection.operations.create?.allowed === true;
   const canTranslate =
@@ -342,6 +362,7 @@ export function useRecordEditor(
   };
 
   const load = async (): Promise<void> => {
+    incoming.value = undefined;
     state.value = 'loading';
     const locale = collection.translatable ? untracked(activeContentLocale) : undefined;
     const ask = (): Promise<RowVerdicts> => loadVerdicts(collection, [id], locale);
@@ -365,21 +386,42 @@ export function useRecordEditor(
     state.value = 'ready';
     settleHash(form.value);
   };
+  const take = (live: FieldForm, row: RecordRow): void => {
+    incoming.value = undefined;
+    loaded.value = row;
+    seedRecordLabel(collection, row, collection.translatable ? activeContentLocale() : undefined);
+    live.restore(row);
+    history.clear();
+    settle(live);
+  };
   const refresh = async (): Promise<void> => {
     const live = form.value;
-    if (isUndefined(live) || state.value !== 'ready' || busy.value || dirty()) return;
+    if (isUndefined(live) || state.value !== 'ready' || busy.value) return;
     const locale = collection.translatable ? activeContentLocale() : undefined;
     const row = await readRecord(collection.segment, isEmpty(id) ? undefined : id, locale);
     if (isNull(row)) {
       redirectGone();
       return;
     }
-    if (isUndefined(row) || form.value !== live || busy.value || dirty()) return;
-    loaded.value = row;
-    seedRecordLabel(collection, row, locale);
-    live.restore(row);
-    history.clear();
-    settle(live);
+    if (isUndefined(row) || form.value !== live || busy.value) return;
+    if (!dirty()) {
+      take(live, row);
+      return;
+    }
+    incoming.value = row;
+    dismissed.value = false;
+  };
+  const changedElsewhere = computed(() => {
+    const row = incoming.value;
+    if (isUndefined(row) || dismissed.value) return [];
+    return formFields
+      .filter((field) => !deepEqual(row[field.name], loaded.value[field.name]))
+      .map((field) => field.name);
+  });
+  const takeChanges = (): void => {
+    const live = form.value;
+    const row = incoming.value;
+    if (!isUndefined(live) && !isUndefined(row)) take(live, row);
   };
   const applyLinkedLocale = (): void => {
     const params = untracked(() => useRoute()?.query) ?? {};
@@ -407,6 +449,12 @@ export function useRecordEditor(
     const changed = untracked(dataChangeCount);
     effect(() => {
       if (dataChangeCount() !== changed) untracked(() => void refresh());
+    });
+    effect(() => {
+      if (isUndefined(incoming.value) || dirty()) return;
+      untracked(() => {
+        if (!busy.value) takeChanges();
+      });
     });
     if (collection.translatable) {
       let applied = untracked(activeContentLocale);
@@ -456,6 +504,8 @@ export function useRecordEditor(
     // The saving fieldset blurs whatever was focused; the element survives the save, so restore.
     if (focused instanceof HTMLElement && focused.isConnected) focused.focus();
     if (outcome.kind === 'saved') {
+      // The answer is newer than a record held back under the draft, which must never land over it.
+      incoming.value = undefined;
       // A scoped answer omits the fields outside its `select`; the last read still holds their values.
       loaded.value = { ...untracked(() => loaded.value), ...outcome.record };
       settle(live);
@@ -539,6 +589,11 @@ export function useRecordEditor(
     save,
     remove,
     restore,
+    changedElsewhere: () => changedElsewhere.value,
+    takeChanges,
+    keepDraft: () => {
+      dismissed.value = true;
+    },
   };
 }
 

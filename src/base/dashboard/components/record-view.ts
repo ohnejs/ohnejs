@@ -1,7 +1,15 @@
 import type { Child, DashboardCollection } from 'ohnejs/dashboard';
 
-import { css, h } from 'ohnejs/dashboard';
-import { isUndefined } from 'ohnejs/utils';
+import {
+  alert,
+  button,
+  css,
+  h,
+  translateMessage,
+  useDashboardLanguage,
+  useT,
+} from 'ohnejs/dashboard';
+import { isEmpty, isUndefined } from 'ohnejs/utils';
 
 import type { RecordEditor } from './record-editor.ts';
 
@@ -64,12 +72,48 @@ export function registerRecordNotice(render: (editor: RecordEditor) => Child): v
 }
 
 /**
- * Every registered notice for `editor`, in registration order, spaced from the fields below when any shows.
+ * Every notice for `editor`, spaced from the fields below when any shows.
+ * The warning that fields changed elsewhere comes first, then the registered notices in order.
  */
 export function recordNotices(editor: RecordEditor): Child {
   return h(
     'div',
     { class: 'o-record-notices' },
+    changedNotice(editor),
     notices.map((render) => render(editor)),
   );
+}
+
+/**
+ * The warning that a write from outside the page changed fields under the unsaved edits.
+ * It offers the new version, which discards the edits, or to keep editing.
+ */
+function changedNotice(editor: RecordEditor): Child {
+  const t = useT();
+  return () => {
+    const names = editor.changedElsewhere();
+    if (isEmpty(names)) return null;
+    const labels = names.map((name) => {
+      const field = editor.collection.fields.find((entry) => entry.name === name);
+      return `\`${isUndefined(field) ? name : translateMessage(field.label)}\``;
+    });
+    const list = new Intl.ListFormat(useDashboardLanguage().value, { type: 'conjunction' });
+    return alert(t('dashboard.record.changedElsewhere', { fields: list.format(labels) }), {
+      tone: 'warning',
+      icon: 'refresh',
+      title: () => t('dashboard.record.changed'),
+      actions: [
+        button(() => t('dashboard.record.takeChanges'), {
+          variant: 'outline',
+          size: -1,
+          onClick: editor.takeChanges,
+        }),
+        button(() => t('dashboard.record.keepDraft'), {
+          variant: 'ghost',
+          size: -1,
+          onClick: editor.keepDraft,
+        }),
+      ],
+    });
+  };
 }
