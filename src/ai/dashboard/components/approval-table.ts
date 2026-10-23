@@ -129,6 +129,15 @@ css`
     border-radius: var(--ohne-radius);
   }
 
+  .o-approval .ohne-table {
+    margin-inline: -0.75rem;
+    border-top-width: 1px;
+  }
+
+  .o-approval .ohne-table-grid td {
+    vertical-align: top;
+  }
+
   .o-approval-destructive {
     border-color: hsl(var(--ohne-destructive) / 0.5);
   }
@@ -265,7 +274,7 @@ export function approvalTable(batch: () => TurnBatch, options: ApprovalTableOpti
     columns: {
       record: {
         label: () => t('ai.dashboard.batch.record'),
-        width: '30%',
+        width: '40%',
         render: (row) => h('div', { class: foreign(row).trim() }, recordName(row, t)),
       },
       action: {

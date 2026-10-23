@@ -265,6 +265,7 @@ export function transformTable(proposal: Proposal, options: TransformTableOption
           name,
           {
             label: () => fieldLabel(collection, name),
+            width: '14rem',
             render: (row: TransformRow) =>
               h(
                 'div',
