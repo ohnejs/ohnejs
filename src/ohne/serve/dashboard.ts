@@ -1,4 +1,4 @@
-import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
+import type { MessageMeta } from '../messages/messages.ts';
 import type { HandlerContext, Route } from '../routes/route.ts';
 
 import { etag } from '../../utils/etag/etag.ts';
@@ -6,12 +6,15 @@ import { exists } from '../../utils/fs/index.ts';
 import {
   cacheControl,
   canonicalizeLanguage,
+  escapeXML,
+  formatMessage,
   isNull,
   isPathInside,
   isPort,
   isUndefined,
   joinPath,
   jsonForScript,
+  languageFallbacks,
   last,
   MAX_PORT,
   messageGroup,
@@ -110,6 +113,60 @@ const CANVAS = `
     `;
 
 /**
+ * The look of the boot failure: the kit's `errorState` centered on the page, its retry an outline button.
+ * The kernel's stylesheets may never have loaded, so the colors are the foundation's, copied as in `CANVAS`.
+ */
+const BOOT_FAILED_STYLE = `
+        .ohne-boot-failed {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 0.5em;
+          justify-content: center;
+          align-items: center;
+          padding: 1.5em 0.75em;
+          color: hsl(228 11% 44%);
+          font: 1rem/1.5 'Inter', sans-serif;
+          text-align: center;
+        }
+        .ohne-boot-failed svg { font-size: 2.5em; opacity: 0.5 }
+        .ohne-boot-failed [stroke] { stroke-width: 1.5 }
+        .ohne-boot-failed p { max-width: 32em; margin: 0; font-size: 0.875rem }
+        .ohne-boot-failed button {
+          height: 2.25em;
+          margin-top: 0.25em;
+          padding: 0 0.75em;
+          border: 1px solid hsl(210 7.41% 89.4%);
+          border-radius: 0.375rem;
+          background: hsl(210 22.2% 96.5%);
+          color: hsl(324 49% 10%);
+          font: inherit;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+        }
+        .dark .ohne-boot-failed { color: hsl(228 11% 65%) }
+        .dark .ohne-boot-failed button {
+          border-color: hsl(231 16.7% 32%);
+          background: hsl(234 16.7% 11.8%);
+          color: hsl(0 0% 98%);
+        }
+        @media (hover: hover) {
+          .ohne-boot-failed button:hover {
+            border-color: hsl(209 71% 88%);
+            background: hsl(209 71% 88%);
+            color: hsl(324 49% 10%);
+          }
+          .dark .ohne-boot-failed button:hover {
+            border-color: hsl(208 52% 28%);
+            background: hsl(208 52% 28%);
+            color: hsl(0 0% 98%);
+          }
+        }
+      `;
+
+/**
  * The framework subtrees the browser graph may load: the dashboard kernel and the utils it imports.
  * Everything else under `src` (the Node framework internals) is off-limits to the browser.
  */
@@ -143,16 +200,19 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const defaultLanguage = resolveDefaultLanguage();
   const reload = useEnv().get('DASHBOARD_RELOAD');
   const framing = `frame-ancestors ${config?.frameAncestors?.join(' ') || "'none'"}`;
+  const failedIcon = iconShape('cloud-off') ?? '';
 
   // A framed dashboard could be clickjacked into a save or a delete; only listed pages may frame it.
   const renderShell = async (): Promise<string> => {
     useResponse().headers.set('content-security-policy', framing);
+    const messages = await collectMessages(layers, { disable: useConfig().disable.messages });
     return shellDocument(
       apiURL,
       buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
       (await collectDashboardBoot(layers)).map((boot) => `${APP_MODULE_BASE}/${boot.module}`),
       defaultLanguage,
-      await collectMessageGroups(layers),
+      uniqueArray(messages.map((message) => messageGroup(message.key))),
+      bootFailed(messages, defaultLanguage, failedIcon),
       reload,
     );
   };
@@ -316,15 +376,44 @@ function resolveDefaultLanguage(): string {
 }
 
 /**
- * Every message group the stack defines, so the dashboard can load a language's catalogs before it renders.
+ * The state the shell falls back to when the dashboard fails to boot, as an inert `template`.
+ * Its text is translated into `language` from `messages`, so it reads as the kit's `errorState` would.
  */
-async function collectMessageGroups(layers: readonly OhneLayer[]): Promise<string[]> {
-  const messages = await collectMessages(layers, { disable: useConfig().disable.messages });
-  return uniqueArray(messages.map((message) => messageGroup(message.key)));
+function bootFailed(messages: MessageMeta[], language: string, icon: string): string {
+  const text = escapeXML(bootText(messages, language, 'dashboard.loadFailed', 'Failed to load'));
+  const retry = escapeXML(bootText(messages, language, 'dashboard.retry', 'Retry'));
+  return `<template id="ohne-boot-failed">
+      <style>${BOOT_FAILED_STYLE}</style>
+      <div class="ohne-boot-failed" role="alert">
+        <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">${icon}</svg>
+        <p>${text}</p>
+        <button type="button" class="ohne-raw">${retry}</button>
+      </div>
+    </template>`;
+}
+
+/**
+ * Translates `key` into `language` from `messages`, down the language's fallback chain.
+ * With no catalog defining it, the English `fallback` stands, as the kit's `defaultText` does.
+ */
+function bootText(
+  messages: MessageMeta[],
+  language: string,
+  key: string,
+  fallback: string,
+): string {
+  for (const tag of languageFallbacks(language)) {
+    const found = messages.find((message) => message.language === tag && message.key === key);
+    if (!isUndefined(found)) return formatMessage(found.template, undefined, tag);
+  }
+  return fallback;
 }
 
 /**
  * The single-page shell: the pre-paint color-mode script, the config, the importmap, and the kernel.
+ * Until the kernel announces `ohne-booted`, a failure to load or run it swaps `#app` for `failed`.
+ * That covers a module the browser could not fetch, so a dropped request never leaves a blank page.
+ * The guard listens while capturing, since a script's fetch failure does not bubble.
  */
 function shellDocument(
   apiURL: string,
@@ -332,6 +421,7 @@ function shellDocument(
   boot: string[],
   defaultLanguage: string,
   messageGroups: string[],
+  failed: string,
   reload: boolean,
 ): string {
   const config = jsonForScript({ apiURL, pages, boot, defaultLanguage, messageGroups });
@@ -359,8 +449,23 @@ function shellDocument(
   </head>
   <body>
     <div id="app"></div>
+    ${failed}
     <script type="application/json" id="ohne-config">${config}</script>
-    <script type="module" src="${MODULE_BASE}/dashboard/boot.ts"></script>${reloadClient}
+    <script type="module" src="${MODULE_BASE}/dashboard/boot.ts" id="ohne-boot"></script>
+    <script>
+      {
+        const kernel = document.getElementById('ohne-boot');
+        const fail = (event) => {
+          if (event.target !== window && event.target !== kernel) return;
+          removeEventListener('error', fail, true);
+          const failed = document.getElementById('ohne-boot-failed').content.cloneNode(true);
+          failed.querySelector('button').addEventListener('click', () => location.reload());
+          document.getElementById('app').replaceChildren(failed);
+        };
+        addEventListener('error', fail, true);
+        addEventListener('ohne-booted', () => removeEventListener('error', fail, true), { once: true });
+      }
+    </script>${reloadClient}
   </body>
 </html>
 `;

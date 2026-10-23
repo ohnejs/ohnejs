@@ -304,7 +304,38 @@ describe('serveDashboard', () => {
   it('references the boot module entry from the shell', async () => {
     const port = await serve('boot');
     strictEqual(
-      (await req(port, '/')).body.includes('<script type="module" src="/m/dashboard/boot.ts">'),
+      (await req(port, '/')).body.includes(
+        '<script type="module" src="/m/dashboard/boot.ts" id="ohne-boot">',
+      ),
+      true,
+    );
+  });
+
+  it('holds a boot failure state in English when no catalog translates it', async () => {
+    const port = await serve('boot-failed');
+    const body = (await req(port, '/')).body;
+    strictEqual(body.includes('<template id="ohne-boot-failed">'), true);
+    strictEqual(body.includes('<p>Failed to load</p>'), true);
+    strictEqual(body.includes('<button type="button" class="ohne-raw">Retry</button>'), true);
+  });
+
+  it('translates the boot failure state down the default language chain', async () => {
+    const dir = makeApp('boot-failed-de');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { messages: { defaultLanguage: 'de-AT' } }\n",
+    );
+    mkdirSync(join(dir, 'messages', 'dashboard'), { recursive: true });
+    writeFileSync(
+      join(dir, 'messages', 'dashboard', 'de.json'),
+      JSON.stringify({ loadFailed: 'Laden <fehlgeschlagen>', retry: "Nochmal '{'versuchen'}'" }),
+    );
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    const body = (await req(port, '/')).body;
+    strictEqual(body.includes('<p>Laden &lt;fehlgeschlagen&gt;</p>'), true);
+    strictEqual(
+      body.includes('<button type="button" class="ohne-raw">Nochmal {versuchen}</button>'),
       true,
     );
   });
