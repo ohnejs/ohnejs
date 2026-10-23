@@ -340,7 +340,7 @@ export default defineConfig({
     "typecheck": "tsc && tsc -p dashboard/tsconfig.json"
   },
   "dependencies": {
-    "ohnejs": "0.3.0"
+    "ohnejs": "0.4.0"
   },
   "devDependencies": {
     "@types/node": "26.0.0",
