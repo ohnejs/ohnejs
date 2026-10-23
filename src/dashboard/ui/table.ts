@@ -141,7 +141,7 @@ let shiftTracked = false;
 
 css`
   .ohne-table {
-    --ohne-table-check: calc(1rem + var(--ohne-table-button) * 0.125rem + 1.375rem);
+    --ohne-table-check: calc(1rem + var(--ohne-table-button) * 0.125rem + 1.875rem);
     --ohne-table-kebab: calc(2 * (1rem + var(--ohne-table-button) * 0.125rem) + 1.75rem);
     --ohne-table-bg: hsl(var(--ohne-table-surface, var(--ohne-background)));
     --ohne-table-shadow: rgb(0 0 0 / 0.08);
@@ -175,13 +175,13 @@ css`
     width: 1rem;
     opacity: 0;
     pointer-events: none;
-    transition: var(--ohne-transition);
-    transition-property: opacity;
+    transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  /* As tall as the rows, so the edges match the pinned columns, which end with the last row. */
   .ohne-table-viewport::before,
   .ohne-table-viewport::after {
-    bottom: var(--ohne-table-scrollbar-x, 0px);
+    height: min(var(--ohne-table-grid-height, 100%), 100% - var(--ohne-table-scrollbar-x, 0px));
   }
 
   .ohne-table-viewport::before,
@@ -291,8 +291,13 @@ css`
   .ohne-table-grid :where(th, td).ohne-table-check {
     width: var(--ohne-table-check);
     min-width: var(--ohne-table-check);
-    padding-right: 0.25rem;
+    padding-right: 0.75rem;
     -webkit-touch-callout: none;
+  }
+
+  /* The pinned box keeps its own gap, so the columns scrolling under it stay clear of it. */
+  .ohne-table-grid .ohne-table-check + :where(th, td) {
+    padding-left: 0.25rem;
   }
 
   .ohne-table-check .ohne-checkbox-button::after {
@@ -511,7 +516,7 @@ function trackShift(): void {
  * `rows` answering `undefined` shows skeleton rows and `[]` the empty state; a `Resource` adds its errors.
  * Sortable headers sort on the client, or only write `sort` with `serverSort`.
  * The header sticks while the table has a bounded height.
- * The checkbox and first columns stick to the start, the actions column to the end.
+ * The checkbox column sticks to the start, the actions column to the end.
  * Rows open by `href` or `onOpen`, select with checkboxes and ranges, and carry an actions menu.
  *
  * @example
@@ -989,6 +994,7 @@ export function table<T, K extends string | number, C extends string = string>(
     );
     viewport.style.setProperty('--ohne-table-scrollbar-y', `${offsetWidth - clientWidth}px`);
     viewport.style.setProperty('--ohne-table-scrollbar-x', `${offsetHeight - clientHeight}px`);
+    viewport.style.setProperty('--ohne-table-grid-height', `${grid.offsetHeight}px`);
   };
   const resize = new ResizeObserver(measureOverflow);
   resize.observe(scroller);
