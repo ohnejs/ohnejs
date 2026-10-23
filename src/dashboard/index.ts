@@ -119,6 +119,7 @@ export { api, setUnauthorizedHandler } from './runtime/api.ts';
 export { useNow } from './runtime/clock.ts';
 export { dashboardConfig } from './runtime/config.ts';
 export type { DashboardConfig } from './runtime/config.ts';
+export { dataChangeCount, markDataChanged } from './runtime/data-changes.ts';
 export {
   dateTimePreferences,
   formatDate,

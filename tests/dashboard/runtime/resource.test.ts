@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 import { startSession } from '../../../src/dashboard/runtime/_request.ts';
 import { clearResourceCache } from '../../../src/dashboard/runtime/_resource-cache.ts';
+import { markDataChanged } from '../../../src/dashboard/runtime/data-changes.ts';
 import {
   type Resource,
   type ResourceOptions,
@@ -215,6 +216,24 @@ describe('useResource', () => {
     await settle();
     deepStrictEqual(me(), { name: 'Thrall' });
     strictEqual(me.state(), 'ready');
+  });
+
+  it('refetches quietly once the data changed', async () => {
+    const raids = read<string[]>('GET /raids');
+    requests[0].answer(200, ['Molten Core']);
+    await settle();
+    markDataChanged();
+    strictEqual(requests[1].url, 'http://api/raids');
+    strictEqual(raids.busy(), false);
+    requests[1].answer(200, ['Naxxramas']);
+    await settle();
+    deepStrictEqual(raids(), ['Naxxramas']);
+  });
+
+  it('leaves a paused read paused once the data changed', () => {
+    read('GET /heroes/[id]', { params: () => undefined });
+    markDataChanged();
+    strictEqual(requests.length, 0);
   });
 
   it('waits while a getter answers undefined', async () => {

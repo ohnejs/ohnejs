@@ -16,6 +16,7 @@ import { stringifySearchParams } from '../../utils/search-params/stringify-searc
 import { type FlightTicket, joinFlight, type Settled, cachedAnswer } from './_resource-cache.ts';
 import { type APIError, readAPIError, unreachableError } from './api-error.ts';
 import { api } from './api.ts';
+import { dataChangeCount } from './data-changes.ts';
 import { signInCount } from './session.ts';
 import { defaultText } from './text.ts';
 import { requestedLanguage } from './use-dashboard-language.ts';
@@ -134,6 +135,7 @@ const BRAND = Symbol('resource');
  * Requests with the same key share one fetch, aborted once its last reader's scope is disposed.
  * A `403` reads as `'forbidden'`; a `401` is left to the session handler and changes nothing.
  * Each sign-in in place sends a fresh request, so a read refused on an expired session recovers.
+ * Each `markDataChanged` refetches quietly, so a write sent from outside the page shows.
  * Any other failure reads as `'error'` and keeps the last value; a read never retries on its own.
  * A bare-path id reads with `GET`.
  * `T` is your claim about the answer; nothing checks it against the server.
@@ -235,6 +237,13 @@ export function useResource<T = unknown>(
     signInCount();
     if (signedIn && !isUndefined(target)) untracked(() => void load(true, false));
     signedIn = true;
+  });
+
+  let changed = false;
+  effect(() => {
+    dataChangeCount();
+    if (changed && !isUndefined(target)) untracked(() => void load(true, true));
+    changed = true;
   });
 
   if (!isUndefined(poll)) {
