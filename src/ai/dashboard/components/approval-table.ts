@@ -5,8 +5,10 @@ import {
   css,
   type DashboardCollection,
   dimMark,
+  fallbackLabel,
   h,
   icon,
+  labelOf,
   loadVerdicts,
   seedLabel,
   table,
@@ -401,6 +403,13 @@ function headerLine(
     const described = describeWhere(proposal.where, {
       field: (name) => fieldLabel(collection, name),
       t: (key, params) => t(key as `ai.${string}`, params),
+      value: (name, value) => {
+        const target = collection.fields.find((entry) => entry.name === name)?.target;
+        if (isUndefined(target) || !isString(value)) return undefined;
+        return (
+          labelOf(target, value, isString(locale) ? locale : undefined) ?? fallbackLabel(value)
+        );
+      },
     });
     return described === ''
       ? ''

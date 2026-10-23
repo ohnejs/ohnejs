@@ -56,6 +56,20 @@ describe('describeWhere', () => {
     strictEqual(describeWhere({ guild: { has: true } }, words), 'Guild is set');
   });
 
+  it('names each value through `value`, keeping the rest as text', () => {
+    const named: Record<string, string> = { u1: 'Onyx Vanguard', u2: 'Silver Hand' };
+    const value = (field: string, entry: unknown): string | undefined =>
+      field === 'guild' ? named[String(entry)] : undefined;
+    strictEqual(
+      describeWhere({ guild: 'u1', rarity: 'epic' }, { ...words, value }),
+      'Guild is `Onyx Vanguard` and Rarity is `epic`',
+    );
+    strictEqual(
+      describeWhere({ guild: { in: ['u1', 'u2'] } }, { ...words, value }),
+      'Guild is one of `Onyx Vanguard, Silver Hand`',
+    );
+  });
+
   it('answers nothing for a filter the grammar refuses', () => {
     strictEqual(describeWhere({ level: null }, words), '');
     strictEqual(describeWhere('wild', words), '');

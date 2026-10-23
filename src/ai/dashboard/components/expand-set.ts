@@ -83,6 +83,12 @@ export interface FilterWords {
    * Translates one `ai.dashboard.filter.*` key.
    */
   t(key: string, params?: Record<string, string | number>): string;
+
+  /**
+   * The words for one value a field is compared with, such as a related record's label for its `UUID`.
+   * Omitted, or answering `undefined`, the value shows as text.
+   */
+  value?(field: string, value: unknown): string | undefined;
 }
 
 /**
@@ -147,7 +153,8 @@ function describeNode(node: ConditionNode, words: FilterWords): string {
       .map((child) => describeNode(child, words))
       .reduce((a, b) => words.t(`ai.dashboard.filter.${node.kind}`, { a, b }));
   }
-  const field = words.field(node.path.join('.'));
+  const name = node.path.join('.');
+  const field = words.field(name);
   if (node.kind === 'has') {
     if (node.condition === null) {
       return words.t(node.negated ? 'ai.dashboard.filter.hasNone' : 'ai.dashboard.filter.hasAny', {
@@ -167,12 +174,13 @@ function describeNode(node: ConditionNode, words: FilterWords): string {
   const key = `ai.dashboard.filter.${node.negated ? 'not.' : ''}${node.op}`;
   return node.op === 'isNull'
     ? words.t(key, { field })
-    : words.t(key, { field, value: formatValue(node.value) });
+    : words.t(key, { field, value: formatValue(node.value, name, words) });
 }
 
 /**
- * A filter value as the clause shows it: a list joined by commas, anything else as text.
+ * A filter value as the clause shows it: each value in `words`, a list joined by commas.
  */
-function formatValue(value: unknown): string {
-  return isArray(value) ? value.map(String).join(', ') : String(value);
+function formatValue(value: unknown, field: string, words: FilterWords): string {
+  const values = isArray(value) ? value : [value];
+  return values.map((entry) => words.value?.(field, entry) ?? String(entry)).join(', ');
 }
