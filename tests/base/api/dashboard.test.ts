@@ -606,7 +606,10 @@ describe('defaultViews', () => {
     } finally {
       await share(true);
     }
-    deepStrictEqual(Object.keys((await call(user)).body.defaultViews), ['DashNotes', 'DashOwners']);
+    deepStrictEqual(Object.keys((await call(user)).body.defaultViews).sort(), [
+      'DashNotes',
+      'DashOwners',
+    ]);
   });
 
   it('reads the defaults past an app hook that scopes them away', async () => {
@@ -614,7 +617,7 @@ describe('defaultViews', () => {
       ir.collection === 'DashboardBookmarkDefaults' ? { ...ir, limit: 0 } : ir,
     );
     try {
-      deepStrictEqual(Object.keys((await call(user)).body.defaultViews), [
+      deepStrictEqual(Object.keys((await call(user)).body.defaultViews).sort(), [
         'DashNotes',
         'DashOwners',
       ]);
