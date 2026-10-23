@@ -1,7 +1,11 @@
 import { defineCollection, field } from 'ohnejs';
+import { checkLength } from 'ohnejs/utils';
 
 import type {} from '../fields/_augment.ts';
 
+import { failureMessage } from '../../ohne/fields/validation-message.ts';
+import { passwordRehashes } from '../auth/_sessions.ts';
+import { useAuthConfig } from '../auth/config.ts';
 import { manageUsers } from '../auth/manage-users.ts';
 
 /**
@@ -9,6 +13,8 @@ import { manageUsers } from '../auth/manage-users.ts';
  *
  * `email` is an `email` field, stored lowercased, so its uniqueness is case-insensitive.
  * `password` takes a plaintext password on write; the field type stores its scrypt hash, never the text.
+ * A new password needs at least `auth.password.minLength` characters, whichever route writes it.
+ * A sign-in's rehash is no new password, so a shorter one set before the rule keeps working.
  * The hash is write-only: no read returns it unless a trusted `select` names it explicitly.
  * `firstName` and `lastName` name the person; both are optional.
  * `roles` holds the user's role names; the capabilities of every held role union.
@@ -50,6 +56,14 @@ const users = defineCollection({
       readable: false,
       label: 'auth.users.password.label',
       description: 'auth.users.password.description',
+      validators: [
+        (value, { tx }) =>
+          passwordRehashes.has(tx)
+            ? undefined
+            : failureMessage(
+                checkLength(value.length, { min: useAuthConfig().password.minLength }),
+              ),
+      ],
     }),
 
     firstName: field('text', { nullable: true, label: 'auth.users.firstName.label' }),

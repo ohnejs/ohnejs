@@ -243,3 +243,29 @@ describe('Users grant rule', () => {
     deepStrictEqual(verdicts.delete.UUIDs, [manager.uuid]);
   });
 });
+
+describe('Users password length', () => {
+  it('refuses a new password below `auth.password.minLength` at `password`', async () => {
+    const { status, body } = await call(ROUTES.create, admin.token, {
+      body: { email: 'short@example.com', password: 'seven77', roles: ['editor'] },
+    });
+    strictEqual(status, 422);
+    deepStrictEqual(Object.keys(errorsOf(body)), ['password']);
+  });
+
+  it('accepts a password of exactly `auth.password.minLength` characters', async () => {
+    const { status } = await call(ROUTES.create, admin.token, {
+      body: { email: 'eight@example.com', password: 'eight888', roles: ['editor'] },
+    });
+    strictEqual(status, 201);
+  });
+
+  it('refuses a short password on an update too', async () => {
+    const { status, body } = await call(ROUTES.patch, admin.token, {
+      uuid: manager.uuid,
+      body: { password: 'seven77' },
+    });
+    strictEqual(status, 422);
+    deepStrictEqual(Object.keys(errorsOf(body)), ['password']);
+  });
+});

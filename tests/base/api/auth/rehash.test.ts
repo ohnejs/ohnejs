@@ -25,7 +25,10 @@ import { connectTest, dialect } from '../../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
 
-useLayers().add({ path: '/auth-rehash-test', input: { auth: { password: { cost: 1024 } } } });
+useLayers().add({
+  path: '/auth-rehash-test',
+  input: { auth: { password: { cost: 1024, minLength: 4 } } },
+});
 
 useFields().register('password', { name: 'password', fieldType: passwordField });
 useFields().register('roles', { name: 'roles', fieldType: rolesField });
@@ -71,11 +74,14 @@ async function storedHash(email: string): Promise<string> {
 }
 
 describe('login rehashes a stale-cost password', () => {
-  it('rewrites the stored hash at the raised cost on a successful sign-in', async () => {
+  it('rewrites the stored hash at the raised cost, even below a raised minimum length', async () => {
     await queryUntyped('Users').createOrThrow({ email: 'anduin@example.com', password: 'hunter2' });
     ok((await storedHash('anduin@example.com')).startsWith('scrypt$1024$'));
 
-    useLayers().add({ path: '/auth-rehash-raise', input: { auth: { password: { cost: 2048 } } } });
+    useLayers().add({
+      path: '/auth-rehash-raise',
+      input: { auth: { password: { cost: 2048, minLength: 12 } } },
+    });
 
     const wrong = await attempt('anduin@example.com', 'nope');
     strictEqual(wrong.status, 401);

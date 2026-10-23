@@ -276,9 +276,30 @@ export default defineConfig({
 Every field is optional, and the values above are the defaults. Both lifetimes take a duration
 string like `'2h'` or a number of milliseconds.
 
+### Password length
+
+A new password needs at least eight characters. Set `auth.password.minLength` to ask for more:
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  auth: {
+    password: { minLength: 12 },
+  },
+});
+```
+
+- Every way of setting a password keeps it: the install page, a sign-up route, the account page
+  and the dashboard all write the `Users` password, which checks it.
+- Signing in never checks it, so raising the minimum never locks anyone out. A shorter password
+  set before keeps working until its owner changes it.
+
 ### Password hashing cost
 
-Passwords are hashed with scrypt. `auth.password` sets how expensive the hashing is. Costlier
+Passwords are hashed with scrypt. `auth.password` also sets how expensive the hashing is. Costlier
 settings make a password harder to crack but make every sign-in slower.
 
 ```ts

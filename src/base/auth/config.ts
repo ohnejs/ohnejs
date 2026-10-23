@@ -61,11 +61,21 @@ declare module 'ohnejs' {
       loginRateLimit?: RouteRateLimit | false;
 
       /**
-       * How hard passwords are to hash, using the scrypt algorithm.
-       * Costlier settings resist cracking better but make every sign-in slower.
+       * The rules for passwords: how long a new one must be, and how hard each is to hash with scrypt.
+       * Costlier hashing resists cracking better but makes every sign-in slower.
        * The defaults suit most servers.
        */
       password?: {
+        /**
+         * The fewest characters a new password may have.
+         * Every write of `Users.password` checks it, so the install page, sign-up and the dashboard all do.
+         * Signing in never does, so raising it never locks out an account whose password is shorter.
+         *
+         * @default
+         * 8
+         */
+        minLength?: number;
+
         /**
          * The main dial for how hard a stored password is to crack.
          * Higher is safer but slower, and each doubling doubles the work; it must be a power of two.
@@ -124,9 +134,14 @@ export interface ResolvedAuthConfig {
   loginRateLimit: RouteRateLimit | false;
 
   /**
-   * The scrypt cost passed to `hashPassword`.
+   * The password rules: the minimum length, and the scrypt cost passed to `hashPassword`.
    */
   password: {
+    /**
+     * The fewest characters a new password may have.
+     */
+    minLength: number;
+
     /**
      * The scrypt CPU/memory cost.
      */
@@ -154,6 +169,7 @@ export const AUTH_DEFAULTS = {
   cookieName: 'session',
   loginRateLimit: { limit: 10, window: '1m' },
   password: {
+    minLength: 8,
     cost: 32_768,
     blockSize: 8,
     parallelization: 1,

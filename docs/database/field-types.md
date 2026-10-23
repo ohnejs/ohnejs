@@ -959,7 +959,8 @@ so `de-at` is stored as `de-AT`.
 </picture>
 
 Takes a plain-text password and stores its scrypt hash. Sanitizers and validators see the plain
-text, so a policy like a minimum length goes in a validator. Pass
+text, so a policy like a minimum length goes in a validator. The `Users` password already has
+one: [`auth.password.minLength`](../auth/authentication.md#password-length). Pass
 [`readable: false`](./collections.md#write-only-and-locked-fields), or reads return the hash.
 
 | Option            | Default | What it does                                                                                                                                                            |
