@@ -2,11 +2,14 @@ import { deepStrictEqual, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
 import type { User } from '../../../src/base/auth/types.ts';
-import type { DashboardCollection } from '../../../src/base/collections-api/describe.ts';
+import type {
+  DashboardCollection,
+  DashboardField,
+} from '../../../src/base/collections-api/describe.ts';
 import type { FieldTypeName } from '../../../src/ohne/fields/known-fields.ts';
 import type { HTTPMethod } from '../../../src/utils/index.ts';
 
-import { describeCollections } from '../../../src/base/collections-api/describe.ts';
+import { describeCollections, firstTextField } from '../../../src/base/collections-api/describe.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { defineField } from '../../../src/ohne/fields/define-field.ts';
 import { field, type FieldInstance } from '../../../src/ohne/fields/field.ts';
@@ -269,5 +272,27 @@ describe('describeCollections', () => {
       { kind: 'card', collapsible: false, nodes: [{ kind: 'field', name: 'name', width: '50%' }] },
     ]);
     strictEqual(collectionOf(editor, 'DescNotes').layout, undefined);
+  });
+});
+
+describe('firstTextField', () => {
+  const column = (name: string, type: string, readable = true): DashboardField =>
+    ({ name, type, kind: 'column', logicalType: 'text', readable }) as DashboardField;
+
+  it('names a block by its first readable text field, past every choice', () => {
+    const fields = [
+      column('layout', 'select'),
+      column('country', 'country'),
+      column('heading', 'text'),
+    ];
+    strictEqual(firstTextField(fields), 'heading');
+    strictEqual(
+      firstTextField([column('secret', 'text', false), column('title', 'text')]),
+      'title',
+    );
+  });
+
+  it('names nothing when a block has only choices', () => {
+    strictEqual(firstTextField([column('ratio', 'select'), column('email', 'email')]), undefined);
   });
 });

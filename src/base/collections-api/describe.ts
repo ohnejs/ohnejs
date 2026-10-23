@@ -584,7 +584,7 @@ function requiredOf(meta: FieldQueryMeta): boolean {
 }
 
 /**
- * The fields that name a record: the declared `recordLabel` as a list, or the `firstTextField`.
+ * The fields that name a record: the declared `recordLabel` as a list, or the `firstTextColumn`.
  * A declared template contributes its `{field}` tokens in order.
  */
 function labelFieldsOf(
@@ -595,15 +595,15 @@ function labelFieldsOf(
     if (isRecordLabelTemplate(declared)) return templateFields(declared) ?? [];
     return isString(declared) ? [declared] : declared;
   }
-  const fallback = firstTextField(fields);
+  const fallback = firstTextColumn(fields);
   return isUndefined(fallback) ? [] : [fallback];
 }
 
 /**
- * The name of the first readable plain `text` column, never `UUID` or a password.
- * It names a record or a block instance that declares no field of its own for that.
+ * The name of the first readable column stored as text, never `UUID` or a password.
+ * It names a record that declares no `recordLabel`, so an `email` or a `slug` can name it.
  */
-export function firstTextField(fields: readonly DashboardField[]): string | undefined {
+function firstTextColumn(fields: readonly DashboardField[]): string | undefined {
   return fields.find(
     (field) =>
       field.readable &&
@@ -612,4 +612,12 @@ export function firstTextField(fields: readonly DashboardField[]): string | unde
       field.type !== 'password' &&
       field.name !== 'UUID',
   )?.name;
+}
+
+/**
+ * The name of the first readable `text` field, which names a block instance that declares no `titleField`.
+ * Only a `text` field counts, so a choice such as a `select` or a `country` never names a block.
+ */
+export function firstTextField(fields: readonly DashboardField[]): string | undefined {
+  return fields.find((field) => field.readable && field.type === 'text')?.name;
 }

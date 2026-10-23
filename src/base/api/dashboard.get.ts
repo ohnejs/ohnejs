@@ -69,7 +69,7 @@ export interface DashboardBlock {
 
   /**
    * The field whose value names one instance beside the label: the declared one, else the first text field.
-   * Absent when the block declares none and has no plain text field.
+   * Absent when the block declares none and has no `text` field.
    */
   titleField?: string;
 
