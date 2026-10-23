@@ -46,7 +46,14 @@ css`
     container: ohne-page / inline-size;
     display: flex;
     flex-direction: column;
+    min-height: 100%;
     font-size: calc(1rem + var(--ohne-size) * 0.125rem);
+  }
+
+  .ohne-page > .ohne-state,
+  .ohne-page > .ohne-loaded > .ohne-loaded-content > .ohne-state {
+    flex: 1;
+    justify-content: center;
   }
 
   .ohne-page-header {
