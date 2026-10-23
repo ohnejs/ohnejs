@@ -1,6 +1,6 @@
 import { closePalette } from 'app/components/palette-state.ts';
-import { api, navigate, useRoute } from 'ohnejs/dashboard';
-import { isUndefined, parseSSE, sleep, untracked } from 'ohnejs/utils';
+import { api, markDataChanged, navigate, useRoute } from 'ohnejs/dashboard';
+import { isNull, isUndefined, parseSSE, sleep, untracked } from 'ohnejs/utils';
 
 import type { Approval, SendTransport } from './send-queue.ts';
 import type { BatchResult, OpenOutcome, TurnBatch } from './turn-store.ts';
@@ -10,6 +10,7 @@ import { turnModel } from './_ai-model-pick.ts';
 import { fetchWithRetry, postResults, sendBatch } from './send-queue.ts';
 import {
   applyTurnEvent,
+  batchOutcome,
   clearTurns,
   currentTurn,
   markTurn,
@@ -109,6 +110,7 @@ export async function ask(input: string, { skill, flow, after }: AskOptions = {}
  * Answers the batch that waits: sends what `approvals` allow, posts the results, streams the next step.
  * A batch that names a page closes the palette and opens it once answered; a declined batch leaves it.
  * The page opens after the writes, so it shows what they changed.
+ * Writes that landed, or may have, reload the page left on screen through `markDataChanged`.
  * `open: false` leaves the page as it is.
  * A batch that no longer waits is left alone.
  */
@@ -135,11 +137,14 @@ export async function answer(
     return;
   }
   sending.value = null;
+  const before = location.href;
   const opened: OpenOutcome | undefined = isUndefined(batch.open)
     ? undefined
     : open
       ? await openPage(batch.open)
       : 'declined';
+  // A page the batch just opened loaded after the writes; only the one still on screen is stale.
+  if (location.href === before && wrote({ ...batch, results })) markDataChanged();
   settleBatch(results, opened);
   nextStep();
   let response: Response | undefined;
@@ -200,6 +205,14 @@ async function consume(response: Response): Promise<void> {
       batch.proposals.map(() => ({ send: true })),
     );
   }
+}
+
+/**
+ * Whether a write of the answered `batch` landed, or may have, since its connection dropped.
+ */
+function wrote(batch: TurnBatch): boolean {
+  const { writes } = batchOutcome(batch);
+  return !isNull(writes) && writes.sent + writes.unknown > 0;
 }
 
 /**
