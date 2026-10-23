@@ -50,7 +50,7 @@ export interface BlockDashboard<TField extends string = string> {
 
   /**
    * A field whose value names one instance beside the block's label, like a heading.
-   * Omitted, the first plain text field names it.
+   * Omitted, the first `text` field names it.
    */
   titleField?: TField;
 
