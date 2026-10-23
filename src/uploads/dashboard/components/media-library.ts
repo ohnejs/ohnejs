@@ -5,6 +5,7 @@ import {
   contextMenu,
   css,
   dashboardMeta,
+  dataChangeCount,
   dropdownItem,
   each,
   h,
@@ -350,6 +351,10 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
       view.ready.value = false;
     });
     reload();
+  });
+  const changed = untracked(dataChangeCount);
+  effect(() => {
+    if (dataChangeCount() !== changed) reload();
   });
   let seen = untracked(() => view.revision.value);
   effect(() => {
