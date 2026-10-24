@@ -27,9 +27,14 @@ const ALWAYS_IGNORED = 'node_modules';
 /**
  * Recursively watches a directory tree, calling `onChange` with the absolute path of each change.
  *
- * Watches each directory in the tree, picking up new ones as they appear.
  * Directories named `node_modules`, dot-prefixed names, and any `ignore` name are skipped.
  * Events inside a skipped directory are not reported.
+ * The files of a directory that appears are reported too, so one moved in whole is not missed.
+ *
+ * On macOS one recursive watch covers the tree.
+ * There every watch opened or closed restarts the event stream all watches share.
+ * Whatever happens during that restart is dropped.
+ * Elsewhere each directory gets its own watch, and a new one is watched as it appears.
  *
  * Returns a closer that tears down every watch.
  *
@@ -48,15 +53,79 @@ export function watchTree(
   options: WatchTreeOptions = {},
 ): () => void {
   const ignore = new Set(options.ignore);
+  const pruned = (name: string): boolean =>
+    name.startsWith('.') || name === ALWAYS_IGNORED || ignore.has(name);
+  const root = resolvePath(dir);
+  return process.platform === 'darwin'
+    ? watchRecursive(root, onChange, pruned)
+    : watchEachDir(root, onChange, pruned);
+}
+
+/**
+ * Watches `root` with one recursive watch, reporting each unpruned path and a new directory's files.
+ */
+function watchRecursive(
+  root: string,
+  onChange: (path: string) => void,
+  pruned: (name: string) => boolean,
+): () => void {
+  let closed = false;
+  let watcher: FSWatcher;
+  try {
+    watcher = watch(root, { recursive: true }, (_event, filename) => {
+      if (closed) return;
+      if (isNull(filename)) {
+        onChange(root);
+        return;
+      }
+      if (filename.split('/').some(pruned)) return;
+      const changed = childPath(root, filename);
+      onChange(changed);
+      void reportFiles(changed);
+    });
+  } catch {
+    return () => {};
+  }
+  watcher.on('error', () => watcher.close());
+
+  return () => {
+    closed = true;
+    watcher.close();
+  };
+
+  /**
+   * Reports every unpruned file under `path`, which does nothing when `path` is not a directory.
+   */
+  async function reportFiles(path: string): Promise<void> {
+    let entries: Dirent[];
+    try {
+      entries = await readdir(path, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (closed || pruned(entry.name)) continue;
+      const child = childPath(path, entry.name);
+      if (entry.isDirectory()) await reportFiles(child);
+      else onChange(child);
+    }
+  }
+}
+
+/**
+ * Watches each unpruned directory under `root` on its own, watching new ones as they appear.
+ */
+function watchEachDir(
+  root: string,
+  onChange: (path: string) => void,
+  pruned: (name: string) => boolean,
+): () => void {
   const watchers = new Map<string, FSWatcher>();
   const reconciles = new Map<string, Promise<void>>();
   let closed = false;
   let ready = false;
 
-  const pruned = (name: string): boolean =>
-    name.startsWith('.') || name === ALWAYS_IGNORED || ignore.has(name);
-
-  void watchDir(resolvePath(dir), false).then(() => {
+  void watchDir(root, false).then(() => {
     ready = true;
   });
 
