@@ -679,8 +679,8 @@ async function retypeInPlace(
 
 /**
  * Ensures the move's target column exists, creating the table or the column from what is known.
- * A missing table comes from the desired schema, without uniques and indexes.
- * The sync's diff re-adds them after the guard probes them.
+ * A missing table comes from the desired schema, without uniques and indexes, its non-key columns nullable.
+ * The sync's diff re-adds the constraints after the guard probes them, so later migrations can fill the rest.
  * A missing column comes from the address itself, nullable; the diff tightens it once values landed.
  */
 async function materializeTarget(
@@ -701,9 +701,13 @@ async function materializeTarget(
         path: meta.file,
       });
     }
+    const keys = new Set([...wanted.primaryKey, ...wanted.foreignKeys.map((key) => key.column)]);
+    const relaxed = wanted.columns.map((item) =>
+      keys.has(item.name) ? item : { ...item, notNull: false },
+    );
     await engine.dialect.applyTableDiff(engine.db, {
       kind: 'create',
-      table: { ...wanted, uniques: [], indexes: [] },
+      table: { ...wanted, columns: relaxed, uniques: [], indexes: [] },
     });
     engine.names.add(to.table);
     const columns = Object.fromEntries(wanted.columns.map((item) => [item.name, item.type]));

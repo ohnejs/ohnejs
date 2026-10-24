@@ -2274,6 +2274,61 @@ describe('executeMigrations with fills', () => {
     await db.close();
   });
 
+  it('creates a required child table over one fill per required subfield', async () => {
+    const db = await connectTest();
+    const posts = table('Posts');
+    await materialize(db, [posts]);
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['p1']);
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-city', {
+          from: null,
+          to: { collection: 'Posts', field: 'address.city' },
+          transform: () => 'Dalaran',
+        }),
+        meta('app/002-street', {
+          from: null,
+          to: { collection: 'Posts', field: 'address.street' },
+          transform: () => 'Violet Citadel',
+        }),
+      ],
+      desired: [
+        posts,
+        table('Posts_address', {
+          columns: [
+            UUID,
+            { name: '_parentUUID', type: 'text', notNull: true },
+            { name: 'street', type: 'text', notNull: true },
+            { name: 'city', type: 'text', notNull: true },
+          ],
+          foreignKeys: [
+            {
+              column: '_parentUUID',
+              targetTable: 'Posts',
+              targetColumn: 'UUID',
+              onDelete: 'cascade',
+            },
+          ],
+          derived: { collection: 'Posts', path: ['address'], kind: 'childOne', required: true },
+        }),
+      ],
+      claimed: classifySchema([posts]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [
+      { name: 'app/001-city', status: 'applied' },
+      { name: 'app/002-street', status: 'applied' },
+    ]);
+    const rows = await db.query<{ _parentUUID: string; street: string; city: string }>(
+      'SELECT "_parentUUID", "street", "city" FROM "Posts_address"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row._parentUUID, row.street, row.city]),
+      [['p1', 'Violet Citadel', 'Dalaran']],
+    );
+    await db.close();
+  });
+
   it('refuses to create required child rows another column would leave `NULL`', async () => {
     const db = await connectTest();
     const posts = table('Posts');

@@ -126,6 +126,70 @@ describe('syncDatabase with a fill migration', () => {
     await db.close();
   });
 
+  it('adds a required object with several required subfields, one fill each', async () => {
+    const db = await connectTest();
+    await syncDatabase(db, dialect, { desired: before });
+    await insertSite(db, 's1');
+    const withSEO = site({
+      title: field('text', { default: 'Home' }),
+      seo: field('object', { fields: { title: field('text'), description: field('text') } }),
+    });
+    const table = withSEO.find((item) => item.derived?.path.join('.') === 'seo')?.name ?? '';
+    await syncDatabase(db, dialect, {
+      desired: withSEO,
+      migrations: [
+        meta('app/2026-10-seo-title', {
+          from: null,
+          to: { collection: 'Site', field: 'seo.title' },
+          transform: () => 'Stormwind',
+        }),
+        meta('app/2026-10-seo-description', {
+          from: null,
+          to: { collection: 'Site', field: 'seo.description' },
+          transform: () => 'The capital of the Alliance.',
+        }),
+      ],
+    });
+    deepStrictEqual(await db.query(`SELECT "title", "description" FROM "${table}"`), [
+      Object.assign(Object.create(null), {
+        title: 'Stormwind',
+        description: 'The capital of the Alliance.',
+      }),
+    ]);
+    const live = await dialect.describeTable(db, table);
+    ok(
+      live.columns
+        .filter((column) => ['title', 'description'].includes(column.name))
+        .every((column) => column.notNull),
+    );
+    await db.close();
+  });
+
+  it('refuses a required object whose second subfield no fill gave a value', async () => {
+    const db = await connectTest();
+    await syncDatabase(db, dialect, { desired: before });
+    await insertSite(db, 's1');
+    const withSEO = site({
+      title: field('text', { default: 'Home' }),
+      seo: field('object', { fields: { title: field('text'), description: field('text') } }),
+    });
+    await rejects(
+      syncDatabase(db, dialect, {
+        desired: withSEO,
+        migrations: [
+          meta('app/2026-10-seo-title', {
+            from: null,
+            to: { collection: 'Site', field: 'seo.title' },
+            transform: () => 'Stormwind',
+          }),
+        ],
+      }),
+      refusalMatching(/\.description` becomes NOT NULL over `1` NULL row/),
+    );
+    ok(!(await dialect.listTables(db)).includes('ohne_migrations'));
+    await db.close();
+  });
+
   it('rolls the fill and its stamp back when a row stays NULL', async () => {
     const db = await connectTest();
     await syncDatabase(db, dialect, { desired: before });
