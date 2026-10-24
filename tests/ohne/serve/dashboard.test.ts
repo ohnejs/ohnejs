@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 
-import { rejects, strictEqual } from 'node:assert';
+import { match, notStrictEqual, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -35,6 +35,14 @@ function req(port: number, path: string, headers: Record<string, string> = {}): 
     r.on('error', reject);
     r.end();
   });
+}
+
+/**
+ * The `imports` of the importmap a shell document carries.
+ */
+function importsOf(body: string): Record<string, string> {
+  const map = /<script type="importmap">(.*?)<\/script>/s.exec(body)?.[1] ?? '{}';
+  return (JSON.parse(map) as { imports: Record<string, string> }).imports;
 }
 
 describe('serveDashboard', () => {
@@ -292,23 +300,119 @@ describe('serveDashboard', () => {
     await rejects(() => serveDashboard(dir), /Invalid default language/);
   });
 
-  it('injects an importmap mapping the bare specifiers to served URLs', async () => {
+  it('maps the bare specifiers straight to fingerprinted URLs', async () => {
     const port = await serve('importmap');
-    const body = (await req(port, '/')).body;
-    strictEqual(body.includes('<script type="importmap">'), true);
-    strictEqual(body.includes('"ohnejs/dashboard":"/m/dashboard/index.ts"'), true);
-    strictEqual(body.includes('"ohnejs/utils":"/m/utils/index.ts"'), true);
-    strictEqual(body.includes('"app/":"/m/app/"'), true);
+    const imports = importsOf((await req(port, '/')).body);
+    match(imports['ohnejs/dashboard'] ?? '', /^\/m\/dashboard\/index\.ts\?h=[\w-]{8}$/);
+    strictEqual(imports['ohnejs/dashboard'], imports['/m/dashboard/index.ts']);
+    match(imports['ohnejs/utils'] ?? '', /^\/m\/utils\/index\.ts\?h=[\w-]{8}$/);
+    strictEqual(imports['ohnejs/utils'], imports['/m/utils/index.ts']);
+    strictEqual(imports['app/'], '/m/app/');
   });
 
-  it('references the boot module entry from the shell', async () => {
+  it('maps every kernel module to its fingerprinted URL', async () => {
+    const port = await serve('importmap-kernel');
+    const imports = importsOf((await req(port, '/')).body);
+    match(imports['/m/utils/reactive/ref.ts'] ?? '', /^\/m\/utils\/reactive\/ref\.ts\?h=[\w-]{8}$/);
+    match(imports['/m/dashboard/router/router.ts'] ?? '', /\?h=[\w-]{8}$/);
+  });
+
+  it('gives a layer module one fingerprinted URL, bare or relative', async () => {
+    const dir = makeApp('importmap-app');
+    writeBoot(dir, 'slots.ts', 'app:slots');
+    http = await serveDashboard(dir);
+    const imports = importsOf((await req((http.server.address() as AddressInfo).port, '/')).body);
+    match(imports['/m/app/boot/slots.ts'] ?? '', /^\/m\/app\/boot\/slots\.ts\?h=[\w-]{8}$/);
+    strictEqual(imports['app/boot/slots.ts'], imports['/m/app/boot/slots.ts']);
+  });
+
+  it('loads the kernel entry from its fingerprinted URL', async () => {
     const port = await serve('boot');
+    const body = (await req(port, '/')).body;
+    const src = importsOf(body)['/m/dashboard/boot.ts'];
+    match(src ?? '', /\?h=[\w-]{8}$/);
+    strictEqual(body.includes(`<script type="module" src="${src}" id="ohne-boot">`), true);
+  });
+
+  it('caches a module for good at its fingerprinted URL', async () => {
+    const port = await serve('immutable');
+    const url = importsOf((await req(port, '/')).body)['/m/dashboard/index.ts'] ?? '';
+    const res = await req(port, url);
+    strictEqual(res.status, 200);
+    strictEqual(res.headers['cache-control'], 'public, max-age=31536000, immutable');
+    strictEqual(res.headers['etag'], `"${url.split('?h=')[1]}"`);
+  });
+
+  it('revalidates a module at its plain or a stale URL, with the current bytes', async () => {
+    const port = await serve('revalidate');
+    const url = importsOf((await req(port, '/')).body)['/m/dashboard/index.ts'] ?? '';
+    const current = await req(port, url);
+    for (const path of ['/m/dashboard/index.ts', '/m/dashboard/index.ts?h=AAAAAAAA']) {
+      const res = await req(port, path);
+      strictEqual(res.headers['cache-control'], 'no-cache');
+      strictEqual(res.headers['etag'], current.headers['etag']);
+      strictEqual(res.body, current.body);
+    }
+  });
+
+  it('caches a page module with brackets in its path for good', async () => {
+    const dir = makeApp('immutable-page');
+    const file = join(dir, 'dashboard', 'pages', 'users', '[id].ts');
+    mkdirSync(join(file, '..'), { recursive: true });
+    writeFileSync(file, 'export default () => null\n');
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    const url = importsOf((await req(port, '/')).body)['app/pages/users/[id].ts'] ?? '';
+    match(url, /^\/m\/app\/pages\/users\/\[id\]\.ts\?h=[\w-]{8}$/);
     strictEqual(
-      (await req(port, '/')).body.includes(
-        '<script type="module" src="/m/dashboard/boot.ts" id="ohne-boot">',
-      ),
-      true,
+      (await req(port, url)).headers['cache-control'],
+      'public, max-age=31536000, immutable',
     );
+  });
+
+  it('names an edited module by its new bytes on the next render, with no restart', async () => {
+    const dir = makeApp('edit');
+    writeBoot(dir, 'theme.ts', 'app:old');
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    const before = importsOf((await req(port, '/')).body)['/m/app/boot/theme.ts'] ?? '';
+
+    writeBoot(dir, 'theme.ts', 'app:newer');
+    const after = importsOf((await req(port, '/')).body)['/m/app/boot/theme.ts'] ?? '';
+    notStrictEqual(after, before);
+
+    const stale = await req(port, before);
+    strictEqual(stale.headers['cache-control'], 'no-cache');
+    strictEqual(stale.body.includes('app:newer'), true);
+    strictEqual(
+      (await req(port, after)).headers['cache-control'],
+      'public, max-age=31536000, immutable',
+    );
+  });
+
+  it('has the shell revalidated, and answers 304 while it is unchanged', async () => {
+    const dir = makeApp('shell-cache');
+    writeBoot(dir, 'theme.ts', 'app:old');
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    const first = await req(port, '/');
+    strictEqual(first.headers['cache-control'], 'no-cache');
+    const etag = first.headers['etag'] as string;
+    strictEqual((await req(port, '/', { 'if-none-match': etag })).status, 304);
+
+    writeBoot(dir, 'theme.ts', 'app:newer');
+    const edited = await req(port, '/', { 'if-none-match': etag });
+    strictEqual(edited.status, 200);
+    notStrictEqual(edited.headers['etag'], etag);
+  });
+
+  it('serves a font as is, revalidated against its stats', async () => {
+    const port = await serve('font');
+    const res = await req(port, '/m/dashboard/assets/fonts/fira-mono-cyrillic-400.woff2');
+    strictEqual(res.status, 200);
+    strictEqual(res.headers['content-type'], 'font/woff2');
+    strictEqual(res.headers['cache-control'], 'no-cache');
+    match(res.headers['etag'] as string, /^W\//);
   });
 
   it('holds a boot failure state in English when no catalog translates it', async () => {
@@ -342,19 +446,20 @@ describe('serveDashboard', () => {
 
   it('omits the reload client and its stream route by default', async () => {
     const port = await serve('no-reload');
-    strictEqual((await req(port, '/')).body.includes('reload-client.ts'), false);
+    strictEqual(
+      (await req(port, '/')).body.includes('src="/m/dashboard/runtime/reload-client.ts'),
+      false,
+    );
     strictEqual((await req(port, '/m/dashboard/reload')).status, 404);
   });
 
   it('injects the reload client when `DASHBOARD_RELOAD` is set', async () => {
     useEnv().set('DASHBOARD_RELOAD', true);
     const port = await serve('reload');
-    strictEqual(
-      (await req(port, '/')).body.includes(
-        '<script type="module" src="/m/dashboard/runtime/reload-client.ts">',
-      ),
-      true,
-    );
+    const body = (await req(port, '/')).body;
+    const src = importsOf(body)['/m/dashboard/runtime/reload-client.ts'];
+    match(src ?? '', /\?h=[\w-]{8}$/);
+    strictEqual(body.includes(`<script type="module" src="${src}">`), true);
   });
 
   it('warns when the dashboard folder has no tsconfig.json', async () => {

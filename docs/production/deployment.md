@@ -116,6 +116,20 @@ If the proxy limits request bodies, keep
 [`uploads.chunkSize`](../uploads/resumable.md#sizes-and-limits) under that limit, so every chunk of
 a large upload gets through.
 
+## Dashboard caching
+
+The dashboard names each module by a fingerprint of its content, like `/m/utils/index.ts?h=47DEQpj8`,
+and lets the browser cache it for a year. The page is sent with `no-cache`, so a reload after a
+deploy loads the changed files and keeps the rest. A deploy needs no cache purge.
+
+A proxy or CDN in front of the dashboard must:
+
+- keep the query string in its cache key, since the fingerprint lives there.
+- pass `Cache-Control` through unchanged. Some CDNs rewrite it by default, so compare a module's
+  headers through the CDN with `curl -I` against the origin's.
+
+Otherwise the browser can keep old code under a new name.
+
 ## CORS
 
 The `ohnejs/base` layer mounts a global [`cors` middleware](../api/middleware.md#cors): only the

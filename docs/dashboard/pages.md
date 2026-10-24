@@ -353,7 +353,7 @@ your `boot/fields.ts` [replaces](../project/layers.md#what-overrides-what) a lay
 
 The browser fetches modules by URL, so everything in the dashboard directory is public.
 
-The shell injects an import map with these entries:
+A page can import these names:
 
 - `ohnejs/dashboard` - the browser runtime: `defineDashboardPage`, `h`, `api`, `useT`, ...
 - `ohnejs/utils` - the utilities that run in both Node and the browser, the same module your Node
@@ -363,15 +363,16 @@ The shell injects an import map with these entries:
 Relative imports work too.
 
 - Name the full file, extension included. The browser resolves URLs, not packages.
+- An `app/` import and a relative import of the same file load one module, with one shared state.
 - `app/` merges every layer's dashboard directory, closest layer first, so an app file replaces a
   layer's file at the same path.
 - The same merge lets a layer import another layer's dashboard files by their `app/` path:
   `app/components/shell-slots.ts` resolves wherever in the stack the file lives. To make the editor
   resolve these imports too, see [type checking](#type-checking).
 
-That map is the whole boundary between browser and server. The server serves only the dashboard
+These names are the whole boundary between browser and server. The server serves only the dashboard
 runtime and the utils, never the Node framework, so browser code cannot import server code.
-`ohnejs` is not in the map, and you cannot use `useDatabase` in a page. Data crosses over HTTP,
+`ohnejs` is not among them, and you cannot use `useDatabase` in a page. Data crosses over HTTP,
 through [`api`](./data.md#calling-the-api-directly).
 
 ## Serving
@@ -384,6 +385,16 @@ channel.
 
 You set the port, the host, and the API base URL the browser talks to under
 [`dashboard.*`](../project/config.md#the-dashboard) in config.
+
+### Caching
+
+The browser keeps each dashboard module until its content changes. A module's URL carries a
+fingerprint of its bytes, so the browser caches it for good and never asks for it again. After a
+deploy or an edit, it downloads only the files that changed.
+
+Every reload revalidates the page itself, so a reload always picks up the new files. You configure
+nothing. If a proxy or CDN sits in front of the dashboard, see
+[dashboard caching](../production/deployment.md#dashboard-caching).
 
 ## Type checking
 

@@ -1,28 +1,20 @@
 import type { Stats } from 'node:fs';
 
-import { stripTypeScriptTypes } from 'node:module';
-
 import { etag } from '../../utils/etag/etag.ts';
+import { findFile } from '../../utils/fs/find-file.ts';
 import { readFileBytes } from '../../utils/fs/read-file-bytes.ts';
-import { readFile } from '../../utils/fs/read-file.ts';
-import { stat } from '../../utils/fs/stat.ts';
-import { silenceFirstStripWarning } from '../../utils/imports/silence-strip-warning.js';
+import { stripFile } from '../../utils/imports/strip-file.ts';
 import {
   cacheControl,
   type CacheControlOptions,
   isNull,
+  isTypeScriptPath,
   mimeTypeFor,
-  safeResolve,
 } from '../../utils/index.ts';
 import { notFound } from './http-error.ts';
 import { isFresh } from './is-fresh.ts';
 import { sendNotModified } from './send-not-modified.ts';
 import { useResponse } from './use-response.ts';
-
-const TYPESCRIPT = /\.m?ts$/;
-const JAVASCRIPT = 'text/javascript; charset=utf-8';
-
-silenceFirstStripWarning();
 
 /**
  * Options for `sendFile`.
@@ -69,14 +61,9 @@ export async function sendFile(
   path: string,
   options: SendFileOptions = {},
 ): Promise<string | Uint8Array | undefined> {
-  for (const root of roots) {
-    const resolved = safeResolve(root, path);
-    if (isNull(resolved)) continue;
-    const stats = await stat(resolved);
-    if (isNull(stats) || !stats.isFile()) continue;
-    return serve(resolved, stats, options);
-  }
-  throw notFound(options.notFound);
+  const found = await findFile(roots, path);
+  if (isNull(found)) throw notFound(options.notFound);
+  return serve(found.path, found.stats, options);
 }
 
 /**
@@ -87,12 +74,12 @@ async function serve(
   stats: Stats,
   options: SendFileOptions,
 ): Promise<string | Uint8Array | undefined> {
-  const typescript = TYPESCRIPT.test(file);
+  const typescript = isTypeScriptPath(file);
 
   const response = useResponse();
   response.headers.set(
     'content-type',
-    typescript ? JAVASCRIPT : (mimeTypeFor(file) ?? 'text/plain; charset=utf-8'),
+    mimeTypeFor(typescript ? 'js' : file) ?? 'text/plain; charset=utf-8',
   );
   response.headers.set('etag', etag(stats));
   response.headers.set('cache-control', cacheControl(options.cache ?? { noCache: true }));
@@ -102,6 +89,6 @@ async function serve(
     return undefined;
   }
 
-  if (typescript) return stripTypeScriptTypes((await readFile(file)) ?? '');
+  if (typescript) return (await stripFile(file)) ?? '';
   return (await readFileBytes(file)) ?? new Uint8Array();
 }

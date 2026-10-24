@@ -1,4 +1,4 @@
-import { rejects, strictEqual } from 'node:assert';
+import { match, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,9 +6,9 @@ import { after, before, describe, it } from 'node:test';
 
 import { type Event, HTTPError, runWithEvent, sendFile } from '../../../src/ohne/index.ts';
 
-function makeEvent(): Event {
+function makeEvent(headers: Record<string, string> = {}): Event {
   return {
-    request: new Request('http://localhost/'),
+    request: new Request('http://localhost/', { headers }),
     url: new URL('http://localhost/'),
     params: {},
     ip: '',
@@ -41,6 +41,7 @@ describe('sendFile', () => {
     mkdirSync(join(second, 'scroll'), { recursive: true });
     writeFileSync(join(first, 'scroll'), 'Medivh');
     writeFileSync(join(second, 'scroll', 'page.txt'), 'Khadgar');
+    writeFileSync(join(first, 'spell.ts'), 'export const school: string = "Frost";\n');
   });
 
   after(() => {
@@ -53,6 +54,19 @@ describe('sendFile', () => {
 
   it('passes a root where a file stands in the path, serving a later root', async () => {
     strictEqual(await serve([first, second], 'scroll/page.txt'), 'Khadgar');
+  });
+
+  it('strips a module and has it revalidated against a weak stat ETag', async () => {
+    const event = makeEvent();
+    const body = await runWithEvent(event, () => sendFile([first], 'spell.ts'));
+    strictEqual(body, 'export const school         = "Frost";\n');
+    strictEqual(event.response.headers.get('content-type'), 'text/javascript; charset=utf-8');
+    strictEqual(event.response.headers.get('cache-control'), 'no-cache');
+    match(event.response.headers.get('etag') ?? '', /^W\//);
+
+    const fresh = makeEvent({ 'if-none-match': event.response.headers.get('etag') ?? '' });
+    strictEqual(await runWithEvent(fresh, () => sendFile([first], 'spell.ts')), undefined);
+    strictEqual(fresh.response.status, 304);
   });
 
   it('answers 404 for a path that can name no file', async () => {
