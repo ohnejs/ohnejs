@@ -4,6 +4,7 @@ import {
   type Child,
   css,
   type DashboardCollection,
+  dashboardMeta,
   dimMark,
   fallbackLabel,
   h,
@@ -39,7 +40,7 @@ import { useAIT } from './_ai-messages.ts';
 import { collectionOfRoute } from './_ai-meta.ts';
 import { transformTable } from './_ai-transform-table.ts';
 import { recordLink } from './_record-link.ts';
-import { describeWhere, expandSet } from './expand-set.ts';
+import { describeWhere, expandSet, type FilterWords } from './expand-set.ts';
 import { currentTurn } from './turn-store.ts';
 
 /**
@@ -400,17 +401,10 @@ function headerLine(
   };
   const filter = (): string => {
     if (isUndefined(proposal.where) || isUndefined(collection)) return '';
-    const described = describeWhere(proposal.where, {
-      field: (name) => fieldLabel(collection, name),
-      t: (key, params) => t(key as `ai.${string}`, params),
-      value: (name, value) => {
-        const target = collection.fields.find((entry) => entry.name === name)?.target;
-        if (isUndefined(target) || !isString(value)) return undefined;
-        return (
-          labelOf(target, value, isString(locale) ? locale : undefined) ?? fallbackLabel(value)
-        );
-      },
-    });
+    const described = describeWhere(
+      proposal.where,
+      filterWords(collection, t, isString(locale) ? locale : undefined),
+    );
     return described === ''
       ? ''
       : stripCodeSpans(t('ai.dashboard.batch.every', { filter: described }));
@@ -594,6 +588,33 @@ function formatValue(value: unknown): Child {
   if (isNullish(value) || value === '') return dimMark('-');
   if (isString(value)) return value;
   return isPlainObject(value) || isArray(value) ? JSON.stringify(value) : String(value);
+}
+
+/**
+ * The words for a filter over `collection`, a related record named by its label at `locale`.
+ * The condition of a `has` reads in the words of the related collection.
+ */
+function filterWords(
+  collection: DashboardCollection,
+  t: AITranslate,
+  locale?: string,
+): FilterWords {
+  const targetOf = (name: string): string | undefined =>
+    collection.fields.find((entry) => entry.name === name)?.target;
+  return {
+    field: (name) => fieldLabel(collection, name),
+    t: (key, params) => t(key as `ai.${string}`, params),
+    value: (name, value) => {
+      const target = targetOf(name);
+      if (isUndefined(target) || !isString(value)) return undefined;
+      return labelOf(target, value, locale) ?? fallbackLabel(value);
+    },
+    within: (name) => {
+      const target = targetOf(name);
+      const related = dashboardMeta()?.collections.find((entry) => entry.name === target);
+      return isUndefined(related) ? undefined : filterWords(related, t, locale);
+    },
+  };
 }
 
 /**

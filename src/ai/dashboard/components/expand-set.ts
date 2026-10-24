@@ -89,6 +89,12 @@ export interface FilterWords {
    * Omitted, or answering `undefined`, the value shows as text.
    */
   value?(field: string, value: unknown): string | undefined;
+
+  /**
+   * The words inside a `has` over the relation `field`, where the condition names the related fields.
+   * Omitted, or answering `undefined`, the condition reads with these same words.
+   */
+  within?(field: string): FilterWords | undefined;
 }
 
 /**
@@ -163,7 +169,7 @@ function describeNode(node: ConditionNode, words: FilterWords): string {
     }
     return words.t(node.negated ? 'ai.dashboard.filter.hasNot' : 'ai.dashboard.filter.has', {
       field,
-      condition: describeNode(node.condition, words),
+      condition: describeNode(node.condition, words.within?.(name) ?? words),
     });
   }
   if (node.kind === 'empty') {

@@ -70,6 +70,22 @@ describe('describeWhere', () => {
     );
   });
 
+  it('describes a has condition in the words of the related collection', () => {
+    const members = {
+      field: (name: string) => ({ leader: 'Leader' })[name] ?? name,
+      t,
+      value: (field: string, value: unknown) => (field === 'leader' ? `@${value}` : undefined),
+    };
+    const outer = {
+      ...words,
+      within: (field: string) => (field === 'guild' ? members : undefined),
+    };
+    strictEqual(
+      describeWhere({ guild: { has: { leader: 'u9' } }, rarity: 'epic' }, outer),
+      'Guild has one where Leader is `@u9` and Rarity is `epic`',
+    );
+  });
+
   it('answers nothing for a filter the grammar refuses', () => {
     strictEqual(describeWhere({ level: null }, words), '');
     strictEqual(describeWhere('wild', words), '');
