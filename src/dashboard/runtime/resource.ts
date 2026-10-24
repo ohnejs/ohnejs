@@ -242,7 +242,7 @@ export function useResource<T = unknown>(
   let changed = false;
   effect(() => {
     dataChangeCount();
-    if (changed && !isUndefined(target)) untracked(() => void load(true, true));
+    if (changed && !isUndefined(target)) untracked(() => void load(false, true));
     changed = true;
   });
 

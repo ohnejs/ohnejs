@@ -2,6 +2,8 @@ import type { APIError } from './api-error.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { setCapped } from '../../utils/map/set-capped.ts';
+import { untracked } from '../../utils/reactive/untracked.ts';
+import { dataChangeCount } from './data-changes.ts';
 
 /**
  * How a read settled: its parsed value, or the failure.
@@ -47,6 +49,7 @@ interface Flight {
   settled: Promise<Settled | undefined>;
   controller: AbortController;
   holds: number;
+  changes: number;
 }
 
 const LIMIT = 100;
@@ -72,6 +75,7 @@ export function cachedAnswer(key: string, standInKey: string): CachedAnswer | un
 /**
  * Holds the request in flight for `key`, or starts one with `send`.
  * A `fresh` join always starts a new request; later joins share that one.
+ * A request sent before the latest `markDataChanged` is never shared, so every join after it reads anew once.
  * A value it answers is cached under `key` and as the newest under `standInKey`.
  * A request settling after a later one for `key` already answered settles with that newer answer instead.
  * The request is aborted once every hold is released.
@@ -82,14 +86,16 @@ export function joinFlight(
   send: (signal: AbortSignal) => Promise<Settled | undefined>,
   fresh: boolean,
 ): FlightTicket {
+  const changes = untracked(dataChangeCount);
   let flight = fresh ? undefined : flights.get(key);
-  if (isUndefined(flight)) {
+  if (isUndefined(flight) || flight.changes !== changes) {
     const controller = new AbortController();
     const sentIn = epoch;
     const order = ++sequence;
     const started: Flight = {
       controller,
       holds: 0,
+      changes,
       settled: send(controller.signal).then((settled) => {
         if (flights.get(key) === started) flights.delete(key);
         if (sentIn !== epoch || isUndefined(settled)) return settled;

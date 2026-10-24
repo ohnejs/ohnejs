@@ -230,6 +230,20 @@ describe('useResource', () => {
     deepStrictEqual(raids(), ['Naxxramas']);
   });
 
+  it('refetches once for every reader of a key once the data changed', async () => {
+    const readers = [read('GET /raids'), read('GET /raids'), read('GET /raids')];
+    requests[0].answer(200, ['Molten Core']);
+    await settle();
+    markDataChanged();
+    strictEqual(requests.length, 2);
+    requests[1].answer(200, ['Naxxramas']);
+    await settle();
+    deepStrictEqual(
+      readers.map((reader) => reader()),
+      [['Naxxramas'], ['Naxxramas'], ['Naxxramas']],
+    );
+  });
+
   it('leaves a paused read paused once the data changed', () => {
     read('GET /heroes/[id]', { params: () => undefined });
     markDataChanged();
