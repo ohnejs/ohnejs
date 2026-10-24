@@ -26,6 +26,11 @@ const BIN = fileURLToPath(new URL('../../../src/ohne/cli/bin.js', import.meta.ur
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 const TIMEOUT = { timeout: 60_000, skip: process.platform === 'win32' };
 
+/**
+ * How long a new file watch gets to come alive before a test writes, five times the slowest start measured.
+ */
+const WATCH_SETTLE = 100;
+
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const probe = createServer();
@@ -110,6 +115,15 @@ interface DevCLI {
 }
 
 /**
+ * Starts `dev` in this process, then waits `WATCH_SETTLE`, since Node never signals that a watch is live.
+ */
+async function startWatching(app: string, options: Parameters<typeof dev>[1]): Promise<DevServer> {
+  const server = await dev(app, options);
+  await delay(WATCH_SETTLE);
+  return server;
+}
+
+/**
  * Spawns `ohne dev` for `app` with its output piped, so a test reads the children's blocks as well.
  */
 function spawnDev(app: string): DevCLI {
@@ -185,6 +199,7 @@ describe('dev', () => {
     const cli = spawnDev(app);
     clis.push(cli);
     await waitFor(async () => /API ready[\s\S]*Waiting for changes/.test(cli.output()));
+    await delay(WATCH_SETTLE);
     strictEqual(await get(dashPort, '/'), 200);
     const apiPort = Number(cli.output().match(/API ready at http:\/\/localhost:(\d+)/)?.[1]);
     return { app, cli, dashPort, apiPort };
@@ -210,7 +225,7 @@ describe('dev', () => {
     const lines: string[] = [];
     useEnv().set('SILENT', false);
     usePrinter().configure({ stream: { write: (line) => lines.push(line) } });
-    servers.push(await dev(app, { entry: BIN, reviveUptime }));
+    servers.push(await startWatching(app, { entry: BIN, reviveUptime }));
     await waitFor(
       async () => (await get(apiPort, '/health')) === 200 && (await get(dashPort, '/')) === 200,
     );
@@ -267,7 +282,7 @@ describe('dev', () => {
     const app = writeProject('reload', port);
     writeRoute(app, 'health.ts');
 
-    const server = await dev(app, { entry: BIN, dashboard: false });
+    const server = await startWatching(app, { entry: BIN, dashboard: false });
     servers.push(server);
 
     await waitFor(async () => (await get(port, '/health')) === 200);
@@ -289,7 +304,7 @@ describe('dev', () => {
     );
     writeFileSync(join(app, '.env'), 'OHNE_TEST_GREETING=hi\n');
 
-    const server = await dev(app, { entry: BIN, dashboard: false });
+    const server = await startWatching(app, { entry: BIN, dashboard: false });
     servers.push(server);
     await waitFor(async () => (await getBody(port, '/greet')) === 'hi');
 
@@ -312,7 +327,7 @@ describe('dev', () => {
     useEnv().set('SILENT', false);
     usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
-      const server = await dev(app, { entry: BIN, dashboard: false });
+      const server = await startWatching(app, { entry: BIN, dashboard: false });
       servers.push(server);
       await waitFor(async () => (await getBody(port, '/greet')) === 'missing');
 
@@ -337,7 +352,7 @@ describe('dev', () => {
     useEnv().set('SILENT', false);
     usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
-      const server = await dev(app, { entry: BIN, dashboard: false });
+      const server = await startWatching(app, { entry: BIN, dashboard: false });
       servers.push(server);
       await waitFor(async () => (await get(port, '/health')) === 200);
 
@@ -367,7 +382,7 @@ describe('dev', () => {
     useEnv().set('SILENT', false);
     usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
-      const server = await dev(app, { entry: BIN, dashboard: false });
+      const server = await startWatching(app, { entry: BIN, dashboard: false });
       servers.push(server);
       await waitFor(async () => (await get(port, '/health')) === 200);
       ok(out.join('').includes('Waiting for changes'));
@@ -386,7 +401,7 @@ describe('dev', () => {
     mkdirSync(join(app, 'messages'), { recursive: true });
     writeFileSync(join(app, 'messages', 'en.json'), JSON.stringify({ greeting: 'Hi' }));
 
-    const server = await dev(app, { entry: BIN, dashboard: false });
+    const server = await startWatching(app, { entry: BIN, dashboard: false });
     servers.push(server);
 
     await waitFor(async () => (await getBody(port, '/lang')) === 'Hi');
@@ -405,7 +420,7 @@ describe('dev', () => {
       "import data from '../content/data.json' with { type: 'json' }\nexport default () => data\n",
     );
 
-    servers.push(await dev(app, { entry: BIN, dashboard: false }));
+    servers.push(await startWatching(app, { entry: BIN, dashboard: false }));
     await waitFor(async () => (await getBody(port, '/data')) === '{"v":1}');
 
     writeFileSync(join(app, 'content', 'data.json'), JSON.stringify({ v: 2 }));
@@ -421,7 +436,7 @@ describe('dev', () => {
     useEnv().set('SILENT', false);
     usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
-      servers.push(await dev(app, { entry: BIN, dashboard: false }));
+      servers.push(await startWatching(app, { entry: BIN, dashboard: false }));
       await waitFor(async () => (await get(port, '/health')) === 200);
       await waitFor(async () => out.join('').includes('Waiting for changes'));
       out.length = 0;
@@ -456,7 +471,7 @@ describe('dev', () => {
       mkdirSync(join(app, 'collections'), { recursive: true });
       writeFileSync(posts, "export default { fields: { title: { type: 'text', options: {} } } }\n");
 
-      servers.push(await dev(app, { entry: BIN, dashboard: false }));
+      servers.push(await startWatching(app, { entry: BIN, dashboard: false }));
       await waitFor(async () => (await get(port, '/health')) === 200);
       const fields = join(app, 'fields.txt');
       strictEqual(readFileSync(fields, 'utf8'), 'title');
@@ -489,7 +504,7 @@ describe('dev', () => {
       const lines: string[] = [];
       useEnv().set('SILENT', false);
       usePrinter().configure({ stream: { write: (line) => lines.push(line) } });
-      servers.push(await dev(app, { entry: BIN, dashboard: false }));
+      servers.push(await startWatching(app, { entry: BIN, dashboard: false }));
       await waitFor(async () => (await get(port, '/health')) === 200);
       const mark = lines.join('').length;
       const since = () => lines.join('').slice(mark);
@@ -515,7 +530,7 @@ describe('dev', () => {
     );
     writeRoute(app, 'health.ts');
 
-    const server = await dev(app, { entry: BIN });
+    const server = await startWatching(app, { entry: BIN });
     servers.push(server);
 
     await waitFor(async () => (await get(dashPort, '/')) === 200);
@@ -538,7 +553,7 @@ describe('dev', () => {
     writeFileSync(join(app, 'ohne.config.ts'), slowConfig);
     writeRoute(app, 'health.ts');
 
-    const server = await dev(app, { entry: BIN, dashboard: false });
+    const server = await startWatching(app, { entry: BIN, dashboard: false });
     servers.push(server);
     await waitFor(async () => (await get(port, '/health')) === 200);
 
@@ -573,6 +588,7 @@ describe('dev', () => {
       const cli = spawnDev(app);
       clis.push(cli);
       await waitFor(async () => /API ready[\s\S]*Waiting for changes/.test(cli.output()));
+      await delay(WATCH_SETTLE);
       const warnings = (): number =>
         cli.output().split('unmet-peer does not support ohne').length - 1;
       strictEqual(warnings(), 1);
@@ -695,7 +711,7 @@ describe('dev', () => {
 
     useEnv().set('HOST', host);
     try {
-      const server = await dev(app, { entry: BIN });
+      const server = await startWatching(app, { entry: BIN });
       servers.push(server);
     } finally {
       useEnv().unset('HOST');
@@ -732,7 +748,7 @@ describe('dev', () => {
     writeFileSync(join(extra, 'ohne.config.ts'), 'export default {}\n');
     writeFileSync(join(extra, 'dashboard', 'pages', 'extra.ts'), 'export default () => null\n');
 
-    const server = await dev(app, { entry: BIN });
+    const server = await startWatching(app, { entry: BIN });
     servers.push(server);
     await waitFor(async () => (await get(dashPort, '/')) === 200);
     strictEqual(await get(dashPort, '/m/app/pages/extra.ts'), 404);
@@ -750,7 +766,7 @@ describe('dev', () => {
       `export default { api: { port: 0 }, dashboard: { port: ${dashPort}, apiURL: 'https://proxy.example/api' }, printer: { silent: true } }\n`,
     );
 
-    const server = await dev(app, { entry: BIN });
+    const server = await startWatching(app, { entry: BIN });
     servers.push(server);
 
     await waitFor(async () => (await get(dashPort, '/')) === 200);
@@ -771,7 +787,7 @@ describe('dev', () => {
     useEnv().set('SILENT', false);
     usePrinter().configure({ stream: { write: (s) => out.push(s) } });
     try {
-      const server = await dev(app, { entry: BIN, dashboard: false });
+      const server = await startWatching(app, { entry: BIN, dashboard: false });
       servers.push(server);
       await waitFor(async () => (await get(port, '/health')) === 200);
       await waitFor(async () => out.join('').includes('Waiting for changes'));
@@ -802,7 +818,7 @@ describe('dev', () => {
     mkdirSync(join(app, 'dashboard', 'pages'), { recursive: true });
     writeFileSync(join(app, 'dashboard', 'pages', 'index.ts'), 'export default () => null\n');
 
-    const server = await dev(app, { entry: BIN });
+    const server = await startWatching(app, { entry: BIN });
     servers.push(server);
     await waitFor(async () => (await get(dashPort, '/')) === 200);
 
@@ -827,7 +843,7 @@ describe('dev', () => {
       mkdirSync(join(app, 'dashboard', 'pages'), { recursive: true });
       writeFileSync(join(app, 'dashboard', 'pages', 'index.ts'), 'export default () => null\n');
 
-      const server = await dev(app, { entry: BIN });
+      const server = await startWatching(app, { entry: BIN });
       servers.push(server);
       await waitFor(async () => (await get(dashPort, '/')) === 200);
       const apiPort = Number(
@@ -854,7 +870,7 @@ describe('dev', () => {
     );
     writeRoute(app, 'health.ts');
 
-    const server = await dev(app, { entry: BIN });
+    const server = await startWatching(app, { entry: BIN });
     servers.push(server);
     await waitFor(async () => (await get(dashPort, '/')) === 200);
     const apiPort = Number(

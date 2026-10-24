@@ -173,7 +173,6 @@ export async function dev(
       await respawn();
     } catch {}
   }
-  park();
 
   // Watch only after the initial build, so no change can race the first spawn.
   const schedule = debounce(() => void (ticking = tick()), DEBOUNCE);
@@ -191,6 +190,7 @@ export async function dev(
   envWatch.on('error', () => envWatch.close());
   watching = true;
   if (revive.size > 0) schedule();
+  park();
 
   let closing: Promise<void> | undefined;
   onShutdown(close);
