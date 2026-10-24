@@ -86,6 +86,10 @@ an error block naming the route, and the stack shows only under
 [`DEBUG`](../project/env.md#the-built-ins). A handler that throws never stops the server: the
 request is answered and the process keeps serving.
 
+Once a streamed response has started, its status is already sent. A throw then cuts the body
+short instead. An `HTTPError` or a write failure ends it quietly, while any other throw is still
+logged.
+
 To replace the generic response, such as with a branded error page, filter it with the
 [`error:response`](../project/hooks.md#errorresponse) hook.
 

@@ -17,6 +17,7 @@ import { useMiddleware } from '../middleware/use-middleware.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { isBusyError } from '../query/write/busy.ts';
 import { isReferenceViolation, isValidationError } from '../query/write/errors.ts';
+import { logUnhandled, routeTarget } from './_unhandled.ts';
 import { enforceRateLimit } from './enforce-rate-limit.ts';
 import { badRequest, conflict, HTTPError, payloadTooLarge, unprocessable } from './http-error.ts';
 import { routeRateLimiter } from './route-limits.ts';
@@ -231,7 +232,7 @@ export async function dispatch(
         return resolveErrorResponse(toResponse(error, event.response), error, event);
       }
       // A request aborted by its client leaving or by shutdown is no fault of the server.
-      if (!request.signal.aborted) logUnhandled(route, error);
+      if (!request.signal.aborted) logUnhandled(routeTarget(route), error);
       const response = toResponse(
         new HTTPError(500, translate('api.http.internalServerError')),
         event.response,
@@ -243,11 +244,7 @@ export async function dispatch(
   const response = isUndefined(options.handlerTimeout)
     ? await run
     : await withTimeout(run, options.handlerTimeout, () => {
-        background.push(
-          run.catch((error: unknown) => {
-            usePrinter().error(`Request failed: ${errorMessage(error)}`);
-          }),
-        );
+        background.push(run.catch((error: unknown) => logUnhandled(routeTarget(route), error)));
         return toResponse(new HTTPError(503, translate('api.http.serviceUnavailable')), {
           status: 503,
           headers: new Headers(),
@@ -323,16 +320,4 @@ function encodesNUL(url: URL): boolean {
  */
 async function drain(background: Promise<unknown>[]): Promise<void> {
   while (background.length > 0) await Promise.all(background.splice(0));
-}
-
-/**
- * Prints an unhandled route error as a block titled by the route, with the stack under `DEBUG`.
- */
-function logUnhandled(route: Route, error: unknown): void {
-  const printer = usePrinter();
-  printer.errorBlock({
-    title: `Unhandled error in \`${route.method ?? 'ANY'} ${route.pattern}\``,
-    body: errorMessage(error),
-  });
-  if (error instanceof Error && !isUndefined(error.stack)) printer.debug(error.stack);
 }

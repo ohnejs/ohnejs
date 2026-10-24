@@ -2,10 +2,11 @@ import type { AddressInfo } from 'node:net';
 
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { once } from 'node:events';
-import { createServer, request, type RequestListener } from 'node:http';
+import { createServer, type IncomingMessage, request, type RequestListener } from 'node:http';
+import { connect } from 'node:net';
 import { text } from 'node:stream/consumers';
 import { describe, it } from 'node:test';
-import { setImmediate } from 'node:timers/promises';
+import { setImmediate, setTimeout as delay } from 'node:timers/promises';
 
 import {
   clientIP,
@@ -32,6 +33,64 @@ async function withServer(
   } finally {
     server.close();
     await once(server, 'close');
+  }
+}
+
+/**
+ * Resolves once `predicate` holds, failing after `timeout` milliseconds, so a stalled connection fails its test.
+ */
+async function until(predicate: () => boolean, timeout = 2000): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('until timed out');
+    await delay(10);
+  }
+}
+
+/**
+ * Opens a raw, half-open connection to `base`, collecting what the server sends and the errors it causes.
+ */
+async function dial(base: string) {
+  const { hostname, port } = new URL(base);
+  const socket = connect({ port: Number(port), host: hostname, allowHalfOpen: true });
+  const seen = { text: '', ended: false, errors: [] as string[] };
+  socket.on('error', (error: NodeJS.ErrnoException) => seen.errors.push(error.code ?? 'error'));
+  socket.on('data', (chunk: Buffer) => (seen.text += chunk.toString('latin1')));
+  socket.on('end', () => (seen.ended = true));
+  await once(socket, 'connect');
+  return { socket, seen };
+}
+
+/**
+ * Sends `head` and `body` on a raw connection to `base` and waits for the first answer.
+ * `close` says whether the answer announced `Connection: close`, and `ended` whether the server then ended.
+ * `reused` says whether a follow-up `GET` was answered `200` on the connection instead.
+ */
+async function exchange(
+  base: string,
+  head: string,
+  body: Uint8Array | string = '',
+): Promise<{ status: string | undefined; close: boolean; ended: boolean; reused: boolean }> {
+  const { socket, seen } = await dial(base);
+  socket.write(head);
+  socket.write(body);
+  try {
+    await until(() => seen.text.includes('\r\n\r\n'));
+    const answer = seen.text.slice(0, seen.text.indexOf('\r\n\r\n'));
+    const status = /^HTTP\/1\.1 (\d+)/.exec(answer)?.[1];
+    const close = /^connection: close$/im.test(answer);
+    await delay(150);
+    if (seen.ended) return { status, close, ended: true, reused: false };
+    socket.write('GET / HTTP/1.1\r\nHost: x\r\n\r\n');
+    await until(() => seen.text.split('HTTP/1.1 ').length > 2);
+    return {
+      status,
+      close,
+      ended: false,
+      reused: seen.text.split('HTTP/1.1 ')[2].startsWith('200'),
+    };
+  } finally {
+    socket.destroy();
   }
 }
 
@@ -503,5 +562,344 @@ describe('sendResponse', () => {
     } finally {
       useHooks().clear();
     }
+  });
+});
+
+describe('connection reuse', () => {
+  const MB = 1024 * 1024;
+  const DRAIN_LIMIT = 256 * 1024;
+  const posting = (length: number, extra = ''): string =>
+    `POST / HTTP/1.1\r\nHost: x\r\nContent-Length: ${length}\r\n${extra}\r\n`;
+  const chunked = 'POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n';
+
+  /**
+   * Answers a `GET` with `ok`, and anything else with `status` after `read` had its way with the request.
+   */
+  const handler =
+    (
+      status: number,
+      read: (req: IncomingMessage) => Promise<unknown> = async () => {},
+      headers?: Record<string, string>,
+    ): RequestListener =>
+    async (req, res) => {
+      if (req.method === 'GET') return void (await sendResponse(res, new Response('ok')));
+      await read(req);
+      await sendResponse(res, new Response(null, { status, headers }));
+    };
+
+  /**
+   * Reads the first chunk of the body, then cancels the rest.
+   */
+  const readPartway = async (req: IncomingMessage): Promise<void> => {
+    const reader = toRequest(req).body!.getReader();
+    await reader.read();
+    await reader.cancel();
+  };
+
+  /**
+   * Reads the first chunk of the body and leaves the rest unread, until the request stops flowing.
+   */
+  const readAndDrop = async (req: IncomingMessage): Promise<void> => {
+    const reader = toRequest(req).body!.getReader();
+    await reader.read();
+    await until(() => req.isPaused());
+  };
+
+  /**
+   * Answers with a body that reads the first chunk of the request body after the head went out, then cancels.
+   */
+  const abandonLate: RequestListener = async (req, res) => {
+    if (req.method === 'GET') return void (await sendResponse(res, new Response('ok')));
+    const reader = toRequest(req).body!.getReader();
+    const answer = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        const { value } = await reader.read();
+        controller.enqueue(new TextEncoder().encode(String(value?.byteLength)));
+        await reader.cancel();
+        controller.close();
+      },
+    });
+    await sendResponse(res, new Response(answer));
+  };
+
+  /**
+   * Sends `head` and part of its body, and after the answer keeps sending `rest` bytes, then reports how it ended.
+   */
+  const refuseWhileSending = async (base: string, head: string, rest = 2 * MB) => {
+    const { socket, seen } = await dial(base);
+    const closed = new Promise<boolean>((resolve) => socket.once('close', resolve));
+    socket.write(head);
+    socket.write(new Uint8Array(64 * 1024));
+    await until(() => seen.ended);
+    for (let sent = 0; sent < rest; sent += 64 * 1024) socket.write(new Uint8Array(64 * 1024));
+    await delay(300);
+    socket.end();
+    const hadError = await closed;
+    return { statuses: seen.text.match(/^HTTP\/1\.[01] \d+/gm), errors: seen.errors, hadError };
+  };
+
+  it('keeps the connection after a body read whole', async () => {
+    await withServer(
+      handler(200, (req) => toRequest(req).text()),
+      async (base) => {
+        deepStrictEqual(await exchange(base, posting(5), 'hello'), {
+          status: '200',
+          close: false,
+          ended: false,
+          reused: true,
+        });
+      },
+    );
+  });
+
+  it('keeps the connection after a request without a body, answered at once', async () => {
+    await withServer(handler(200), async (base) => {
+      deepStrictEqual(await exchange(base, 'GET / HTTP/1.1\r\nHost: x\r\n\r\n'), {
+        status: '200',
+        close: false,
+        ended: false,
+        reused: true,
+      });
+    });
+  });
+
+  it('keeps the connection after a small body nobody read', async () => {
+    await withServer(handler(401), async (base) => {
+      deepStrictEqual(await exchange(base, posting(1024), new Uint8Array(1024)), {
+        status: '401',
+        close: false,
+        ended: false,
+        reused: true,
+      });
+    });
+  });
+
+  it('keeps the connection after a small body read partway and cancelled', async () => {
+    await withServer(handler(422, readPartway), async (base) => {
+      deepStrictEqual(await exchange(base, posting(64 * 1024), new Uint8Array(64 * 1024)), {
+        status: '422',
+        close: false,
+        ended: false,
+        reused: true,
+      });
+    });
+  });
+
+  it('keeps the connection after a small body abandoned once the answer started', async () => {
+    await withServer(abandonLate, async (base) => {
+      deepStrictEqual(await exchange(base, posting(64 * 1024), new Uint8Array(64 * 1024)), {
+        status: '200',
+        close: false,
+        ended: false,
+        reused: true,
+      });
+    });
+  });
+
+  it('drains a large body abandoned once a success started, since the client must finish it', async () => {
+    await withServer(abandonLate, async (base) => {
+      deepStrictEqual(await exchange(base, posting(MB), new Uint8Array(MB)), {
+        status: '200',
+        close: false,
+        ended: false,
+        reused: true,
+      });
+    });
+  });
+
+  it('drains a large body read partway before a success, since the client must finish it', async () => {
+    await withServer(handler(201, readPartway), async (base) => {
+      deepStrictEqual(await exchange(base, posting(MB), new Uint8Array(MB)), {
+        status: '201',
+        close: false,
+        ended: false,
+        reused: true,
+      });
+    });
+  });
+
+  it('drains a large body read partway and dropped uncancelled before a success', async () => {
+    await withServer(handler(200, readAndDrop), async (base) => {
+      deepStrictEqual(await exchange(base, posting(MB), new Uint8Array(MB)), {
+        status: '200',
+        close: false,
+        ended: false,
+        reused: true,
+      });
+    });
+  });
+
+  it('drains a large unread body after any status below 400', async () => {
+    for (const status of [303, 399]) {
+      await withServer(handler(status), async (base) => {
+        deepStrictEqual(await exchange(base, posting(MB), new Uint8Array(MB)), {
+          status: String(status),
+          close: false,
+          ended: false,
+          reused: true,
+        });
+      });
+    }
+  });
+
+  it('discards an unread body after an error status up to the drain limit, and closes past it', async () => {
+    await withServer(handler(413), async (base) => {
+      const at = await exchange(base, posting(DRAIN_LIMIT), new Uint8Array(DRAIN_LIMIT));
+      const past = await exchange(base, posting(DRAIN_LIMIT + 1), new Uint8Array(64 * 1024));
+      deepStrictEqual([at.reused, past.close], [true, true]);
+    });
+  });
+
+  it('announces the close after a large body read partway and refused', async () => {
+    await withServer(handler(400, readPartway), async (base) => {
+      deepStrictEqual(await exchange(base, posting(MB), new Uint8Array(64 * 1024)), {
+        status: '400',
+        close: true,
+        ended: true,
+        reused: false,
+      });
+    });
+  });
+
+  it('announces the close after a streamed body overruns maxBodySize', async () => {
+    const overrun = (req: IncomingMessage) => rejects(toRequest(req, { maxBodySize: 1024 }).text());
+    await withServer(handler(413, overrun), async (base) => {
+      const chunk = 'x'.repeat(64 * 1024);
+      deepStrictEqual(
+        await exchange(base, chunked, `${chunk.length.toString(16)}\r\n${chunk}\r\n`),
+        {
+          status: '413',
+          close: true,
+          ended: true,
+          reused: false,
+        },
+      );
+    });
+  });
+
+  it('announces the close rather than read a large unread body whole', async () => {
+    await withServer(handler(413), async (base) => {
+      deepStrictEqual(await exchange(base, posting(8 * MB), new Uint8Array(64 * 1024)), {
+        status: '413',
+        close: true,
+        ended: true,
+        reused: false,
+      });
+    });
+  });
+
+  it('settles an answer queued behind a slower one', async () => {
+    const slow: RequestListener = async (req, res) => {
+      if (req.method !== 'GET') return handler(422, readPartway)(req, res);
+      await delay(300);
+      await sendResponse(res, new Response('slow'));
+    };
+    await withServer(slow, async (base) => {
+      deepStrictEqual(
+        await refuseWhileSending(base, `GET / HTTP/1.1\r\nHost: x\r\n\r\n${posting(8 * MB)}`),
+        { statuses: ['HTTP/1.1 200', 'HTTP/1.1 422'], errors: [], hadError: false },
+      );
+    });
+  });
+
+  it('keeps reading after the close, so a client still sending gets no reset', async () => {
+    const closing = handler(422, async () => {}, { connection: 'close' });
+    const heads = {
+      announced: posting(8 * MB),
+      'asked by the client': posting(8 * MB, 'Connection: close\r\n'),
+      'HTTP/1.0': `POST / HTTP/1.0\r\nHost: x\r\nContent-Length: ${8 * MB}\r\n\r\n`,
+    };
+    for (const [name, head] of Object.entries(heads)) {
+      await withServer(handler(422), async (base) => {
+        deepStrictEqual(
+          { name, ...(await refuseWhileSending(base, head)) },
+          { name, statuses: ['HTTP/1.1 422'], errors: [], hadError: false },
+        );
+      });
+    }
+    await withServer(closing, async (base) => {
+      const rest = DRAIN_LIMIT - 64 * 1024;
+      deepStrictEqual(await refuseWhileSending(base, posting(DRAIN_LIMIT), rest), {
+        statuses: ['HTTP/1.1 422'],
+        errors: [],
+        hadError: false,
+      });
+    });
+  });
+
+  it('stops reading a closed connection once the linger runs out', async () => {
+    await withServer(handler(413), async (base) => {
+      const { socket, seen } = await dial(base);
+      const closed = new Promise<boolean>((resolve) => socket.once('close', resolve));
+      socket.write(posting(64 * MB));
+      await until(() => seen.ended);
+      const ended = Date.now();
+      const sending = setInterval(() => socket.write(new Uint8Array(16 * 1024)), 50);
+      try {
+        await closed;
+      } finally {
+        clearInterval(sending);
+      }
+      const lingered = Date.now() - ended;
+      ok(lingered > 4000 && lingered < 6500, `lingered ${lingered}ms`);
+    });
+  });
+
+  it('errors a body still read once its answer finished, rather than end it short', async () => {
+    let read: Promise<ArrayBuffer> | undefined;
+    const background: RequestListener = async (req, res) => {
+      read = toRequest(req).arrayBuffer();
+      read.catch(() => {});
+      await sendResponse(res, new Response(null, { status: 202 }));
+    };
+    await withServer(background, async (base) => {
+      const { socket, seen } = await dial(base);
+      socket.write(posting(MB));
+      socket.write(new Uint8Array(64 * 1024));
+      try {
+        await until(() => seen.text.includes('\r\n\r\n'));
+        await rejects(read!, { name: 'AbortError' });
+      } finally {
+        socket.destroy();
+      }
+    });
+  });
+
+  it('errors the body when the client leaves before sending it whole', async () => {
+    let read: Promise<string> | undefined;
+    const reading: RequestListener = async (req, res) => {
+      read = toRequest(req).text();
+      await read.catch(() => {});
+      res.destroy();
+    };
+    await withServer(reading, async (base) => {
+      const { socket } = await dial(base);
+      socket.write(posting(MB));
+      socket.write(new Uint8Array(64 * 1024));
+      await until(() => read !== undefined);
+      socket.destroy();
+      await rejects(read!);
+    });
+  });
+
+  it('reads no further than the stream asks while its reader waits', async () => {
+    let read = 0;
+    const idle: RequestListener = async (req, res) => {
+      await toRequest(req).body!.getReader().read();
+      await delay(200);
+      read = req.socket.bytesRead;
+      await sendResponse(res, new Response(null, { status: 413 }));
+    };
+    await withServer(idle, async (base) => {
+      const { socket, seen } = await dial(base);
+      socket.write(posting(32 * MB));
+      socket.write(new Uint8Array(32 * MB));
+      try {
+        await until(() => seen.ended, 5000);
+      } finally {
+        socket.destroy();
+      }
+    });
+    ok(read > 0 && read < 8 * MB, `read ${read} bytes`);
   });
 });

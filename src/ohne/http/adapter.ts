@@ -7,6 +7,7 @@ import { first, isArray, isNull, isUndefined, lazyStream, limitStream } from '..
 import { unmapIP } from '../../utils/net/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
+import { releaseConnection, streamBody } from './_request-body.ts';
 import { badRequest, notImplemented, payloadTooLarge } from './http-error.ts';
 
 declare module 'ohnejs' {
@@ -95,8 +96,9 @@ export function toURL(req: IncomingMessage, trustProxy?: (ip: string) => boolean
  *
  * `GET` and `HEAD` are forced bodyless.
  * `TRACE`, which a Web `Request` cannot carry, throws `501`.
- * Every other method streams the body via `Readable.toWeb` with `duplex: 'half'`.
+ * Every other method streams the body with `duplex: 'half'`.
  * The body attaches to the socket on its first read, then flows on demand with backpressure.
+ * Cancelling it discards the rest, so the connection still serves the next request.
  *
  * When `maxBodySize` is set, the streamed body is metered, so an overrun aborts mid-flight with `413`.
  * The thrown error is an `HTTPError`, so the pipeline maps it to a response.
@@ -137,7 +139,7 @@ export function toRequest(req: IncomingMessage, options: ToRequestOptions = {}):
  */
 function openBody(req: IncomingMessage, options: ToRequestOptions): ReadableStream<Uint8Array> {
   options.onFirstRead?.();
-  const body = Readable.toWeb(req) as ReadableStream<Uint8Array>;
+  const body = streamBody(req);
   const { maxBodySize } = options;
   return isUndefined(maxBodySize) ? body : limitStream(body, maxBodySize, payloadTooLarge);
 }
@@ -214,9 +216,12 @@ function firstToken(value: string | string[] | undefined): string | undefined {
  * A bodyless response (e.g. `204`) just ends the socket.
  * So does the answer to a `HEAD`, whose body is cancelled unread, since Node would pull and discard it whole.
  * An answer to a client that already went away is dropped the same way, its body cancelled unread.
+ * A request body still arriving once it is sent is discarded, unless an error refuses a large one.
+ * The connection then closes.
  */
 export async function sendResponse(res: ServerResponse, response: Response): Promise<void> {
   res.statusCode = response.status;
+  releaseConnection(res);
   res.setHeaders(await resolveHeaders(response, res.req.method));
 
   if (isNull(response.body) || res.req.method === 'HEAD' || res.destroyed) {

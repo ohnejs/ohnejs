@@ -23,6 +23,8 @@ import { createCIDRMatcher, createHostMatcher } from '../../utils/net/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
 import { usePrinter } from '../printer/use-printer.ts';
+import { releaseConnection } from './_request-body.ts';
+import { isAnswered, logUnhandled, routeTarget } from './_unhandled.ts';
 import { clientIP, sendResponse, toRequest, toURL } from './adapter.ts';
 import { dispatch } from './dispatch.ts';
 import { HTTPError } from './http-error.ts';
@@ -69,7 +71,8 @@ export interface HTTPServer {
 export interface CreateServerOptions {
   /**
    * How long the server waits for the complete request headers, in milliseconds or as a string like `'10s'`.
-   * Omitted keeps Node's default of 60 seconds.
+   * It must not exceed `requestTimeout`.
+   * Omitted keeps Node's default of 60 seconds, or `requestTimeout` when that is shorter.
    *
    * @example
    * ```ts
@@ -260,16 +263,19 @@ export function createServer(router: Router, options: CreateServerOptions = {}):
   if (!isUndefined(options.maxHeaderSize)) {
     httpOptions.maxHeaderSize = parseBytes(options.maxHeaderSize);
   }
+  // Given here, Node bounds the headers by the request; assigned later, it keeps its own 60 seconds.
+  if (!isUndefined(options.headersTimeout)) {
+    httpOptions.headersTimeout = parseDuration(options.headersTimeout);
+  }
+  if (!isUndefined(options.requestTimeout)) {
+    httpOptions.requestTimeout = parseDuration(options.requestTimeout);
+  }
   const serve = (req: IncomingMessage, res: ServerResponse, onFirstRead?: () => void): void =>
     void handle(router, gate, limits, trustProxy, allowedHosts, basePath, req, res, onFirstRead);
   const server = createNodeServer(httpOptions, serve);
   // Without this listener, Node sends 100 Continue before routing, so a body the route refuses is sent anyway.
   server.on('checkContinue', (req, res) => serve(req, res, () => sendContinue(res)));
 
-  if (!isUndefined(options.headersTimeout))
-    server.headersTimeout = parseDuration(options.headersTimeout);
-  if (!isUndefined(options.requestTimeout))
-    server.requestTimeout = parseDuration(options.requestTimeout);
   if (!isUndefined(options.keepAliveTimeout)) {
     server.keepAliveTimeout = parseDuration(options.keepAliveTimeout);
   }
@@ -298,11 +304,17 @@ async function handle(
   res: ServerResponse,
   onFirstRead?: () => void,
 ): Promise<void> {
+  // A closing connection must serve nothing more, and the answer could not be sent.
+  if (req.socket.writableEnded) {
+    req.resume();
+    return;
+  }
   const controller = new AbortController();
   const release = gate.enter((reason) => controller.abort(reason));
   if (isNull(release)) {
     res.statusCode = 503;
     res.setHeader('Connection', 'close');
+    releaseConnection(res);
     res.end();
     return;
   }
@@ -310,6 +322,7 @@ async function handle(
   let drain: (() => Promise<void>) | undefined;
   let event: Event | undefined;
   let unhold: (() => void) | undefined;
+  let route: Route | undefined;
   try {
     const url = toURL(req, trustProxy);
     if (allowedHosts && !allowedHosts(url.hostname)) {
@@ -347,7 +360,7 @@ async function handle(
     unhold = holdRequest(controller.signal, request);
 
     if (match.type === 'matched' || match.type === 'options') {
-      const route = match.type === 'matched' ? match.route : autoOptionsRoute(match.allow);
+      route = match.type === 'matched' ? match.route : autoOptionsRoute(match.allow);
       const params = match.type === 'matched' ? match.params : {};
       const dispatched = await dispatch(route, request, url, params, {
         maxBodySize,
@@ -361,14 +374,26 @@ async function handle(
     } else {
       await sendResponse(res, errorResponse(match));
     }
-  } catch (error) {
+  } catch (thrown) {
+    let error = thrown;
     if (error instanceof HTTPError && !res.headersSent) {
-      await sendResponse(res, toResponse(error, { status: error.status, headers: new Headers() }));
-      return;
+      try {
+        await sendResponse(
+          res,
+          toResponse(error, { status: error.status, headers: new Headers() }),
+        );
+        return;
+      } catch (failure) {
+        error = failure;
+      }
     }
-    usePrinter().error(`Request failed: ${errorMessage(error)}`);
+    // Once the answer started, a fault the pipeline answers just ends its body early.
+    if (!res.headersSent || !isAnswered(error)) {
+      logUnhandled(isUndefined(route) ? `${req.method} ${req.url}` : routeTarget(route), error);
+    }
     if (!res.headersSent) {
       res.statusCode = 500;
+      releaseConnection(res);
       res.end();
     }
   } finally {

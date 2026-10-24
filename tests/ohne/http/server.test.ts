@@ -1,7 +1,7 @@
 import type { IncomingHttpHeaders, IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { once } from 'node:events';
 import { request } from 'node:http';
 import { connect } from 'node:net';
@@ -19,6 +19,7 @@ import {
   hook,
   matchPath,
   matchesPath,
+  notFound,
   readRawBody,
   readTextBody,
   unauthorized,
@@ -29,6 +30,8 @@ import {
   useRequest,
   waitUntil,
 } from '../../../src/ohne/index.ts';
+import { busyError } from '../../../src/ohne/query/write/busy.ts';
+import { validationError } from '../../../src/ohne/query/write/errors.ts';
 import { isUndefined, sleep } from '../../../src/utils/index.ts';
 import { collectGarbage } from './_gc.ts';
 
@@ -223,6 +226,11 @@ describe('createServer', () => {
       strictEqual(res.headers.get('content-type'), 'text/html; charset=utf-8');
       strictEqual(await res.text(), '');
     });
+  });
+
+  it('bounds the wait for headers by a requestTimeout given alone', () => {
+    const { server } = createServer(createRouter([]), { requestTimeout: '5s' });
+    deepStrictEqual([server.headersTimeout, server.requestTimeout], [5000, 5000]);
   });
 
   it('refuses a request with 503 and Connection close while the gate is closing', async () => {
@@ -696,7 +704,7 @@ describe('Expect: 100-continue', () => {
 });
 
 describe('keep-alive', () => {
-  it('answers the next request on the connection after a large body went unread', async () => {
+  it('answers the next request on the connection after a small body went unread', async () => {
     const routes = [
       makeRoute('POST', '/scroll', () => {
         throw unauthorized();
@@ -706,7 +714,7 @@ describe('keep-alive', () => {
     await withServer(
       routes,
       async (base) => {
-        const body = 'a'.repeat(1 << 20);
+        const body = 'a'.repeat(64 * 1024);
         const socket = connect(Number(new URL(base).port));
         socket.write(
           `POST /scroll HTTP/1.1\r\nHost: localhost\r\nContent-Length: ${body.length}\r\n\r\n${body}`,
@@ -717,6 +725,77 @@ describe('keep-alive', () => {
       },
       { keepAliveTimeout: '1s' },
     );
+  });
+
+  it('announces the close and serves nothing more after refusing a large unread body', async () => {
+    const printed: string[] = [];
+    usePrinter().configure({ stream: { write: (chunk) => void printed.push(chunk) } });
+    let served = 0;
+    const routes = [
+      makeRoute('POST', '/scroll', () => {
+        throw unauthorized();
+      }),
+      makeRoute('GET', '/tome', () => `Medivh ${++served}`),
+    ];
+    try {
+      await withServer(routes, async (base) => {
+        const body = 'a'.repeat(1 << 20);
+        const socket = connect(Number(new URL(base).port));
+        socket.write(
+          `POST /scroll HTTP/1.1\r\nHost: localhost\r\nContent-Length: ${body.length}\r\n\r\n${body}`,
+        );
+        socket.write('GET /tome HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+        const answer = (await Array.fromAsync(socket)).join('');
+        deepStrictEqual(answer.match(/^HTTP\/1\.1 \d+/gm), ['HTTP/1.1 401']);
+        ok(/^connection: close$/im.test(answer));
+        await sleep(300);
+      });
+    } finally {
+      usePrinter().configure({ stream: { write() {} } });
+    }
+    deepStrictEqual({ printed, served }, { printed: [], served: 0 });
+  });
+
+  it('keeps reading a refused upload the client goes on sending, so its answer is not reset', async () => {
+    const routes = [
+      makeRoute('POST', '/scroll', () => {
+        throw conflict();
+      }),
+    ];
+    const cases = {
+      'unanswered Expect': 'Expect: 100-continue\r\n',
+      'the closing gate': '',
+    };
+    for (const [name, extra] of Object.entries(cases)) {
+      await withServer(routes, async (base, gate) => {
+        if (name === 'the closing gate') await gate.close();
+        const socket = connect({ port: Number(new URL(base).port), allowHalfOpen: true });
+        const errors: string[] = [];
+        socket.on('error', (error: NodeJS.ErrnoException) => errors.push(error.code ?? 'error'));
+        const closed = new Promise<boolean>((resolve) => socket.once('close', resolve));
+        let answer = '';
+        let ended = false;
+        socket.on('data', (chunk: Buffer) => (answer += chunk.toString('latin1')));
+        socket.on('end', () => (ended = true));
+        socket.write(
+          `POST /scroll HTTP/1.1\r\nHost: localhost\r\nContent-Length: ${8 << 20}\r\n${extra}\r\n`,
+        );
+        await waitFor(() => ended);
+        for (let sent = 0; sent < 2 << 20; sent += 1 << 16) socket.write(new Uint8Array(1 << 16));
+        await sleep(300);
+        socket.end();
+        const hadError = await closed;
+        deepStrictEqual(
+          { name, status: answer.match(/^HTTP\/1\.1 \d+/gm), errors, hadError },
+          {
+            name,
+            status: [name === 'the closing gate' ? 'HTTP/1.1 503' : 'HTTP/1.1 409'],
+            errors: [],
+            hadError: false,
+          },
+        );
+      });
+    }
   });
 });
 
@@ -874,5 +953,122 @@ describe('request signal', () => {
       await collectGarbage();
       strictEqual(ref?.deref(), undefined);
     });
+  });
+});
+
+describe('errors after the answer started', () => {
+  /**
+   * Runs `send` against routes with a captured printer and returns what was printed.
+   */
+  async function printedBy(
+    routes: Route[],
+    send: (base: string) => Promise<unknown>,
+    options: CreateServerOptions = {},
+    debug = false,
+  ): Promise<string> {
+    const printed: string[] = [];
+    usePrinter().configure({ debug, stream: { write: (chunk) => void printed.push(chunk) } });
+    try {
+      await withServer(routes, (base) => send(base).then(() => sleep(50)), options);
+    } finally {
+      usePrinter().configure({ debug: false, stream: { write() {} } });
+    }
+    return printed.join('');
+  }
+
+  /**
+   * Requests `path` and resolves once the response ends or is cut off, with its status.
+   */
+  function cutOff(base: string, path: string, body?: string): Promise<number> {
+    const { port } = new URL(base);
+    return new Promise((resolve, reject) => {
+      const method = isUndefined(body) ? 'GET' : 'POST';
+      const req = request({ port, path, method, headers: { connection: 'close' } }, (res) => {
+        res.on('error', () => {}).resume();
+        res.once('close', () => resolve(res.statusCode ?? 0));
+      });
+      req.on('error', reject);
+      req.end(body);
+    });
+  }
+
+  /**
+   * A route that streams one chunk, then fails with `failure` once the chunk went out.
+   */
+  const failing = (pattern: string, failure: () => unknown): Route =>
+    makeRoute('GET', pattern, () => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('Jaina'));
+        },
+        async pull(controller) {
+          await sleep(20);
+          controller.error(failure());
+        },
+      });
+      return new Response(body);
+    });
+
+  it('logs nothing for a failure the pipeline answers, which only cuts the body short', async () => {
+    const routes = [
+      failing('/missing', () => notFound()),
+      failing('/invalid', () => validationError({ name: 'required' })),
+      failing('/busy', () => busyError()),
+    ];
+    const printed = await printedBy(routes, async (base) => {
+      for (const path of ['/missing', '/invalid', '/busy'])
+        strictEqual(await cutOff(base, path), 200);
+    });
+    strictEqual(printed, '');
+  });
+
+  it('logs nothing when a client overruns maxBodySize into a streamed answer', async () => {
+    const echo = makeRoute(
+      'POST',
+      '/echo',
+      defineHandler(() => new Response(useRequest().body), { maxBodySize: 16 }),
+    );
+    let answer = '';
+    const printed = await printedBy([echo], async (base) => {
+      const socket = connect(Number(new URL(base).port));
+      socket.on('error', () => {});
+      socket.on('data', (chunk: Buffer) => (answer += chunk.toString('latin1')));
+      socket.write(
+        'POST /echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nJaina\r\n',
+      );
+      await waitFor(() => answer.includes('Jaina'));
+      const chunk = 'x'.repeat(65536);
+      socket.write(`${chunk.length.toString(16)}\r\n${chunk}\r\n`);
+      await new Promise((resolve) => socket.once('close', resolve));
+    });
+    deepStrictEqual(
+      { status: answer.slice(0, 12), printed },
+      { status: 'HTTP/1.1 200', printed: '' },
+    );
+  });
+
+  it('logs a bug thrown after the headers by its route, with the stack under DEBUG', async () => {
+    const routes = [failing('/bug', () => new Error('Arthas'))];
+    const quiet = await printedBy(routes, (base) => cutOff(base, '/bug'));
+    const loud = await printedBy(routes, (base) => cutOff(base, '/bug'), {}, true);
+    ok(quiet.includes('Unhandled error in') && quiet.includes('GET /bug'), quiet);
+    ok(quiet.includes('Arthas') && !quiet.includes('    at '), quiet);
+    ok(loud.includes('    at '), loud);
+  });
+
+  it('answers 500 and logs once when sending a refusal fails', async () => {
+    hook('response:headers', () => {
+      throw new Error('Kel’Thuzad');
+    });
+    let status = 0;
+    const printed = await printedBy(
+      [makeRoute('GET', '/', () => 'ok')],
+      async (base) => {
+        status = await statusWithHost(base, 'evil.test');
+      },
+      { allowedHosts: ['ohne.test'] },
+    );
+    strictEqual(status, 500);
+    strictEqual(printed.split('Unhandled error in').length, 2, printed);
   });
 });
