@@ -320,6 +320,8 @@ export function useRecordEditor(
     create ? untracked(() => buildForm(undefined)) : undefined,
   );
   const busy = ref(false);
+  // Bumped by every read and save, so a read they overtook lands nothing.
+  let generation = 0;
   onCleanup(() => form.value?.dispose());
 
   // The form reads dirty before its typing lands in the history, so the guard asks on either.
@@ -362,6 +364,7 @@ export function useRecordEditor(
   };
 
   const load = async (): Promise<void> => {
+    generation++;
     incoming.value = undefined;
     state.value = 'loading';
     const locale = collection.translatable ? untracked(activeContentLocale) : undefined;
@@ -398,7 +401,9 @@ export function useRecordEditor(
     const live = form.value;
     if (isUndefined(live) || state.value !== 'ready' || busy.value) return;
     const locale = collection.translatable ? activeContentLocale() : undefined;
+    const asked = ++generation;
     const row = await readRecord(collection.segment, isEmpty(id) ? undefined : id, locale);
+    if (asked !== generation) return;
     if (isNull(row)) {
       redirectGone();
       return;
@@ -494,6 +499,7 @@ export function useRecordEditor(
     }
     const focused = document.activeElement;
     busy.value = true;
+    generation++;
     const outcome = await write(
       collection.segment,
       create ? undefined : id,
@@ -508,6 +514,8 @@ export function useRecordEditor(
       incoming.value = undefined;
       // A scoped answer omits the fields outside its `select`; the last read still holds their values.
       loaded.value = { ...untracked(() => loaded.value), ...outcome.record };
+      // The answer also carries what changed elsewhere under a kept draft.
+      live.restore(untracked(() => loaded.value));
       settle(live);
       seedRecordLabel(
         collection,

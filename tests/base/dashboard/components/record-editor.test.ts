@@ -101,6 +101,8 @@ describe('useRecordEditor', () => {
   let hasUnsavedChanges!: Guard['hasUnsavedChanges'];
   const requests: string[] = [];
   let stored = 'thrall@x.example';
+  // A read the next query waits on.
+  let held: Promise<void> | undefined;
 
   before(async () => {
     baseBrowser('/collections/showcase/u1');
@@ -162,7 +164,14 @@ describe('useRecordEditor', () => {
           });
         }
         if (url.endsWith('/collections/showcase/query')) {
-          return Response.json({ records: [{ UUID: 'u1', contactEmail: stored }] });
+          const record = { UUID: 'u1', contactEmail: stored };
+          await held;
+          return Response.json({ records: [record] });
+        }
+        if (init?.method === 'PATCH' && url.endsWith('/collections/showcase/u1')) {
+          const sent = JSON.parse(String(init.body)) as Record<string, unknown>;
+          stored = (sent.contactEmail as string | undefined) ?? stored;
+          return Response.json({ UUID: 'u1', ...sent, contactEmail: stored });
         }
         return Response.json(ADMIN);
       },
@@ -275,6 +284,67 @@ describe('useRecordEditor', () => {
     deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'jaina@x.example' });
     deepStrictEqual(record.changedElsewhere(), []);
     strictEqual(record.dirty(), false);
+    scope.dispose();
+  });
+
+  it('lands the record a save answers, after keeping the draft over changes from elsewhere', async () => {
+    const { record, scope } = await open();
+    const knob = findElement(
+      record.form.value!.controlOf('featured')!.element as unknown as FakeElement,
+      (element) => hasClass(element, 'ohne-switch-control'),
+    ) as FakeElement & { checked: boolean };
+    knob.checked = true;
+    fire(knob, 'change');
+    flush();
+    stored = 'jaina@x.example';
+    markDataChanged();
+    await settle();
+    deepStrictEqual(record.changedElsewhere(), ['contactEmail']);
+    record.keepDraft();
+    await record.save();
+    flush();
+    deepStrictEqual(record.history.getCurrentState(), {
+      contactEmail: 'jaina@x.example',
+      featured: true,
+    });
+    deepStrictEqual([record.dirty(), hasUnsavedChanges()], [false, false]);
+    stored = 'thrall@x.example';
+    scope.dispose();
+  });
+
+  it('drops a read sent before a save and answered after it', async () => {
+    const { record, scope } = await open();
+    type(inputOf(record.form.value!.controlOf('contactEmail')!.element), 'bob@x.example');
+    record.history.flush();
+    let answer!: () => void;
+    held = new Promise((resolve) => (answer = resolve));
+    markDataChanged();
+    await settle();
+    held = undefined;
+    await record.save();
+    answer();
+    await settle();
+    deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'bob@x.example' });
+    deepStrictEqual([record.dirty(), record.changedElsewhere()], [false, []]);
+    stored = 'thrall@x.example';
+    scope.dispose();
+  });
+
+  it('lands only the newer of two overlapping reloads', async () => {
+    const { record, scope } = await open();
+    let answer!: () => void;
+    held = new Promise((resolve) => (answer = resolve));
+    stored = 'jaina@x.example';
+    markDataChanged();
+    await settle();
+    held = undefined;
+    stored = 'sylvanas@x.example';
+    markDataChanged();
+    await settle();
+    answer();
+    await settle();
+    deepStrictEqual(record.history.getCurrentState(), { contactEmail: 'sylvanas@x.example' });
+    stored = 'thrall@x.example';
     scope.dispose();
   });
 
