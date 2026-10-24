@@ -94,6 +94,49 @@ describe('limitStream', () => {
     strictEqual(cancelled(), 'Arthas left');
   });
 
+  it('leaves no unhandled rejection behind when cancelled or capped', async () => {
+    const stray: unknown[] = [];
+    const record = (reason: unknown): void => void stray.push(reason);
+    process.on('unhandledRejection', record);
+    try {
+      await limitStream(endless().stream, 10, () => 'over').cancel('Arthas left');
+      await rejects(texts(limitStream(endless().stream, 10, () => 'over')), (e) => e === 'over');
+      const reader = limitStream(endless().stream, 10, () => 'over').getReader();
+      await reader.read();
+      await reader.cancel('Sylvanas left');
+      for (let turn = 0; turn < 5; turn++) await setImmediate();
+    } finally {
+      process.off('unhandledRejection', record);
+    }
+    deepStrictEqual(stray, []);
+  });
+
+  it("errors with the source's own error", async () => {
+    const broken = new Error('The Lich King fell');
+    const failing = new ReadableStream<Uint8Array>({
+      pull: (controller) => controller.error(broken),
+    });
+    await rejects(texts(limitStream(failing, 10, () => 'over')), (e) => e === broken);
+  });
+
+  it('reads the source only as the consumer reads', async () => {
+    let pulls = 0;
+    const counted = new ReadableStream<Uint8Array>(
+      {
+        pull: (controller) => {
+          pulls += 1;
+          controller.enqueue(new Uint8Array(1));
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const reader = limitStream(counted, 1_000, () => 'over').getReader();
+    for (let read = 0; read < 3; read++) await reader.read();
+    for (let turn = 0; turn < 5; turn++) await setImmediate();
+    strictEqual(pulls, 3);
+    await reader.cancel();
+  });
+
   it('with a cap of zero, passes only an empty stream', async () => {
     deepStrictEqual(await texts(limitStream(source('', '').stream, 0, () => 'over')), ['', '']);
     await rejects(texts(limitStream(source('a').stream, 0, () => 'over')), (e) => e === 'over');

@@ -3,6 +3,7 @@
  * The chunk that crosses the cap is never forwarded: the stream errors with `onExceed()`'s value instead.
  * The source is cancelled with the same value, so an upstream socket or file stops producing.
  * A stream that ends at or below `max` flows through whole, and `onExceed` is never called.
+ * It reads the source only as its consumer reads, and cancelling it cancels the source with the same reason.
  *
  * @example
  * ```ts
@@ -15,14 +16,22 @@ export function limitStream(
   max: number,
   onExceed: () => unknown,
 ): ReadableStream<Uint8Array> {
+  // A reader, not `pipeThrough`: Node 26.4 leaves the pipe's promises unhandled when the result is cancelled.
+  const reader = stream.getReader();
   let seen = 0;
-  return stream.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        seen += chunk.byteLength;
-        if (seen > max) throw onExceed();
-        controller.enqueue(chunk);
+  return new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        const { done, value } = await reader.read();
+        if (done) return controller.close();
+        seen += value.byteLength;
+        if (seen <= max) return controller.enqueue(value);
+        const error = onExceed();
+        controller.error(error);
+        await reader.cancel(error);
       },
-    }),
+      cancel: (reason) => reader.cancel(reason),
+    },
+    { highWaterMark: 0 },
   );
 }
