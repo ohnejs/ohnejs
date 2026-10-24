@@ -334,6 +334,54 @@ describe('serveDashboard', () => {
     strictEqual(body.includes(`<script type="module" src="${src}" id="ohne-boot">`), true);
   });
 
+  it('preloads the graph the kernel entry reaches, after the importmap', async () => {
+    const port = await serve('preload');
+    const body = (await req(port, '/')).body;
+    const imports = importsOf(body);
+    const preloads = [...body.matchAll(/<link rel="modulepreload" href="([^"]+)" \/>/g)].map(
+      (match) => match[1],
+    );
+    strictEqual(preloads[0], imports['/m/dashboard/boot.ts']);
+    strictEqual(preloads.includes(imports['/m/dashboard/router/router.ts'] ?? ''), true);
+    strictEqual(preloads.includes(imports['/m/utils/reactive/ref.ts'] ?? ''), true);
+    strictEqual(new Set(preloads).size, preloads.length);
+    for (const href of preloads) match(href ?? '', /\?h=[\w-]{8}$/);
+
+    const links = body.indexOf('<link rel="modulepreload"');
+    strictEqual(body.indexOf('<script type="importmap">') < links, true);
+    strictEqual(links < body.indexOf('id="ohne-boot"'), true);
+  });
+
+  it('preloads the layer modules boot files and pages reach, and only those', async () => {
+    const dir = makeApp('preload-app');
+    writeBoot(dir, 'theme.ts', 'app:theme');
+    const files = {
+      'boot/fields.ts': "import { field } from '../components/field.ts';\nexport { field };\n",
+      'components/field.ts': "import 'app/components/shared.ts';\nexport const field = 1;\n",
+      'components/shared.ts': 'export {};\n',
+      'components/unused.ts': 'export {};\n',
+      'pages/home.ts': "export default () => import('./lazy.ts');\n",
+      'pages/lazy.ts': 'export {};\n',
+    };
+    for (const [path, source] of Object.entries(files)) {
+      mkdirSync(join(dir, 'dashboard', path, '..'), { recursive: true });
+      writeFileSync(join(dir, 'dashboard', path), source);
+    }
+    http = await serveDashboard(dir);
+    const body = (await req((http.server.address() as AddressInfo).port, '/')).body;
+    const imports = importsOf(body);
+    const preloaded = (path: string): boolean =>
+      body.includes(`<link rel="modulepreload" href="${imports[`/m/app/${path}`]}" />`);
+
+    for (const path of ['boot/theme.ts', 'boot/fields.ts', 'components/field.ts']) {
+      strictEqual(preloaded(path), true, path);
+    }
+    strictEqual(preloaded('components/shared.ts'), true);
+    strictEqual(preloaded('pages/home.ts'), true);
+    strictEqual(preloaded('pages/lazy.ts'), true);
+    strictEqual(preloaded('components/unused.ts'), false);
+  });
+
   it('caches a module for good at its fingerprinted URL', async () => {
     const port = await serve('immutable');
     const url = importsOf((await req(port, '/')).body)['/m/dashboard/index.ts'] ?? '';

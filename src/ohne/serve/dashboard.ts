@@ -3,6 +3,7 @@ import type { HandlerContext, Route } from '../routes/route.ts';
 
 import { etag } from '../../utils/etag/etag.ts';
 import { exists } from '../../utils/fs/index.ts';
+import { createImportMapResolver } from '../../utils/imports/create-import-map-resolver.ts';
 import {
   cacheControl,
   canonicalizeLanguage,
@@ -55,7 +56,12 @@ import { SRC_ROOT } from '../meta/src-root.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
 import { listen } from './_listen.ts';
-import { createModuleTable, type ModuleMount, type ModuleTable } from './_module-table.ts';
+import {
+  createModuleTable,
+  type ModuleMount,
+  type ModuleTable,
+  type ScannedModule,
+} from './_module-table.ts';
 
 /**
  * URL prefix under which the framework's browser modules are served.
@@ -84,6 +90,16 @@ const ICON_MAX_AGE = 86_400;
  * Path of the dev live-reload event stream the browser subscribes to, gated by `DASHBOARD_RELOAD`.
  */
 const RELOAD_PATH = `${MODULE_BASE}/dashboard/reload`;
+
+/**
+ * The kernel's entry module, the one the shell loads.
+ */
+const KERNEL_ENTRY = `${MODULE_BASE}/dashboard/boot.ts`;
+
+/**
+ * The dev live-reload client the shell loads under `DASHBOARD_RELOAD`.
+ */
+const RELOAD_CLIENT = `${MODULE_BASE}/dashboard/runtime/reload-client.ts`;
 
 /**
  * The favicon: the ohne mark at rest, the solid dot, as an inline SVG data URI.
@@ -173,6 +189,7 @@ const KERNEL_MOUNTS: ModuleMount[] = ['dashboard', 'utils'].map((dir) => ({
  * Both are type-stripped to JavaScript: the dashboard is a pure SPA with no build step.
  *
  * The importmap names every module by a fingerprint of its bytes, so the browser keeps each one for good.
+ * The shell also preloads every module the kernel, the boot files and the pages reach, all at once.
  * Every shell render rescans the modules first, so the page never names bytes that are gone.
  * The shell itself is revalidated on every load.
  *
@@ -204,17 +221,24 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
     const response = useResponse();
     response.headers.set('content-security-policy', framing);
     response.headers.set('cache-control', cacheControl({ noCache: true }));
-    const hashed = await modules.scan();
+    const scanned = await modules.scan();
     const messages = await collectMessages(layers, { disable: useConfig().disable.messages });
+    const pages = buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE);
+    const boot = (await collectDashboardBoot(layers)).map(
+      (file) => `${APP_MODULE_BASE}/${file.module}`,
+    );
+    const imports = importMap(scanned);
+    const entries = reload ? [KERNEL_ENTRY, RELOAD_CLIENT] : [KERNEL_ENTRY];
     const html = shellDocument(
       apiURL,
-      buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE),
-      (await collectDashboardBoot(layers)).map((boot) => `${APP_MODULE_BASE}/${boot.module}`),
+      pages,
+      boot,
       defaultLanguage,
       uniqueArray(messages.map((message) => messageGroup(message.key))),
       bootFailed(messages, defaultLanguage, failedIcon),
       reload,
-      hashed,
+      imports,
+      preloads([...entries, ...boot, ...pages.map((page) => page.url)], imports, scanned),
     );
     response.headers.set('etag', etag(html));
 
@@ -435,31 +459,62 @@ function bootText(
 }
 
 /**
- * The importmap that names every served module in `hashed` by its fingerprinted URL.
+ * The importmap's `imports`, naming every module in `scanned` by its fingerprinted URL.
  * A mapped specifier is never mapped again, so each bare name points straight at a fingerprinted URL.
  * Each layer module gets its own `app/` name too, so a bare and a relative import load one instance.
  * The `app/` prefix stays for a module the scan left out, which loads from its plain URL either way.
  */
-function importMap(hashed: Map<string, string>): string {
+function importMap(scanned: Map<string, ScannedModule>): Record<string, string> {
   const kernel = `${MODULE_BASE}/dashboard/index.ts`;
   const utils = `${MODULE_BASE}/utils/index.ts`;
   const imports: Record<string, string> = {
-    'ohnejs/dashboard': hashed.get(kernel) ?? kernel,
-    'ohnejs/utils': hashed.get(utils) ?? utils,
+    'ohnejs/dashboard': scanned.get(kernel)?.hashed ?? kernel,
+    'ohnejs/utils': scanned.get(utils)?.hashed ?? utils,
     'app/': `${APP_MODULE_BASE}/`,
   };
-  for (const [url, target] of hashed) {
+  for (const [url, { hashed }] of scanned) {
     if (url.startsWith(`${APP_MODULE_BASE}/`)) {
-      imports[`app/${url.slice(APP_MODULE_BASE.length + 1)}`] = target;
+      imports[`app/${url.slice(APP_MODULE_BASE.length + 1)}`] = hashed;
     }
-    imports[url] = target;
+    imports[url] = hashed;
   }
-  return jsonForScript({ imports });
+  return imports;
+}
+
+/**
+ * The fingerprinted URL of every module `roots` reach through `imports`, breadth-first from the roots.
+ * The browser preloads a module without its imports, so the list carries the whole graph.
+ * Each specifier resolves as the browser resolves it, and one that names no scanned module is skipped.
+ */
+function preloads(
+  roots: string[],
+  imports: Record<string, string>,
+  scanned: Map<string, ScannedModule>,
+): string[] {
+  const resolve = createImportMapResolver(imports);
+  const modules = new Map<string, [url: string, module: ScannedModule]>();
+  for (const [url, module] of scanned) {
+    const target = resolve(url, '/');
+    if (!isNull(target)) modules.set(target, [url, module]);
+  }
+
+  const found = new Map<string, [url: string, module: ScannedModule]>();
+  const visit = (specifier: string, base: string): void => {
+    const target = resolve(specifier, base) ?? '';
+    const module = modules.get(target);
+    if (!isUndefined(module)) found.set(target, module);
+  };
+  for (const root of roots) visit(root, '/');
+  for (const [url, module] of found.values()) {
+    for (const specifier of module.imports) visit(specifier, url);
+  }
+  return [...found.keys()];
 }
 
 /**
  * The single-page shell: the pre-paint color-mode script, the config, the importmap, and the kernel.
- * A module script's `src` skips the importmap, so the shell writes the fingerprinted URLs itself.
+ * A module script's `src` and a preload's `href` skip the importmap, so the shell writes fingerprinted URLs.
+ * The preloads follow the importmap, since a browser ignores an importmap that comes after a module fetch.
  * Until the kernel announces `ohne-booted`, a failure to load or run it swaps `#app` for `failed`.
  * That covers a module the browser could not fetch, so a dropped request never leaves a blank page.
  * The guard listens while capturing, since a script's fetch failure does not bubble.
@@ -472,13 +527,15 @@ function shellDocument(
   messageGroups: string[],
   failed: string,
   reload: boolean,
-  hashed: Map<string, string>,
+  imports: Record<string, string>,
+  preload: string[],
 ): string {
   const config = jsonForScript({ apiURL, pages, boot, defaultLanguage, messageGroups });
-  const kernel = `${MODULE_BASE}/dashboard/boot.ts`;
-  const client = `${MODULE_BASE}/dashboard/runtime/reload-client.ts`;
+  const links = preload
+    .map((href) => `\n    <link rel="modulepreload" href="${escapeXML(href)}" />`)
+    .join('');
   const reloadClient = reload
-    ? `\n    <script type="module" src="${hashed.get(client) ?? client}"></script>`
+    ? `\n    <script type="module" src="${imports[RELOAD_CLIENT] ?? RELOAD_CLIENT}"></script>`
     : '';
   return `<!doctype html>
 <html lang="${defaultLanguage}">
@@ -497,13 +554,13 @@ function shellDocument(
       } catch {}
     </script>
     <style>${CANVAS}</style>
-    <script type="importmap">${importMap(hashed)}</script>
+    <script type="importmap">${jsonForScript({ imports })}</script>${links}
   </head>
   <body>
     <div id="app"></div>
     ${failed}
     <script type="application/json" id="ohne-config">${config}</script>
-    <script type="module" src="${hashed.get(kernel) ?? kernel}" id="ohne-boot"></script>
+    <script type="module" src="${imports[KERNEL_ENTRY] ?? KERNEL_ENTRY}" id="ohne-boot"></script>
     <script>
       {
         const kernel = document.getElementById('ohne-boot');

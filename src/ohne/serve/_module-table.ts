@@ -3,6 +3,7 @@ import type { Stats } from 'node:fs';
 import { fingerprint } from '../../utils/crypto/fingerprint.ts';
 import { findFile } from '../../utils/fs/find-file.ts';
 import { listDir } from '../../utils/fs/list-dir.ts';
+import { parseImports } from '../../utils/imports/parse-imports.ts';
 import { stripFile } from '../../utils/imports/strip-file.ts';
 import {
   cacheControl,
@@ -19,7 +20,7 @@ import { sendNotModified } from '../http/send-not-modified.ts';
 import { useEvent } from '../http/use-event.ts';
 
 /**
- * A module file stripped to JavaScript, with the stats it was read under and the fingerprint of its body.
+ * A module file stripped to JavaScript, with the stats it was read under, its fingerprint and its specifiers.
  */
 interface Entry {
   size: number;
@@ -27,6 +28,7 @@ interface Entry {
   settled: boolean;
   body: string;
   hash: string;
+  imports: string[];
 }
 
 /**
@@ -55,15 +57,31 @@ export interface ModuleMount {
 }
 
 /**
+ * One module a scan found.
+ */
+export interface ScannedModule {
+  /**
+   * The module's URL with the fingerprint of its stripped bytes, like `/m/app/nav.ts?h=47DEQpj8`.
+   */
+  hashed: string;
+
+  /**
+   * Every specifier the module's source names, verbatim.
+   * It over-captures: a specifier in a comment or a string counts too.
+   */
+  imports: string[];
+}
+
+/**
  * The dashboard's served modules, each named by a fingerprint of its stripped bytes.
  */
 export interface ModuleTable {
   /**
    * Re-lists every mount and fingerprints what changed since the last scan.
-   * Resolves each module's served URL mapped to its fingerprinted URL.
+   * Resolves each module's served URL mapped to what the scan found.
    * A file the stripper rejects is left out, so it stays reachable at its plain URL.
    */
-  scan(): Promise<Map<string, string>>;
+  scan(): Promise<Map<string, ScannedModule>>;
 
   /**
    * Serves the module at `path` in the first of `roots` that holds it, for the current request.
@@ -117,37 +135,38 @@ const entries = new Map<string, Entry>();
  * So a scan always begins after its caller arrived and sees every change made before.
  */
 export function createModuleTable(mounts: readonly ModuleMount[]): ModuleTable {
-  let running: Promise<Map<string, string>> | undefined;
-  let queued: Promise<Map<string, string>> | undefined;
+  let running: Promise<Map<string, ScannedModule>> | undefined;
+  let queued: Promise<Map<string, ScannedModule>> | undefined;
   let owned = new Set<string>();
 
-  const start = (): Promise<Map<string, string>> => {
+  const start = (): Promise<Map<string, ScannedModule>> => {
     running = rescan().finally(() => (running = undefined));
     return running;
   };
 
-  const next = (): Promise<Map<string, string>> => {
+  const next = (): Promise<Map<string, ScannedModule>> => {
     queued = undefined;
     return start();
   };
 
-  async function rescan(): Promise<Map<string, string>> {
+  async function rescan(): Promise<Map<string, ScannedModule>> {
     const winners = (await Promise.all(mounts.map(listWinners))).flat();
     const built = await mapConcurrent(winners, READ_CONCURRENCY, (winner) =>
       buildListed(winner.path, winner.stats),
     );
 
-    const hashed = new Map<string, string>();
+    const scanned = new Map<string, ScannedModule>();
     const kept = new Set<string>();
     winners.forEach((winner, index) => {
       const entry = built[index];
       if (isNullish(entry)) return;
       kept.add(winner.path);
-      hashed.set(winner.url, `${winner.url}?${HASH_PARAM}=${entry.hash}`);
+      const hashed = `${winner.url}?${HASH_PARAM}=${entry.hash}`;
+      scanned.set(winner.url, { hashed, imports: entry.imports });
     });
     for (const file of owned) if (!kept.has(file)) entries.delete(file);
     owned = kept;
-    return hashed;
+    return scanned;
   }
 
   return {
@@ -210,6 +229,7 @@ async function entryFor(file: string, stats: Stats, keep: boolean): Promise<Entr
     settled: Date.now() - stats.ctimeMs > SETTLE_MS,
     body,
     hash: fingerprint(body),
+    imports: parseImports(body),
   };
   if (keep) entries.set(file, entry);
   return entry;

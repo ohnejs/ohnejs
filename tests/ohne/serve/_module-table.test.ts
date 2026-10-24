@@ -15,7 +15,11 @@ import { dirname, join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { type Event, HTTPError, runWithEvent } from '../../../src/ohne/index.ts';
-import { createModuleTable, type ModuleTable } from '../../../src/ohne/serve/_module-table.ts';
+import {
+  createModuleTable,
+  type ModuleTable,
+  type ScannedModule,
+} from '../../../src/ohne/serve/_module-table.ts';
 import { fingerprint } from '../../../src/utils/crypto/index.ts';
 
 function makeEvent(url: string, headers: Record<string, string> = {}): Event {
@@ -29,6 +33,10 @@ function makeEvent(url: string, headers: Record<string, string> = {}): Event {
     appliedMiddleware: [],
     waitUntil() {},
   };
+}
+
+function hashes(scanned: Map<string, ScannedModule>): Map<string, string> {
+  return new Map([...scanned].map(([url, module]) => [url, module.hashed]));
 }
 
 function hashOf(source: string): string {
@@ -71,7 +79,7 @@ describe('createModuleTable', () => {
         'near/assets/font.woff2': 'binary',
       });
       const table = createModuleTable([{ base: '/m/app', roots: [near] }]);
-      deepStrictEqual([...(await table.scan())].toSorted(), [
+      deepStrictEqual([...hashes(await table.scan())].toSorted(), [
         [
           '/m/app/boot/runes.ts',
           `/m/app/boot/runes.ts?h=${hashOf('export const rune: string = "Frost";\n')}`,
@@ -80,10 +88,27 @@ describe('createModuleTable', () => {
       ]);
     });
 
+    it('records the specifiers each module imports at runtime', async () => {
+      const [near] = layers({
+        'near/a.ts': [
+          "import type { Rune } from './types.ts';",
+          "import { cast } from './cast.ts';",
+          "export * from 'ohnejs/utils';",
+          "export const later = () => import('app/pages/home.ts');",
+        ].join('\n'),
+      });
+      const table = createModuleTable([{ base: '/m/app', roots: [near] }]);
+      deepStrictEqual((await table.scan()).get('/m/app/a.ts')?.imports.toSorted(), [
+        './cast.ts',
+        'app/pages/home.ts',
+        'ohnejs/utils',
+      ]);
+    });
+
     it('skips a root that does not exist', async () => {
       const [near, far] = layers({ 'far/a.ts': 'export {};\n' });
       const table = createModuleTable([{ base: '/m/app', roots: [near, far] }]);
-      deepStrictEqual([...(await table.scan()).keys()], ['/m/app/a.ts']);
+      deepStrictEqual([...hashes(await table.scan()).keys()], ['/m/app/a.ts']);
     });
 
     it('fingerprints the closer root, which serves the path', async () => {
@@ -93,7 +118,7 @@ describe('createModuleTable', () => {
       });
       const table = createModuleTable([{ base: '/m/app', roots: [near, far] }]);
       strictEqual(
-        (await table.scan()).get('/m/app/a.ts'),
+        hashes(await table.scan()).get('/m/app/a.ts'),
         `/m/app/a.ts?h=${hashOf('export const from = "near";\n')}`,
       );
     });
@@ -107,7 +132,7 @@ describe('createModuleTable', () => {
       symlinkSync(join(near, '..', 'elsewhere', 'a.ts'), join(near, 'a.ts'));
       const table = createModuleTable([{ base: '/m/app', roots: [near, far] }]);
       strictEqual(
-        (await table.scan()).get('/m/app/a.ts'),
+        hashes(await table.scan()).get('/m/app/a.ts'),
         `/m/app/a.ts?h=${hashOf('export const from = "link";\n')}`,
       );
     });
@@ -124,7 +149,7 @@ describe('createModuleTable', () => {
       writeFileSync(join(far, 'a.ts'), 'export const a = 22;\n');
       unlinkSync(join(far, 'b.ts'));
       write(join(near, 'c.ts'), 'export const c = 3;\n');
-      const hashed = await table.scan();
+      const hashed = hashes(await table.scan());
 
       strictEqual(hashed.get('/m/app/a.ts'), `/m/app/a.ts?h=${hashOf('export const a = 22;\n')}`);
       strictEqual(hashed.has('/m/app/b.ts'), false);
@@ -137,7 +162,7 @@ describe('createModuleTable', () => {
       await table.scan();
       writeFileSync(join(near, 'a.ts'), 'export const a = 2;\n');
       strictEqual(
-        (await table.scan()).get('/m/app/a.ts'),
+        hashes(await table.scan()).get('/m/app/a.ts'),
         `/m/app/a.ts?h=${hashOf('export const a = 2;\n')}`,
       );
     });
@@ -145,14 +170,14 @@ describe('createModuleTable', () => {
     it('keeps the fingerprint across a type-only edit or a touch', async () => {
       const [near] = layers({ 'near/a.ts': 'let a: string = 1;\n' });
       const table = createModuleTable([{ base: '/m/app', roots: [near] }]);
-      const before = (await table.scan()).get('/m/app/a.ts');
+      const before = hashes(await table.scan()).get('/m/app/a.ts');
 
       writeFileSync(join(near, 'a.ts'), 'let a: number = 1;\n');
-      strictEqual((await table.scan()).get('/m/app/a.ts'), before);
+      strictEqual(hashes(await table.scan()).get('/m/app/a.ts'), before);
 
       const { atime } = statSync(join(near, 'a.ts'));
       utimesSync(join(near, 'a.ts'), atime, new Date(0));
-      strictEqual((await table.scan()).get('/m/app/a.ts'), before);
+      strictEqual(hashes(await table.scan()).get('/m/app/a.ts'), before);
     });
 
     it('leaves out a module the stripper rejects', async () => {
@@ -161,14 +186,14 @@ describe('createModuleTable', () => {
         'near/a.ts': 'export {};\n',
       });
       const table = createModuleTable([{ base: '/m/app', roots: [near] }]);
-      deepStrictEqual([...(await table.scan()).keys()], ['/m/app/a.ts']);
+      deepStrictEqual([...hashes(await table.scan()).keys()], ['/m/app/a.ts']);
     });
 
     it('fingerprints more modules than it reads at once', async () => {
       const files: Record<string, string> = {};
       for (let i = 0; i < 300; i++) files[`near/m${i}.ts`] = `export const n = ${i};\n`;
       const [near] = layers(files);
-      const hashed = await createModuleTable([{ base: '/m/app', roots: [near] }]).scan();
+      const hashed = hashes(await createModuleTable([{ base: '/m/app', roots: [near] }]).scan());
       strictEqual(
         hashed.get('/m/app/m299.ts'),
         `/m/app/m299.ts?h=${hashOf('export const n = 299;\n')}`,
@@ -186,7 +211,10 @@ describe('createModuleTable', () => {
       const joined = await first;
       strictEqual(joined, await second);
       strictEqual(joined === (await running), false);
-      strictEqual(joined.get('/m/app/a.ts'), `/m/app/a.ts?h=${hashOf('export const a = 22;\n')}`);
+      strictEqual(
+        joined.get('/m/app/a.ts')?.hashed,
+        `/m/app/a.ts?h=${hashOf('export const a = 22;\n')}`,
+      );
     });
   });
 

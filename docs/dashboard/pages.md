@@ -386,7 +386,10 @@ channel.
 You set the port, the host, and the API base URL the browser talks to under
 [`dashboard.*`](../project/config.md#the-dashboard) in config.
 
-### Caching
+### Loading and caching
+
+The page names every module the dashboard can load up front, so the browser fetches them all at
+once instead of finding them one import at a time.
 
 The browser keeps each dashboard module until its content changes. A module's URL carries a
 fingerprint of its bytes, so the browser caches it for good and never asks for it again. After a
