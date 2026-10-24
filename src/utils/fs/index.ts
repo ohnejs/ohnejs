@@ -2,6 +2,7 @@ export * from './append-file.ts';
 export * from './empty-dir.ts';
 export * from './ensure-dir.ts';
 export * from './exists.ts';
+export * from './find-file.ts';
 export * from './find-up.ts';
 export * from './import-default.ts';
 export * from './list-dir.ts';

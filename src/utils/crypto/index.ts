@@ -1,4 +1,5 @@
 export * from './digest.ts';
+export * from './fingerprint.ts';
 export * from './hash-password.ts';
 export * from './hmac-bytes.ts';
 export * from './hmac.ts';

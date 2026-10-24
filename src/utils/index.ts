@@ -250,6 +250,7 @@ export * from './path/expand-tilde.ts';
 export * from './path/extname.ts';
 export * from './path/is-absolute-path.ts';
 export * from './path/is-path-inside.ts';
+export * from './path/is-typescript-path.ts';
 export * from './path/join-path.ts';
 export * from './path/normalize-path.ts';
 export * from './path/path-name-segments.ts';
