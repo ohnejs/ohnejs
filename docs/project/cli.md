@@ -89,6 +89,12 @@ dependencies are skipped. On a change:
 Each server is a child process, the same one `serve` runs in production. The API restarts as a fresh
 process, so no old module is left after a reload.
 
+A project without a dashboard, such as an API another app's pages call, runs the API alone:
+
+```sh
+npx ohne dev --no-dashboard
+```
+
 A codegen error, or a server that crashes or fails to start, prints its error and waits. The API
 starts again on your next change to API source, a message catalog, `ohne.config.ts`, or `.env`. The
 dashboard starts again on any change.

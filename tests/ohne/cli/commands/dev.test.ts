@@ -1,12 +1,13 @@
-import { strictEqual } from 'node:assert';
+import { ok, strictEqual } from 'node:assert';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
+import { devCommand } from '../../../../src/ohne/cli/commands/dev.ts';
 import { ohne } from '../../../../src/ohne/cli/ohne.ts';
 import { useEnv } from '../../../../src/ohne/index.ts';
-import { runCommand } from '../../../../src/utils/cli/index.ts';
+import { resolveArgs, runCommand } from '../../../../src/utils/cli/index.ts';
 
 describe('ohne dev', () => {
   let root: string;
@@ -30,5 +31,15 @@ describe('ohne dev', () => {
     await runCommand(ohne, ['dev', '--cwd', dir]);
     strictEqual(process.exitCode, 1);
     strictEqual(existsSync(join(dir, '.ohne')), false);
+  });
+
+  it('serves the dashboard unless `--no-dashboard` asks for the API alone', () => {
+    const { args } = devCommand;
+    ok(args);
+    const plain = resolveArgs(args, []);
+    const alone = resolveArgs(args, ['--no-dashboard']);
+    ok(plain.ok && alone.ok);
+    strictEqual(plain.values.dashboard, true);
+    strictEqual(alone.values.dashboard, false);
   });
 });

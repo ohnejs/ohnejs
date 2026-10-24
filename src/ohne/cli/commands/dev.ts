@@ -7,6 +7,7 @@ import { isOhneProject } from '../../project/is-ohne-project.ts';
 /**
  * The `ohne dev` command.
  * Watches the project at `--cwd`, reloads the API server when a change affects it, and serves the dashboard.
+ * `--no-dashboard` leaves the dashboard out, for a project that has none.
  *
  * Refuses to run outside an ohne project and sets a non-zero exit code in that case.
  */
@@ -17,6 +18,11 @@ export const devCommand = defineCommand({
   },
   args: {
     cwd: { type: 'string', description: 'Project root to watch.' },
+    dashboard: {
+      type: 'boolean',
+      default: true,
+      description: 'Serve the dashboard; `--no-dashboard` runs the API alone.',
+    },
   },
   async run({ values }) {
     const cwd = resolvePath(values.cwd ?? '.');
@@ -32,6 +38,6 @@ export const devCommand = defineCommand({
       return;
     }
 
-    await dev(cwd);
+    await dev(cwd, { dashboard: values.dashboard });
   },
 });
