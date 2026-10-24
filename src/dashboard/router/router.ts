@@ -11,6 +11,7 @@ import { ref, type Ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
 import { parseSearchParams } from '../../utils/search-params/parse-search-params.ts';
 import { canonicalPath } from '../../utils/uri/canonical-path.ts';
+import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { mount } from '../render/mount.ts';
 import { when } from '../render/when.ts';
@@ -88,6 +89,17 @@ let at = 0;
 let settling: 'undo' | 'undo-replay' | 'replay' | null = null;
 let held = 0;
 let cause: NavigationCause = 'load';
+
+css`
+  .ohne-load-failed {
+    min-height: 100%;
+    justify-content: center;
+  }
+
+  .ohne-load-failed-bare {
+    min-height: 100dvh;
+  }
+`;
 
 /**
  * Starts the client router: it renders the matched page for the current URL into `container`.
@@ -318,11 +330,14 @@ function notFound(): Child {
 }
 
 /**
- * The page standing in for one whose module failed to load.
+ * The page standing in for one whose module failed to load, centered in the frame or on the bare screen.
  * The browser keeps a failed module failed for the document's life, so its retry reloads the page.
  */
-function loadFailed(): Child {
-  return errorState(undefined, { retry: () => location.reload() });
+function loadFailed(frame: boolean): HTMLElement {
+  const state = errorState(undefined, { retry: () => location.reload() });
+  state.classList.add('ohne-load-failed');
+  if (!frame) state.classList.add('ohne-load-failed-bare');
+  return state;
 }
 
 /**
@@ -346,7 +361,8 @@ async function render(): Promise<void> {
   } catch (error) {
     if (mine !== token) return;
     console.error(error);
-    component = defineDashboardPage(loadFailed, { frame: untracked(() => framed.value) });
+    const frame = untracked(() => framed.value);
+    component = defineDashboardPage(() => loadFailed(frame), { frame });
   }
   if (mine !== token) return;
   const search = ref(location.search);

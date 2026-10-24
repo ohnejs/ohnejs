@@ -138,6 +138,12 @@ describe('startRouter with a page frame', () => {
    */
   const frameRoot = () => findElement(container, (element) => element.tagName === 'DIV');
 
+  /**
+   * The load failure the router rendered, found by its alert role.
+   */
+  const failure = () =>
+    findElement(container, (element) => element.getAttribute('role') === 'alert');
+
   before(async () => {
     browser = fakeBrowser('/');
     router = (await import(
@@ -236,6 +242,8 @@ describe('startRouter with a page frame', () => {
     strictEqual(logged.mock.callCount(), 1);
     strictEqual(container.textContent, '[Failed to loadRetry]');
     strictEqual(router.useRoute()?.path, '/broken');
+    strictEqual(failure()?.classList.has('ohne-load-failed'), true);
+    strictEqual(failure()?.classList.has('ohne-load-failed-bare'), false);
   });
 
   it('keeps a bare page bare when the next page fails to load', async () => {
@@ -246,6 +254,7 @@ describe('startRouter with a page frame', () => {
     await settle();
     logged.mock.restore();
     strictEqual(container.textContent, 'Failed to loadRetry');
+    strictEqual(failure()?.classList.has('ohne-load-failed-bare'), true);
   });
 
   it('keeps the page on a query step and updates `query` synchronously', async () => {
