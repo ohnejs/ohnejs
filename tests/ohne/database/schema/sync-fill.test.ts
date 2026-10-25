@@ -190,6 +190,89 @@ describe('syncDatabase with a fill migration', () => {
     await db.close();
   });
 
+  it('makes a live object required, one fill per required subfield', async () => {
+    const db = await connectTest();
+    const subfields = () => ({ title: field('text'), description: field('text') });
+    await syncDatabase(db, dialect, {
+      desired: site({
+        title: field('text', { default: 'Home' }),
+        seo: field('object', { nullable: true, fields: subfields() }),
+      }),
+    });
+    await insertSite(db, 's1');
+    const required = site({
+      title: field('text', { default: 'Home' }),
+      seo: field('object', { fields: subfields() }),
+    });
+    const table = required.find((item) => item.derived?.path.join('.') === 'seo')?.name ?? '';
+    await syncDatabase(db, dialect, {
+      desired: required,
+      migrations: [
+        meta('app/2026-10-seo-title', {
+          from: null,
+          to: { collection: 'Site', field: 'seo.title' },
+          transform: () => 'Stormwind',
+        }),
+        meta('app/2026-10-seo-description', {
+          from: null,
+          to: { collection: 'Site', field: 'seo.description' },
+          transform: () => 'The capital of the Alliance.',
+        }),
+      ],
+    });
+    deepStrictEqual(await db.query(`SELECT "title", "description" FROM "${table}"`), [
+      Object.assign(Object.create(null), {
+        title: 'Stormwind',
+        description: 'The capital of the Alliance.',
+      }),
+    ]);
+    const live = await dialect.describeTable(db, table);
+    ok(live.columns.every((column) => column.notNull));
+    deepStrictEqual(
+      live.uniques.map((unique) => unique.columns),
+      [['_parentUUID']],
+    );
+    await db.close();
+  });
+
+  it('moves fields one at a time into a live object made required', async () => {
+    const db = await connectTest();
+    const subfields = () => ({ title: field('text'), description: field('text') });
+    await syncDatabase(db, dialect, {
+      desired: site({
+        metaTitle: field('text'),
+        metaDescription: field('text'),
+        seo: field('object', { nullable: true, fields: subfields() }),
+      }),
+    });
+    await db.run(
+      'INSERT INTO "Site" ("UUID", "_updatedAt", "metaTitle", "metaDescription") VALUES (?, ?, ?, ?)',
+      ['s1', 0, 'Stormwind', 'The capital of the Alliance.'],
+    );
+    const required = site({ seo: field('object', { fields: subfields() }) });
+    const table = required.find((item) => item.derived?.path.join('.') === 'seo')?.name ?? '';
+    await syncDatabase(db, dialect, {
+      desired: required,
+      migrations: [
+        meta('app/2026-10-seo-description', {
+          from: { collection: 'Site', field: 'metaDescription' },
+          to: { collection: 'Site', field: 'seo.description' },
+        }),
+        meta('app/2026-10-seo-title', {
+          from: { collection: 'Site', field: 'metaTitle' },
+          to: { collection: 'Site', field: 'seo.title' },
+        }),
+      ],
+    });
+    deepStrictEqual(await db.query(`SELECT "title", "description" FROM "${table}"`), [
+      Object.assign(Object.create(null), {
+        title: 'Stormwind',
+        description: 'The capital of the Alliance.',
+      }),
+    ]);
+    await db.close();
+  });
+
   it('rolls the fill and its stamp back when a row stays NULL', async () => {
     const db = await connectTest();
     await syncDatabase(db, dialect, { desired: before });

@@ -589,7 +589,6 @@ function requiredChildParent(engine: Engine, table: string): string | undefined 
 /**
  * Gives each parent record without its required child row one, holding the transform's value in `to`.
  * The table materializes first when missing, so a fill can back a newly added required `object`.
- * Another column that refuses `NULL` could never hold a valid row, so the fill refuses instead.
  */
 async function fillChildless(
   engine: Engine,
@@ -606,19 +605,7 @@ async function fillChildless(
       `WHERE ${dialect.quote(to.table)}.${dialect.quote('_parentUUID')} = ${dialect.quote(parent)}.${dialect.quote('UUID')})`,
   );
   if (isEmpty(parents)) return;
-  const blocking = schema.columns.find(
-    (column) => column.notNull && !['UUID', '_parentUUID', to.column].includes(column.name),
-  );
-  if (!isUndefined(blocking)) {
-    throw ohneError({
-      title: `Migration \`${meta.name}\` cannot create \`${to.table}\` rows`,
-      body: [
-        `\`${parent}\` holds \`${parents.length}\` ${pluralize(parents.length, 'row')} without a \`${to.table}\` row, and \`${blocking.name}\` refuses \`NULL\`.`,
-        'Give those records the field through your app first, or make it `nullable`.',
-      ],
-      path: meta.file,
-    });
-  }
+  await relaxUnwritten(engine, schema, ['UUID', '_parentUUID', to.column]);
   const column = schema.columns.find((item) => item.name === to.column) as ColumnSchema;
   const insert =
     `INSERT INTO ${dialect.quote(to.table)} (${['UUID', '_parentUUID', to.column].map((name) => dialect.quote(name)).join(', ')}) ` +
@@ -749,6 +736,40 @@ function targetColumn(
       'Migrate the occupying column away first, or pick another name.',
     ],
     path: meta.file,
+  });
+}
+
+/**
+ * Makes every `NOT NULL` column outside `written` nullable, so a row holding only `written` can land.
+ * A later migration fills the rest; the sync's diff tightens them back, its guard probing each.
+ */
+async function relaxUnwritten(
+  engine: Engine,
+  schema: TableSchema,
+  written: readonly string[],
+): Promise<void> {
+  const changeColumns = schema.columns
+    .filter((column) => column.notNull && !written.includes(column.name))
+    .map((column) => ({ live: column, desired: { ...column, notNull: false } }));
+  if (isEmpty(changeColumns)) return;
+  const relaxed = new Map(changeColumns.map((change) => [change.live.name, change.desired]));
+  await engine.dialect.applyTableDiff(engine.db, {
+    kind: 'alter',
+    live: schema,
+    desired: {
+      ...schema,
+      columns: schema.columns.map((column) => relaxed.get(column.name) ?? column),
+    },
+    addColumns: [],
+    dropColumns: [],
+    changeColumns,
+    changePrimaryKey: false,
+    addUniques: [],
+    dropUniques: [],
+    addIndexes: [],
+    dropIndexes: [],
+    addForeignKeys: [],
+    dropForeignKeys: [],
   });
 }
 
@@ -1810,6 +1831,7 @@ async function writeValues(
     : undefined;
   const localeKeyed = source.columns.some((column) => column.name === '_localeCode');
   let unmatched = 0;
+  let relaxed = false;
   for (const row of rows) {
     const ctx = switchContext(engine, localeKeyed ? String(row._localeCode) : undefined);
     const value = dialect.deserialize(from.type, row[from.column] ?? null);
@@ -1851,6 +1873,8 @@ async function writeValues(
     const { changes } = await db.run(update, params);
     if (changes > 0) continue;
     if (!isUndefined(insert)) {
+      if (!relaxed) await relaxUnwritten(engine, target, insertColumns);
+      relaxed = true;
       const anchor = row[sourceKey[0] as string] ?? null;
       await db.run(
         insert,

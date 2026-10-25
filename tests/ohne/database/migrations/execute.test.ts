@@ -2329,7 +2329,7 @@ describe('executeMigrations with fills', () => {
     await db.close();
   });
 
-  it('refuses to create required child rows another column would leave `NULL`', async () => {
+  it('fills the required child rows of a live table one subfield at a time', async () => {
     const db = await connectTest();
     const posts = table('Posts');
     const address = table('Posts_address', {
@@ -2346,27 +2346,41 @@ describe('executeMigrations with fills', () => {
     });
     await materialize(db, [posts, address]);
     await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['p1']);
-    await rejects(
-      executeMigrations(db, dialect, {
-        migrations: [
-          meta('app/001-city', {
-            from: null,
-            to: { collection: 'Posts', field: 'address.city' },
-            transform: () => 'Dalaran',
-          }),
-        ],
-        desired: [posts, address],
-        claimed: classifySchema([posts, address]),
-        force: false,
-      }),
-      (error: { title?: string; body?: string[] }) => {
-        match(error.title ?? '', /cannot create `Posts_address` rows/);
-        match(
-          (error.body ?? []).join('\n'),
-          /`Posts` holds `1` row without a `Posts_address` row, and `street` refuses `NULL`/,
-        );
-        return true;
-      },
+    await db.run('INSERT INTO "Posts" ("UUID") VALUES (?)', ['p2']);
+    await db.run(
+      'INSERT INTO "Posts_address" ("UUID", "_parentUUID", "street", "city") VALUES (?, ?, ?, ?)',
+      ['a2', 'p2', 'Trade District', 'Stormwind'],
+    );
+    const outcome = await executeMigrations(db, dialect, {
+      migrations: [
+        meta('app/001-city', {
+          from: null,
+          to: { collection: 'Posts', field: 'address.city' },
+          transform: () => 'Dalaran',
+        }),
+        meta('app/002-street', {
+          from: null,
+          to: { collection: 'Posts', field: 'address.street' },
+          transform: () => 'Violet Citadel',
+        }),
+      ],
+      desired: [posts, address],
+      claimed: classifySchema([posts, address]),
+      force: false,
+    });
+    deepStrictEqual(outcome.stamps, [
+      { name: 'app/001-city', status: 'applied' },
+      { name: 'app/002-street', status: 'applied' },
+    ]);
+    const rows = await db.query<{ _parentUUID: string; street: string; city: string }>(
+      'SELECT "_parentUUID", "street", "city" FROM "Posts_address" ORDER BY "_parentUUID"',
+    );
+    deepStrictEqual(
+      rows.map((row) => [row._parentUUID, row.street, row.city]),
+      [
+        ['p1', 'Violet Citadel', 'Dalaran'],
+        ['p2', 'Trade District', 'Stormwind'],
+      ],
     );
     await db.close();
   });
