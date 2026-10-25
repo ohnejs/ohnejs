@@ -102,6 +102,11 @@ describe('renderHelp', () => {
     strictEqual(help.includes('\n  app build [options]\n'), true);
   });
 
+  it('names the positionals in the usage line', () => {
+    const help = renderHelp({ meta: { name: 'init', positionals: '[dir]' } }, plain);
+    strictEqual(help.includes('\n  init [dir] [options]\n'), true);
+  });
+
   it('omits a hidden option from the option list', () => {
     const build = {
       meta: { name: 'build' },

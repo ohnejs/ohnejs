@@ -2,6 +2,7 @@ import type { ANSIColors } from '../../ansi/pick-ansi-colors.ts';
 import type { ArgSchema, ArgsSchema } from '../args/define-args.ts';
 import type { Command } from './define-command.ts';
 
+import { compact } from '../../array/compact.ts';
 import { toArray } from '../../array/to-array.ts';
 import { toKebabCase } from '../../case/to-kebab-case.ts';
 import { isUndefined } from '../../is/is-undefined.ts';
@@ -15,7 +16,7 @@ interface Row {
 /**
  * Renders the help text for a command as a string, ending with a newline.
  * Includes the title, description, a usage line, the subcommand list, and the option list.
- * The usage line opens with `path`, the words that invoke the command.
+ * The usage line opens with `path`, the words that invoke the command, then names its positionals.
  * Long flags are shown in kebab-case; `--help` (and `--version` when set) are appended automatically.
  * A boolean that defaults to `true` shows as the `--no-` flag that turns it off.
  * A `globals` schema, when passed, is rendered under a `GLOBAL OPTIONS` section after the options.
@@ -41,7 +42,8 @@ export function renderHelp(
 
   if (meta.description) lines.push('', meta.description);
 
-  lines.push('', colors.bold('USAGE'), `  ${path} ${subCommands ? '<command> ' : ''}[options]`);
+  const usage = compact([path, subCommands && '<command>', meta.positionals, '[options]']);
+  lines.push('', colors.bold('USAGE'), `  ${usage.join(' ')}`);
 
   if (subCommands) {
     const rows = Object.entries(subCommands).map(

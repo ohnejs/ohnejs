@@ -19,6 +19,11 @@ export interface CommandMeta {
    * One-line summary, shown in help and in a parent's command list.
    */
   description?: string;
+
+  /**
+   * The positionals it takes, as the usage line shows them before `[options]`, like `'[dir]'`.
+   */
+  positionals?: string;
 }
 
 /**
