@@ -144,7 +144,9 @@ css`
   }
 
   .o-media-item-selected .o-media-file-item-button:not(.o-media-file-item-button-disabled),
-  .o-media-item-box:focus-within .o-media-file-item-button:not(.o-media-file-item-button-disabled) {
+  .o-media-item-box:focus-within .o-media-file-item-button:not(.o-media-file-item-button-disabled),
+  .o-media-item-box[data-ohne-context-menu-open]
+    .o-media-file-item-button:not(.o-media-file-item-button-disabled) {
     background-color: hsl(var(--ohne-card));
     color: hsl(var(--ohne-card-foreground));
   }

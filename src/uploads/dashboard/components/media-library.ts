@@ -2,16 +2,12 @@ import { activeContentLocale } from 'app/components/content-language-switcher.ts
 import {
   type Child,
   container,
-  contextMenu,
   css,
   dashboardMeta,
   dataChangeCount,
-  dropdownItem,
   each,
   h,
   type HotkeysOptions,
-  icon,
-  type IconName,
   keyed,
   lastNavigation,
   listenTrigger,
@@ -27,22 +23,21 @@ import {
   effect,
   hasKey,
   isEmpty,
-  isNull,
   isUndefined,
   onCleanup,
   parseSearchParams,
-  ref,
   stringifySearchParams,
   untracked,
 } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
+import type { MediaItemDisabled } from './media-image-item.ts';
 
+import { mediaMenu, type MediaMenuOptions } from './_media-menu.ts';
 import { mediaPopups } from './_media-popups.ts';
 import { useUploadsT } from './_messages.ts';
 import { mediaBreadcrumbs } from './media-breadcrumbs.ts';
 import { mediaFooter } from './media-footer.ts';
-import { detailsHref, type MediaItemDisabled } from './media-image-item.ts';
 import { mediaItem, type MediaItemActions } from './media-item.ts';
 import {
   confirmDeleteUploads,
@@ -51,9 +46,7 @@ import {
   mediaMemory,
   parseMediaQuery,
   privateFolders,
-  resolveUploadURL,
   serializeMediaQuery,
-  setUploadsPrivate,
   uploadsCollection,
   uploadsPermissions,
 } from './media-library-data.ts';
@@ -73,7 +66,6 @@ import {
   type MediaView,
   pageFolderHidden,
   PER_PAGE,
-  pinned,
 } from './media-library-state.ts';
 
 /**
@@ -265,8 +257,10 @@ export function mediaActionsRegistry(): MediaActions {
  * Shift ranges the selection from the checkbox, or from the tile itself once something is selected.
  * Escape clears, and Delete deletes.
  * Cmd/Ctrl+A selects the page, or clears the selection when the page is already selected.
- * A right-click or a long-press opens the record's context menu: open, rename, move, details, delete.
- * A layer with private files adds make private or make public to it.
+ * A right-click or a long-press on a tile opens its context menu, built by `mediaMenu`.
+ * The menu acts on the selection when the tile is in it, else on that tile alone.
+ * Opening it leaves the selection as it is.
+ * The tile's checkbox and buttons keep the browser's own menu.
  * Empty folders say so once the read has answered.
  */
 export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
@@ -274,7 +268,7 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
   const view = options.view;
   const mode = options.selectionMode ?? 'none';
   const permissions = uploadsPermissions();
-  const { canEdit, canMove, canSetPrivate, canDelete } = permissions;
+  const { canMove, canSetPrivate, canDelete } = permissions;
   const actions = options.actions ?? registered;
   const showPathTooltips =
     options.showPathTooltips ?? ((): boolean => !isUndefined(view.query.value.where));
@@ -365,69 +359,12 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
   });
   listenTrigger(MEDIA_REFRESH, () => view.refresh());
 
-  const menuEvent = ref<MouseEvent | TouchEvent | null>(null);
-  let menuRecord: UploadRecord | null = null;
-  const closeMenu = (): void => {
-    menuEvent.value = null;
+  const menu: MediaMenuOptions = {
+    view,
+    permissions,
+    actions,
+    selectable: (record) => (canMove || canSetPrivate || canDelete) && selectable(record),
   };
-  const menuItem = (
-    glyph: IconName,
-    label: string,
-    onClick: () => void,
-    extras: { href?: string; target?: string; destructive?: boolean } = {},
-  ): HTMLElement => {
-    const item = dropdownItem([icon(glyph), h('span', null, label)], {
-      href: extras.href,
-      target: extras.target,
-      destructive: extras.destructive,
-      onClick: () => {
-        closeMenu();
-        onClick();
-      },
-    });
-    item.title = label;
-    return item;
-  };
-  const menuItems = (): Child => {
-    const record = menuRecord;
-    if (isNull(record)) return null;
-    const folder = record.kind === 'folder';
-    const details = (): void => {
-      if (actions.onDetails) actions.onDetails(record);
-      else navigate(detailsHref(record, false));
-    };
-    return [
-      folder
-        ? menuItem('folder-open', t('dashboard.open'), () => {}, { href: mediaPath(record.path) })
-        : menuItem('external-link', t('uploads.dashboard.openInNewTab'), () => {}, {
-            href: resolveUploadURL(record),
-            target: '_blank',
-          }),
-      canEdit && actions.onRename
-        ? menuItem('pencil', t('uploads.dashboard.rename'), () => actions.onRename?.(record))
-        : null,
-      canMove && actions.onMove
-        ? menuItem('file-arrow-right', t('uploads.dashboard.move'), () =>
-            actions.onMove?.([record]),
-          )
-        : null,
-      canSetPrivate && !pinned(record, view.privateFolders.value)
-        ? menuItem(
-            record.private ? 'lock-open' : 'lock',
-            t(record.private ? 'uploads.dashboard.makePublic' : 'uploads.dashboard.makePrivate'),
-            () => void setUploadsPrivate([record], !record.private),
-          )
-        : null,
-      folder ? null : menuItem('info-circle', t('uploads.dashboard.details'), details),
-      canDelete ? h('hr') : null,
-      canDelete
-        ? menuItem('trash-x', t('dashboard.delete'), () => void confirmDeleteUploads([record]), {
-            destructive: true,
-          })
-        : null,
-    ];
-  };
-  const menu = mode === 'none' ? contextMenu(menuEvent, menuItems, { size: -1 }) : null;
 
   const hotkeys = useHotkeys(options.hotkeys);
   hotkeys.listen('selectAll', (event) => {
@@ -503,12 +440,8 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
                       disabled: options.disabled,
                       onPick: options.onPick,
                       actions,
-                      contextMenu: isNull(menu)
-                        ? undefined
-                        : (target) => {
-                            menuRecord = target;
-                            return menu;
-                          },
+                      contextMenu:
+                        mode === 'none' ? (record) => mediaMenu(record, menu) : undefined,
                       rangeKey: () => shift,
                     }),
                 ),
@@ -528,7 +461,6 @@ export function mediaLibrary(options: MediaLibraryOptions): HTMLElement {
           ),
         ),
     ),
-    menu?.root,
   );
 }
 

@@ -749,7 +749,7 @@ export function mediaDetailsPopup(record: UploadRecord, options: MediaDetailsPop
   };
 
   const urlRow = (): HTMLElement => {
-    const open = button(() => t('uploads.dashboard.openInNewTab'), {
+    const open = button(() => t('dashboard.openInNewTab'), {
       icon: 'external-link',
       iconOnly: true,
       size: -2,

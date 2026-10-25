@@ -1,5 +1,14 @@
-import { attachTooltip, button, checkbox, type ContextMenu, css, h, when } from 'ohnejs/dashboard';
-import { isEmpty, isNull, onCleanup, type Ref, untracked } from 'ohnejs/utils';
+import {
+  attachTooltip,
+  button,
+  checkbox,
+  contextMenu,
+  css,
+  h,
+  type MenuGroup,
+  when,
+} from 'ohnejs/dashboard';
+import { isEmpty, isNull, isUndefined, onCleanup, type Ref, untracked } from 'ohnejs/utils';
 
 import type { UploadRecord } from '../../uploads/types.ts';
 import type { UploadsPermissions } from './_permissions.ts';
@@ -83,10 +92,10 @@ export interface MediaItemOptions {
   actions?: MediaItemActions;
 
   /**
-   * The library's context menu, aimed at the tile's record.
-   * The tile opens it on a right-click or a long-press.
+   * The library's context menu groups for a record, read on each open.
+   * A right-click or a long-press opens them; the checkbox and buttons keep the browser's own menu.
    */
-  contextMenu?(record: UploadRecord): ContextMenu;
+  contextMenu?(record: UploadRecord): readonly MenuGroup[];
 
   /**
    * Whether the range modifier is held, read when the checkbox toggles.
@@ -259,7 +268,7 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
 
   const renameButton = (): HTMLElement => {
     return button(() => t('uploads.dashboard.rename'), {
-      icon: 'pencil',
+      icon: 'cursor-text',
       iconOnly: true,
       size: -3,
       variant: 'outline',
@@ -291,6 +300,42 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
           nameText,
         );
 
+  const box = h(
+    'div',
+    {
+      draggable: draggable ? 'true' : undefined,
+      class: 'o-media-item-box',
+      onDragstart: (event: DragEvent) => {
+        if (!draggable) {
+          event.preventDefault();
+          return;
+        }
+        const current = record();
+        if (!view.isSelected(current.UUID)) view.select(current);
+        startMoving(
+          view,
+          t('uploads.dashboard.selected', {
+            count: untracked(() => view.selection.value.length),
+          }),
+        );
+        // Firefox starts a drag only once the transfer carries data.
+        event.dataTransfer?.setData('text/plain', current.path);
+        event.dataTransfer?.setDragImage(dragImage(), -16, 10);
+      },
+      onDragend: () => stopMoving(view),
+    },
+    tile,
+    when(() => selectable && !disabled().value, checkboxEl),
+    when(
+      () => mode === 'none' && canDelete && isEmpty(view.selection.value) && !disabled().value,
+      deleteButton,
+    ),
+  );
+  const items = options.contextMenu;
+  if (!isUndefined(items)) {
+    contextMenu(box, () => items(record()), { ignore: 'button', size: -1 });
+  }
+
   const root = h(
     'div',
     {
@@ -304,40 +349,7 @@ export function mediaItem(record: () => UploadRecord, options: MediaItemOptions)
         else view.select(record(), true);
       },
     },
-    h(
-      'div',
-      {
-        draggable: draggable ? 'true' : undefined,
-        class: 'o-media-item-box',
-        onDragstart: (event: DragEvent) => {
-          if (!draggable) {
-            event.preventDefault();
-            return;
-          }
-          const current = record();
-          if (!view.isSelected(current.UUID)) view.select(current);
-          startMoving(
-            view,
-            t('uploads.dashboard.selected', {
-              count: untracked(() => view.selection.value.length),
-            }),
-          );
-          // Firefox starts a drag only once the transfer carries data.
-          event.dataTransfer?.setData('text/plain', current.path);
-          event.dataTransfer?.setDragImage(dragImage(), -16, 10);
-        },
-        onDragend: () => stopMoving(view),
-        onContextmenu: (event: MouseEvent) => options.contextMenu?.(record()).onContextMenu(event),
-        onTouchstart: (event: TouchEvent) => options.contextMenu?.(record()).onTouchStart(event),
-        onTouchend: (event: TouchEvent) => options.contextMenu?.(record()).onTouchEnd(event),
-      },
-      tile,
-      when(() => selectable && !disabled().value, checkboxEl),
-      when(
-        () => mode === 'none' && canDelete && isEmpty(view.selection.value) && !disabled().value,
-        deleteButton,
-      ),
-    ),
+    box,
     h(
       'div',
       { class: 'o-media-item-name' },

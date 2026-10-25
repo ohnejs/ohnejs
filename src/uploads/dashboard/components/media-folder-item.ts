@@ -90,6 +90,7 @@ css`
 
   .o-media-item-selected .o-media-folder-item-button,
   .o-media-item-box:focus-within .o-media-folder-item-button,
+  .o-media-item-box[data-ohne-context-menu-open] .o-media-folder-item-button,
   .o-media-folder-item-highlighted .o-media-folder-item-button {
     background-color: hsl(var(--ohne-card));
     color: hsl(var(--ohne-card-foreground));
