@@ -224,6 +224,25 @@ css`
     opacity: 1;
   }
 
+  @media (hover: hover) and (pointer: fine) {
+    .ohne-table-overflow-end.ohne-table-pinned-end:not(
+        :has(
+          tbody > tr:hover,
+          :focus-visible,
+          [aria-expanded='true'],
+          [data-ohne-context-menu-open]
+        )
+      ) {
+      &::after {
+        opacity: 1;
+      }
+
+      & :where(th, td).ohne-table-actions {
+        right: calc(-1 * var(--ohne-table-kebab) - 2.5rem);
+      }
+    }
+  }
+
   .ohne-table-scroller {
     flex: 1 1 auto;
     min-height: 0;
@@ -317,6 +336,7 @@ css`
     width: var(--ohne-table-kebab);
     min-width: var(--ohne-table-kebab);
     background-color: var(--ohne-table-bg);
+    transition: right 300ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .ohne-table-grid :where(th):is(.ohne-table-check, .ohne-table-actions) {
