@@ -20,10 +20,11 @@ export interface EnvSpec<T> {
 
   /**
    * How this var is surfaced as a CLI flag, for tools that mirror env vars onto flags.
-   * `'boolean'` is a switch (`--force-sync` / `--no-force-sync`); `'value'` takes a value (`--host x`).
+   * `'boolean'` is a switch (`--force-sync` / `--no-force-sync`).
+   * `'value'` takes a value (`--host x`), and `'number'` a numeric one (`--port 8080`).
    * Omitted means the var has no flag.
    */
-  flag?: 'boolean' | 'value';
+  flag?: 'boolean' | 'number' | 'value';
 }
 
 /**
@@ -90,7 +91,7 @@ export interface EnvRegistry<E extends object> {
   /**
    * Returns the CLI flag kind registered for `name` via its spec, or `undefined` when it has none.
    */
-  flag<K extends keyof E & string>(name: K): 'boolean' | 'value' | undefined;
+  flag<K extends keyof E & string>(name: K): 'boolean' | 'number' | 'value' | undefined;
 }
 
 interface Slot {
