@@ -43,6 +43,123 @@ In `record`, each [block](../database/blocks.md) reads as `{ block, UUID, fields
   translation. The CMS never substitutes another language, so fall back on the site, as in
   `upload.description ?? ''`.
 
+## Site data
+
+Not everything on your site is a page. A menu, a footer, or a list of posts lives in records you
+read by collection name. Here the menu sits in a [singleton](../database/collections.md#singletons):
+
+```ts
+// collections/Settings.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  singleton: true,
+  api: { read: 'public', update: true },
+  fields: {
+    copyright: field('text', { default: '' }),
+    menu: field('repeater', {
+      fields: {
+        label: field('text'),
+        link: field('link', { collections: ['Pages'], nullable: true }),
+      },
+    }),
+  },
+});
+```
+
+`read` and `list` take the collection's name:
+
+```ts
+const settings = await ohne.read('Settings');
+const post = await ohne.read('Posts', uuid);
+const posts = await ohne.list('Posts', { order: ['-publishedAt'], page: 2 });
+```
+
+- `read` with a name alone reads a singleton's record.
+- `read` with a `UUID` reads that record, or answers `undefined` when the visitor may not see it.
+- `list` answers one page: `{ records, total, page, perPage, lastPage }`. Omitted, `perPage` is
+  `20`, and it takes at most `100`.
+
+`list` takes the [URL query](../api/url-queries.md) as options:
+
+```ts
+const posts = await ohne.list('Posts', {
+  where: { title: { contains: 'ohne' } },
+  order: ['-publishedAt'],
+  select: ['title', 'publishedAt'],
+  locale: 'de',
+});
+```
+
+- [`where`](../api/url-queries.md#filtering) keeps the matching records.
+- `select` narrows the fields. `UUID` and `path` come whatever it names.
+- `locale` picks the language. Omitted, records read in your default locale.
+- A `read` takes `select` and `locale` too.
+
+You read as a visitor does, so the collection's read access decides what comes back:
+
+- A collection read with `publishedScope` shows only its published records.
+- A collection the visitor may not read is missing: `list` and a singleton's `read` throw.
+- A `where` never widens the access. It only narrows what the access shows.
+- Each record loads as a page's `record` does: uploads with absolute URLs, relations one level
+  deep, and links with `href`. A record with a route carries its `path`.
+- Reads show saved records, never the editor's unsaved changes. A list in the live preview shows
+  what is saved.
+
+## Forms
+
+A contact form, a newsletter sign-up, or a comment box sends a record to your CMS. Open the
+collection's create to visitors:
+
+```ts
+// collections/Messages.ts
+import { defineCollection, field } from 'ohnejs';
+
+export default defineCollection({
+  api: { create: 'public' },
+  fields: {
+    name: field('text'),
+    email: field('email'),
+    message: field('text'),
+  },
+});
+```
+
+Its read stays closed, so anyone may send a message and only your editors read them.
+
+`create` takes the collection's name and the fields:
+
+```ts
+const result = await ohne.create('Messages', {
+  name: 'Ada',
+  email: 'ada@example.com',
+  message: 'Hello!',
+});
+
+if (!result.ok) console.log(result.errors.email ?? result.message);
+```
+
+- A stored create answers `{ ok: true, UUID }`.
+- A refusal the visitor can fix answers `ok: false`. Its `status` is `422` for an invalid field,
+  `403` when a middleware refuses, and `429` when a rate limit does.
+- `message` says what went wrong, and `errors` holds a message per invalid field, like
+  `result.errors.email`. Pass the visitor's `Accept-Language` on, and both are in their language.
+- Anything else throws, like a collection with no create or an API that does not answer.
+
+A spam check reads a header. Run it as [middleware](../api/middleware.md#route-middleware) on the
+create, `create: { public: true, middleware: ['recaptcha'] }`, and pass the header with the create:
+
+```ts
+await ohne.create('Messages', message, { headers: { 'recaptcha-token': token } });
+```
+
+The [Nuxt and Next](./frameworks.md) packages send the create from your site's server, and pass
+each visitor's address on as `X-Forwarded-For`. List that server in
+[`api.trustProxy`](../production/deployment.md#behind-a-proxy), so `event.ip` and each
+[rate limit](../api/rate-limiting.md#who-counts-as-one-client) see the visitor, not your site.
+A Next server passes on the header it receives, so list it only behind a proxy that sets that
+header, like your host's.
+
 ## Types
 
 The CMS describes its pages as a TypeScript file, `ohne.ts`. Pass its `CMS` type to `createOhne`,
@@ -62,9 +179,17 @@ if (page.kind === 'page' && page.collection === 'Posts') {
 
 Checking `collection` narrows `record` to that collection's fields.
 
-`CMS` describes everything your CMS resolves; `Page`, `Block`, `Blocks`, `Related` and `Upload`
-name its parts. `Block<'Hero'>` is one `Hero` item, and `Block` alone is any block, narrowed by
-`block`:
+It types [site data](#site-data) too. `read` and `list` take only collections a visitor may read.
+Their `order`, `select` and `where` take only that collection's fields, and the answer holds the
+fields you select.
+
+It types [forms](#forms) as well. `create` takes only collections a visitor may create in, and
+checks each field you send. A composite or blocks field takes any value, and the API validates it.
+
+`CMS` describes everything your CMS resolves; `Page`, `Block`, `Blocks`, `Records`, `Creatable`,
+`Related` and `Upload` name its parts. `Creatable['Messages']` is what a create in `Messages`
+takes. `Block<'Hero'>` is one `Hero` item, and `Block` alone is any block,
+narrowed by `block`:
 
 ```ts
 import { escapeHTML, richTextToHTML } from '@ohnejs/client';

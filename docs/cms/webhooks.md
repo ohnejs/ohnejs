@@ -22,7 +22,14 @@ A URL must be `https`, or `http` on `localhost`. A secret has at least 16 charac
 
 ## What is sent
 
-Every saved change to a page, the site settings, or a redirect sends a `POST` with a JSON body:
+Every saved change your website may show sends a `POST`:
+
+- a page, in any collection with a route
+- the site settings and the redirects
+- a record of any collection whose read is [public](../api/collections.md#exposure), like the
+  `Settings` your site reads as [site data](./website.md#site-data)
+
+The body is JSON:
 
 ```json
 { "event": "update", "collection": "Pages", "uuids": ["01a10e2a-156a-7c83-bfc1-7f0e62eaa859"], "at": 1791331200000 }

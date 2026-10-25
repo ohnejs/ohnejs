@@ -91,6 +91,83 @@ defineProps<{ fields: Blocks['Hero'] }>();
   `link` field as a `NuxtLink`.
 - `nuxt typecheck` names a block that has no component.
 
+A layout or a component reads [site data](./website.md#site-data) with `useOhneRead` and
+`useOhneList`:
+
+```vue
+<!-- app/layouts/default.vue -->
+<script setup lang="ts">
+const settings = await useOhneRead('Settings');
+</script>
+
+<template>
+  <div>
+    <nav>
+      <OhneLink v-for="item in settings.menu" :key="item.label" :link="item.link">
+        {{ item.label }}
+      </OhneLink>
+    </nav>
+    <slot />
+    <footer>{{ settings.copyright }}</footer>
+  </div>
+</template>
+```
+
+- Records read in the current page's locale unless you pass `locale`.
+- A failed read shows the error page with a `502`, as a failed page does. So the ref always holds
+  the record, and the template needs no `?.`.
+
+Options passed as a getter read again when they change, like a page number from the query:
+
+```ts
+const route = useRoute();
+const posts = await useOhneList('Posts', () => ({ page: Number(route.query.page) || 1 }));
+```
+
+A [form](./website.md#forms) sends its record with `useOhne().create`. The browser posts to your
+site, and your site passes the create on to your API:
+
+```vue
+<!-- app/components/ContactForm.vue -->
+<script setup lang="ts">
+const ohne = useOhne();
+const sent = ref(false);
+const errors = ref<Partial<Record<string, string>>>({});
+
+async function send(event: Event) {
+  const form = new FormData(event.target as HTMLFormElement);
+  const field = (name: string) => String(form.get(name));
+  const message = { name: field('name'), email: field('email'), message: field('message') };
+  const headers = { 'recaptcha-token': field('g-recaptcha-response') };
+  const result = await ohne.create('Messages', message, { headers });
+  if (result.ok) sent.value = true;
+  else errors.value = result.errors;
+}
+</script>
+
+<template>
+  <p v-if="sent">Thanks!</p>
+  <form v-else @submit.prevent="send">
+    <input name="name" />
+    <input name="email" type="email" />
+    <p v-if="errors.email">{{ errors.email }}</p>
+    <textarea name="message" />
+    <button>Send</button>
+  </form>
+</template>
+```
+
+Your site passes on only the body, the visitor's language and their address. A header your spam
+check reads must be named in `ohne.headers`:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['@ohnejs/nuxt'],
+  ohne: { api: 'https://api.example.com', headers: ['recaptcha-token'] },
+});
+```
+
 `nuxt typecheck` runs `vue-tsc`, which needs TypeScript 6. Install both with
 `pnpm add -D typescript@6 vue-tsc`. The module's [README](https://github.com/ohnejs/nuxt#readme)
 covers layouts and reading other paths.
@@ -225,6 +302,99 @@ export function Hero({ fields }: Block<'Hero'>) {
 - `OhneBlocks` wraps each block in a `<div>` with `data-ohne-block`, so the editor can select it.
 - `OhneRichText` sends clicks on links to your pages through Next's router. `OhneLink` renders a
   `link` field as Next's `Link`.
+
+A layout or a component reads [site data](./website.md#site-data) with `ohne.read` and
+`ohne.list`:
+
+```tsx
+// app/[[...slug]]/layout.tsx
+import { OhneLink } from '@ohnejs/next/client';
+
+import { ohne } from '../../lib/ohne';
+
+export default async function SiteLayout({ children }: LayoutProps<'/[[...slug]]'>) {
+  const settings = await ohne.read('Settings');
+  return (
+    <>
+      <nav>
+        {settings.menu.map((item) => (
+          <OhneLink key={item.label} link={item.link}>
+            {item.label}
+          </OhneLink>
+        ))}
+      </nav>
+      {children}
+      <footer>{settings.copyright}</footer>
+    </>
+  );
+}
+```
+
+- Reads are cached like the page's, and dropped with it by the [webhook](./webhooks.md) route.
+- Records read in your default locale unless you pass `locale`.
+
+Only a page receives `searchParams`. A block reads the query with `ohne.searchParams()` instead,
+like a page number for its list:
+
+```ts
+const page = Number((await ohne.searchParams()).get('page')) || 1;
+const posts = await ohne.list('Posts', { order: ['-publishedAt'], page });
+```
+
+A layout must not read the query: Next keeps a layout as first rendered when only the query
+changes.
+
+A [form](./website.md#forms) sends its record from a Server Action with `ohne.create`:
+
+```ts
+// app/contact/actions.ts
+'use server';
+
+import { ohne } from '../../lib/ohne';
+import type { Creatable } from '../../ohne';
+
+export async function sendMessage(message: Creatable['Messages'], token: string) {
+  return ohne.create('Messages', message, { headers: { 'recaptcha-token': token } });
+}
+```
+
+A Client Component calls it and shows each field's error beside its input:
+
+```tsx
+// components/contact-form.tsx
+'use client';
+
+import { useState } from 'react';
+
+import { sendMessage } from '../app/contact/actions';
+
+export function ContactForm() {
+  const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
+  const [sent, setSent] = useState(false);
+
+  async function send(form: FormData) {
+    const field = (name: string) => String(form.get(name));
+    const message = { name: field('name'), email: field('email'), message: field('message') };
+    const result = await sendMessage(message, field('g-recaptcha-response'));
+    if (result.ok) setSent(true);
+    else setErrors(result.errors);
+  }
+
+  if (sent) return <p>Thanks!</p>;
+  return (
+    <form action={send}>
+      <input name="name" />
+      <input name="email" type="email" />
+      {errors.email && <p>{errors.email}</p>}
+      <textarea name="message" />
+      <button>Send</button>
+    </form>
+  );
+}
+```
+
+A create is never cached, and it passes the visitor's [address](./website.md#forms) and language
+on.
 
 Two route handlers serve the sitemap and `robots.txt` at your site's root:
 
