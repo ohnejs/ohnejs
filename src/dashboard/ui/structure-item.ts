@@ -1,4 +1,5 @@
 import type { Child } from '../render/insert.ts';
+import type { MenuGroup } from './menu.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
@@ -10,6 +11,7 @@ import { defaultText } from '../runtime/text.ts';
 import { longPress } from './_long-press.ts';
 import { card } from './card.ts';
 import { structureDraggable } from './container.ts';
+import { contextMenu } from './context-menu.ts';
 import { icon } from './icon.ts';
 import './tokens.ts';
 
@@ -34,6 +36,13 @@ export interface StructureItemOptions {
    * Omitted, the card body holds only the drop zones.
    */
   body?: Child | (() => Child);
+
+  /**
+   * The actions a right-click or a touch hold on the header row opens, read on each open.
+   * The body never opens them, and the drag handle and other controls keep the browser's own menu.
+   * Without a header there is nowhere to open them.
+   */
+  menu?: () => readonly MenuGroup[];
 
   /**
    * Controls whether the item can be dragged.
@@ -188,6 +197,7 @@ css`
  * They report a pointerup as `onDrop`, so a finger lifted over one drops there.
  * A touch drag keeps them visible.
  * The dragged card dims its body, and `$expanded === false` collapses it.
+ * A right-click or a touch hold on the header row opens `menu`; the drag handle keeps its own hold.
  */
 export function structureItem(options: StructureItemOptions): HTMLElement {
   const isDraggable = options.isDraggable ?? true;
@@ -270,6 +280,43 @@ export function structureItem(options: StructureItemOptions): HTMLElement {
         ),
     );
 
+  const header = isUndefined(options.header)
+    ? undefined
+    : h(
+        'div',
+        { class: 'ohne-structure-item-header ohne-row' },
+        when(
+          () => isDraggable && !disabled(),
+          () =>
+            h(
+              'button',
+              {
+                'aria-label': () => defaultText('dashboard.dragToReorder', 'Drag to reorder'),
+                tabindex: '-1',
+                type: 'button',
+                class: 'ohne-structure-drag-handle ohne-raw',
+                onMousedown: handleDrag,
+                onPointerdown: (event: PointerEvent) => {
+                  // A touch stays captured by the node it hit, so its release would miss the zones.
+                  const target = event.target as Element;
+                  if (target.hasPointerCapture(event.pointerId)) {
+                    target.releasePointerCapture(event.pointerId);
+                  }
+                },
+                onTouchstart: (event: TouchEvent) => {
+                  event.preventDefault();
+                  onTouchStart(event);
+                },
+                onTouchmove: onTouchMove,
+                onTouchcancel: () => press.end(),
+              },
+              icon('grip-vertical'),
+            ),
+        ),
+        options.header,
+      );
+  if (!isUndefined(header) && !isUndefined(options.menu)) contextMenu(header, options.menu);
+
   const root = card(
     [
       zone('before'),
@@ -281,43 +328,7 @@ export function structureItem(options: StructureItemOptions): HTMLElement {
           ),
       zone('after'),
     ],
-    {
-      header: isUndefined(options.header)
-        ? undefined
-        : h(
-            'div',
-            { class: 'ohne-structure-item-header ohne-row' },
-            when(
-              () => isDraggable && !disabled(),
-              () =>
-                h(
-                  'button',
-                  {
-                    'aria-label': () => defaultText('dashboard.dragToReorder', 'Drag to reorder'),
-                    tabindex: '-1',
-                    type: 'button',
-                    class: 'ohne-structure-drag-handle ohne-raw',
-                    onMousedown: handleDrag,
-                    onPointerdown: (event: PointerEvent) => {
-                      // A touch stays captured by the node it hit, so its release would miss the zones.
-                      const target = event.target as Element;
-                      if (target.hasPointerCapture(event.pointerId)) {
-                        target.releasePointerCapture(event.pointerId);
-                      }
-                    },
-                    onTouchstart: (event: TouchEvent) => {
-                      event.preventDefault();
-                      onTouchStart(event);
-                    },
-                    onTouchmove: onTouchMove,
-                    onTouchcancel: () => press.end(),
-                  },
-                  icon('grip-vertical'),
-                ),
-            ),
-            options.header,
-          ),
-    },
+    { header },
   );
 
   root.classList.add('ohne-structure-item');

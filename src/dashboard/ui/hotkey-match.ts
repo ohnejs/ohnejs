@@ -2,6 +2,7 @@ import type { KeyStroke } from '../../utils/keys/key-stroke.ts';
 
 import { isNull } from '../../utils/is/is-null.ts';
 import { keySpecLabel } from '../../utils/keys/key-spec-label.ts';
+import { mapValues } from '../../utils/object/map-values.ts';
 
 /**
  * A named keyboard shortcut the dashboard understands.
@@ -122,8 +123,13 @@ function resolveAction(stroke: KeyStroke, mac: boolean, idle: boolean): HotkeyAc
 }
 
 /**
+ * A `HotkeyAction` that carries a display label.
+ * `insertAfter` and `insertBefore` carry none.
+ */
+export type LabeledHotkeyAction = Exclude<HotkeyAction, 'insertAfter' | 'insertBefore'>;
+
+/**
  * The display labels for the default hotkeys, e.g. `Cmd + S` for `save`.
- * `insertAfter` and `insertBefore` carry no label.
  *
  * @example
  * ```ts
@@ -131,25 +137,28 @@ function resolveAction(stroke: KeyStroke, mac: boolean, idle: boolean): HotkeyAc
  * hotkeyLabels(false).redo // -> 'Ctrl + Y'
  * ```
  */
-export function hotkeyLabels(
-  mac: boolean,
-): Record<Exclude<HotkeyAction, 'insertAfter' | 'insertBefore'>, string> {
-  const platform = mac ? 'mac' : 'win';
-  const label = (spec: string) => keySpecLabel(spec, platform);
+export function hotkeyLabels(mac: boolean): Record<LabeledHotkeyAction, string> {
+  return mapValues(hotkeySpecs(mac), (_, spec) => keySpecLabel(spec, mac ? 'mac' : 'win'));
+}
 
+/**
+ * The key spec behind each labeled hotkey, as `keySpecLabel` and `ariaKeyShortcut` read it.
+ * `delete` names the key a keyboard has for it: Backspace on macOS, Delete elsewhere, though both fire it.
+ */
+export function hotkeySpecs(mac: boolean): Record<LabeledHotkeyAction, string> {
   return {
-    close: label('esc'),
-    copy: label('mod+c'),
-    cut: label('mod+x'),
-    delete: label('delete'),
-    duplicate: label('mod+d'),
-    moveDown: label('mod+arrowdown'),
-    moveUp: label('mod+arrowup'),
-    paste: label('mod+v'),
-    redo: label(mac ? 'mod+shift+z' : 'mod+y'),
-    save: label('mod+s'),
-    search: label('mod+k'),
-    selectAll: label('mod+a'),
-    undo: label('mod+z'),
+    close: 'esc',
+    copy: 'mod+c',
+    cut: 'mod+x',
+    delete: mac ? 'backspace' : 'delete',
+    duplicate: 'mod+d',
+    moveDown: 'mod+arrowdown',
+    moveUp: 'mod+arrowup',
+    paste: 'mod+v',
+    redo: mac ? 'mod+shift+z' : 'mod+y',
+    save: 'mod+s',
+    search: 'mod+k',
+    selectAll: 'mod+a',
+    undo: 'mod+z',
   };
 }

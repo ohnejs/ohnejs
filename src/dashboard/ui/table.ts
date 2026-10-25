@@ -1,6 +1,6 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
-import type { MenuItem } from './menu.ts';
+import type { MenuGroup } from './menu.ts';
 import type { TableColumn, TableSelection, TableSort } from './table-model.ts';
 
 import { isNull } from '../../utils/is/is-null.ts';
@@ -24,8 +24,10 @@ import { isResource, resourceState } from '../runtime/resource.ts';
 import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { helpIcon } from './_help-icon.ts';
 import { longPress } from './_long-press.ts';
+import { menuActions } from './_menu-rows.ts';
 import { button } from './button.ts';
 import { checkbox } from './checkbox.ts';
+import { contextMenu } from './context-menu.ts';
 import { icon } from './icon.ts';
 import { menu } from './menu.ts';
 import { pagination } from './pagination.ts';
@@ -87,10 +89,11 @@ export interface TableOptions<T, K extends string | number, C extends string> {
   selection?: TableSelection<T, K>;
 
   /**
-   * The rows of a row's actions menu, behind a trailing button.
-   * Called each time the menu opens.
+   * The groups of a row's actions menu, behind a trailing button and on a right-click on the row.
+   * Called each time the menu opens, so a row inside the selection can act on all of it.
+   * The checkbox cell and the links, buttons and fields in a row keep the browser's own menu.
    */
-  actions?: (row: T) => readonly MenuItem[];
+  actions?: (row: T) => readonly MenuGroup[];
 
   /**
    * Where a row leads when the reader opens it.
@@ -132,6 +135,7 @@ export interface TableOptions<T, K extends string | number, C extends string> {
 type Phase = 'forbidden' | 'error' | 'loading' | 'empty' | 'rows';
 
 const IGNORED = 'a, button, input, textarea, select, label, [contenteditable]';
+const MENU_IGNORED = `${IGNORED}, .ohne-table-check`;
 const SKELETON_ROWS = 5;
 const NO_KEYS: ReadonlySet<never> = new Set();
 const TOUCH_DURATION = 500;
@@ -443,6 +447,10 @@ css`
     }
   }
 
+  .ohne-table-grid [data-ohne-context-menu-open] > td {
+    background-image: linear-gradient(hsl(var(--ohne-muted) / 0.5), hsl(var(--ohne-muted) / 0.5));
+  }
+
   .ohne-table-state > td {
     white-space: normal;
   }
@@ -518,6 +526,7 @@ function trackShift(): void {
  * The header sticks while the table has a bounded height.
  * The checkbox column sticks to the start, the actions column to the end.
  * Rows open by `href` or `onOpen`, select with checkboxes and ranges, and carry an actions menu.
+ * A right-click opens the same actions as the row's kebab.
  *
  * @example
  * ```ts
@@ -788,22 +797,27 @@ export function table<T, K extends string | number, C extends string = string>(
     return cell;
   };
 
-  const kebabCell = (items: (row: T) => readonly MenuItem[], row: () => T): HTMLElement =>
-    h('td', { class: 'ohne-table-actions' }, () => {
-      // Read, so a change of rows rebuilds the button and closes its open menu.
-      void visible.value;
-      const trigger = button(() => defaultText('dashboard.actions', 'Actions'), {
-        icon: 'dots',
-        iconOnly: true,
-        size: buttonSize,
-        class: 'ohne-table-kebab',
-      });
-      return h(
-        'div',
-        null,
-        menu(trigger, () => items(row())),
-      );
-    });
+  const kebabCell = (groups: (row: T) => readonly MenuGroup[], row: () => T): HTMLElement =>
+    h(
+      'td',
+      { class: 'ohne-table-actions' },
+      when(
+        () => menuActions(groups(row())).length > 0,
+        () =>
+          h('div', null, () => {
+            // Read, so a change of rows rebuilds the button and closes its open menu.
+            void visible.value;
+            const label = () => defaultText('dashboard.record.moreActions', 'More actions');
+            const trigger = button(label, {
+              icon: 'dots',
+              iconOnly: true,
+              size: buttonSize,
+              class: 'ohne-table-kebab',
+            });
+            return menu(trigger, () => groups(row()));
+          }),
+      ),
+    );
 
   const bodyCell = (column: TableColumn<T>, row: T): Child => {
     if (column.render) return column.render(row);
@@ -833,7 +847,7 @@ export function table<T, K extends string | number, C extends string = string>(
         toggleRow(selecting, !untracked(selected).has(selecting));
       }
     };
-    return h(
+    const el = h(
       'tr',
       openable
         ? {
@@ -868,6 +882,9 @@ export function table<T, K extends string | number, C extends string = string>(
       ),
       isUndefined(actions) ? null : kebabCell(actions, row),
     );
+    return isUndefined(actions)
+      ? el
+      : contextMenu(el, () => actions(untracked(row)), { ignore: MENU_IGNORED });
   };
 
   const stateBody = (content: Child): HTMLElement =>

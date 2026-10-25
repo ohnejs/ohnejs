@@ -40,6 +40,21 @@ export interface Rect {
 }
 
 /**
+ * A point on screen, like a `Touch` or a `MouseEvent`.
+ */
+export interface ScreenPoint {
+  /**
+   * The horizontal viewport coordinate in pixels.
+   */
+  clientX: number;
+
+  /**
+   * The vertical viewport coordinate in pixels.
+   */
+  clientY: number;
+}
+
+/**
  * A measured size.
  */
 export interface Dimensions {
@@ -87,6 +102,15 @@ export interface PlaceInput {
    * The preferred `placement` is ignored entirely.
    */
   allowedPlacements?: Placement[];
+
+  /**
+   * Makes `allowedPlacements` take the first entry that fits instead of the roomiest one.
+   * Nothing fitting still falls back to the roomiest.
+   *
+   * @default
+   * false
+   */
+  firstFit?: boolean;
 
   /**
    * Flips to the opposite side when the preferred side overflows and the opposite has more room.
@@ -247,12 +271,14 @@ function alignedSide(side: Side, alignment: Alignment): Side {
 
 /**
  * Returns the fitting placement with the most main-axis room, else the roomiest; earlier entries win ties.
+ * Under `firstFit`, the earliest fitting entry wins regardless of room.
  */
 function pickPlacement(
   allowed: Placement[],
   reference: Rect,
   floating: Dimensions,
   viewport: Dimensions,
+  firstFit: boolean,
 ): Placement {
   const scored = allowed.map((placement) => {
     const { x, y } = coordsAt(placement, reference, floating);
@@ -266,6 +292,8 @@ function pickPlacement(
         : [overflow[side], overflow.top, overflow.bottom];
     return { placement, main: overflow[side], fits: checks.every((value) => value <= 0) };
   });
+  const first = firstFit ? scored.find((entry) => entry.fits) : undefined;
+  if (first) return first.placement;
   scored.sort((a, b) => a.main - b.main);
   return (scored.find((entry) => entry.fits) ?? scored[0]!).placement;
 }
@@ -365,7 +393,7 @@ export function placeFloating(input: PlaceInput): PlaceResult {
   const shiftPadding = input.shiftPadding ?? 0;
   const preferred = input.placement ?? 'bottom-start';
   const placement = input.allowedPlacements
-    ? pickPlacement(input.allowedPlacements, reference, floating, viewport)
+    ? pickPlacement(input.allowedPlacements, reference, floating, viewport, input.firstFit ?? false)
     : input.flip
       ? flipPlacement(preferred, reference, floating, viewport)
       : preferred;

@@ -38,8 +38,10 @@ import {
   focusOrigin,
   type ItemFocus,
   structureActions,
+  type StructureActionsOptions,
   structureErrorMark,
   structureItemError,
+  structureMenu,
   trackItemFocus,
 } from '../structure-chrome.ts';
 
@@ -274,6 +276,37 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       onClick: () => focusNew(addAt()),
     });
 
+    const actionsOf = (
+      entry: () => RepeaterEntry,
+      index: () => number,
+    ): StructureActionsOptions => ({
+      index,
+      count: () => entries.value.length,
+      expanded: () => entry().$expanded,
+      allExpanded,
+      allCollapsed,
+      onToggleExpanded: () => toggleExpanded(entry()),
+      onExpandAll: () => setAllExpanded(true),
+      onCollapseAll: () => setAllExpanded(false),
+      onMove: (delta) => move(entry(), delta),
+      onAdd: (at) => focusNew(addAt(at, entry())),
+      copyPayload: () => ({
+        ohneClipboardDataType: 'structure-item',
+        data: { $type: itemType, ...valueOf(entry().form) },
+      }),
+      canPaste: () => {
+        const payload = clipboardData.value;
+        return (
+          !isNull(payload) &&
+          payload.ohneClipboardDataType === 'structure-item' &&
+          payload.data.$type === itemType
+        );
+      },
+      onPaste: (at) => focusNew(pasteAt(at, entry())),
+      onDuplicate: () => focusNew(duplicate(entry())),
+      onRemove: () => remove(entry()),
+    });
+
     const element = h(
       'div',
       { tabindex: '-1' },
@@ -296,36 +329,11 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
             ? null
             : trackItemFocus(
                 untracked(() => entry().focus),
-                structureActions({
-                  index,
-                  count: () => entries.value.length,
-                  expanded: () => entry().$expanded,
-                  allExpanded,
-                  allCollapsed,
-                  onToggleExpanded: () => toggleExpanded(entry()),
-                  onExpandAll: () => setAllExpanded(true),
-                  onCollapseAll: () => setAllExpanded(false),
-                  onMove: (delta) => move(entry(), delta),
-                  onAdd: (at) => focusNew(addAt(at, entry())),
-                  copyPayload: () => ({
-                    ohneClipboardDataType: 'structure-item',
-                    data: { $type: itemType, ...valueOf(entry().form) },
-                  }),
-                  canPaste: () => {
-                    const payload = clipboardData.value;
-                    return (
-                      !isNull(payload) &&
-                      payload.ohneClipboardDataType === 'structure-item' &&
-                      payload.data.$type === itemType
-                    );
-                  },
-                  onPaste: (at) => focusNew(pasteAt(at, entry())),
-                  onDuplicate: () => focusNew(duplicate(entry())),
-                  onRemove: () => remove(entry()),
-                }),
+                structureActions(actionsOf(entry, index)),
                 false,
               ),
         ],
+        itemMenu: off ? undefined : (entry, index) => structureMenu(actionsOf(entry, index)),
         // The form and the memory are stable per row, so untracked reads hold focus through expand-all.
         item: (entry) =>
           trackItemFocus(

@@ -1,3 +1,6 @@
+import type { Text } from '../runtime/text.ts';
+import type { IconName } from '../ui/icon.ts';
+import type { MenuAction, MenuGroup } from '../ui/menu.ts';
 import type { TreeItemModel, TreeModel } from '../ui/tree-model.ts';
 import type { BlockNode, BlocksHandle } from './builtin/blocks.ts';
 
@@ -17,14 +20,14 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { translateMessage, useT } from '../runtime/use-t.ts';
+import { menuRows } from '../ui/_menu-rows.ts';
 import { bubble } from '../ui/bubble.ts';
 import { button } from '../ui/button.ts';
-import { dropdownItem } from '../ui/dropdown-item.ts';
 import { dropdown } from '../ui/dropdown.ts';
 import { useHotkeys } from '../ui/hotkeys.ts';
 import { icon } from '../ui/icon.ts';
 import { toast } from '../ui/toaster.ts';
-import { flatTreeItems } from '../ui/tree-model.ts';
+import { flatTreeItems, getChildTreeItems, normalizeTreeSelection } from '../ui/tree-model.ts';
 import { tree, type TreeHandle } from '../ui/tree.ts';
 import {
   type BlockSlots,
@@ -178,7 +181,8 @@ css`
  * Every change runs through the lists' own handles, so the form, its history, and its dirt follow.
  * Drag and drop and the move, duplicate, delete, copy, and cut keys come from `tree`.
  * Enter adds after the selection and Shift+Enter before it; Escape clears it; Cmd/Ctrl+V pastes after it.
- * A row offers `+` to add inside it and a menu that adds, copies, cuts, pastes, duplicates, and deletes.
+ * A row offers `+` to add inside it and a menu to add, copy, cut, paste, move, duplicate, and delete.
+ * A right-click or the context-menu key opens that menu too, on the selection when the row is in it.
  * A block that holds several `blocks` fields shows one slot row per field; slots take drops but no selection.
  * A locked list renders the rows with no actions.
  */
@@ -286,10 +290,20 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
   };
 
   const remove = (items: readonly TreeItemModel<BlocksTreeRow>[]): void => {
+    const gone = new Set(
+      items.flatMap((item) => [item, ...getChildTreeItems(item, model.value)]).map(({ id }) => id),
+    );
     for (const [from, forms] of byList(items)) {
       from.commit(from.nodes().filter((node) => !forms.has(node.form)));
     }
-    selectedItems.value = [];
+    selectedItems.value = selectedItems.value.filter(({ id }) => !gone.has(id));
+    // A menu that opened on a removed row has no row to give focus back to.
+    setTimeout(() => {
+      if (element.contains(document.activeElement)) return;
+      const firstOf = (selector: string): HTMLElement | undefined =>
+        first([...element.querySelectorAll<HTMLElement>(selector)]);
+      (firstOf('.ohne-tree-item-button-selected') ?? firstOf('.ohne-tree-item-button'))?.focus();
+    });
   };
 
   const copy = (items: readonly TreeItemModel<BlocksTreeRow>[]): void => {
@@ -337,6 +351,7 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
     highlightedItem,
     itemIcon: (item) => icon(rowIcon(item.source)),
     itemLabel: (item) => rowLabel(item),
+    itemMenu: rowItems,
     onDropItems: (items, target, zone) => {
       const destination = dropDestination(target, zone, slots);
       if (isUndefined(destination)) return;
@@ -471,19 +486,16 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
       },
     });
     dots.tabIndex = -1;
-    effect(() => {
-      dots.classList.toggle('ohne-button-ghost', menuOpen.value !== key);
-      dots.classList.toggle('ohne-button-primary', menuOpen.value === key);
-    });
+    dots.setAttribute('aria-haspopup', 'menu');
+    effect(() => dots.setAttribute('aria-expanded', String(menuOpen.value === key)));
     return h(
       'span',
       {
         class: () =>
           'ohne-blocks-tree-actions' +
           (menuOpen.value === key ? ' ohne-blocks-tree-actions-open' : ''),
-        onClick: (event: MouseEvent) => {
-          if (selectedItems.value.length > 1) event.stopPropagation();
-        },
+        // The row's own click would select it, and opening a menu never changes the selection.
+        onClick: (event: MouseEvent) => event.stopPropagation(),
       },
       plusButton(item),
       dots,
@@ -495,112 +507,122 @@ export function blocksTree(list: () => BlocksHandle | undefined): BlocksTree {
   }
 
   /**
-   * The actions menu of a row, acting on the selection when the row is in it, else on the row alone.
+   * The actions of a row, acting on the selection when the row is in it, else on the row alone.
+   * The row's add, duplicate, and move actions, then the clipboard, then Delete alone.
+   * A row hides when it would change nothing: an add or a paste no type fits, a duplicate of a type gone.
+   * The move rows hide while no target can move, and one disables at the edge it faces.
+   * A row shows its hotkey only when it acts on the selection, since the keys act on nothing else.
+   * A locked list and a slot row offer none.
+   */
+  function rowItems(item: TreeItemModel<BlocksTreeRow>): MenuGroup[] {
+    if (!editable() || item.source.kind === 'slot') return [];
+    const selection = selectedItems.value;
+    const selected = selection.some((entry) => entry.id === item.id);
+    const targets = selected ? normalizeTreeSelection(selection, model.value) : [item];
+    const single = targets.length === 1;
+    const payload = clipboardData.value;
+    const before = beside(item, 'before');
+    const inside = beside(item, 'inside');
+    const after = beside(item, 'after');
+    const end = (destination: Destination): Destination => ({
+      list: destination.list,
+      index: destination.list.nodes().length,
+    });
+    const action = (
+      shape: IconName,
+      label: Text,
+      run: () => void,
+      extra: Partial<MenuAction> = {},
+    ): MenuAction => ({
+      icon: shape,
+      label,
+      ...extra,
+      hotkey: selected ? extra.hotkey : undefined,
+      // After the kebab's teardown, whose focus restore would otherwise land after the action's own.
+      onSelect: () => void nextTick().then(run),
+    });
+    const addable = (destination: Destination | undefined): destination is Destination =>
+      single && !isUndefined(destination) && destination.list.offered.length > 0;
+    const pastable = (destination: Destination | undefined): destination is Destination =>
+      single &&
+      !isUndefined(destination) &&
+      !isNull(payload) &&
+      payload.ohneClipboardDataType === 'blocks' &&
+      payload.data.some(({ $key }) => destination.list.offered.includes($key));
+    const stuck = (delta: -1 | 1): boolean =>
+      [...byList(targets)].every(([from, forms]) => {
+        const nodes = from.nodes();
+        return stepBlocks(nodes, forms, delta).every((node, index) => node === nodes[index]);
+      });
+    const movable = !stuck(-1) || !stuck(1);
+    const duplicable = blockRows(targets).every(({ node, list: from }) =>
+      from.offered.includes(node.block),
+    );
+    return [
+      [
+        addable(before) && action('arrow-bar-to-up', 'dashboard.sort.addBefore', () => add(before)),
+        addable(inside) &&
+          action('circle-plus', 'dashboard.sort.addInside', () => add(end(inside))),
+        addable(after) && action('arrow-bar-to-down', 'dashboard.sort.addAfter', () => add(after)),
+        duplicable &&
+          action('copy', 'dashboard.duplicate', () => duplicate(targets), { hotkey: 'duplicate' }),
+        movable &&
+          action('chevron-up', 'dashboard.sort.moveUp', () => step(targets, -1), {
+            hotkey: 'moveUp',
+            disabled: () => stuck(-1),
+          }),
+        movable &&
+          action('chevron-down', 'dashboard.sort.moveDown', () => step(targets, 1), {
+            hotkey: 'moveDown',
+            disabled: () => stuck(1),
+          }),
+      ],
+      [
+        action('clipboard', 'dashboard.clipboard.copy', () => copy(targets), { hotkey: 'copy' }),
+        action(
+          'cut',
+          'dashboard.clipboard.cut',
+          () => {
+            copy(targets);
+            remove(targets);
+          },
+          { hotkey: 'cut' },
+        ),
+        pastable(before) &&
+          action('clipboard-plus', 'dashboard.clipboard.pasteBefore', () => paste(before)),
+        pastable(inside) &&
+          action('clipboard-plus', 'dashboard.clipboard.pasteInside', () => paste(end(inside))),
+        pastable(after) &&
+          action('clipboard-plus', 'dashboard.clipboard.pasteAfter', () => paste(after), {
+            hotkey: 'paste',
+          }),
+      ],
+      [
+        action(
+          'trash-x',
+          single
+            ? 'dashboard.delete'
+            : { key: 'dashboard.blocks.deleteCount', params: { count: targets.length } },
+          () => remove(targets),
+          { hotkey: 'delete', destructive: true },
+        ),
+      ],
+    ];
+  }
+
+  /**
+   * The kebab's dropdown of the row's actions, placed at `reference`.
    */
   function rowMenu(item: TreeItemModel<BlocksTreeRow>, reference: HTMLElement): HTMLElement {
     const close = (): void => {
       menuOpen.value = undefined;
     };
-    const selection = untracked(() => selectedItems.value);
-    const targets = selection.some((entry) => entry.id === item.id) ? selection : [item];
-    const single = targets.length === 1;
-    const canPaste = (): boolean => {
-      const payload = clipboardData.value;
-      return !isNull(payload) && payload.ohneClipboardDataType === 'blocks';
-    };
-    const action = (
-      shape: Parameters<typeof icon>[0],
-      label: () => string,
-      run: () => void,
-      destructive = false,
-    ): HTMLElement => {
-      const el = dropdownItem([icon(shape), h('span', null, label)], {
-        destructive,
-        onClick: () => {
-          close();
-          void nextTick().then(run);
-        },
-      });
-      effect(() => {
-        el.title = label();
-      });
-      return el;
-    };
-    const inside = beside(item, 'inside');
-    const menu = dropdown(
-      [
-        single
-          ? [
-              action(
-                'arrow-bar-to-up',
-                () => t('dashboard.sort.addBefore'),
-                () => add(beside(item, 'before')),
-              ),
-              isUndefined(inside)
-                ? null
-                : action(
-                    'circle-plus',
-                    () => t('dashboard.sort.addInside'),
-                    () => add({ list: inside.list, index: inside.list.nodes().length }),
-                  ),
-              action(
-                'arrow-bar-to-down',
-                () => t('dashboard.sort.addAfter'),
-                () => add(beside(item, 'after')),
-              ),
-              h('hr'),
-            ]
-          : null,
-        action(
-          'clipboard',
-          () => t('dashboard.clipboard.copy'),
-          () => copy(targets),
-        ),
-        action(
-          'cut',
-          () => t('dashboard.clipboard.cut'),
-          () => {
-            copy(targets);
-            remove(targets);
-          },
-        ),
-        when(
-          () => single && canPaste(),
-          () => [
-            action(
-              'clipboard-plus',
-              () => t('dashboard.clipboard.pasteBefore'),
-              () => paste(beside(item, 'before')),
-            ),
-            isUndefined(inside)
-              ? null
-              : action(
-                  'clipboard-plus',
-                  () => t('dashboard.clipboard.pasteInside'),
-                  () => paste({ list: inside.list, index: inside.list.nodes().length }),
-                ),
-            action(
-              'clipboard-plus',
-              () => t('dashboard.clipboard.pasteAfter'),
-              () => paste(beside(item, 'after')),
-            ),
-          ],
-        ),
-        h('hr'),
-        action(
-          'copy',
-          () => t('dashboard.duplicate'),
-          () => duplicate(targets),
-        ),
-        action(
-          'trash',
-          () => t('dashboard.delete'),
-          () => remove(targets),
-          true,
-        ),
-      ],
-      { reference, placement: 'end', onClose: close },
-    );
+    const menu = dropdown(menuRows(rowItems(item), close), {
+      reference,
+      placement: 'end',
+      onClose: close,
+    });
+    menu.root.setAttribute('role', 'menu');
     return menu.root;
   }
 

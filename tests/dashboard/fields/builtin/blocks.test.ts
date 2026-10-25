@@ -7,11 +7,14 @@ import { isNumber } from '../../../../src/utils/is/is-number.ts';
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
 import { type FakeElement, findElement, hasClass } from '../../_fake-dom.ts';
+import { fire } from '../../ui/_events.ts';
+import { shapeOfDOM } from '../../ui/_menu-shape.ts';
 import {
   buttonLabelled,
   focusIn,
   mount,
   pick,
+  rightPick,
   settle,
   shownInputs,
   toggleCard,
@@ -67,6 +70,7 @@ const SECTIONS = {
 type Item = Record<string, unknown>;
 
 trackFocus();
+Object.assign(window, { getSelection: () => null });
 
 /**
  * Every rendered input under `root`, in document order.
@@ -126,7 +130,12 @@ describe('blocksType control', () => {
     });
     mock.method(globalThis, 'fetch', async (url: string) => {
       if (!url.endsWith('/dashboard')) return new Response(JSON.stringify(ADMIN));
-      const blocks = [{ name: 'Hero', label: 'Hero', fields: [TITLE], titleField: 'title' }];
+      const blocks = ['Hero', 'Quote'].map((name) => ({
+        name,
+        label: name,
+        fields: [TITLE],
+        titleField: 'title',
+      }));
       return new Response(JSON.stringify({ collections: [], locales: [], menu: [], blocks }));
     });
     sessionUser();
@@ -293,6 +302,68 @@ describe('blocksType control', () => {
       strictEqual(document.activeElement, rise);
       await pick(element, 0, 'dashboard.delete');
       strictEqual(document.activeElement, buttonLabelled(element, 'dashboard.addBlock'));
+    });
+  });
+
+  it('opens the More actions on a right-click of a block header, keeping the focus a pick hands on', async () => {
+    await effectScope().run(async () => {
+      const stored = { sections: [{ block: 'Hero', UUID: 'b1', fields: { title: 'Fall' } }] };
+      const form = createFieldForm([SECTIONS], stored, {
+        mode: 'edit',
+        path: '',
+        language: () => 'en',
+      });
+      const root = mount(h('div', null, form.render()) as unknown as FakeElement);
+      flush();
+      (inputsOf(root)[0] as unknown as HTMLElement).focus();
+      await rightPick(root, 0, 'dashboard.duplicate');
+      deepStrictEqual(shownInputs(root), ['Fall', 'Fall']);
+      strictEqual(document.activeElement, inputsOf(root)[0]);
+    });
+  });
+
+  it('offers Duplicate only on a card whose type the list still admits', () => {
+    effectScope().run(() => {
+      const stored = {
+        sections: [
+          { block: 'Quote', UUID: 'b1', fields: { title: 'Fall' } },
+          { block: 'Hero', UUID: 'b2', fields: { title: 'Rise' } },
+        ],
+      };
+      const form = createFieldForm([SECTIONS], stored, {
+        mode: 'edit',
+        path: '',
+        language: () => 'en',
+      });
+      const root = h('div', null, form.render());
+      flush();
+      const kebab = (index: number): string => {
+        let seen = 0;
+        const dots = findElement(
+          root as unknown as FakeElement,
+          (el) =>
+            el.getAttribute('aria-label') === 'dashboard.record.moreActions' && seen++ === index,
+        ) as FakeElement;
+        fire(dots, 'click');
+        flush();
+        const shape = shapeOfDOM(
+          findElement(dots.parentNode as FakeElement, (el) => el.getAttribute('role') === 'menu')!,
+        );
+        fire(dots, 'click');
+        flush();
+        return shape;
+      };
+      const rest =
+        ', dashboard.sort.moveUp, dashboard.sort.moveDown' +
+        ' | dashboard.clipboard.copy, dashboard.clipboard.cut' +
+        ' | dashboard.menu.collapseAll | dashboard.delete';
+      deepStrictEqual(
+        [kebab(0), kebab(1)],
+        [
+          `dashboard.sort.addBefore, dashboard.sort.addAfter${rest}`,
+          `dashboard.sort.addBefore, dashboard.sort.addAfter, dashboard.duplicate${rest}`,
+        ],
+      );
     });
   });
 

@@ -102,6 +102,10 @@ export class FakeElement extends FakeNode {
     };
   }
 
+  get nodeName(): string {
+    return this.tagName;
+  }
+
   setAttribute(name: string, value: string): void {
     this.attributes.set(name, value);
   }

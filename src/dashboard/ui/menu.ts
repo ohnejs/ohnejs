@@ -1,4 +1,5 @@
-import type { Child } from '../render/insert.ts';
+import type { Text } from '../runtime/text.ts';
+import type { LabeledHotkeyAction } from './hotkey-match.ts';
 import type { IconName } from './icon.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -6,13 +7,8 @@ import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
 import { type EffectScope, effectScope, onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { type MaybeGetter, toValue } from '../../utils/reactive/to-value.ts';
-import { css } from '../render/css.ts';
-import { h } from '../render/h.ts';
-import { resolveText, type Text } from '../runtime/text.ts';
-import { dropdownItem } from './dropdown-item.ts';
+import { menuActions, menuRows } from './_menu-rows.ts';
 import { dropdown } from './dropdown.ts';
-import { icon } from './icon.ts';
-import './tokens.ts';
 
 /**
  * One action row of a `menu`.
@@ -53,40 +49,43 @@ export interface MenuAction {
   disabled?: () => boolean;
 
   /**
+   * The hotkey whose platform label shows right-aligned on the row, e.g. `Cmd + D` for `duplicate`.
+   * Pressing it while the menu is open picks the row; once closed, the key does whatever `useHotkeys` binds.
+   */
+  hotkey?: LabeledHotkeyAction;
+
+  /**
    * Called when the row is picked, right after the menu closes.
    */
   onSelect?: () => void;
 }
 
 /**
- * One row of a `menu`: an action, or `'---'` for a divider.
+ * One group of menu rows.
+ * A falsy entry is skipped, so a row can be written as `allowed && action`.
  */
-export type MenuItem = MenuAction | '---';
-
-css`
-  .ohne-menu-item-disabled {
-    cursor: default;
-    opacity: 0.5;
-  }
-`;
+export type MenuGroup = readonly (MenuAction | false | undefined)[];
 
 /**
- * Wires `trigger` to open a dropdown menu of `items` on click, and returns it.
+ * Wires `trigger` to open a dropdown menu of `groups` on click, and returns it.
+ * A divider separates groups that keep a row, so a filtered menu never shows a stray rule.
  * Rows without an icon indent to line up with rows that have one.
- * Dividers collapse at the edges and when doubled, so a filtered list never shows a stray rule.
+ * A click opens nothing while every group is empty.
+ * A keyboard open focuses the first enabled row; a pointer open focuses the panel.
  * The menu closes on a pick, Escape, or an outside click, and focus returns to the trigger.
  *
  * @example
  * ```ts
- * menu(button('Actions', { icon: 'dots', iconOnly: true, variant: 'ghost' }), [
- *   { label: 'Promote to officer', icon: 'shield', onSelect: promote },
- *   { label: 'Open profile', icon: 'user', href: '/members/thrall' },
- *   '---',
- *   { label: 'Remove from guild', icon: 'trash', destructive: true, onSelect: remove },
+ * menu(button('More actions', { icon: 'dots', iconOnly: true, variant: 'ghost' }), [
+ *   [
+ *     { label: 'Open profile', icon: 'user', href: '/members/thrall' },
+ *     officer && { label: 'Promote to officer', icon: 'shield', onSelect: promote },
+ *   ],
+ *   [{ label: 'Remove from guild', icon: 'trash-x', destructive: true, onSelect: remove }],
  * ])
  * ```
  */
-export function menu(trigger: HTMLElement, items: MaybeGetter<readonly MenuItem[]>): HTMLElement {
+export function menu(trigger: HTMLElement, groups: MaybeGetter<readonly MenuGroup[]>): HTMLElement {
   const expanded = ref(false);
   let scope: EffectScope | undefined;
 
@@ -96,11 +95,12 @@ export function menu(trigger: HTMLElement, items: MaybeGetter<readonly MenuItem[
     expanded.value = false;
   };
 
-  const open = (): void => {
+  const open = (keyboard: boolean): void => {
     scope = effectScope(true);
     scope.run(() => {
-      const handle = dropdown(() => rows(toValue(items), close), {
+      const handle = dropdown(() => menuRows(toValue(groups), close), {
         reference: trigger,
+        focusFirstRow: keyboard,
         onClose: close,
       });
       handle.root.setAttribute('role', 'menu');
@@ -112,49 +112,11 @@ export function menu(trigger: HTMLElement, items: MaybeGetter<readonly MenuItem[
 
   trigger.setAttribute('aria-haspopup', 'menu');
   batchedEffect(() => trigger.setAttribute('aria-expanded', String(expanded.value)));
-  trigger.addEventListener('click', () => (isUndefined(scope) ? open() : close()));
+  // A click the keyboard synthesizes on a button carries no click count.
+  trigger.addEventListener('click', (event) => {
+    if (!isUndefined(scope)) close();
+    else if (menuActions(toValue(groups)).length > 0) open(event.detail === 0);
+  });
   onCleanup(close);
   return trigger;
-}
-
-/**
- * The dropdown rows for `items`, indenting icon-less rows when any row has an icon.
- */
-function rows(items: readonly MenuItem[], close: () => void): Child[] {
-  const indent = items.some((item) => item !== '---' && !isUndefined(item.icon));
-  return items.map((item) => (item === '---' ? h('hr') : row(item, indent, close)));
-}
-
-/**
- * One action row, ignoring picks while disabled.
- */
-function row(item: MenuAction, indent: boolean, close: () => void): HTMLElement {
-  const { disabled, label } = item;
-  const el = dropdownItem(
-    [isUndefined(item.icon) ? null : icon(item.icon), h('span', null, () => resolveText(label))],
-    {
-      href: item.href,
-      target: item.target,
-      destructive: item.destructive,
-      indent: indent && isUndefined(item.icon),
-      onClick: (event: MouseEvent) => {
-        if (disabled?.()) {
-          event.preventDefault();
-          return;
-        }
-        close();
-        item.onSelect?.();
-      },
-    },
-  );
-  el.setAttribute('role', 'menuitem');
-  if (!isUndefined(disabled)) {
-    batchedEffect(() => {
-      const off = disabled();
-      el.classList.toggle('ohne-menu-item-disabled', off);
-      if (off) el.setAttribute('aria-disabled', 'true');
-      else el.removeAttribute('aria-disabled');
-    });
-  }
-  return el;
 }

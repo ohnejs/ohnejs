@@ -30,8 +30,10 @@ import {
   focusOrigin,
   type ItemFocus,
   structureActions,
+  type StructureActionsOptions,
   structureErrorMark,
   structureItemError,
+  structureMenu,
   trackItemFocus,
 } from '../structure-chrome.ts';
 
@@ -360,6 +362,46 @@ export const blocksType: FieldType = {
       onReveal: undefined,
     };
 
+    const actionsOf = (node: () => BlockNode, index: () => number): StructureActionsOptions => ({
+      index,
+      count: () => nodes.value.length,
+      expanded: () => node().$expanded,
+      allExpanded,
+      allCollapsed,
+      onToggleExpanded: () => toggleExpanded(node()),
+      onExpandAll: () => setAllExpanded(true),
+      onCollapseAll: () => setAllExpanded(false),
+      onMove: (delta) => {
+        surface?.resumeScrollWatcher();
+        move(node(), delta);
+        surface?.pauseScrollWatcher();
+      },
+      onAdd:
+        offered.length === 0
+          ? undefined
+          : (at) => {
+              if (offered.length > 1) pick(at, node());
+              else focusNew(addAt(offered[0] as string, at, node()));
+            },
+      copyPayload: () => ({
+        ohneClipboardDataType: 'blocks',
+        data: [{ $key: node().block, ...valueOf(node()) }],
+      }),
+      canPaste: () => {
+        const payload = clipboardData.value;
+        return (
+          !isNull(payload) &&
+          payload.ohneClipboardDataType === 'blocks' &&
+          payload.data.every(({ $key }) => offered.includes($key))
+        );
+      },
+      onPaste: (at) => focusNew(pasteAt(at, node())),
+      onDuplicate: offered.includes(untracked(() => node().block))
+        ? () => focusNew(duplicate(node()))
+        : undefined,
+      onRemove: () => remove(node()),
+    });
+
     // Built on first read, in the control's scope, so a surface that never shows the cards never builds them.
     let element: HTMLElement | undefined;
     let addButton: HTMLElement | undefined;
@@ -393,46 +435,11 @@ export const blocksType: FieldType = {
               ? null
               : trackItemFocus(
                   untracked(() => node().focus),
-                  structureActions({
-                    index,
-                    count: () => nodes.value.length,
-                    expanded: () => node().$expanded,
-                    allExpanded,
-                    allCollapsed,
-                    onToggleExpanded: () => toggleExpanded(node()),
-                    onExpandAll: () => setAllExpanded(true),
-                    onCollapseAll: () => setAllExpanded(false),
-                    onMove: (delta) => {
-                      surface?.resumeScrollWatcher();
-                      move(node(), delta);
-                      surface?.pauseScrollWatcher();
-                    },
-                    onAdd:
-                      offered.length === 0
-                        ? undefined
-                        : (at) => {
-                            if (offered.length > 1) pick(at, node());
-                            else focusNew(addAt(offered[0] as string, at, node()));
-                          },
-                    copyPayload: () => ({
-                      ohneClipboardDataType: 'blocks',
-                      data: [{ $key: node().block, ...valueOf(node()) }],
-                    }),
-                    canPaste: () => {
-                      const payload = clipboardData.value;
-                      return (
-                        !isNull(payload) &&
-                        payload.ohneClipboardDataType === 'blocks' &&
-                        payload.data.every(({ $key }) => offered.includes($key))
-                      );
-                    },
-                    onPaste: (at) => focusNew(pasteAt(at, node())),
-                    onDuplicate: () => focusNew(duplicate(node())),
-                    onRemove: () => remove(node()),
-                  }),
+                  structureActions(actionsOf(node, index)),
                   false,
                 ),
           ],
+          itemMenu: off ? undefined : (node, index) => structureMenu(actionsOf(node, index)),
           // Untracked reads keep expand-all's replacement from rebuilding the body and dropping focus.
           item: (node) => {
             const form = untracked(() => node().form);

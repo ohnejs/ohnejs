@@ -1,5 +1,5 @@
 import { flush, nextTick } from '../../../src/utils/reactive/_scheduler.ts';
-import { FakeElement, FakeNode, findElement } from '../_fake-dom.ts';
+import { FakeElement, FakeNode, findElement, hasClass } from '../_fake-dom.ts';
 import { fire } from '../ui/_events.ts';
 
 /**
@@ -86,10 +86,20 @@ export async function settle(): Promise<void> {
 }
 
 /**
- * Picks the More actions item `title`, a message key while no catalog is loaded, on the `index`-th card.
+ * The menu row `label` under `root`, a message key while no catalog is loaded.
+ */
+export function menuRow(root: unknown, label: string): FakeElement {
+  return findElement(
+    root as FakeElement,
+    (el) => el.getAttribute('role') === 'menuitem' && el.textContent === label,
+  ) as FakeElement;
+}
+
+/**
+ * Picks the More actions item `label`, a message key while no catalog is loaded, on the `index`-th card.
  * Waits out the menu's close and the new card's mount, as the browser does before it paints.
  */
-export async function pick(root: unknown, index: number, title: string): Promise<void> {
+export async function pick(root: unknown, index: number, label: string): Promise<void> {
   let seen = 0;
   const dots = findElement(
     root as FakeElement,
@@ -97,12 +107,46 @@ export async function pick(root: unknown, index: number, title: string): Promise
   ) as FakeElement;
   fire(dots, 'click');
   flush();
-  const action = findElement(
-    dots.parentNode as FakeElement,
-    (el) => (el as unknown as HTMLElement).title === title,
-  );
-  fire(action as FakeElement, 'click');
+  fire(menuRow(dots.parentNode, label), 'click');
   await settle();
+}
+
+/**
+ * Right-clicks inside the header of the `index`-th card under `root`, and returns the event.
+ */
+export function rightClickHeader(
+  root: unknown,
+  index: number,
+): { defaultPrevented: boolean; propagationStopped: boolean } {
+  let seen = 0;
+  const header = findElement(
+    root as FakeElement,
+    (el) => hasClass(el, 'ohne-structure-item-header') && seen++ === index,
+  ) as FakeElement;
+  Object.assign(header, {
+    getBoundingClientRect: () => ({ left: 0, top: 0, right: 600, bottom: 40 }),
+  });
+  return fire(header, 'contextmenu', { target: header, clientX: 120, clientY: 20 });
+}
+
+/**
+ * Picks the menu item `label` a right-click on the `index`-th card's header opens.
+ * Waits for the menu to take focus first, then out its close, the new card's mount, and the focus restore.
+ */
+export async function rightPick(root: unknown, index: number, label: string): Promise<void> {
+  rightClickHeader(root, index);
+  await macrotask();
+  await macrotask();
+  fire(menuRow(document.body, label), 'click');
+  await settle();
+  await macrotask();
+}
+
+/**
+ * Waits one macrotask, behind every timer already set.
+ */
+function macrotask(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve));
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { ComputedRef } from '../../utils/reactive/computed.ts';
 import type { Child } from '../render/insert.ts';
+import type { MenuGroup } from './menu.ts';
 
 import { next } from '../../utils/array/next.ts';
 import { prev } from '../../utils/array/prev.ts';
@@ -201,6 +202,13 @@ export interface TreeOptions<T> {
    * Renders a custom label for each item.
    */
   itemLabel?: (item: TreeItemModel<T>) => Child;
+
+  /**
+   * The groups a right-click or the context-menu key opens on an item, read on each open.
+   * Opening it leaves the selection as it is, so act on the selection only when the item is in it.
+   * A touch hold starts a drag, so it opens no menu.
+   */
+  itemMenu?: (item: TreeItemModel<T>) => readonly MenuGroup[];
 
   /**
    * Called with the normalized selection when the user copies it.
@@ -590,6 +598,7 @@ export function tree<T>(options: TreeOptions<T>): HTMLElement {
             persistentExpandButton: options.persistentExpandButton,
             icon: options.itemIcon,
             label: options.itemLabel,
+            menu: options.itemMenu,
             onHighlight: (item) => {
               if (options.highlightedItem) options.highlightedItem.value = item;
             },
@@ -656,6 +665,8 @@ export function tree<T>(options: TreeOptions<T>): HTMLElement {
     scrollableEl,
   );
 
+  // Capture, since a row's menu claims the event: the pointer leaving for that menu must not revert focus.
+  root.addEventListener('contextmenu', () => (hasInteracted = true), { capture: true });
   root.addEventListener('focusin', () => {
     focused.value = true;
   });

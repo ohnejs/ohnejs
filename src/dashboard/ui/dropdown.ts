@@ -1,6 +1,8 @@
 import type { Child } from '../render/insert.ts';
-import type { Placement } from './floater-place.ts';
+import type { Placement, Rect, ScreenPoint } from './floater-place.ts';
 
+import { first } from '../../utils/array/first.ts';
+import { last } from '../../utils/array/last.ts';
 import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isString } from '../../utils/is/is-string.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -55,10 +57,11 @@ export interface DropdownItemSizes {
  */
 export interface DropdownOptions {
   /**
-   * The anchor element the floating panel positions against.
+   * The anchor the floating panel positions against: an element, or a viewport point.
+   * A point anchors a zero-size rect, so the panel opens with its corner at the pointer, as under `firstFit`.
    * Omitted, the panel stays at its initial coordinates.
    */
-  reference?: HTMLElement;
+  reference?: HTMLElement | ScreenPoint;
 
   /**
    * Which side of the `reference` the panel prefers.
@@ -68,6 +71,14 @@ export interface DropdownOptions {
    * 'start'
    */
   placement?: 'start' | 'end';
+
+  /**
+   * Takes the first corner that fits, below before above, instead of the roomiest one.
+   *
+   * @default
+   * false
+   */
+  firstFit?: boolean;
 
   /**
    * The gap between the panel and its `reference` in pixels.
@@ -80,6 +91,8 @@ export interface DropdownOptions {
   /**
    * Where focus goes when the dropdown unmounts.
    * `true` refocuses the element focused before opening; `false` restores nothing.
+   * Focus that something outside the panel took meanwhile, like a picked action's, is never taken back.
+   * Focus resting on the hosting popup itself does not count, so it still moves on.
    * An `HTMLElement` is focused directly; a string focuses the first match of the CSS selector.
    *
    * @default
@@ -88,9 +101,20 @@ export interface DropdownOptions {
   restoreFocus?: boolean | string | HTMLElement;
 
   /**
+   * Whether opening focuses the first enabled row instead of the panel.
+   * Pass it when the keyboard opened the dropdown; a pointer open keeps every row unhighlighted.
+   * Without an enabled row, the panel takes focus.
+   *
+   * @default
+   * false
+   */
+  focusFirstRow?: boolean;
+
+  /**
    * Whether the dropdown takes control of keyboard and mouse events while mounted.
    * While on, the body gets `ohne-no-interaction` and arrows and Tab rove focus through the rows.
-   * Outside clicks or Escape call `onClose`.
+   * Home and End jump to the first and the last row.
+   * Outside clicks, right-clicks, or Escape call `onClose`.
    * The chips field passes `false` and keeps keyboard control in its text input.
    *
    * @default
@@ -100,7 +124,7 @@ export interface DropdownOptions {
 
   /**
    * Adjusts the size of the component, from -2 (very small) to 2 (very large).
-   * Omitted, the panel takes the `--ohne-size` around its `reference`, even when mounted on the body.
+   * Omitted, the panel takes the `--ohne-size` around an element `reference`, even when mounted on the body.
    * The trigger's own size is left out, so a compact icon button still opens a readable menu.
    */
   size?: number;
@@ -210,23 +234,21 @@ css`
     background-color: hsl(var(--ohne-card) / 0.16);
     border: none;
   }
-
-  .ohne-dropdown-inner > hr + hr,
-  .ohne-dropdown-inner > hr:first-child,
-  .ohne-dropdown-inner > hr:last-child {
-    display: none;
-  }
 `;
 
 /**
  * The floating panel primitive.
  *
  * A primary-colored panel anchored to `reference`: the roomiest of the four corner placements wins.
+ * A point `reference` or `firstFit` takes the first corner that fits instead.
  * The height clamps to the available space with an 8px inset.
  * The panel is raised to the top layer, so a `container-type` or transformed ancestor cannot crop it.
  * With `handleControls` on, the page loses pointer events.
- * Focus roves through `.ohne-dropdown-item` rows with wraparound.
+ * Focus roves through `.ohne-dropdown-item` rows with wraparound, and Home and End reach either end.
  * Escape or an outside click asks the owner to close.
+ * An outside right-click closes without the browser's menu.
+ * A right-click inside the panel does nothing, and never reaches the element that hosts the panel.
+ * The closing Escape is marked handled, so `useHotkeys` skips it.
  *
  * @example
  * ```ts
@@ -242,7 +264,8 @@ export function dropdown(
   options: DropdownOptions = {},
 ): DropdownHandle {
   const handleControls = options.handleControls ?? true;
-  const size = options.size ?? referenceSize(options.reference);
+  const element = options.reference instanceof HTMLElement ? options.reference : undefined;
+  const size = options.size ?? referenceSize(element);
   const alignment = options.placement ?? 'start';
   const allowedPlacements: Placement[] =
     alignment === 'end'
@@ -284,6 +307,11 @@ export function dropdown(
       onKeydown: (event: KeyboardEvent) => {
         if (event.key === ' ') event.preventDefault();
       },
+      // The panel stays in its host's tree, so a host's context menu or row handler would take it.
+      onContextmenu: (event: MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+      },
     },
     scrollable(inner, scrollableOptions),
   );
@@ -299,16 +327,16 @@ export function dropdown(
   };
 
   const update = (): void => {
-    const reference = options.reference;
+    const reference = referenceRect(options.reference);
     if (!reference) return;
-    const rect = reference.getBoundingClientRect();
     const input = {
-      reference: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      reference,
       viewport: {
         width: document.documentElement.clientWidth,
         height: document.documentElement.clientHeight,
       },
       allowedPlacements,
+      firstFit: options.firstFit || isUndefined(element),
       offset: options.offset ?? 4,
       shiftPadding: 0,
       sizePadding: 8,
@@ -330,23 +358,32 @@ export function dropdown(
     placement.value = placed.placement;
   };
 
+  const rows = (): HTMLElement[] => [...root.querySelectorAll<HTMLElement>('.ohne-dropdown-item')];
+
   const focusPrevious = (): void => {
-    const items = [...root.querySelectorAll<HTMLElement>('.ohne-dropdown-item')];
+    const items = rows();
     const index = items.findIndex((item) => item === document.activeElement);
     (items[index - 1] ?? items[items.length - 1])?.focus();
   };
 
   const focusNext = (): void => {
-    const items = [...root.querySelectorAll<HTMLElement>('.ohne-dropdown-item')];
+    const items = rows();
     const index = items.findIndex((item) => item === document.activeElement);
     (items[index + 1] ?? items[0])?.focus();
+  };
+
+  const focusOnOpen = (): void => {
+    const first = options.focusFirstRow
+      ? rows().find((row) => row.getAttribute('aria-disabled') !== 'true')
+      : undefined;
+    (first ?? root).focus();
   };
 
   containers.set(root, () => parentContainer);
 
   const observer = new ResizeObserver(update);
   observer.observe(root);
-  if (options.reference) observer.observe(options.reference);
+  if (element) observer.observe(element);
   window.addEventListener('scroll', update, { capture: true, passive: true });
   window.addEventListener('resize', update);
 
@@ -359,7 +396,7 @@ export function dropdown(
 
     if (handleControls) {
       document.body.classList.add('ohne-no-interaction');
-      setTimeout(() => root.focus());
+      setTimeout(focusOnOpen);
 
       while (
         parentContainer &&
@@ -385,21 +422,22 @@ export function dropdown(
           } else if (event.code === 'Tab') {
             if (event.shiftKey) focusPrevious();
             else focusNext();
+          } else if (event.code === 'Home') {
+            first(rows())?.focus();
+          } else if (event.code === 'End') {
+            last(rows())?.focus();
           } else if (event.code === 'Escape') {
-            if (container.nodeName !== 'BODY') {
-              event.preventDefault();
-              event.stopPropagation();
-            }
+            event.preventDefault();
+            if (container.nodeName !== 'BODY') event.stopPropagation();
             options.onClose?.();
           }
         };
         const onPress = (event: MouseEvent): void => {
           // Strict descendants only: a click on the panel itself, outside any row, closes the dropdown.
-          const inside =
-            event.target instanceof HTMLElement &&
-            event.target !== root &&
-            root.contains(event.target);
-          if (event.target instanceof HTMLElement && !inside) options.onClose?.();
+          const hit = event.target;
+          if (!(hit instanceof HTMLElement) || (hit !== root && root.contains(hit))) return;
+          if (event.type === 'contextmenu') event.preventDefault();
+          options.onClose?.();
         };
         container.addEventListener('keydown', onKeydown);
         container.addEventListener('click', onPress);
@@ -433,19 +471,25 @@ export function dropdown(
     const restore = options.restoreFocus ?? true;
     if (restore) {
       setTimeout(() => {
+        const active = document.activeElement;
+        // A picked action runs before this timer, and the focus it hands on wins.
+        const handedOn = active !== document.body && active !== parentContainer;
+        if (active instanceof HTMLElement && handedOn && active.isConnected) return;
+        // Handing focus back must not scroll: a right-click focuses the target, however tall it is.
+        const back = { preventScroll: true };
         if (restore instanceof HTMLElement) {
-          restore.focus();
+          restore.focus(back);
         } else if (isString(restore)) {
-          document.querySelector<HTMLElement>(restore)?.focus();
+          document.querySelector<HTMLElement>(restore)?.focus(back);
         } else {
-          prevFocus?.focus();
+          prevFocus?.focus(back);
         }
         if (
           document.activeElement?.nodeName === 'BODY' &&
           parentContainer &&
           parentContainer.nodeName !== 'BODY'
         ) {
-          parentContainer.focus();
+          parentContainer.focus(back);
         }
       });
     }
@@ -455,10 +499,23 @@ export function dropdown(
 }
 
 /**
- * The `--ohne-size` in effect around `reference`, or `undefined` without one.
+ * The viewport rect of `reference`, a zero-size one at a point, or `undefined` without one.
  */
-function referenceSize(reference: HTMLElement | undefined): string | undefined {
+function referenceRect(reference: HTMLElement | ScreenPoint | undefined): Rect | undefined {
+  if (isUndefined(reference)) return undefined;
+  if (!(reference instanceof HTMLElement)) {
+    return { x: reference.clientX, y: reference.clientY, width: 0, height: 0 };
+  }
+  const { x, y, width, height } = reference.getBoundingClientRect();
+  return { x, y, width, height };
+}
+
+/**
+ * The `--ohne-size` in effect around `reference`, read from its parent, or `undefined` without one.
+ * The parent leaves out the reference's own size, so a compact trigger still opens a readable panel.
+ */
+export function referenceSize(reference: HTMLElement | undefined): number | undefined {
   const context = reference?.parentElement;
   const size = context ? getComputedStyle(context).getPropertyValue('--ohne-size').trim() : '';
-  return isEmpty(size) ? undefined : size;
+  return isEmpty(size) ? undefined : Number(size);
 }

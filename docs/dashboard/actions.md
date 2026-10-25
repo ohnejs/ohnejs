@@ -1,6 +1,7 @@
 # Actions
 
-Buttons and the controls that act on a page: a group of choices, a select, a menu, a copy button.
+Buttons and the controls that act on a page: a group of choices, a select, a menu, a context menu,
+a copy button.
 Each one is typed by what it holds, so a choice outside the set fails the typecheck.
 
 ```ts
@@ -171,20 +172,83 @@ Wrap it in [`formField`](./forms.md#wrapping-a-control) to give it a label.
 `menu` opens a dropdown of actions from a button you pass, and returns that button:
 
 ```ts
-menu(button('Member actions', { icon: 'dots', iconOnly: true, variant: 'ghost' }), [
-  { label: 'Promote to officer', icon: 'shield', onSelect: () => promote(member) },
-  { label: 'Open profile', icon: 'user', href: `/members/${member.name}` },
-  '---',
-  { label: 'Remove from guild', icon: 'user-minus', destructive: true, onSelect: remove },
+menu(button('More actions', { icon: 'dots', iconOnly: true, variant: 'ghost' }), [
+  [
+    { label: 'Open profile', icon: 'user', href: `/members/${member.name}` },
+    isLeader && { label: 'Promote to officer', icon: 'shield', onSelect: () => promote(member) },
+  ],
+  [{ label: 'Remove from guild', icon: 'trash-x', destructive: true, onSelect: remove }],
 ])
 ```
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/menu-icons-divider-destructive-disabled-link-dark.png">
+  <img alt="An open menu below a kebab button: three actions, one dimmed, then a divider and Remove from guild" src="../images/kit/menu-icons-divider-destructive-disabled-link-light.png">
+</picture>
+
+- The rows come in groups, and a divider separates two groups.
+- `false` or `undefined` in place of a row skips it, so `allowed && row` hides what the user cannot do.
+  A group left without rows draws no divider, and a menu without rows does not open.
 - `onSelect` runs after the menu closes. `href` makes the row a link instead.
-- `'---'` is a divider. One at an edge or next to another never shows.
 - `disabled` takes a getter. A disabled row dims and ignores clicks.
+- `hotkey` names a dashboard hotkey, like `'duplicate'`, and shows its key at the row's end.
+  Pressing that key while the menu is open picks the row.
 - Escape and a click outside close the menu, and focus returns to the button.
 
-A [table's row actions](./tables.md#row-actions) take the same items.
+A [table's row actions](./tables.md#row-actions) take the same groups.
+
+## Context menu
+
+`contextMenu` opens a menu at the pointer when you right-click an element, and returns that element:
+
+```ts
+// dashboard/pages/roster.ts
+import { contextMenu, defineDashboardPage, h, page, toast } from 'ohnejs/dashboard';
+
+const members = ['Thrall', 'Jaina Proudmoore', 'Anduin Wrynn'];
+
+export default defineDashboardPage(() =>
+  page(
+    { title: 'Roster' },
+    h(
+      'ul',
+      null,
+      members.map((name) =>
+        contextMenu(h('li', { tabindex: 0 }, name), [
+          [
+            { label: 'Open profile', icon: 'user', href: `/members/${name}` },
+            { label: 'Promote to officer', icon: 'shield', onSelect: () => toast(`Promoted ${name}`) },
+          ],
+          [
+            {
+              label: 'Remove from guild',
+              icon: 'trash-x',
+              destructive: true,
+              onSelect: () => toast(`${name} left the guild`),
+            },
+          ],
+        ]),
+      ),
+    ),
+  ),
+);
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/contextmenu-any-element-hotkey-hint-disabled-row-dark.png">
+  <img alt="A member card with a context menu open beside it, a hotkey hint at the end of one row" src="../images/kit/contextmenu-any-element-hotkey-hint-disabled-row-light.png">
+</picture>
+
+- It takes the groups [`menu`](#menu) takes. Pass a getter to build them on each open, for example
+  from a selection.
+- The context-menu key and Shift+F10 open it too. Give the element a `tabindex` so the keyboard
+  can reach it.
+- On a touch screen, a held finger opens it. Pass `touch: false` where a hold starts a drag.
+- Links, buttons, fields, and editable text inside the element keep the browser's own menu, and
+  so does a Shift right-click. `ignore` takes a CSS selector to change which elements keep it.
+
+A context menu is easy to miss, so offer its actions somewhere visible too, like a
+[`menu`](#menu) button.
 
 ## Copy button
 

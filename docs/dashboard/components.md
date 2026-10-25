@@ -42,8 +42,8 @@ surfaces.
   <img alt="Rows of buttons in every variant and size" src="../images/kit/button-variant-x-size-light.png">
 </picture>
 
-`button`, `buttonGroup`, `iconGroup`, `select`, `menu`, and `copyButton`. [Actions](./actions.md)
-covers the controls that act on a page.
+`button`, `buttonGroup`, `iconGroup`, `select`, `menu`, `contextMenu`, and `copyButton`.
+[Actions](./actions.md) covers the controls that act on a page.
 
 ## Display
 

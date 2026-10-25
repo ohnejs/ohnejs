@@ -101,7 +101,8 @@ the browser as type-stripped JavaScript.
   shares.
 - [Layout](./dashboard/layout.md) - `page`, sections, stacks, rows, grids, and splits.
 - [Cards and tabs](./dashboard/cards-and-tabs.md) - cards, tabs, and disclosures.
-- [Actions](./dashboard/actions.md) - buttons, button groups, selects, menus, and copy buttons.
+- [Actions](./dashboard/actions.md) - buttons, button groups, selects, menus, context menus, and
+  copy buttons.
 - [Display](./dashboard/display.md) - badges, status, icons, alerts, facts, lists, meters, and
   states.
 - [Feedback](./dashboard/feedback.md) - toasts, confirmations, and dialogs.

@@ -211,8 +211,8 @@ css`
   }
 
   :is(.ohne-button-secondary, .ohne-button-ghost)[aria-haspopup][aria-expanded='true'] {
-    background-color: hsl(var(--ohne-accent));
-    color: hsl(var(--ohne-accent-foreground));
+    background-color: hsl(var(--ohne-primary));
+    color: hsl(var(--ohne-primary-foreground));
   }
 
   .ohne-button-outline[aria-haspopup][aria-expanded='true'] {

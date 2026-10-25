@@ -13,6 +13,8 @@ import {
   focusIn,
   mount,
   pick,
+  rightClickHeader,
+  rightPick,
   settle,
   shownInputs,
   toggleCard,
@@ -94,6 +96,7 @@ function headersOf(root: unknown): string[] {
 }
 
 trackFocus();
+Object.assign(window, { getSelection: () => null });
 
 const ACTS: DashboardField = {
   ...QUESTS,
@@ -428,6 +431,37 @@ describe('repeaterType control', () => {
       await pick(element, 1, 'dashboard.sort.addAfter');
       deepStrictEqual(shownInputs(element), ['Ashes', 'Ashes', '']);
       strictEqual(document.activeElement, inputsOf(element)[2]);
+    });
+  });
+
+  it('opens the More actions on a right-click of a card header, keeping the focus a pick hands on', async () => {
+    await effectScope().run(async () => {
+      const stored = { quests: [{ UUID: 'q1', question: 'Ashes' }] };
+      const form = createFieldForm([QUESTS], stored, { mode: 'edit', path: '', language });
+      const root = mount(h('div', null, form.render()) as unknown as FakeElement);
+      flush();
+      (inputsOf(root)[0] as unknown as HTMLElement).focus();
+      await rightPick(root, 0, 'dashboard.sort.addAfter');
+      deepStrictEqual(shownInputs(root), ['Ashes', '']);
+      strictEqual(document.activeElement, inputsOf(root)[1]);
+      await rightPick(root, 1, 'dashboard.delete');
+      deepStrictEqual(shownInputs(root), ['Ashes']);
+      strictEqual(document.activeElement, inputsOf(root)[0]);
+    });
+  });
+
+  it('offers no right-click menu while the list is disabled', () => {
+    effectScope().run(() => {
+      const stored = { quests: [{ UUID: 'q1', question: 'Ashes' }] };
+      const form = createFieldForm([QUESTS], stored, {
+        mode: 'edit',
+        path: '',
+        language,
+        disabled: true,
+      });
+      const root = h('div', null, form.render());
+      flush();
+      strictEqual(rightClickHeader(root, 0).defaultPrevented, false);
     });
   });
 

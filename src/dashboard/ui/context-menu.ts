@@ -1,29 +1,29 @@
-import type { Ref } from '../../utils/reactive/ref.ts';
-import type { Child } from '../render/insert.ts';
-import type { Placement } from './floater-place.ts';
+import type { ScreenPoint } from './floater-place.ts';
+import type { MenuGroup } from './menu.ts';
 
-import { first } from '../../utils/array/first.ts';
-import { last } from '../../utils/array/last.ts';
 import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
-import { onCleanup } from '../../utils/reactive/effect-scope.ts';
-import { ref } from '../../utils/reactive/ref.ts';
-import { h } from '../render/h.ts';
-import { when } from '../render/when.ts';
+import { type EffectScope, effectScope, onCleanup } from '../../utils/reactive/effect-scope.ts';
+import { type MaybeGetter, toValue } from '../../utils/reactive/to-value.ts';
 import { longPress } from './_long-press.ts';
-import { placeFloating } from './floater-place.ts';
-import { placeFixed, raiseToTopLayer } from './overlay.ts';
-import { scrollable } from './scrollable.ts';
-// The menu renders `dropdown`'s chrome by hand; re-declaring its styles would re-order them after overrides.
-import './dropdown.ts';
-import './tokens.ts';
+import { menuActions, menuRows } from './_menu-rows.ts';
+import { dropdown, referenceSize } from './dropdown.ts';
 
 /**
  * Options for `contextMenu`.
  */
 export interface ContextMenuOptions {
   /**
-   * The duration in milliseconds a touch must hold to trigger the context menu.
+   * Whether a still touch hold opens the menu.
+   * Turn it off where a hold already starts a drag.
+   *
+   * @default
+   * true
+   */
+  touch?: boolean;
+
+  /**
+   * The duration in milliseconds a touch must hold to open the menu.
    *
    * @default
    * 500
@@ -31,276 +31,104 @@ export interface ContextMenuOptions {
   touchDuration?: number;
 
   /**
-   * Size step of the component: -2 very small, -1 small, 0 default, 1 large, 2 very large.
-   * Omitted inherits `--ohne-size` from `root`'s ancestors.
+   * The CSS selector of elements strictly inside `target` that keep the browser's own menu.
+   * A `target` that matches it itself still opens the menu.
+   *
+   * @default
+   * 'a[href], button, input, textarea, select, label, [contenteditable]'
+   */
+  ignore?: string;
+
+  /**
+   * Size step of the menu, from -2 (very small) to 2 (very large).
+   * Omitted, the menu takes the `--ohne-size` around `target`.
    */
   size?: number;
 }
 
+const IGNORE = 'a[href], button, input, textarea, select, label, [contenteditable]';
+
 /**
- * A mounted context menu: the root element plus the trigger surface the consumer wires up.
+ * Touch starts an inner target armed, so an outer target never arms a second menu.
  */
-export interface ContextMenu {
-  /**
-   * The root element to insert into the tree.
-   * It stays empty: the panel mounts on `document.body`.
-   * Its place in the tree resolves the hosting popup and the inherited `--ohne-size`.
-   */
-  root: HTMLElement;
-
-  /**
-   * Bind to the trigger area's `contextmenu` event.
-   * Suppresses the native menu and opens this one at the pointer.
-   */
-  onContextMenu(event: MouseEvent): void;
-
-  /**
-   * Bind to the trigger area's `touchstart` event.
-   * A still, single-finger hold of `touchDuration` opens the menu.
-   * The finger moving past a few pixels, a second finger, or a `touchcancel` drops the hold.
-   */
-  onTouchStart(event: TouchEvent): void;
-
-  /**
-   * Bind to the trigger area's `touchend` event.
-   * Cancels a pending hold.
-   * After a hold that opened the menu, it suppresses the release click.
-   * It also clears the text selection the long-press created.
-   */
-  onTouchEnd(event: TouchEvent): void;
-}
-
-const ALLOWED_PLACEMENTS: Placement[] = ['bottom-start', 'bottom-end', 'top-start', 'top-end'];
+const claimedTouches = new WeakSet<Event>();
 
 /**
- * The right-click and long-press menu.
- *
- * While `event` holds one, the panel mounts on `document.body` at the event's pointer coordinates.
- * It is raised to the top layer, so a `container-type` or transformed ancestor cannot displace it.
- * The roomiest corner wins, clamped to the viewport.
- * While open, the page loses pointer events outside the host: `root`'s `.ohne-popup` ancestor, else `body`.
- * Arrows and Tab cycle the focus through `.ohne-dropdown-item` elements.
- * Escape closes without closing a hosting popup, and any outside press closes.
- * A second right-click closes too; its new coordinates land only on the third.
- * Item clicks close nothing by themselves: the consumer usually nulls `event` on click.
- * Closing restores focus to the previously focused element.
+ * Wires `target` to open a menu of `groups` on a right-click or a touch hold, and returns it.
+ * The menu opens below and after the pointer, and flips only to a corner where it fits.
+ * The context-menu key and Shift+F10 open it too, while focus is inside `target`.
+ * Then the menu opens below `target`, focused on its first enabled row.
+ * `groups` is read on each open, so a getter sees the current selection.
+ * Shift, text selected in `target`, an `ignore` match, or no action row leaves the browser's own menu.
+ * The innermost target wins, and groups, dividers and closing on a pick work as in `menu`.
+ * While its menu is open, `target` carries the `data-ohne-context-menu-open` attribute.
+ * Offer each action elsewhere too, since a context menu is hard to discover.
  *
  * @example
  * ```ts
- * const event = ref<MouseEvent | TouchEvent | null>(null)
- * const menu = contextMenu(event, [item1, h('hr'), item2])
- *
- * h(
- *   'div',
- *   {
- *     onContextmenu: (e: MouseEvent) => menu.onContextMenu(e),
- *     onTouchstart: (e: TouchEvent) => menu.onTouchStart(e),
- *     onTouchend: (e: TouchEvent) => menu.onTouchEnd(e),
- *   },
- *   target,
- *   menu.root,
- * )
+ * contextMenu(h('li', { tabindex: 0 }, member.name), () => [
+ *   [{ label: 'Promote to officer', icon: 'shield', onSelect: () => promote(member) }],
+ *   [{ label: 'Remove from guild', icon: 'trash-x', destructive: true, onSelect: () => remove(member) }],
+ * ])
  * ```
  */
 export function contextMenu(
-  event: Ref<MouseEvent | TouchEvent | null>,
-  content: Child | (() => Child),
+  target: HTMLElement,
+  groups: MaybeGetter<readonly MenuGroup[]>,
   options: ContextMenuOptions = {},
-): ContextMenu {
+): HTMLElement {
+  const ignore = options.ignore ?? IGNORE;
+  let scope: EffectScope | undefined;
+  let keyed = false;
+
   const close = (): void => {
-    event.value = null;
+    scope?.dispose();
+    scope = undefined;
+    keyed = false;
   };
 
-  const sizeOf = (): number =>
-    options.size ?? (Number(getComputedStyle(root).getPropertyValue('--ohne-size')) || 0);
-
-  const itemHeight = (size: number): number => {
-    const base = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-    return 2 * (base + size * 0.125 * base);
+  const open = (reference: HTMLElement | ScreenPoint, keyboard: boolean): boolean => {
+    close();
+    const rows = toValue(groups);
+    if (menuActions(rows).length === 0) return false;
+    scope = effectScope(true);
+    scope.run(() => {
+      const handle = dropdown(menuRows(rows, close), {
+        reference,
+        offset: keyboard ? undefined : 0,
+        firstFit: true,
+        focusFirstRow: keyboard,
+        size: options.size ?? referenceSize(target),
+        onClose: close,
+      });
+      handle.root.setAttribute('role', 'menu');
+      (target.closest('.ohne-popup') ?? document.body).append(handle.root);
+      // An attribute, not a class: a reactive `class` binding rewrites the whole list and would drop it.
+      target.setAttribute('data-ohne-context-menu-open', '');
+      onCleanup(() => {
+        handle.root.remove();
+        target.removeAttribute('data-ohne-context-menu-open');
+      });
+    });
+    return true;
   };
 
-  const buildDropdown = (): Child => {
-    const placement = ref<Placement>('bottom-start');
-    const isMounted = ref(false);
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const size = sizeOf();
-    let host: HTMLElement | null = null;
-
-    const inner = h('div', { class: 'ohne-dropdown-inner' }, content);
-    const panel = scrollable(inner, {
-      autoScroll: itemHeight(size),
-      class: 'ohne-dropdown-scrollable',
-    });
-    const floating = h(
-      'div',
-      {
-        tabindex: '-1',
-        class: () =>
-          'ohne-dropdown' +
-          (isMounted.value ? ' ohne-dropdown-mounted' : '') +
-          ` ohne-dropdown-${placement.value}`,
-        style:
-          `position: fixed; left: 0; top: 0; --ohne-size: ${size};` +
-          ' --ohne-background: var(--ohne-primary);' +
-          ' --ohne-foreground: var(--ohne-primary-foreground);',
-        onKeydown: (keyboard: KeyboardEvent) => {
-          if (keyboard.key === ' ') keyboard.preventDefault();
-        },
-      },
-      panel,
-    );
-    document.body.append(floating);
-    raiseToTopLayer(floating);
-
-    const update = (): void => {
-      const trigger = event.value;
-      const point = trigger instanceof MouseEvent ? trigger : trigger?.touches[0];
-      const input = {
-        reference: { x: point?.clientX ?? 0, y: point?.clientY ?? 0, width: 0, height: 0 },
-        viewport: {
-          width: document.documentElement.clientWidth,
-          height: document.documentElement.clientHeight,
-        },
-        allowedPlacements: ALLOWED_PLACEMENTS,
-        offset: 0,
-        shiftPadding: 0,
-        sizePadding: 8,
-      };
-      let placed = placeFloating({
-        ...input,
-        floating: { width: floating.offsetWidth, height: floating.offsetHeight },
-      });
-      if (placed.availableHeight < inner.scrollHeight) {
-        floating.style.height = `${Math.max(0, placed.availableHeight)}px`;
-      } else {
-        floating.style.removeProperty('height');
-      }
-      placed = placeFloating({
-        ...input,
-        floating: { width: floating.offsetWidth, height: floating.offsetHeight },
-      });
-      placeFixed(floating, placed.x, placed.y);
-      placement.value = placed.placement;
-    };
-
-    const items = (): HTMLElement[] => [
-      ...floating.querySelectorAll<HTMLElement>('.ohne-dropdown-item'),
-    ];
-
-    const focusPrevious = (): void => {
-      const order = items();
-      const index = order.findIndex((item) => item === document.activeElement);
-      (order[index - 1] ?? last(order))?.focus();
-    };
-
-    const focusNext = (): void => {
-      const order = items();
-      const index = order.findIndex((item) => item === document.activeElement);
-      (order[index + 1] ?? first(order))?.focus();
-    };
-
-    const onHostKeydown = (keyboard: KeyboardEvent): void => {
-      if (!['Enter', 'NumpadEnter', 'Escape', 'Space'].includes(keyboard.code)) {
-        keyboard.preventDefault();
-        keyboard.stopPropagation();
-      }
-      if (keyboard.code === 'ArrowUp') {
-        focusPrevious();
-      } else if (keyboard.code === 'ArrowDown') {
-        focusNext();
-      } else if (keyboard.code === 'Tab') {
-        if (keyboard.shiftKey) focusPrevious();
-        else focusNext();
-      } else if (keyboard.code === 'Escape') {
-        if (host && host.nodeName !== 'BODY') {
-          keyboard.preventDefault();
-          keyboard.stopPropagation();
-        }
-        close();
-      }
-    };
-
-    const onPanelKeydown = (keyboard: KeyboardEvent): void => {
-      if (keyboard.target instanceof HTMLElement && floating.contains(keyboard.target)) {
-        onHostKeydown(keyboard);
-      }
-    };
-
-    const onHostPress = (press: Event): void => {
-      if (press.target instanceof HTMLElement && !floating.contains(press.target)) close();
-    };
-
-    const stops: (() => void)[] = [];
-    let disposed = false;
-    const observer = new ResizeObserver(update);
-    observer.observe(floating);
-    window.addEventListener('scroll', update, { capture: true, passive: true });
-    window.addEventListener('resize', update);
-    stops.push(() => {
-      observer.disconnect();
-      window.removeEventListener('scroll', update, { capture: true });
-      window.removeEventListener('resize', update);
-    });
-
-    queueMicrotask(() => {
-      if (disposed) return;
-      document.body.classList.add('ohne-no-interaction');
-      setTimeout(() => floating.focus());
-      host = root.closest<HTMLElement>('.ohne-popup') ?? document.body;
-      host.classList.add('ohne-allow-interaction');
-      setTimeout(() => {
-        const target = host;
-        if (disposed || !target) return;
-        target.addEventListener('keydown', onHostKeydown);
-        target.addEventListener('click', onHostPress);
-        target.addEventListener('contextmenu', onHostPress);
-        stops.push(() => {
-          target.removeEventListener('keydown', onHostKeydown);
-          target.removeEventListener('click', onHostPress);
-          target.removeEventListener('contextmenu', onHostPress);
-        });
-        if (target.contains(floating)) return;
-        // A popup host traps Tab at `document` capture, so the panel's keys are claimed at `window` first.
-        window.addEventListener('keydown', onPanelKeydown, { capture: true });
-        stops.push(() => window.removeEventListener('keydown', onPanelKeydown, { capture: true }));
-      });
-      update();
-    });
-
-    setTimeout(() => {
-      isMounted.value = true;
-    });
-
-    onCleanup(() => {
-      disposed = true;
-      document.body.classList.remove('ohne-no-interaction');
-      host?.classList.remove('ohne-allow-interaction');
-      for (const stop of stops) stop();
-      floating.remove();
-      setTimeout(() => {
-        previous?.focus();
-        if (document.activeElement?.nodeName === 'BODY' && host && host.nodeName !== 'BODY') {
-          host.focus();
-        }
-      });
-    });
-
-    return null;
+  const ignored = (hit: EventTarget | null): boolean => {
+    const match = hit instanceof Element ? hit.closest(ignore) : null;
+    return !isNull(match) && match !== target && target.contains(match);
   };
 
-  const root = h(
-    'div',
-    { class: 'ohne-context-menu' },
-    when(() => event.value, buildDropdown),
-  );
+  const selecting = (): boolean => {
+    const selection = window.getSelection();
+    return selection?.isCollapsed === false && selection.containsNode(target, true);
+  };
 
   let touching = false;
   let held = false;
-  let pressed: TouchEvent | null = null;
+  let origin: ScreenPoint = { clientX: 0, clientY: 0 };
   let untrack = (): void => {};
   const press = longPress(options.touchDuration ?? 500, () => {
-    held = true;
-    event.value = pressed;
+    held = open(origin, false);
   });
 
   const endTouch = (): void => {
@@ -309,54 +137,92 @@ export function contextMenu(
     untrack = () => {};
     touching = false;
   };
-  onCleanup(endTouch);
 
-  return {
-    root,
-    onContextMenu: (trigger) => {
-      trigger.preventDefault();
-      // A platform that also fires `contextmenu` on a long-press would toggle the held menu shut.
-      if (held) {
-        trigger.stopPropagation();
-        return;
-      }
-      if (touching) {
-        press.end();
-        held = true;
-      }
-      event.value = trigger;
-    },
-    onTouchStart: (trigger) => {
-      endTouch();
-      held = false;
-      const start = trigger.touches[0];
-      const target = trigger.target;
-      if (trigger.touches.length > 1 || isUndefined(start) || isNull(target)) return;
-      const onMove = (move: Event): void => {
-        const touch = (move as TouchEvent).touches[0];
-        if (touch) press.move(touch);
-      };
-      const onCancel = (): void => {
-        endTouch();
-        held = false;
-      };
-      // Touch events keep targeting the touched node, even once it leaves the trigger area.
-      target.addEventListener('touchmove', onMove, { passive: true });
-      target.addEventListener('touchcancel', onCancel);
-      untrack = () => {
-        target.removeEventListener('touchmove', onMove);
-        target.removeEventListener('touchcancel', onCancel);
-      };
-      touching = true;
-      pressed = trigger;
-      press.start(start);
-    },
-    onTouchEnd: (end) => {
-      endTouch();
-      if (!held) return;
-      held = false;
-      end.preventDefault();
-      setTimeout(() => window.getSelection()?.removeAllRanges(), 50);
-    },
+  const onKeyDown = (event: KeyboardEvent): void => {
+    const key = event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
+    if (!key || selecting() || ignored(event.target) || !open(target, true)) return;
+    keyed = true;
+    event.preventDefault();
+    event.stopPropagation();
   };
+
+  const onContextMenu = (event: MouseEvent): void => {
+    // A hold or a menu key that opened it may be followed by the browser's own `contextmenu`.
+    if (held || keyed) {
+      keyed = false;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    const { clientX, clientY } = event;
+    const rect = target.getBoundingClientRect();
+    const keyboard =
+      (clientX === 0 && clientY === 0) ||
+      !(
+        clientX >= rect.left &&
+        clientX < rect.right &&
+        clientY >= rect.top &&
+        clientY < rect.bottom
+      );
+    if ((event.shiftKey && !keyboard) || selecting() || ignored(event.target)) return;
+    if (!open(keyboard ? target : { clientX, clientY }, keyboard)) return;
+    if (touching) {
+      press.end();
+      held = true;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const onTouchStart = (event: TouchEvent): void => {
+    endTouch();
+    held = false;
+    const start = event.touches[0];
+    const hit = event.target;
+    if (event.touches.length > 1 || isUndefined(start) || isNull(hit)) return;
+    if (claimedTouches.has(event) || ignored(hit)) return;
+    claimedTouches.add(event);
+    const onMove = (move: Event): void => {
+      const touch = (move as TouchEvent).touches[0];
+      if (touch) press.move(touch);
+    };
+    const onCancel = (): void => {
+      endTouch();
+      held = false;
+    };
+    // Touch events keep targeting the touched node, even once it leaves the target.
+    hit.addEventListener('touchmove', onMove, { passive: true });
+    hit.addEventListener('touchcancel', onCancel);
+    untrack = () => {
+      hit.removeEventListener('touchmove', onMove);
+      hit.removeEventListener('touchcancel', onCancel);
+    };
+    touching = true;
+    origin = { clientX: start.clientX, clientY: start.clientY };
+    press.start(start);
+  };
+
+  const onTouchEnd = (event: TouchEvent): void => {
+    endTouch();
+    if (!held) return;
+    held = false;
+    event.preventDefault();
+    setTimeout(() => window.getSelection()?.removeAllRanges(), 50);
+  };
+
+  target.addEventListener('contextmenu', onContextMenu);
+  target.addEventListener('keydown', onKeyDown);
+  if (options.touch ?? true) {
+    target.addEventListener('touchstart', onTouchStart, { passive: true });
+    target.addEventListener('touchend', onTouchEnd);
+  }
+  onCleanup(() => {
+    endTouch();
+    close();
+    target.removeEventListener('contextmenu', onContextMenu);
+    target.removeEventListener('keydown', onKeyDown);
+    target.removeEventListener('touchstart', onTouchStart);
+    target.removeEventListener('touchend', onTouchEnd);
+  });
+  return target;
 }

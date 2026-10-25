@@ -1,5 +1,6 @@
+import { isUndefined } from '../../../src/utils/is/is-undefined.ts';
 import { detectPlatform } from '../../../src/utils/keys/platform.ts';
-import { FakeElement } from '../_fake-dom.ts';
+import { FakeElement, type FakeNode, hasClass } from '../_fake-dom.ts';
 
 const listeners = new WeakMap<FakeElement, Map<string, ((event: unknown) => void)[]>>();
 
@@ -9,7 +10,13 @@ Object.assign(FakeElement.prototype, {
     listeners.set(this, byType);
     byType.set(type, [...(byType.get(type) ?? []), listener]);
   },
-  removeEventListener() {},
+  removeEventListener(this: FakeElement, type: string, listener: (event: unknown) => void) {
+    const byType = listeners.get(this);
+    byType?.set(
+      type,
+      (byType.get(type) ?? []).filter((held) => held !== listener),
+    );
+  },
   append(this: FakeElement, ...nodes: FakeElement[]) {
     for (const node of nodes) this.appendChild(node);
   },
@@ -83,6 +90,18 @@ export function fire(
   type: string,
   init: Record<string, unknown> = {},
 ): { defaultPrevented: boolean; propagationStopped: boolean } {
+  return bubble([element], type, init);
+}
+
+/**
+ * Runs one minimal event through the `type` listeners of each element in `path`, and returns it.
+ * `path` lists the innermost element first; a listener that stops propagation ends the walk.
+ */
+export function bubble(
+  path: FakeElement[],
+  type: string,
+  init: Record<string, unknown> = {},
+): { defaultPrevented: boolean; propagationStopped: boolean } {
   const event = {
     ...init,
     type,
@@ -95,8 +114,67 @@ export function fire(
       event.propagationStopped = true;
     },
   };
-  for (const listener of listeners.get(element)?.get(type) ?? []) listener(event);
+  for (const element of path) {
+    if (event.propagationStopped) break;
+    for (const listener of listeners.get(element)?.get(type) ?? []) listener(event);
+  }
   return event;
+}
+
+/**
+ * Lets `querySelectorAll` match one class selector, and `focus` set `document.activeElement`.
+ * A test calls it once to follow focus as it roves through `.ohne-dropdown-item` rows.
+ */
+export function trackRowFocus(): void {
+  const descendants = (node: FakeNode): FakeElement[] =>
+    node.childNodes.flatMap((child) => [
+      ...(child instanceof FakeElement ? [child] : []),
+      ...descendants(child),
+    ]);
+  Object.assign(FakeElement.prototype, {
+    querySelectorAll(this: FakeElement, selector: string) {
+      return descendants(this).filter((element) => hasClass(element, selector.slice(1)));
+    },
+    focus(this: FakeElement) {
+      Object.assign(document, { activeElement: this });
+    },
+  });
+}
+
+/**
+ * Lets `closest` match comma-separated simple selectors, and `contains` follow parents.
+ * A part is a class like `.ohne-row`, a tag, an attribute like `[contenteditable]`, or both, like `a[href]`.
+ */
+export function matchSelectors(): void {
+  const matches = (node: FakeElement, selector: string): boolean => {
+    if (selector.startsWith('.')) {
+      return hasClass(node, selector.slice(1)) || node.classList.has(selector.slice(1));
+    }
+    const [, tag, attribute] = /^([a-z]*)(?:\[([a-z-]+)\])?$/.exec(selector) ?? [];
+    if (isUndefined(tag)) return false;
+    return (
+      (!tag || node.tagName === tag.toUpperCase()) &&
+      (isUndefined(attribute) || node.getAttribute(attribute) !== null)
+    );
+  };
+  const nearest = (node: FakeElement | null, parts: string[]): FakeElement | null => {
+    if (!node) return null;
+    return parts.some((part) => matches(node, part)) ? node : nearest(node.parentElement, parts);
+  };
+  Object.assign(FakeElement.prototype, {
+    closest(this: FakeElement, selector: string): FakeElement | null {
+      return nearest(
+        this,
+        selector.split(',').map((part) => part.trim()),
+      );
+    },
+    contains(this: FakeElement, other: FakeElement): boolean {
+      for (let node: FakeElement | null = other; node; node = node.parentElement) {
+        if (node === this) return true;
+      }
+      return false;
+    },
+  });
 }
 
 /**

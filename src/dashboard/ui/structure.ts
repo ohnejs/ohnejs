@@ -1,5 +1,6 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
+import type { MenuGroup } from './menu.ts';
 import type { ScrollableHandle } from './scrollable.ts';
 
 import { debounce } from '../../utils/debounce/debounce.ts';
@@ -108,6 +109,13 @@ export interface StructureOptions<TItem extends Record<string, unknown>> {
   header?: (item: () => TItem, index: () => number) => Child;
 
   /**
+   * The actions a right-click or a touch hold on an item's card header opens, read on each open.
+   * The card body never opens them, and the controls in the header keep the browser's own menu.
+   * Without a `header` there is nowhere to open them.
+   */
+  itemMenu?: (item: () => TItem, index: () => number) => readonly MenuGroup[];
+
+  /**
    * Renders an item's card body, receiving reactive item and index accessors.
    * The body hides while the item carries `$expanded === false`.
    */
@@ -183,6 +191,7 @@ css`
  * So the item transiently exists in both lists.
  * While empty and accepting, the structure renders a dashed dropzone with `dropItemsHereLabel`.
  * A click outside cancels an in-flight drag without dropping.
+ * A right-click or a touch hold on a card header opens that item's `itemMenu`.
  *
  * @example
  * ```ts
@@ -302,6 +311,7 @@ export function structure<TItem extends Record<string, unknown>>(
           structureItem({
             item,
             header: options.header && ((): Child => options.header!(item, index)),
+            menu: options.itemMenu && (() => options.itemMenu!(item, index)),
             body: options.item && ((): Child => options.item!(item, index)),
             isDraggable,
             droppable: () => droppable.value,

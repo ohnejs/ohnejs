@@ -1,4 +1,5 @@
 import type { Child } from '../render/insert.ts';
+import type { MenuGroup } from './menu.ts';
 
 import { isFunction } from '../../utils/is/is-function.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -12,6 +13,7 @@ import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { longPress } from './_long-press.ts';
+import { contextMenu } from './context-menu.ts';
 import { isMac } from './hotkeys.ts';
 import { icon } from './icon.ts';
 import {
@@ -119,6 +121,12 @@ export interface TreeItemOptions<T> {
   label?: (item: TreeItemModel<T>) => Child;
 
   /**
+   * The groups a right-click or the context-menu key opens on the item, read on each open.
+   * A touch hold starts a drag, so it opens no menu.
+   */
+  menu?: (item: TreeItemModel<T>) => readonly MenuGroup[];
+
+  /**
    * Called with the item to highlight, or `undefined` to clear the highlight.
    */
   onHighlight: (item: TreeItemModel<T> | undefined) => void;
@@ -188,7 +196,8 @@ css`
     color: hsl(var(--ohne-foreground));
   }
 
-  .ohne-tree-item-button-highlighted {
+  .ohne-tree-item-button-highlighted,
+  .ohne-tree-item-button[data-ohne-context-menu-open] {
     outline: 0.125rem solid hsl(var(--ohne-ring));
     outline-offset: -0.125rem;
   }
@@ -301,6 +310,8 @@ css`
 /**
  * One tree row: selection, highlight and focus, expand and collapse, drag initiation, drop-zone hit areas.
  * Only `tree` constructs it; the shared drag and selection state arrives through the options.
+ * Opening the row's `menu` leaves the selection as it is.
+ * Without a `menu`, a right-click selects an unselected row alone and holds back the browser's own menu.
  */
 export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
   const touchDuration = options.touchDuration ?? 500;
@@ -349,6 +360,13 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
 
     return zones;
   });
+
+  const selectAlone = (): void => {
+    const current = item();
+    if (current.selectable === false || options.selectedItemIds()[current.id]) return;
+    options.onSelect([current]);
+    options.selectionOrigin.value = current;
+  };
 
   const select = (event: MouseEvent | KeyboardEvent): void => {
     const current = item();
@@ -545,8 +563,9 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
       onBlur: () => options.onHighlight(undefined),
       onClick: (event: MouseEvent) => select(event),
       onContextmenu: (event: MouseEvent) => {
+        if (!isUndefined(options.menu)) return;
         event.preventDefault();
-        select(event);
+        selectAlone();
       },
       onFocus: () => options.onHighlight(item()),
       onKeydown: (event: KeyboardEvent) => {
@@ -629,6 +648,11 @@ export function treeItem<T>(options: TreeItemOptions<T>): HTMLElement {
       options.label ? options.label(item()) : (item().label ?? item().id),
     ),
   );
+
+  const { menu } = options;
+  if (!isUndefined(menu)) {
+    contextMenu(button, () => menu(item()), { touch: false });
+  }
 
   const zoneVisible = (zone: TreeDropTarget<T>['zone'], target?: TreeItemModel<T>): boolean => {
     const id = (target ?? item()).id;

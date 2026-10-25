@@ -143,22 +143,55 @@ table(() => raiders.value, {
 ## Row actions
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/table-actions-menu-per-row-dark.png">
-  <img alt="A table with a menu button at the end of each row" src="../images/kit/table-actions-menu-per-row-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="../images/kit/contextmenu-a-table-row-opens-its-actions-dark.png">
+  <img alt="A table with one row's actions menu open: two actions, a divider, then Remove from guild" src="../images/kit/contextmenu-a-table-row-opens-its-actions-light.png">
 </picture>
 
 `actions` adds a menu button at the end of each row:
 
 ```ts
 actions: (raider) => [
-  { label: 'Promote', icon: 'arrow-up', onSelect: () => promote(raider) },
-  '---',
-  { label: 'Remove', icon: 'trash', destructive: true, onSelect: () => remove(raider) },
+  [{ label: 'Promote', icon: 'arrow-up', onSelect: () => promote(raider) }],
+  [{ label: 'Remove', icon: 'trash-x', destructive: true, onSelect: () => remove(raider) }],
 ]
 ```
 
-The function runs each time a menu opens, so it can read live state. The items are the ones
-[`menu`](./actions.md#menu) takes.
+The function runs each time a menu opens, so it can read live state. The groups are the ones
+[`menu`](./actions.md#menu) takes. A row whose groups are all empty shows no menu button.
+
+A right-click on the row opens the same menu as a [context menu](./actions.md#context-menu).
+
+## Acting on the selection
+
+Opening a row's menu never changes the selection. To act on every selected row, read the
+selection in `actions`: when the row is part of it, return the actions for all of them.
+
+```ts
+const picked = ref<ReadonlySet<string>>(new Set());
+
+table(() => raiders.value, {
+  key: (raider) => raider.name,
+  columns,
+  selection: { selected: picked },
+  actions: (raider) => {
+    const names = picked.value;
+    if (!names.has(raider.name) || names.size < 2) {
+      return [[{ label: 'Promote', icon: 'arrow-up', onSelect: () => promote(raider) }]];
+    }
+    return [
+      [{ label: 'Clear selection', icon: 'square-off', onSelect: () => (picked.value = new Set()) }],
+      [
+        {
+          label: `Remove ${names.size}`,
+          icon: 'trash-x',
+          destructive: true,
+          onSelect: () => remove(names),
+        },
+      ],
+    ];
+  },
+})
+```
 
 ## Layout and scrolling
 

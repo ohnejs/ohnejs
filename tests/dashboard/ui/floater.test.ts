@@ -44,6 +44,25 @@ describe('floater placement', () => {
     strictEqual(placed.y, 493);
   });
 
+  it('takes the first placement that fits under `firstFit`, else still the roomiest', () => {
+    const at = (x: number, y: number, height = 200) =>
+      placeFloating(
+        floaterInput({
+          reference: { x, y, width: 0, height: 0 },
+          floating: { width: 150, height },
+          firstFit: true,
+        }),
+      ).placement;
+    strictEqual(at(10, 500), 'bottom-start');
+    strictEqual(at(950, 500), 'bottom-end');
+    strictEqual(at(10, 700), 'top-start');
+    strictEqual(at(10, 500, 900), 'top-start');
+    strictEqual(
+      placeFloating(floaterInput({ reference: { x: 10, y: 500, width: 0, height: 0 } })).placement,
+      'top-start',
+    );
+  });
+
   it('ignores the offset gap when choosing the placement', () => {
     const placed = placeFloating(
       floaterInput({

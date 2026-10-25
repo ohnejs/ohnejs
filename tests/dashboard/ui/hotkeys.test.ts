@@ -117,7 +117,7 @@ describe('hotkey labels', () => {
       close: 'Esc',
       copy: 'Cmd + C',
       cut: 'Cmd + X',
-      delete: 'Del',
+      delete: 'Backspace',
       duplicate: 'Cmd + D',
       moveDown: 'Cmd + ↓',
       moveUp: 'Cmd + ↑',

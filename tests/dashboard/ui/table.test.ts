@@ -9,7 +9,8 @@ import { effectScope } from '../../../src/utils/reactive/effect-scope.ts';
 import { ref } from '../../../src/utils/reactive/ref.ts';
 import { FakeElement, type FakeNode, findElement, hasClass } from '../_fake-dom.ts';
 import { requests, settle } from '../_fake-fetch.ts';
-import './_events.ts';
+import { matchSelectors } from './_events.ts';
+import { shapeOfDOM } from './_menu-shape.ts';
 
 type Listener = (event: unknown) => void;
 
@@ -41,6 +42,8 @@ Object.assign(window, {
 Object.assign(globalThis, {
   location: { pathname: '/', search: '', hash: '', href: 'http://dashboard/' },
 });
+
+matchSelectors();
 
 const { table } = await import('../../../src/dashboard/ui/table.ts');
 const { setNavigationGuard } = await import('../../../src/dashboard/router/router.ts');
@@ -134,6 +137,35 @@ function toggle(root: FakeElement, name: string): void {
   dispatch(input, 'change');
   flush();
 }
+
+/**
+ * Right-clicks `target` at a point inside the row showing `name`, and returns the event.
+ */
+function rightClick(root: FakeElement, name: string, target = rowOf(root, name)) {
+  const row = rowOf(root, name);
+  Object.assign(row, {
+    getBoundingClientRect: () => ({
+      x: 0,
+      y: 0,
+      width: 600,
+      height: 40,
+      left: 0,
+      top: 0,
+      right: 600,
+      bottom: 40,
+    }),
+  });
+  return dispatch(row, 'contextmenu', { target, clientX: 120, clientY: 20 });
+}
+
+/**
+ * Every open menu panel, the latest last.
+ */
+const menus = (): FakeElement[] =>
+  findAll(
+    document.body as unknown as FakeElement,
+    (element) => element.getAttribute('role') === 'menu',
+  );
 
 /**
  * A raid table over `rows` with the shared columns, keyed by name.
@@ -289,7 +321,7 @@ describe('table', () => {
     const picked: string[] = [];
     const root = raidTable(() => rows.value, {
       actions: (raider) => [
-        { label: `Invite ${raider.name}`, onSelect: () => picked.push(raider.name) },
+        [{ label: `Invite ${raider.name}`, onSelect: () => picked.push(raider.name) }],
       ],
     });
     const panel = (): FakeElement | undefined =>
@@ -547,6 +579,107 @@ describe('table rows that open', () => {
     flush();
     deepStrictEqual([...selected.value], ['Anduin']);
     deepStrictEqual(seen, []);
+  });
+});
+
+describe('table context menu', () => {
+  const invite = (raider: Raider) => [[{ label: `Invite ${raider.name}` }]];
+
+  it('opens the row actions at the pointer on a right-click', () => {
+    const picked: string[] = [];
+    const root = raidTable(() => RAIDERS, {
+      actions: (raider) => [
+        [{ label: `Invite ${raider.name}`, onSelect: () => picked.push(raider.name) }],
+      ],
+    });
+    const before = menus().length;
+    strictEqual(rightClick(root, 'Jaina').defaultPrevented, true);
+    strictEqual(menus().length, before + 1);
+    const panel = menus().at(-1)!;
+    strictEqual(panel.textContent, 'Invite Jaina');
+    dispatch(findAll(panel, (element) => element.getAttribute('role') === 'menuitem')[0]!, 'click');
+    deepStrictEqual(picked, ['Jaina']);
+    strictEqual(menus().includes(panel), false);
+  });
+
+  it('leaves the check cell, the controls, and a row without a menu to the browser', () => {
+    const root = raidTable(() => RAIDERS, {
+      selection: { selected: ref(new Set()) },
+      actions: invite,
+    });
+    const row = rowOf(root, 'Jaina');
+    const before = menus().length;
+    for (const name of ['ohne-table-check', 'ohne-table-kebab']) {
+      strictEqual(rightClick(root, 'Jaina', byClass(row, name)[0]).defaultPrevented, false);
+    }
+    strictEqual(
+      rightClick(
+        raidTable(() => RAIDERS),
+        'Jaina',
+      ).defaultPrevented,
+      false,
+    );
+    strictEqual(menus().length, before);
+  });
+
+  it('opens the same groups on a right-click and the kebab, read with the selection of the moment', () => {
+    const selected = ref<ReadonlySet<string>>(new Set(['Thrall', 'Jaina']));
+    const root = raidTable(() => RAIDERS, {
+      selection: { selected },
+      actions: (raider) =>
+        selected.value.has(raider.name) && selected.value.size > 1
+          ? [[{ label: 'Clear selection' }], [{ label: `Kick ${selected.value.size}` }]]
+          : [[{ label: `Invite ${raider.name}` }], [{ label: 'Kick' }]],
+    });
+    const kebab = (name: string): string => {
+      dispatch(byClass(rowOf(root, name), 'ohne-table-kebab')[0]!, 'click');
+      flush();
+      const shape = shapeOfDOM(menus().at(-1)!);
+      dispatch(byClass(rowOf(root, name), 'ohne-table-kebab')[0]!, 'click');
+      flush();
+      return shape;
+    };
+    const right = (name: string): string => {
+      rightClick(root, name);
+      return shapeOfDOM(menus().at(-1)!);
+    };
+    deepStrictEqual(
+      [right('Jaina'), kebab('Jaina'), right('Anduin'), kebab('Anduin')],
+      [
+        'Clear selection | Kick 2',
+        'Clear selection | Kick 2',
+        'Invite Anduin | Kick',
+        'Invite Anduin | Kick',
+      ],
+    );
+    deepStrictEqual([...selected.value], ['Thrall', 'Jaina']);
+  });
+
+  it('shows no kebab and leaves the browser menu on a row whose groups are all empty', () => {
+    const root = raidTable(() => RAIDERS, {
+      actions: (raider) => [[raider.name === 'Jaina' && { label: 'Invite' }], []],
+    });
+    deepStrictEqual(
+      [
+        byClass(rowOf(root, 'Jaina'), 'ohne-table-kebab').length,
+        rightClick(root, 'Jaina').defaultPrevented,
+      ],
+      [1, true],
+    );
+    deepStrictEqual(
+      [
+        byClass(rowOf(root, 'Thrall'), 'ohne-table-kebab').length,
+        rightClick(root, 'Thrall').defaultPrevented,
+      ],
+      [0, false],
+    );
+  });
+
+  it('names the kebab more actions', () => {
+    const root = raidTable(() => RAIDERS, { actions: invite });
+    const kebab = byClass(rowOf(root, 'Jaina'), 'ohne-table-kebab')[0]!;
+    flush();
+    strictEqual(kebab.getAttribute('aria-label'), 'More actions');
   });
 });
 

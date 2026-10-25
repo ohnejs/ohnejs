@@ -1,20 +1,7 @@
+import type { ScreenPoint } from './floater-place.ts';
+
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
-
-/**
- * A point on screen, like a `Touch` or a `PointerEvent`.
- */
-export interface ScreenPoint {
-  /**
-   * The horizontal viewport coordinate in pixels.
-   */
-  clientX: number;
-
-  /**
-   * The vertical viewport coordinate in pixels.
-   */
-  clientY: number;
-}
 
 /**
  * The state of one long-press gesture, fed by its caller's touch or pointer events.

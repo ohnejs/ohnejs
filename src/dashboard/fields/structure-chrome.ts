@@ -1,4 +1,6 @@
 import type { Child } from '../render/insert.ts';
+import type { Text } from '../runtime/text.ts';
+import type { MenuAction, MenuGroup } from '../ui/menu.ts';
 import type { FieldForm } from './field-form.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
@@ -10,8 +12,8 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
 import { useT } from '../runtime/use-t.ts';
+import { menuRows } from '../ui/_menu-rows.ts';
 import { button } from '../ui/button.ts';
-import { dropdownItem } from '../ui/dropdown-item.ts';
 import { dropdown } from '../ui/dropdown.ts';
 import { fieldMessage } from '../ui/field-message.ts';
 import { icon, type IconName } from '../ui/icon.ts';
@@ -21,23 +23,23 @@ import { attachTooltip } from '../ui/tooltip.ts';
 import { type ClipboardData, copyClipboard } from './clipboard.ts';
 
 /**
- * Options for `structureActions`, one hook per action of the item header cluster.
+ * Options for `structureMenu`, one hook per more action of a list item.
  */
-export interface StructureActionsOptions {
+export interface StructureMenuOptions {
   /**
    * The item's reactive position in the list.
    */
   index: () => number;
 
   /**
-   * The reactive list length; the move buttons render only while it is above one.
+   * The reactive list length; the move actions render only while it is above one.
    */
   count: () => number;
 
   /**
-   * Whether the item is expanded. Reactive.
+   * Swaps the item with its previous or next neighbour.
    */
-  expanded: () => boolean;
+  onMove(delta: -1 | 1): void;
 
   /**
    * Whether every item is expanded, hiding the Expand all action. Reactive.
@@ -50,11 +52,6 @@ export interface StructureActionsOptions {
   allCollapsed: () => boolean;
 
   /**
-   * Flips the item's expanded state.
-   */
-  onToggleExpanded(): void;
-
-  /**
    * Expands every item.
    */
   onExpandAll(): void;
@@ -63,11 +60,6 @@ export interface StructureActionsOptions {
    * Collapses every item.
    */
   onCollapseAll(): void;
-
-  /**
-   * Swaps the item with its previous or next neighbour.
-   */
-  onMove(delta: -1 | 1): void;
 
   /**
    * Inserts a new item at `at`.
@@ -93,13 +85,29 @@ export interface StructureActionsOptions {
 
   /**
    * Inserts a copy of the item at its own position.
+   * Omitted, the Duplicate action does not render.
    */
-  onDuplicate(): void;
+  onDuplicate?(): void;
 
   /**
    * Removes the item; Cut and Delete call it.
    */
   onRemove(): void;
+}
+
+/**
+ * Options for `structureActions`: the more actions, plus the hooks of the header cluster's own buttons.
+ */
+export interface StructureActionsOptions extends StructureMenuOptions {
+  /**
+   * Whether the item is expanded. Reactive.
+   */
+  expanded: () => boolean;
+
+  /**
+   * Flips the item's expanded state.
+   */
+  onToggleExpanded(): void;
 }
 
 css`
@@ -123,6 +131,7 @@ css`
     > :where(.ohne-card-header)
     > :where(.ohne-row)
     > .ohne-item-actions,
+  [data-ohne-context-menu-open] > .ohne-item-actions,
   .ohne-item-actions-visible {
     display: flex;
   }
@@ -151,21 +160,21 @@ css`
 `;
 
 /**
- * The item header actions cluster the `repeater` and `blocks` controls share.
- *
- * Move up and down, the expand toggle, and the more-actions dropdown.
- * The dropdown carries add, clipboard, duplicate, delete, and expand-all actions.
- * The cluster shows while its card is hovered or focused, or while its dropdown is open.
+ * The more actions of a list item, shared by its header cluster's dropdown and its header's right-click.
+ * The item's add, duplicate, and move actions, then the clipboard, then expand-all, then Delete alone.
  * Copy and Cut write `copyClipboard` and toast; the paste actions show only while `canPaste`.
- * A focused move button the item's position disables, by a click or an undo, hands focus to its sibling.
- * A picked action returns focus to the dropdown trigger, unless it hands focus on, as Delete does.
+ * The move actions show only while the list holds several items, and disable at the edge they face.
+ * A pick hands focus back to `opener` first, then runs a tick later, so its action can still move focus on.
+ * `opener` defaults to the element focused when the rows are built, which a right-click reads on open.
  */
-export function structureActions(options: StructureActionsOptions): HTMLElement {
+export function structureMenu(
+  options: StructureMenuOptions,
+  opener: Element | null = document.activeElement,
+): MenuGroup[] {
   const t = useT();
-  const open = ref(false);
-  const close = (): void => {
-    open.value = false;
-  };
+  const { onAdd, onDuplicate } = options;
+
+  const movable = options.count() > 1;
 
   const copy = (): void => {
     copyClipboard(options.copyPayload());
@@ -174,15 +183,73 @@ export function structureActions(options: StructureActionsOptions): HTMLElement 
 
   const action = (
     shape: IconName,
-    label: () => string,
-    onClick: () => void,
-    destructive = false,
-  ): HTMLElement => {
-    const el = dropdownItem([icon(shape), h('span', null, label)], { destructive, onClick });
-    effect(() => {
-      el.title = label();
-    });
-    return el;
+    label: Text,
+    run: () => void,
+    extra: Partial<MenuAction> = {},
+  ): MenuAction => ({
+    icon: shape,
+    label,
+    ...extra,
+    onSelect: () => {
+      if (opener instanceof HTMLElement) opener.focus();
+      void nextTick().then(run);
+    },
+  });
+
+  return [
+    [
+      !isUndefined(onAdd) &&
+        action('arrow-bar-to-up', 'dashboard.sort.addBefore', () => onAdd(options.index())),
+      !isUndefined(onAdd) &&
+        action('arrow-bar-to-down', 'dashboard.sort.addAfter', () => onAdd(options.index() + 1)),
+      !isUndefined(onDuplicate) && action('copy', 'dashboard.duplicate', onDuplicate),
+      movable &&
+        action('chevron-up', 'dashboard.sort.moveUp', () => options.onMove(-1), {
+          disabled: () => options.index() === 0,
+        }),
+      movable &&
+        action('chevron-down', 'dashboard.sort.moveDown', () => options.onMove(1), {
+          disabled: () => options.index() === options.count() - 1,
+        }),
+    ],
+    [
+      action('clipboard', 'dashboard.clipboard.copy', copy),
+      action('cut', 'dashboard.clipboard.cut', () => {
+        copy();
+        options.onRemove();
+      }),
+      options.canPaste() &&
+        action('clipboard-plus', 'dashboard.clipboard.pasteBefore', () =>
+          options.onPaste(options.index()),
+        ),
+      options.canPaste() &&
+        action('clipboard-plus', 'dashboard.clipboard.pasteAfter', () =>
+          options.onPaste(options.index() + 1),
+        ),
+    ],
+    [
+      !options.allExpanded() &&
+        action('maximize', 'dashboard.menu.expandAll', () => options.onExpandAll()),
+      !options.allCollapsed() &&
+        action('minimize', 'dashboard.menu.collapseAll', () => options.onCollapseAll()),
+    ],
+    [action('trash-x', 'dashboard.delete', () => options.onRemove(), { destructive: true })],
+  ];
+}
+
+/**
+ * The item header actions cluster the `repeater` and `blocks` controls share.
+ *
+ * Move up and down, the expand toggle, and a dropdown of the `structureMenu` actions.
+ * The cluster shows while its card is hovered or focused, or while its dropdown or the header's menu is open.
+ * A focused move button the item's position disables, by a click or an undo, hands focus to its sibling.
+ * A picked action returns focus to the dropdown trigger, unless it hands focus on, as Delete does.
+ */
+export function structureActions(options: StructureActionsOptions): HTMLElement {
+  const t = useT();
+  const open = ref(false);
+  const close = (): void => {
+    open.value = false;
   };
 
   const atEdge = (delta: -1 | 1): boolean =>
@@ -241,97 +308,17 @@ export function structureActions(options: StructureActionsOptions): HTMLElement 
       open.value = !open.value;
     },
   });
-  effect(() => {
-    dots.classList.toggle('ohne-button-ghost', !open.value);
-    dots.classList.toggle('ohne-button-primary', open.value);
-  });
-
-  // The trigger takes focus while the open menu still shows the cluster, before the action can move it on.
-  const settle = (run: () => void): void => {
-    dots.focus();
-    close();
-    void nextTick().then(run);
-  };
+  dots.setAttribute('aria-haspopup', 'menu');
+  effect(() => dots.setAttribute('aria-expanded', String(open.value)));
 
   const menu = (): Child => {
-    const handle = dropdown(
-      [
-        isUndefined(options.onAdd)
-          ? null
-          : [
-              action(
-                'arrow-bar-to-up',
-                () => t('dashboard.sort.addBefore'),
-                () => settle(() => options.onAdd?.(options.index())),
-              ),
-              action(
-                'arrow-bar-to-down',
-                () => t('dashboard.sort.addAfter'),
-                () => settle(() => options.onAdd?.(options.index() + 1)),
-              ),
-            ],
-        h('hr'),
-        action(
-          'clipboard',
-          () => t('dashboard.clipboard.copy'),
-          () => settle(copy),
-        ),
-        action(
-          'cut',
-          () => t('dashboard.clipboard.cut'),
-          () =>
-            settle(() => {
-              copy();
-              options.onRemove();
-            }),
-        ),
-        when(options.canPaste, () => [
-          action(
-            'clipboard-plus',
-            () => t('dashboard.clipboard.pasteBefore'),
-            () => settle(() => options.onPaste(options.index())),
-          ),
-          action(
-            'clipboard-plus',
-            () => t('dashboard.clipboard.pasteAfter'),
-            () => settle(() => options.onPaste(options.index() + 1)),
-          ),
-        ]),
-        h('hr'),
-        action(
-          'copy',
-          () => t('dashboard.duplicate'),
-          () => settle(() => options.onDuplicate()),
-        ),
-        action(
-          'trash',
-          () => t('dashboard.delete'),
-          () => settle(() => options.onRemove()),
-          true,
-        ),
-        h('hr'),
-        when(
-          () => !options.allExpanded(),
-          () =>
-            action(
-              'maximize',
-              () => t('dashboard.menu.expandAll'),
-              () => settle(() => options.onExpandAll()),
-            ),
-        ),
-        when(
-          () => !options.allCollapsed(),
-          () =>
-            action(
-              'minimize',
-              () => t('dashboard.menu.collapseAll'),
-              () => settle(() => options.onCollapseAll()),
-            ),
-        ),
-      ],
-      { reference: dots, placement: 'end', onClose: close },
-    );
-    handle.root.addEventListener('click', close);
+    // The trigger takes focus back on a pick while the closing menu still shows the cluster.
+    const handle = dropdown(() => menuRows(structureMenu(options, dots), close), {
+      reference: dots,
+      placement: 'end',
+      onClose: close,
+    });
+    handle.root.setAttribute('role', 'menu');
     return handle.root;
   };
 
