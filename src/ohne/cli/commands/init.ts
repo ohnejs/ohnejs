@@ -2,6 +2,8 @@ import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
 import { promisify } from 'node:util';
 
+import type { Prompt } from '../../../utils/cli/index.ts';
+import type { TarEntry } from '../../../utils/index.ts';
 import type { BlockOptions } from '../../../utils/print/index.ts';
 
 import { codeSpan, isColorStream, pickANSIColors } from '../../../utils/ansi/index.ts';
@@ -13,6 +15,7 @@ import {
   first,
   isNull,
   isPackageName,
+  isPrerelease,
   isUndefined,
   joinPath,
   launcherName,
@@ -25,6 +28,7 @@ import { colorOverride } from '../../env/color-override.ts';
 import { toolchain } from '../../meta/toolchain.ts';
 import { version } from '../../meta/version.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
+import { readStarter, webRefusal, writeStarter } from '../starter.ts';
 
 // A shell, because Windows starts the `.cmd` shims of npm and pnpm only through one.
 const run = promisify(exec);
@@ -76,10 +80,13 @@ node_modules/
  * The target directory comes from the one positional, where a leading `~` stands for the home directory.
  * When it is omitted, a TTY prompts for the location and a non-TTY defaults to the current directory.
  * The package name defaults to the directory name, slugified when that is not a valid package name.
- * On a TTY it also prompts for the name, package manager, and git init, then installs the dependencies.
+ * On a TTY it also prompts for the name, a website, the package manager, and git init.
+ * Then it installs the dependencies.
+ * `--web` scaffolds a pnpm workspace from the Nuxt or Next starter at this version instead.
  * `--yes` skips the prompts and the install, taking the defaults.
  * A non-empty target needs a double confirm to purge, or `--force` to purge without asking.
  * A second positional, a control character, or an invalid name is refused before anything is written.
+ * So is `--web` with `--pm npm` or from a prerelease `ohnejs`.
  */
 export const initCommand = defineCommand({
   meta: {
@@ -97,7 +104,13 @@ export const initCommand = defineCommand({
     git: { type: 'boolean', description: 'Initialize a git repository.' },
     yes: { type: 'boolean', alias: 'y', description: 'Skip prompts and take the defaults.' },
     force: { type: 'boolean', alias: 'f', description: 'Empty a non-empty directory first.' },
+    web: {
+      type: 'enum',
+      options: ['nuxt', 'next'],
+      description: 'Add a website: a pnpm workspace with apps/backend and apps/web.',
+    },
     ohnePath: { type: 'string', hidden: true },
+    starter: { type: 'string', hidden: true },
   },
   async run({ values, positionals }) {
     const print = usePrinter();
@@ -128,6 +141,8 @@ export const initCommand = defineCommand({
     if (!isUndefined(values.name) && !isPackageName(values.name)) {
       return refuse({ title: `Invalid package name ${codeSpan(values.name)}`, body: NAME_RULE });
     }
+    const refusal = isUndefined(values.web) ? undefined : webRefusal(values.pm, version);
+    if (refusal) return refuse(refusal);
 
     if (interactive) {
       process.stdout.write('\n');
@@ -155,7 +170,8 @@ export const initCommand = defineCommand({
     }
 
     const names = await readDir(target);
-    if (!isNull(names) && names.length > 0) {
+    const occupied = !isNull(names) && names.length > 0;
+    if (occupied) {
       if (!values.force) {
         if (!interactive) {
           return refuse({
@@ -177,7 +193,6 @@ export const initCommand = defineCommand({
         if (isCancel(purge)) return cancel();
         if (!purge) return keep();
       }
-      await emptyDir(target);
     }
 
     let name = values.name ?? derived;
@@ -191,8 +206,22 @@ export const initCommand = defineCommand({
       name = answer;
     }
 
-    let pm = values.pm ?? packageManager();
-    if (interactive && isUndefined(values.pm)) {
+    let web = values.web;
+    if (interactive && isUndefined(web) && values.pm !== 'npm' && !isPrerelease(version)) {
+      const answer = await prompt.select<'nuxt' | 'next' | undefined>({
+        message: 'Add a website?',
+        options: [
+          { value: undefined, label: 'None' },
+          { value: 'nuxt', label: 'Nuxt' },
+          { value: 'next', label: 'Next' },
+        ],
+      });
+      if (isCancel(answer)) return cancel();
+      web = answer;
+    }
+
+    let pm = values.pm ?? (web ? 'pnpm' : packageManager());
+    if (interactive && isUndefined(values.pm) && isUndefined(web)) {
       const answer = await prompt.select<'npm' | 'pnpm'>({
         message: 'Package manager?',
         options: [
@@ -212,7 +241,10 @@ export const initCommand = defineCommand({
       git = answer;
     }
 
-    await scaffold(target, name, values.ohnePath ?? version);
+    const starter = web && (await download(web, values.starter, interactive ? prompt : undefined));
+    if (occupied) await emptyDir(target);
+    if (starter) await writeStarter(target, name, starter);
+    else await scaffold(target, name, values.ohnePath ?? version);
     if (git) await gitInit(target);
 
     let installed = false;
@@ -287,6 +319,26 @@ async function scaffold(target: string, name: string, ohne: string): Promise<voi
   });
   await writeFile(joinPath(target, 'tsconfig.json'), TSCONFIG_FILE);
   await writeFile(joinPath(target, '.gitignore'), GITIGNORE_FILE);
+}
+
+/**
+ * Reads the `web` starter, from `tarball` when given, behind a spinner when a `prompt` runs.
+ */
+async function download(
+  web: 'nuxt' | 'next',
+  tarball: string | undefined,
+  prompt: Prompt | undefined,
+): Promise<TarEntry[]> {
+  const spin = prompt?.spinner();
+  spin?.start(`Downloading the ${web} starter`);
+  try {
+    const entries = await readStarter(web, tarball);
+    spin?.stop('Starter downloaded');
+    return entries;
+  } catch (error) {
+    spin?.stop(`Could not download the ${web} starter`, 1);
+    throw error;
+  }
 }
 
 /**

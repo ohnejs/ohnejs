@@ -1,4 +1,4 @@
-import { deepStrictEqual, match, strictEqual } from 'node:assert';
+import { deepStrictEqual, match, rejects, strictEqual } from 'node:assert';
 import {
   existsSync,
   mkdirSync,
@@ -19,6 +19,7 @@ import { ohne } from '../../../../src/ohne/cli/ohne.ts';
 import { usePrinter } from '../../../../src/ohne/index.ts';
 import { runCommand } from '../../../../src/utils/cli/index.ts';
 import { isUndefined } from '../../../../src/utils/index.ts';
+import { KEPT, starterTarball } from '../_starter.ts';
 
 describe('ohne init', () => {
   let root: string;
@@ -341,6 +342,116 @@ describe('ohne init', () => {
       process.stdin.isTTY = isTTY;
     }
     strictEqual(output.join('').includes('git repository'), false);
+  });
+
+  it('scaffolds a website from the starter with `--web`', async () => {
+    const dir = join(freshDir('web'), 'my-site');
+    const tarball = starterTarball(freshDir('tarball'));
+
+    const output = await initAs(undefined, [dir, '--yes', '--web', 'nuxt', '--starter', tarball]);
+    strictEqual(process.exitCode, 0);
+    deepStrictEqual(readdirSync(dir).sort(), [
+      '.gitignore',
+      'apps',
+      'package.json',
+      'pnpm-workspace.yaml',
+    ]);
+    strictEqual(JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).name, 'my-site');
+    strictEqual(
+      readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8').includes('minimumReleaseAge'),
+      false,
+    );
+    for (const path of Object.keys(KEPT)) strictEqual(existsSync(join(dir, path)), true, path);
+    match(output, /\bpnpm install\n[^]*\bpnpm dev$/m);
+  });
+
+  it('refuses `--web` with `--pm npm` before touching anything, and exits 1', async () => {
+    const dir = freshDir('web-npm');
+    writeFileSync(join(dir, 'keep.txt'), 'mine');
+
+    const output = await initAs(undefined, [
+      dir,
+      '--yes',
+      '--force',
+      '--web',
+      'next',
+      '--pm',
+      'npm',
+    ]);
+    strictEqual(process.exitCode, 1);
+    match(output, /A website needs pnpm\n[^]*Run it again without --pm npm\./);
+    deepStrictEqual(readdirSync(dir), ['keep.txt']);
+    process.exitCode = 0;
+  });
+
+  it('refuses an unknown `--web`', async () => {
+    const dir = join(freshDir('web-vue'), 'app');
+    const errors: string[] = [];
+    const write = mock.method(process.stderr, 'write', (chunk: string) => errors.push(chunk) > 0);
+
+    try {
+      strictEqual(await runCommand(ohne, ['init', dir, '--yes', '--web', 'vue']), 1);
+    } finally {
+      write.mock.restore();
+    }
+    match(errors.join(''), /Flag `--web` must be one of `nuxt`, `next`/);
+    strictEqual(existsSync(dir), false);
+  });
+
+  it('purges nothing when the starter cannot be read', async () => {
+    const dir = freshDir('web-fail');
+    writeFileSync(join(dir, 'keep.txt'), 'mine');
+    const missing = join(freshDir('none'), 'missing.tar.gz');
+
+    await rejects(
+      runCommand(ohne, ['init', dir, '--yes', '--force', '--web', 'nuxt', '--starter', missing]),
+    );
+    deepStrictEqual(readdirSync(dir), ['keep.txt']);
+  });
+
+  it('purges a non-empty directory before writing the starter with `--force`', async () => {
+    const dir = freshDir('web-force');
+    writeFileSync(join(dir, 'stale.txt'), 'old');
+
+    await initAs(undefined, [
+      dir,
+      '--yes',
+      '--force',
+      '--web',
+      'nuxt',
+      '--starter',
+      starterTarball(freshDir('t')),
+    ]);
+    strictEqual(existsSync(join(dir, 'stale.txt')), false);
+    strictEqual(existsSync(join(dir, 'pnpm-workspace.yaml')), true);
+  });
+
+  it('asks for a website on a TTY, where Enter keeps a plain project', async () => {
+    const dir = join(freshDir('app'), 'asked');
+    const { isTTY } = process.stdin;
+    const path = process.env.PATH;
+    const output: string[] = [];
+    const passThrough = process.stdout.write.bind(process.stdout);
+    const write = mock.method(process.stdout, 'write', (chunk: string | Uint8Array) => {
+      if (typeof chunk !== 'string') return passThrough(chunk);
+      output.push(chunk);
+      if (chunk.includes('?')) {
+        setImmediate(() => process.stdin.emit('keypress', '\r', { name: 'return' }));
+      }
+      return true;
+    });
+
+    process.stdin.isTTY = true;
+    process.env.PATH = '';
+    try {
+      await runCommand(ohne, ['init', dir, '--name', 'asked', '--no-git']);
+    } finally {
+      process.env.PATH = path;
+      write.mock.restore();
+      process.stdin.isTTY = isTTY;
+    }
+    match(output.join(''), /Add a website\?[^]*Package manager\?/);
+    strictEqual(existsSync(join(dir, 'ohne.config.ts')), true);
   });
 
   it('purges a non-empty directory with --force', async () => {
