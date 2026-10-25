@@ -1,4 +1,4 @@
-import { strictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import {
   closeSync,
   mkdtempSync,
@@ -29,6 +29,12 @@ describe('writeFile', () => {
     const f = join(dir, 'a.txt');
     await writeFile(f, 'hello');
     strictEqual(readFileSync(f, 'utf8'), 'hello');
+  });
+
+  it('writes bytes as they are', async () => {
+    const f = join(dir, 'bytes.bin');
+    await writeFile(f, new Uint8Array([0, 255, 10]));
+    deepStrictEqual([...readFileSync(f)], [0, 255, 10]);
   });
 
   it('overwrites an existing file atomically', async () => {

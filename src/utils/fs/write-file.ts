@@ -6,6 +6,7 @@ import { ensureDir } from './ensure-dir.ts';
 
 /**
  * Writes `content` to `path` atomically.
+ * A string is written as UTF-8, bytes as they are.
  *
  * Writes to a sibling temp file first, then renames into place.
  * `rename` is atomic on POSIX, so the destination is either the previous contents or the full new contents.
@@ -16,9 +17,10 @@ import { ensureDir } from './ensure-dir.ts';
  * @example
  * ```ts
  * await writeFile('./build/manifest.txt', 'hello')
+ * await writeFile('./build/logo.png', bytes)
  * ```
  */
-export async function writeFile(path: string, content: string): Promise<void> {
+export async function writeFile(path: string, content: string | Uint8Array): Promise<void> {
   await ensureDir(dirname(path));
   const tmp = `${path}.${randomBytes(8).toString('hex')}.tmp`;
   try {
