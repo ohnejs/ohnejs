@@ -8,7 +8,6 @@
     "signOutOtherDevices": "Odjavi se sa svih drugih uređaja",
     "title": "Moj račun"
   },
-  "actions": "Radnje",
   "addBlock": "Dodaj blok",
   "addItem": "Dodaj stavku",
   "apply": "Primijeni",
@@ -17,6 +16,7 @@
   "blocks": {
     "addNested": "Dodaj ugniježđeni blok",
     "addTopLevel": "Dodaj blok na najvišem nivou",
+    "deleteCount": "Obriši {count, plural, one {# blok} few {# bloka} other {# blokova}}",
     "empty": "Nema dodanih blokova",
     "notPasted": "{count, plural, one {# blok nije moguće zalijepiti} few {# bloka nije moguće zalijepiti} other {# blokova nije moguće zalijepiti}}"
   },
@@ -297,6 +297,7 @@
   "ofPrevious": "{share} od prethodnog",
   "ok": "OK",
   "open": "Otvori",
+  "openInNewTab": "Otvori u novoj kartici",
   "other": "Ostalo",
   "overview": {
     "activity": "Aktivnost",

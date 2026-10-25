@@ -8,8 +8,7 @@ import {
   hasModifierKey,
   type IconName,
   isEditingText,
-  loadVerdicts,
-  type MenuItem,
+  type MenuGroup,
   overlayCount,
   pagination,
   popup,
@@ -58,7 +57,7 @@ import {
   sortableFields,
   type TableRecord,
 } from './collection-table-data.ts';
-import { admitsRow, pageUUIDs } from './collection-table-selection.ts';
+import { pageUUIDs } from './collection-table-selection.ts';
 import {
   parseTableState,
   resolveTableColumns,
@@ -146,7 +145,7 @@ css`
  * A view part the query endpoint refuses is dropped with a toast, as on the collection page.
  * Single mode picks on a click or tap, or the row's Select action, and closes.
  * Multiple mode selects with checkboxes and shift ranges across pages, and applies explicitly.
- * A row's actions also open the record in a new tab, as edit or view by the row's update verdict.
+ * A row's actions also open the record in a new tab.
  * Cmd/Ctrl+S applies or closes, Cmd/Ctrl+A toggles the page's selection, and arrow keys page.
  * Create it inside a reactive region; dispose the region after `onClose`'s close resolves.
  */
@@ -198,7 +197,6 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
   });
 
   const data = ref<TableRecord[] | undefined>(undefined);
-  const updatable = ref<ReadonlySet<string>>(new Set());
   const paginated = ref({ currentPage: state.page, lastPage: 1, perPage: PER_PAGE, total: 0 });
   const filterOpen = ref(false);
   const columnsOpen = ref(false);
@@ -223,7 +221,7 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     const mine = (generation += 1);
     // Read inside the load effect, so a content-language switch reloads the page at that locale.
     const locale = collection.translatable ? activeContentLocale() : undefined;
-    void loadTablePage(segment, queryBody(locale)).then(async (loaded) => {
+    void loadTablePage(segment, queryBody(locale)).then((loaded) => {
       if (generation !== mine) return;
       if (isUndefined(loaded) || 'refused' in loaded) {
         const patch = isUndefined(loaded)
@@ -236,8 +234,6 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
         }
         data.value ??= [];
       } else {
-        const answered = await loadVerdicts(collection, pageUUIDs(loaded.records), locale);
-        if (generation !== mine) return;
         data.value = loaded.records;
         paginated.value = {
           currentPage: loaded.page,
@@ -245,7 +241,6 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
           perPage: loaded.perPage,
           total: loaded.total,
         };
-        updatable.value = answered.update;
         seedLabels(collection, loaded.records, locale);
         if (loaded.page > loaded.lastPage) push({ page: loaded.lastPage || 1 });
       }
@@ -304,24 +299,24 @@ export function dataTablePopup(options: DataTablePopupOptions): Popup {
     options.onClose(handle.close);
   };
 
-  const rowActions = (row: TableRecord): MenuItem[] => {
+  const rowActions = (row: TableRecord): MenuGroup[] => {
     const uuid = String(row.UUID);
-    const canUpdate = admitsRow(updatable.value, row.UUID);
     return [
-      multiple && selected.value.has(uuid)
-        ? { label: 'dashboard.deselect', icon: 'square-off', onSelect: () => deselect(uuid) }
-        : {
-            label: 'dashboard.select',
-            icon: 'checkbox',
-            onSelect: () => (multiple ? select(uuid) : pick(uuid)),
-          },
-      '---',
-      {
-        label: canUpdate ? 'dashboard.edit' : 'dashboard.view',
-        icon: canUpdate ? 'pencil' : 'list-search',
-        href: recordHref(collection, uuid),
-        target: '_blank',
-      },
+      [
+        multiple && selected.value.has(uuid)
+          ? { label: 'dashboard.deselect', icon: 'square-off', onSelect: () => deselect(uuid) }
+          : {
+              label: 'dashboard.select',
+              icon: 'checkbox',
+              onSelect: () => (multiple ? select(uuid) : pick(uuid)),
+            },
+        {
+          label: 'dashboard.openInNewTab',
+          icon: 'external-link',
+          href: recordHref(collection, uuid),
+          target: '_blank',
+        },
+      ],
     ];
   };
 

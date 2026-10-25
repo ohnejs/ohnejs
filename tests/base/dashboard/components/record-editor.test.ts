@@ -4,16 +4,20 @@ import { before, describe, it } from 'node:test';
 import type {
   DashboardCollection,
   DashboardField,
+  DashboardMeta,
 } from '../../../../src/dashboard/runtime/meta-types.ts';
 
+import { startSession } from '../../../../src/dashboard/runtime/_request.ts';
 import { markDataChanged } from '../../../../src/dashboard/runtime/data-changes.ts';
-import { effectScope } from '../../../../src/utils/index.ts';
+import { dashboardMeta, invalidateDashboardMeta } from '../../../../src/dashboard/runtime/meta.ts';
+import { effectScope, isUndefined } from '../../../../src/utils/index.ts';
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
-import { FakeElement, findElement, hasClass } from '../../../dashboard/_fake-dom.ts';
+import { FakeElement, type FakeNode, findElement, hasClass } from '../../../dashboard/_fake-dom.ts';
 import { shownInputs, toggleCard } from '../../../dashboard/fields/_cards.ts';
 import { inputOf, type } from '../../../dashboard/fields/_controls.ts';
 import { settle } from '../../../dashboard/router/_browser.ts';
 import { fire } from '../../../dashboard/ui/_events.ts';
+import { shapeOfDOM } from '../../../dashboard/ui/_menu-shape.ts';
 import { baseBrowser } from '../_browser.ts';
 
 // `baseBrowser` blanks `querySelector`; the controls need the one `_controls.ts` installs.
@@ -443,5 +447,170 @@ describe('useRecordEditor', () => {
     strictEqual(requests.length, sent);
     strictEqual(control.error(), 'validation.invalidEmail');
     scope.dispose();
+  });
+});
+
+describe('recordEditorFooter menu', () => {
+  const allowed = { allowed: true, public: false, scoped: false };
+  const META: DashboardMeta = {
+    menu: [],
+    collections: [],
+    blocks: [],
+    roles: [],
+    capabilities: [],
+    routes: ['POST /collections/[collection]/[uuid]/duplicate'],
+    locales: ['en', 'de'],
+    defaultLocale: 'en',
+    languages: ['en'],
+    accountFields: [],
+    accountLayout: [],
+    defaultViews: {},
+  };
+  type Right = 'create' | 'duplicable' | 'update' | 'delete' | 'translatable';
+  let editor!: Editor;
+  let h!: typeof import('../../../../src/dashboard/render/h.ts').h;
+  let icon!: typeof import('../../../../src/dashboard/ui/icon.ts').icon;
+  let scope: ReturnType<typeof effectScope> | undefined;
+
+  const findAll = (root: FakeNode, match: (element: FakeElement) => boolean): FakeElement[] =>
+    root.childNodes.flatMap((child) => [
+      ...(child instanceof FakeElement && match(child) ? [child] : []),
+      ...findAll(child, match),
+    ]);
+  const lastMenu = (): FakeElement =>
+    findAll(
+      document.body as unknown as FakeElement,
+      (element) => element.getAttribute('role') === 'menu',
+    ).at(-1)!;
+  const kebabOf = (root: FakeElement): FakeElement | undefined =>
+    findAll(
+      root,
+      (element) => element.getAttribute('aria-label') === 'dashboard.record.moreActions',
+    )[0];
+
+  /**
+   * The footer of the guild record `u1` with `rights` granted, mounted once the record and its verdicts land.
+   */
+  const footer = async (rights: readonly Right[]): Promise<FakeElement> => {
+    scope?.dispose();
+    scope = effectScope();
+    const grant = (right: Right) => (rights.includes(right) ? allowed : null);
+    const collection: DashboardCollection = {
+      ...SHOWCASE,
+      name: 'Guild',
+      segment: 'guild',
+      translatable: rights.includes('translatable'),
+      duplicable: rights.includes('duplicable'),
+      operations: {
+        read: allowed,
+        create: grant('create'),
+        update: grant('update'),
+        delete: grant('delete'),
+      },
+      fields: [EMAIL],
+    };
+    const record = scope.run(() => editor.useRecordEditor(collection, 'u1'));
+    await settle();
+    const root = scope.run(() => h('div', null, editor.recordEditorFooter(record) as Node));
+    flush();
+    return root as unknown as FakeElement;
+  };
+
+  /**
+   * The shape of the footer's open record menu, `''` while it has no kebab.
+   */
+  const shape = (root: FakeElement): string => {
+    const kebab = kebabOf(root);
+    if (isUndefined(kebab)) return '';
+    fire(kebab, 'click');
+    flush();
+    const menu = shapeOfDOM(lastMenu());
+    fire(kebab, 'click');
+    flush();
+    return menu;
+  };
+
+  before(async () => {
+    Object.assign(globalThis, {
+      fetch: async (url: string) => {
+        const path = new URL(url).pathname;
+        if (path === '/dashboard') return Response.json(META);
+        if (path === '/collections/guild/query') {
+          return Response.json({ records: [{ UUID: 'u1', contactEmail: 'thrall@x.example' }] });
+        }
+        return new Response(null, { status: 404 });
+      },
+    });
+    const { classList } = document.body as unknown as FakeElement;
+    Object.assign(classList, {
+      remove: (...names: string[]) => names.forEach((name) => classList.delete(name)),
+      contains: (name: string) => classList.has(name),
+    });
+    editor = await import('../../../../src/base/dashboard/components/record-editor.ts');
+    ({ h } = await import('../../../../src/dashboard/render/h.ts'));
+    ({ icon } = await import('../../../../src/dashboard/ui/icon.ts'));
+    startSession();
+    invalidateDashboardMeta();
+    dashboardMeta();
+    await settle();
+  });
+
+  const T = 'dashboard.translations.translate';
+  const cases: [string, Right[], string][] = [
+    ['create', ['create'], 'dashboard.new'],
+    ['create + duplicate', ['create', 'duplicable'], 'dashboard.new, dashboard.duplicate'],
+    ['create + translate', ['create', 'translatable'], `${T}, dashboard.new`],
+    ['translate only', ['translatable'], T],
+    ['delete', ['delete'], 'dashboard.delete'],
+    ['translate + delete', ['translatable', 'delete'], `${T} | dashboard.delete`],
+    [
+      'every right',
+      ['create', 'duplicable', 'update', 'delete', 'translatable'],
+      `${T}, dashboard.new, dashboard.duplicate | dashboard.delete`,
+    ],
+    ['update only', ['update'], ''],
+    ['duplicable without create', ['update', 'duplicable'], ''],
+  ];
+  for (const [name, rights, expected] of cases) {
+    it(`renders ${JSON.stringify(expected)} for ${name}`, async () => {
+      strictEqual(shape(await footer(rights)), expected);
+    });
+  }
+
+  it('renders no footer while the user may neither write, create, translate, nor delete', async () => {
+    const root = await footer(['duplicable']);
+    strictEqual(findAll(root, (element) => hasClass(element, 'o-record-editor-footer')).length, 0);
+  });
+
+  it('links New to the create page and marks Delete destructive with `trash-x`', async () => {
+    const root = await footer(['create', 'delete']);
+    fire(kebabOf(root)!, 'click');
+    flush();
+    const [create, remove] = findAll(
+      lastMenu(),
+      (element) => element.getAttribute('role') === 'menuitem',
+    );
+    strictEqual(create?.getAttribute('href'), '/collections/guild/new');
+    const svg = findElement(remove!, (element) => element.tagName === 'SVG');
+    deepStrictEqual(
+      [
+        hasClass(remove!, 'ohne-dropdown-item-destructive'),
+        (svg as unknown as SVGSVGElement).innerHTML === icon('trash-x').innerHTML,
+      ],
+      [true, true],
+    );
+  });
+
+  it('marks the open kebab expanded instead of turning it primary', async () => {
+    const root = await footer(['delete']);
+    const kebab = kebabOf(root)!;
+    fire(kebab, 'click');
+    flush();
+    strictEqual(kebab.getAttribute('aria-expanded'), 'true');
+    strictEqual(hasClass(kebab, 'ohne-button-primary'), false);
+    fire(kebab, 'click');
+    flush();
+    strictEqual(kebab.getAttribute('aria-expanded'), 'false');
+    scope?.dispose();
   });
 });

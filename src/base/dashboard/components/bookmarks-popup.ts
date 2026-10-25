@@ -12,7 +12,8 @@ import {
   type IconName,
   loaded,
   menu,
-  type MenuItem,
+  type MenuGroup,
+  menuActions,
   openDialog,
   popup,
   type Popup,
@@ -185,49 +186,45 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
     }
   };
 
-  const ownActions = (bookmark: BookmarkEntry): MenuItem[] => {
+  const ownActions = (bookmark: BookmarkEntry): MenuGroup[] => {
     const editable = canUpdate && (!bookmark.shared || canShare);
-    const items: MenuItem[] = [];
-    if (editable && !applied(bookmark.view)) {
-      items.push({
-        label: 'dashboard.bookmarks.update',
-        icon: 'device-floppy',
-        onSelect: () => void change(bookmark, { view: options.view }, 'viewUpdated'),
-      });
-    }
-    items.push('---');
-    if (canShare && !bookmark.shared) {
-      items.push({
-        label: 'dashboard.bookmarks.share',
-        icon: 'users-plus',
-        onSelect: () => void change(bookmark, { shared: true }, 'nowShared'),
-      });
-    }
-    if (canUpdate && bookmark.shared) {
-      items.push({
-        label: 'dashboard.bookmarks.stopSharing',
-        icon: 'users-minus',
-        onSelect: () => void change(bookmark, { shared: false }, 'noLongerShared'),
-      });
-    }
-    if (editable) {
-      items.push({
-        label: 'dashboard.bookmarks.rename',
-        icon: 'pencil',
-        onSelect: () => {
-          naming.value = { bookmark };
+    return [
+      [
+        editable &&
+          !applied(bookmark.view) && {
+            label: 'dashboard.bookmarks.update',
+            icon: 'device-floppy',
+            onSelect: () => void change(bookmark, { view: options.view }, 'viewUpdated'),
+          },
+        editable && {
+          label: 'dashboard.bookmarks.rename',
+          icon: 'cursor-text',
+          onSelect: () => {
+            naming.value = { bookmark };
+          },
         },
-      });
-    }
-    if (canDelete) {
-      items.push({
-        label: 'dashboard.delete',
-        icon: 'trash-x',
-        destructive: true,
-        onSelect: () => void confirmDelete(bookmark),
-      });
-    }
-    return items;
+        canShare &&
+          !bookmark.shared && {
+            label: 'dashboard.bookmarks.share',
+            icon: 'users-plus',
+            onSelect: () => void change(bookmark, { shared: true }, 'nowShared'),
+          },
+        canUpdate &&
+          bookmark.shared && {
+            label: 'dashboard.bookmarks.stopSharing',
+            icon: 'users-minus',
+            onSelect: () => void change(bookmark, { shared: false }, 'noLongerShared'),
+          },
+      ],
+      [
+        canDelete && {
+          label: 'dashboard.delete',
+          icon: 'trash-x',
+          destructive: true,
+          onSelect: () => void confirmDelete(bookmark),
+        },
+      ],
+    ];
   };
 
   /**
@@ -308,7 +305,7 @@ export function bookmarksPopup(options: BookmarksPopupOptions): Popup {
       applyButton(() => item().view),
       defaultButton(value, item),
       when(
-        () => ownActions(item()).some((action) => action !== '---'),
+        () => menuActions(ownActions(item())).length > 0,
         () =>
           menu(
             button(() => t('dashboard.record.moreActions'), {

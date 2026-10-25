@@ -8,7 +8,6 @@
     "signOutOtherDevices": "Von allen anderen Geräten abmelden",
     "title": "Mein Konto"
   },
-  "actions": "Aktionen",
   "addBlock": "Block hinzufügen",
   "addItem": "Eintrag hinzufügen",
   "apply": "Anwenden",
@@ -17,6 +16,7 @@
   "blocks": {
     "addNested": "Verschachtelten Block hinzufügen",
     "addTopLevel": "Block auf oberster Ebene hinzufügen",
+    "deleteCount": "{count, plural, one {# Block} other {# Blöcke}} löschen",
     "empty": "Keine Blöcke hinzugefügt",
     "notPasted": "{count, plural, one {# Block konnte nicht eingesetzt werden} other {# Blöcke konnten nicht eingesetzt werden}}"
   },
@@ -297,6 +297,7 @@
   "ofPrevious": "{share} des vorherigen",
   "ok": "OK",
   "open": "Öffnen",
+  "openInNewTab": "In neuem Tab öffnen",
   "other": "Sonstige",
   "overview": {
     "activity": "Aktivität",

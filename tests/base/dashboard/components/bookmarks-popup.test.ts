@@ -13,6 +13,7 @@ import { startSession } from '../../../../src/dashboard/runtime/_request.ts';
 import { dashboardMeta, invalidateDashboardMeta } from '../../../../src/dashboard/runtime/meta.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
 import { type FakeElement, hasClass } from '../../../dashboard/_fake-dom.ts';
+import { shapeOfDOM } from '../../../dashboard/ui/_menu-shape.ts';
 import { baseBrowser } from '../_browser.ts';
 import {
   body,
@@ -146,18 +147,16 @@ describe('bookmarksPopup', () => {
   };
 
   /**
-   * The labels of the row's actions menu, read by opening it.
+   * The shape of the row's actions menu, read by opening it, or `''` without a kebab.
    */
-  const actionsOf = (name: string): string[] => {
+  const actionsOf = (name: string): string => {
     const trigger = labelled(rowOf(name), 'dashboard.record.moreActions')[0];
-    if (trigger === undefined) return [];
+    if (trigger === undefined) return '';
     fire(trigger, 'click');
     const menu = findAll(body(), (element) => element.getAttribute('role') === 'menu').at(-1)!;
-    const labels = findAll(menu, (element) => element.getAttribute('role') === 'menuitem').map(
-      (item) => item.textContent,
-    );
+    const shape = shapeOfDOM(menu);
     fire(trigger, 'click');
-    return labels;
+    return shape;
   };
 
   /**
@@ -291,18 +290,15 @@ describe('bookmarksPopup', () => {
 
   it('offers your own rows every action, and shared rows none', async () => {
     await open();
-    deepStrictEqual(actionsOf('Drafts'), [
-      'dashboard.bookmarks.update',
-      'dashboard.bookmarks.share',
-      'dashboard.bookmarks.rename',
-      'dashboard.delete',
-    ]);
-    deepStrictEqual(actionsOf('Titles'), [
-      'dashboard.bookmarks.stopSharing',
-      'dashboard.bookmarks.rename',
-      'dashboard.delete',
-    ]);
-    deepStrictEqual(actionsOf('Team'), []);
+    strictEqual(
+      actionsOf('Drafts'),
+      'dashboard.bookmarks.update, dashboard.bookmarks.rename, dashboard.bookmarks.share | dashboard.delete',
+    );
+    strictEqual(
+      actionsOf('Titles'),
+      'dashboard.bookmarks.rename, dashboard.bookmarks.stopSharing | dashboard.delete',
+    );
+    strictEqual(actionsOf('Team'), '');
   });
 
   it('shares, stops sharing, and updates a bookmark to the current view', async () => {
@@ -385,12 +381,11 @@ describe('bookmarksPopup', () => {
   it('keeps sharing and editing a shared row behind the share capability', async () => {
     await serve(metaWith(ROUTES, []));
     await open();
-    deepStrictEqual(actionsOf('Drafts'), [
-      'dashboard.bookmarks.update',
-      'dashboard.bookmarks.rename',
-      'dashboard.delete',
-    ]);
-    deepStrictEqual(actionsOf('Titles'), ['dashboard.bookmarks.stopSharing', 'dashboard.delete']);
+    strictEqual(
+      actionsOf('Drafts'),
+      'dashboard.bookmarks.update, dashboard.bookmarks.rename | dashboard.delete',
+    );
+    strictEqual(actionsOf('Titles'), 'dashboard.bookmarks.stopSharing | dashboard.delete');
     await serve(metaWith(ROUTES, ['dashboard.bookmarks.share']));
   });
 
@@ -406,7 +401,7 @@ describe('bookmarksPopup', () => {
   it('drops every action whose route the app does not serve', async () => {
     await serve(metaWith(['GET /dashboard/bookmarks/[collection]'], ['*']));
     await open();
-    deepStrictEqual(actionsOf('Drafts'), []);
+    strictEqual(actionsOf('Drafts'), '');
     strictEqual(labelled(body(), 'dashboard.bookmarks.setDefault').length, 0);
     strictEqual(labelled(body(), 'dashboard.bookmarks.isDefault').length, 0);
     strictEqual(textButton('dashboard.bookmarks.add'), undefined);

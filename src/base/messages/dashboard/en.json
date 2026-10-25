@@ -8,7 +8,6 @@
     "signOutOtherDevices": "Sign out from all other devices",
     "title": "My account"
   },
-  "actions": "Actions",
   "addBlock": "Add block",
   "addItem": "Add item",
   "apply": "Apply",
@@ -17,6 +16,7 @@
   "blocks": {
     "addNested": "Add nested block",
     "addTopLevel": "Add top-level block",
+    "deleteCount": "Delete {count, plural, one {# block} other {# blocks}}",
     "empty": "No blocks added",
     "notPasted": "{count, plural, one {# block could not be pasted} other {# blocks could not be pasted}}"
   },
@@ -297,6 +297,7 @@
   "ofPrevious": "{share} of previous",
   "ok": "OK",
   "open": "Open",
+  "openInNewTab": "Open in new tab",
   "other": "Other",
   "overview": {
     "activity": "Activity",

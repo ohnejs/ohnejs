@@ -13,6 +13,7 @@ import { defineDashboardPage } from '../../../../src/dashboard/router/define-das
 import { startSession } from '../../../../src/dashboard/runtime/_request.ts';
 import { markDataChanged } from '../../../../src/dashboard/runtime/data-changes.ts';
 import { dashboardMeta, invalidateDashboardMeta } from '../../../../src/dashboard/runtime/meta.ts';
+import { isUndefined } from '../../../../src/utils/is/is-undefined.ts';
 import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { effectScope } from '../../../../src/utils/reactive/effect-scope.ts';
 import {
@@ -23,6 +24,7 @@ import {
   resizeTo,
 } from '../../../dashboard/_fake-dom.ts';
 import { pageModule, settle } from '../../../dashboard/router/_browser.ts';
+import { shapeOfDOM } from '../../../dashboard/ui/_menu-shape.ts';
 import { baseBrowser } from '../_browser.ts';
 
 const { navigate, startRouter } = await import('../../../../src/dashboard/router/router.ts');
@@ -274,6 +276,19 @@ describe('collectionTable sheet', () => {
     flush();
   };
 
+  const lastMenu = (): FakeElement =>
+    findAll(body(), (element) => element.getAttribute('role') === 'menu').at(-1)!;
+  const menuRows = (menu: FakeElement): FakeElement[] =>
+    findAll(menu, (element) => element.getAttribute('role') === 'menuitem');
+  const labelOf = (row: FakeElement): string =>
+    findAll(row, (element) => element.tagName === 'KBD').reduce(
+      (text, hint) => text.replace(hint.textContent, ''),
+      row.textContent,
+    );
+  const labels = (menu: FakeElement): string[] => menuRows(menu).map(labelOf);
+  const menuRow = (menu: FakeElement, label: string): FakeElement =>
+    menuRows(menu).find((row) => labelOf(row) === label)!;
+
   /**
    * Picks the menu row labelled `label` from the row's actions menu; without catalogs a label reads as its key.
    */
@@ -398,6 +413,59 @@ describe('collectionTable sheet', () => {
     strictEqual(byClass(root, 'ohne-button-destructive').length, 1);
     pickAction(root, 'Jaina', 'dashboard.deselect');
     strictEqual(byClass(root, 'ohne-table-check').length, 0);
+  });
+
+  it('offers to open a row in a new tab', async () => {
+    const root = await sheet();
+    dispatch(byClass(rowOf(root, 'Jaina'), 'ohne-table-kebab')[0]!, 'click');
+    flush();
+    const link = menuRow(lastMenu(), 'dashboard.openInNewTab');
+    deepStrictEqual(
+      [link.tagName, link.getAttribute('href'), link.getAttribute('target')],
+      ['A', '/collections/raiders/u-jaina', '_blank'],
+    );
+    scope?.dispose();
+  });
+
+  it('acts on the whole selection on a right-click on a row of a selection of several', async () => {
+    const root = await sheet();
+    pickAction(root, 'Thrall', 'dashboard.select');
+    dispatch(rowOf(root, 'Thrall'), 'contextmenu', { clientX: 0, clientY: 0 });
+    flush();
+    strictEqual(labels(lastMenu()).includes('dashboard.deselect'), true);
+    pickAction(root, 'Jaina', 'dashboard.select');
+    dispatch(rowOf(root, 'Anduin'), 'contextmenu', { clientX: 0, clientY: 0 });
+    flush();
+    strictEqual(labels(lastMenu()).includes('dashboard.select'), true);
+    dispatch(rowOf(root, 'Jaina'), 'contextmenu', { clientX: 0, clientY: 0 });
+    flush();
+    deepStrictEqual(labels(lastMenu()), [
+      'dashboard.clearSelection',
+      'dashboard.table.deleteCount',
+    ]);
+    const remove = menuRow(lastMenu(), 'dashboard.table.deleteCount');
+    const { isMac } = await import('../../../../src/dashboard/ui/hotkeys.ts');
+    strictEqual(remove.getAttribute('aria-keyshortcuts'), isMac() ? 'Backspace' : 'Delete');
+    dispatch(remove, 'click');
+    await idle();
+    const cancel = findAll(
+      body(),
+      (element) => element.tagName === 'BUTTON' && element.textContent === 'dashboard.cancel',
+    ).at(-1)!;
+    strictEqual(
+      findAll(body(), (element) => element.textContent === 'dashboard.table.confirmDeleteMany')
+        .length > 0,
+      true,
+    );
+    dispatch(cancel, 'click');
+    await idle();
+    deepStrictEqual(checked(root), ['true', 'true', 'false']);
+    dispatch(rowOf(root, 'Thrall'), 'contextmenu', { clientX: 0, clientY: 0 });
+    flush();
+    dispatch(menuRow(lastMenu(), 'dashboard.clearSelection'), 'click');
+    flush();
+    strictEqual(byClass(root, 'ohne-table-check').length, 0);
+    scope?.dispose();
   });
 
   it('folds New to an icon below 768px of footer, and marks the footer while rows are selected', async () => {
@@ -910,6 +978,242 @@ describe('collectionTable duplicate', () => {
       (
         await labels({ ...HEROES, operations: { ...HEROES.operations, create: null } }, [ROUTE])
       ).includes('dashboard.duplicate'),
+      false,
+    );
+    scope?.dispose();
+  });
+});
+
+describe('collectionTable row menu', () => {
+  const ROUTE = 'POST /collections/[collection]/[uuid]/duplicate';
+  const allowed = { allowed: true, public: false, scoped: false };
+  const META: DashboardMeta = {
+    menu: [],
+    collections: [],
+    blocks: [],
+    roles: [],
+    capabilities: [],
+    routes: [ROUTE],
+    locales: ['en', 'de'],
+    defaultLocale: 'en',
+    languages: ['en'],
+    accountFields: [],
+    accountLayout: [],
+    defaultViews: {},
+  };
+  const GUILD: DashboardCollection = {
+    name: 'Guild',
+    segment: 'guild',
+    label: 'Guild',
+    translatable: false,
+    singleton: false,
+    duplicable: true,
+    operations: { read: allowed, create: null, update: null, delete: null },
+    fields: [
+      {
+        name: 'name',
+        type: 'text',
+        kind: 'column',
+        logicalType: 'text',
+        label: 'Name',
+        nullable: false,
+        required: false,
+        unique: false,
+        translatable: false,
+        readable: true,
+        writable: true,
+        immutable: false,
+      },
+    ],
+    labelFields: ['name'],
+    table: { columns: ['name'] },
+  };
+  const PAGE = {
+    records: [
+      { UUID: 'u-thrall', name: 'Thrall' },
+      { UUID: 'u-jaina', name: 'Jaina' },
+      { UUID: 'u-anduin', name: 'Anduin' },
+    ],
+    page: 1,
+    lastPage: 1,
+    perPage: 50,
+    total: 3,
+  };
+  let scope: ReturnType<typeof effectScope> | undefined;
+  let collectionTable!: (collection: DashboardCollection) => unknown;
+  let dialogHost!: () => unknown;
+
+  const findAll = (root: FakeNode, match: (element: FakeElement) => boolean): FakeElement[] =>
+    root.childNodes.flatMap((child) => [
+      ...(child instanceof FakeElement && match(child) ? [child] : []),
+      ...findAll(child, match),
+    ]);
+  const body = (): FakeElement => document.body as unknown as FakeElement;
+  const lastMenu = (): FakeElement =>
+    findAll(body(), (element) => element.getAttribute('role') === 'menu').at(-1)!;
+  const rowOf = (root: FakeElement, name: string): FakeElement =>
+    findAll(root, (element) => element.tagName === 'TR' && element.textContent.includes(name))[0]!;
+  const kebabOf = (root: FakeElement, name: string): FakeElement | undefined =>
+    findAll(rowOf(root, name), (element) => hasClass(element, 'ohne-table-kebab'))[0];
+
+  /**
+   * The shape of the row's right-click menu, asserted equal to its kebab's; no rows reads as `''`.
+   */
+  const shape = (root: FakeElement, name: string): string => {
+    let prevented = false;
+    dispatch(rowOf(root, name), 'contextmenu', {
+      clientX: 0,
+      clientY: 0,
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+    flush();
+    const viaRightClick = prevented ? shapeOfDOM(lastMenu()) : '';
+    const kebab = kebabOf(root, name);
+    if (isUndefined(kebab)) {
+      strictEqual(viaRightClick, '');
+      return '';
+    }
+    dispatch(kebab, 'click');
+    flush();
+    strictEqual(shapeOfDOM(lastMenu()), viaRightClick);
+    dispatch(kebab, 'click');
+    flush();
+    return viaRightClick;
+  };
+
+  const pick = (root: FakeElement, name: string, label: string): void => {
+    dispatch(rowOf(root, name), 'contextmenu', { clientX: 0, clientY: 0 });
+    flush();
+    const row = findAll(
+      lastMenu(),
+      (element) => element.getAttribute('role') === 'menuitem' && labelOf(element) === label,
+    )[0]!;
+    dispatch(row, 'click');
+    flush();
+  };
+  const labelOf = (row: FakeElement): string =>
+    findAll(row, (element) => element.tagName === 'KBD').reduce(
+      (text, hint) => text.replace(hint.textContent, ''),
+      row.textContent,
+    );
+
+  /**
+   * Mounts the guild table with `rights` granted, translatable or not, and lets its page land.
+   */
+  const sheet = async (rights: Rights, translatable: boolean): Promise<FakeElement> => {
+    scope?.dispose();
+    scope = effectScope();
+    const operations = {
+      read: allowed,
+      create: rights.includes('create') ? allowed : null,
+      update: rights.includes('update') ? allowed : null,
+      delete: rights.includes('delete') ? allowed : null,
+    };
+    const root = scope.run(() =>
+      h(
+        'div',
+        null,
+        collectionTable({ ...GUILD, translatable, operations }) as Node,
+        dialogHost() as Node,
+      ),
+    )!;
+    await idle();
+    return root as unknown as FakeElement;
+  };
+
+  type Rights = readonly ('create' | 'update' | 'delete')[];
+
+  const go = (update: boolean): string =>
+    `${update ? 'dashboard.edit' : 'dashboard.view'}, dashboard.openInNewTab`;
+  const T = ', dashboard.translations.translate';
+  const DUP = ', dashboard.duplicate';
+  const SEVERAL = 'dashboard.clearSelection | dashboard.table.deleteCount[delete]';
+
+  const matrix: {
+    name: string;
+    rights: Rights;
+    translatable: boolean;
+    alone: string;
+    selectedAlone?: string;
+  }[] = [
+    { name: 'read', rights: [], translatable: false, alone: go(false) },
+    { name: 'read + translate', rights: [], translatable: true, alone: go(false) + T },
+    { name: 'update', rights: ['update'], translatable: false, alone: go(true) },
+    { name: 'read + duplicate', rights: ['create'], translatable: false, alone: go(false) + DUP },
+    {
+      name: 'update + translate + duplicate',
+      rights: ['update', 'create'],
+      translatable: true,
+      alone: go(true) + T + DUP,
+    },
+    {
+      name: 'delete',
+      rights: ['delete'],
+      translatable: false,
+      alone: `${go(false)} | dashboard.select | dashboard.delete`,
+      selectedAlone: `${go(false)} | dashboard.deselect | dashboard.delete[delete]`,
+    },
+    {
+      name: 'update + delete',
+      rights: ['update', 'delete'],
+      translatable: false,
+      alone: `${go(true)} | dashboard.select | dashboard.delete`,
+      selectedAlone: `${go(true)} | dashboard.deselect | dashboard.delete[delete]`,
+    },
+    {
+      name: 'every right',
+      rights: ['create', 'update', 'delete'],
+      translatable: true,
+      alone: `${go(true)}${T}${DUP} | dashboard.select | dashboard.delete`,
+      selectedAlone: `${go(true)}${T}${DUP} | dashboard.deselect | dashboard.delete[delete]`,
+    },
+  ];
+
+  before(async () => {
+    Object.assign(globalThis, {
+      fetch: async (url: string) => {
+        const path = new URL(url).pathname;
+        if (path === '/dashboard') return Response.json(META);
+        if (path.endsWith('/query')) return Response.json(PAGE);
+        return new Response(null, { status: 404 });
+      },
+    });
+    ({ collectionTable } =
+      await import('../../../../src/base/dashboard/components/collection-table.ts'));
+    ({ dialogHost } = await import('../../../../src/dashboard/ui/dialog.ts'));
+    invalidateDashboardMeta();
+    dashboardMeta();
+    await idle();
+  });
+
+  for (const row of matrix) {
+    it(`shows the grammar for ${row.name}`, async () => {
+      const root = await sheet(row.rights, row.translatable);
+      strictEqual(shape(root, 'Jaina'), row.alone);
+      if (isUndefined(row.selectedAlone)) return;
+      pick(root, 'Jaina', 'dashboard.select');
+      strictEqual(shape(root, 'Jaina'), row.selectedAlone);
+      strictEqual(shape(root, 'Thrall'), row.alone);
+      pick(root, 'Thrall', 'dashboard.select');
+      pick(root, 'Anduin', 'dashboard.select');
+      strictEqual(shape(root, 'Jaina'), SEVERAL);
+    });
+  }
+
+  it('confirms deleting the selection on a Delete pick from the row selected alone', async () => {
+    const root = await sheet(['delete'], false);
+    pick(root, 'Jaina', 'dashboard.select');
+    pick(root, 'Jaina', 'dashboard.delete');
+    await idle();
+    const texts = findAll(body(), (element) => element.textContent.startsWith('dashboard.table'));
+    strictEqual(
+      texts.some((element) => element.textContent === 'dashboard.table.confirmDeleteMany'),
+      true,
+    );
+    strictEqual(
+      texts.some((element) => element.textContent === 'dashboard.table.confirmDeleteOne'),
       false,
     );
     scope?.dispose();

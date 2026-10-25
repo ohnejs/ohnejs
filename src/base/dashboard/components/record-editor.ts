@@ -10,8 +10,6 @@ import {
   type DashboardField,
   dashboardMeta,
   dataChangeCount,
-  dropdown,
-  dropdownItem,
   fallbackLabel,
   type FieldForm,
   type FieldFormOptions,
@@ -20,6 +18,9 @@ import {
   joinLabel,
   knownLabel,
   loadVerdicts,
+  menu,
+  menuActions,
+  type MenuGroup,
   navigate,
   openDialog,
   overlayCount,
@@ -704,7 +705,7 @@ export function recordEditorHeading(editor: RecordEditor): Child[] {
 
 /**
  * The record page's footer: undo and redo, Save, and the record actions menu.
- * It renders only while the user may write, create, or delete.
+ * It renders only while the user may write, create, translate, or delete.
  */
 export function recordEditorFooter(editor: RecordEditor): Child {
   const t = useT();
@@ -725,7 +726,7 @@ export function recordEditorFooter(editor: RecordEditor): Child {
   });
 
   return when(
-    () => canWrite() || canCreate || canDelete(),
+    () => canWrite() || canCreate || canTranslate || canDelete(),
     () =>
       h(
         'div',
@@ -741,12 +742,7 @@ export function recordEditorFooter(editor: RecordEditor): Child {
             'div',
             { class: 'ohne-row ohne-ml-auto' },
             when(canWrite, () => saveButton),
-            editor.create
-              ? null
-              : when(
-                  () => canCreate || canTranslate || canDelete(),
-                  () => recordMenu(editor),
-                ),
+            editor.create ? null : recordMenu(editor),
           ),
         ),
       ),
@@ -754,8 +750,8 @@ export function recordEditorFooter(editor: RecordEditor): Child {
 }
 
 /**
- * The record actions menu of the edit page: the trigger turns primary while the dropdown is open.
- * New links to the create page, Translate opens the translations popup, Delete confirms first.
+ * The record actions menu of the edit page, rendered only while it has a row.
+ * Translate opens the translations popup, New links to the create page, Delete confirms first.
  * Duplicate copies the saved record and stays, its toast opening the copy.
  */
 function recordMenu(editor: RecordEditor): Child {
@@ -772,92 +768,48 @@ function recordMenu(editor: RecordEditor): Child {
         });
       })
     : undefined;
-  const open = ref(false);
   const translationsOpen = ref(false);
-  const close = (): void => {
-    open.value = false;
-  };
-  const trigger = button(() => t('dashboard.record.moreActions'), {
-    icon: 'dots-vertical',
-    iconOnly: true,
-    variant: 'outline',
-    onClick: () => {
-      open.value = true;
-    },
-  });
-  effect(() => {
-    trigger.classList.toggle('ohne-button-primary', open.value);
-    trigger.classList.toggle('ohne-button-outline', !open.value);
-  });
-  return h(
-    'div',
-    { class: 'ohne-flex' },
-    trigger,
-    when(
-      () => open.value,
-      () => {
-        const items: Child[] = [];
-        if (canCreate) {
-          const item = dropdownItem([icon('note'), h('span', null, () => t('dashboard.new'))], {
-            href: `/collections/${collection.segment}/new`,
-            onClick: close,
-          });
-          effect(() => {
-            item.title = t('dashboard.new');
-          });
-          items.push(item);
-        }
-        if (canCreate && (canTranslate || !isUndefined(duplicate) || canDelete())) {
-          items.push(h('hr'));
-        }
-        if (canTranslate) {
-          const item = dropdownItem(
-            [icon('language'), h('span', null, () => t('dashboard.translations.translate'))],
-            {
-              onClick: () => {
-                close();
-                translationsOpen.value = true;
-              },
-            },
-          );
-          effect(() => {
-            item.title = t('dashboard.translations.translate');
-          });
-          items.push(item);
-        }
-        if (!isUndefined(duplicate)) {
-          const item = dropdownItem(
-            [icon('copy'), h('span', null, () => t('dashboard.duplicate'))],
-            {
-              onClick: () => {
-                close();
-                void duplicate(editor.id());
-              },
-            },
-          );
-          effect(() => {
-            item.title = t('dashboard.duplicate');
-          });
-          items.push(item);
-        }
-        if (canDelete()) {
-          const item = dropdownItem(
-            [icon('trash-x'), h('span', null, () => t('dashboard.delete'))],
-            {
-              destructive: true,
-              onClick: () => {
-                close();
-                void editor.remove();
-              },
-            },
-          );
-          effect(() => {
-            item.title = t('dashboard.delete');
-          });
-          items.push(item);
-        }
-        return dropdown(items, { reference: trigger, onClose: close }).root;
+  const groups = (): MenuGroup[] => [
+    [
+      canTranslate && {
+        label: 'dashboard.translations.translate',
+        icon: 'language',
+        onSelect: () => {
+          translationsOpen.value = true;
+        },
       },
+      canCreate && {
+        label: 'dashboard.new',
+        icon: 'note',
+        href: `/collections/${collection.segment}/new`,
+      },
+      !isUndefined(duplicate) && {
+        label: 'dashboard.duplicate',
+        icon: 'copy',
+        onSelect: () => void duplicate(editor.id()),
+      },
+    ],
+    [
+      canDelete() && {
+        label: 'dashboard.delete',
+        icon: 'trash-x',
+        destructive: true,
+        onSelect: () => void editor.remove(),
+      },
+    ],
+  ];
+  return [
+    when(
+      () => menuActions(groups()).length > 0,
+      () =>
+        menu(
+          button(() => t('dashboard.record.moreActions'), {
+            icon: 'dots-vertical',
+            iconOnly: true,
+            variant: 'outline',
+          }),
+          groups,
+        ),
     ),
     when(
       () => translationsOpen.value,
@@ -873,7 +825,7 @@ function recordMenu(editor: RecordEditor): Child {
         return null;
       },
     ),
-  );
+  ];
 }
 
 /**

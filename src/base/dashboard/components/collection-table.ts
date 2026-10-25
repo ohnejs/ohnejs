@@ -18,7 +18,7 @@ import {
   keyed,
   lastNavigation,
   loadVerdicts,
-  type MenuItem,
+  type MenuGroup,
   navigate,
   openDialog,
   overlayCount,
@@ -180,6 +180,7 @@ css`
  * A bookmarks button opens the saved views while the app serves their list route.
  * Rows select with shift ranges into the batch delete.
  * A row's actions menu opens, edits, and deletes single records behind confirm dialogs.
+ * A right-click opens it too; on a row of a selection of several, it offers to delete or clear the selection.
  * Each page loads with its row verdicts, so a row offers only what the `access` scopes admit for it.
  */
 export function collectionTable(collection: DashboardCollection): Child {
@@ -550,49 +551,67 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
     };
   }
 
-  const rowActions = (row: TableRecord): MenuItem[] => {
+  const rowActions = (row: TableRecord): MenuGroup[] => {
     const uuid = String(row.UUID);
+    const inSelection = selected.value.has(uuid);
+    if (inSelection && selectedCount.value > 1) {
+      return [
+        [{ label: 'dashboard.clearSelection', icon: 'square-off', onSelect: deselectAll }],
+        [
+          {
+            label: { key: 'dashboard.table.deleteCount', params: { count: selectedCount.value } },
+            icon: 'trash-x',
+            destructive: true,
+            hotkey: 'delete',
+            onSelect: () => void onDeleteSelection(),
+          },
+        ],
+      ];
+    }
     const canDelete = mayDelete(row.UUID);
-    const items: MenuItem[] = [
-      mayUpdate(row.UUID)
-        ? { label: 'dashboard.edit', icon: 'pencil', href: rowHref(uuid) }
-        : { label: 'dashboard.view', icon: 'list-search', href: rowHref(uuid) },
-    ];
-    if (canTranslate) {
-      items.push({
-        label: 'dashboard.translations.translate',
-        icon: 'language',
-        onSelect: () => {
-          translationsUUID.value = uuid;
+    return [
+      [
+        mayUpdate(row.UUID)
+          ? { label: 'dashboard.edit', icon: 'pencil', href: rowHref(uuid) }
+          : { label: 'dashboard.view', icon: 'list-search', href: rowHref(uuid) },
+        {
+          label: 'dashboard.openInNewTab',
+          icon: 'external-link',
+          href: rowHref(uuid),
+          target: '_blank',
         },
-      });
-    }
-    if (!isUndefined(duplicate)) {
-      items.push({
-        label: 'dashboard.duplicate',
-        icon: 'copy',
-        onSelect: () => void duplicate(uuid),
-      });
-    }
-    if (canDelete) {
-      items.push({
-        label: 'dashboard.delete',
-        icon: 'trash-x',
-        destructive: true,
-        onSelect: () => void onDelete(uuid),
-      });
-    }
-    items.push('---');
-    if (selected.value.has(uuid)) {
-      items.push({
-        label: 'dashboard.deselect',
-        icon: 'square-off',
-        onSelect: () => deselect(uuid),
-      });
-    } else if (canDelete) {
-      items.push({ label: 'dashboard.select', icon: 'checkbox', onSelect: () => select(uuid) });
-    }
-    return items;
+        canTranslate && {
+          label: 'dashboard.translations.translate',
+          icon: 'language',
+          onSelect: () => {
+            translationsUUID.value = uuid;
+          },
+        },
+        !isUndefined(duplicate) && {
+          label: 'dashboard.duplicate',
+          icon: 'copy',
+          onSelect: () => void duplicate(uuid),
+        },
+      ],
+      [
+        inSelection
+          ? { label: 'dashboard.deselect', icon: 'square-off', onSelect: () => deselect(uuid) }
+          : canDelete && {
+              label: 'dashboard.select',
+              icon: 'checkbox',
+              onSelect: () => select(uuid),
+            },
+      ],
+      [
+        canDelete && {
+          label: 'dashboard.delete',
+          icon: 'trash-x',
+          destructive: true,
+          hotkey: inSelection ? 'delete' : undefined,
+          onSelect: () => void (inSelection ? onDeleteSelection() : onDelete(uuid)),
+        },
+      ],
+    ];
   };
 
   const grid = table(() => data.value, {

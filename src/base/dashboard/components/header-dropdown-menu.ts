@@ -1,94 +1,43 @@
 import {
   button,
   dashboardMeta,
-  dropdown,
-  dropdownItem,
-  h,
-  icon,
+  menu,
   resolvedColorMode,
   setColorMode,
   useT,
-  when,
 } from 'ohnejs/dashboard';
-import { effect, ref } from 'ohnejs/utils';
 
 /**
  * The header's kebab user menu.
- * The trigger turns primary while the dropdown is open.
- * One group toggles the color mode against the resolved OS-aware mode.
- * A rule separates it from the account link and the destructive sign-out, a link to the logout page.
+ * The first group toggles the color mode against the resolved OS-aware mode, then links the account page.
  * The account link shows only while the discovery data lists account fields.
+ * The destructive sign-out, a link to the logout page, sits alone in the last group.
  */
 export function headerDropdownMenu(): HTMLElement {
   const t = useT();
-  const open = ref(false);
-  const close = (): void => {
-    open.value = false;
-  };
-
-  const trigger = button(() => t('dashboard.header.openUserMenu'), {
-    icon: 'dots-vertical',
-    iconOnly: true,
-    variant: 'outline',
-    onClick: () => {
-      open.value = true;
+  return menu(
+    button(() => t('dashboard.header.openUserMenu'), {
+      icon: 'dots-vertical',
+      iconOnly: true,
+      variant: 'outline',
+    }),
+    () => {
+      const light = resolvedColorMode() === 'light';
+      return [
+        [
+          {
+            label: light ? 'dashboard.header.darkMode' : 'dashboard.header.lightMode',
+            icon: light ? 'moon' : 'sun',
+            onSelect: () => setColorMode(light ? 'dark' : 'light'),
+          },
+          (dashboardMeta()?.accountFields.length ?? 0) > 0 && {
+            label: 'dashboard.header.myAccount',
+            icon: 'user',
+            href: '/account',
+          },
+        ],
+        [{ label: 'dashboard.signOut', icon: 'logout', destructive: true, href: '/logout' }],
+      ];
     },
-  });
-  effect(() => {
-    trigger.classList.toggle('ohne-button-primary', open.value);
-    trigger.classList.toggle('ohne-button-outline', !open.value);
-  });
-
-  return h(
-    'div',
-    { class: 'ohne-flex' },
-    trigger,
-    when(
-      () => open.value,
-      () =>
-        dropdown(
-          [
-            () => {
-              const mode = resolvedColorMode();
-              return dropdownItem(
-                [
-                  icon(mode === 'light' ? 'moon' : 'sun'),
-                  h(
-                    'span',
-                    null,
-                    t(
-                      mode === 'light' ? 'dashboard.header.darkMode' : 'dashboard.header.lightMode',
-                    ),
-                  ),
-                ],
-                {
-                  onClick: () => {
-                    setColorMode(mode === 'light' ? 'dark' : 'light');
-                    close();
-                  },
-                },
-              );
-            },
-            h('hr'),
-            when(
-              () => (dashboardMeta()?.accountFields.length ?? 0) > 0,
-              () =>
-                dropdownItem(
-                  [icon('user'), h('span', null, () => t('dashboard.header.myAccount'))],
-                  {
-                    href: '/account',
-                    onClick: close,
-                  },
-                ),
-            ),
-            dropdownItem([icon('logout'), h('span', null, () => t('dashboard.signOut'))], {
-              href: '/logout',
-              destructive: true,
-              onClick: close,
-            }),
-          ],
-          { reference: trigger, onClose: close },
-        ).root,
-    ),
   );
 }
