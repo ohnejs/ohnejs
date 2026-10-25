@@ -454,11 +454,22 @@ describe('serveDashboard', () => {
     notStrictEqual(edited.headers['etag'], etag);
   });
 
-  it('serves a font as is, revalidated against its stats', async () => {
+  it('maps a kernel font to its fingerprinted URL and caches it there for good', async () => {
     const port = await serve('font');
-    const res = await req(port, '/m/dashboard/assets/fonts/fira-mono-cyrillic-400.woff2');
+    const path = '/m/dashboard/assets/fonts/fira-mono-cyrillic-400.woff2';
+    const url = importsOf((await req(port, '/')).body)[path] ?? '';
+    match(url, /\?h=[\w-]{8}$/);
+    const res = await req(port, url);
     strictEqual(res.status, 200);
     strictEqual(res.headers['content-type'], 'font/woff2');
+    strictEqual(res.headers['cache-control'], 'public, max-age=31536000, immutable');
+    strictEqual((await req(port, path)).headers['cache-control'], 'no-cache');
+  });
+
+  it('serves any other file as is, revalidated against its stats', async () => {
+    const port = await serve('asset');
+    const res = await req(port, '/m/dashboard/tsconfig.json');
+    strictEqual(res.status, 200);
     strictEqual(res.headers['cache-control'], 'no-cache');
     match(res.headers['etag'] as string, /^W\//);
   });

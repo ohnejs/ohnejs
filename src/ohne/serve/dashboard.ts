@@ -12,7 +12,6 @@ import {
   isNull,
   isPathInside,
   isPort,
-  isTypeScriptPath,
   isUndefined,
   joinPath,
   jsonForScript,
@@ -60,6 +59,7 @@ import {
   createModuleTable,
   type ModuleMount,
   type ModuleTable,
+  isFingerprinted,
   type ScannedModule,
 } from './_module-table.ts';
 
@@ -329,15 +329,15 @@ function serveModule(modules: ModuleTable, path: string): Promise<string | Uint8
 }
 
 /**
- * Serves `path` from the first of `roots`: a module through the module table, any other file as is.
- * Assets like fonts stay out of the table, so a large file a layer ships never sits in memory.
+ * Serves `path` from the first of `roots`: a module or a font through the module table, any other file as is.
+ * Other assets stay out of the table, so a large file a layer ships never sits in memory.
  */
 function serveFrom(
   modules: ModuleTable,
   roots: string[],
   path: string,
 ): Promise<string | Uint8Array | undefined> {
-  return isTypeScriptPath(path)
+  return isFingerprinted(path)
     ? modules.send(roots, path)
     : sendFile(roots, path, { notFound: 'Not Found' });
 }

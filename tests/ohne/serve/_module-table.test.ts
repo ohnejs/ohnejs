@@ -76,7 +76,7 @@ describe('createModuleTable', () => {
       const [near] = layers({
         'near/boot/runes.ts': 'export const rune: string = "Frost";\n',
         'near/pages/[id].mts': 'export default 1;\n',
-        'near/assets/font.woff2': 'binary',
+        'near/assets/logo.png': 'binary',
       });
       const table = createModuleTable([{ base: '/m/app', roots: [near] }]);
       deepStrictEqual([...hashes(await table.scan())].toSorted(), [
@@ -86,6 +86,15 @@ describe('createModuleTable', () => {
         ],
         ['/m/app/pages/[id].mts', `/m/app/pages/[id].mts?h=${hashOf('export default 1;\n')}`],
       ]);
+    });
+
+    it('fingerprints a font by its bytes as is, naming no specifiers', async () => {
+      const [near] = layers({ 'near/assets/inter.woff2': "wOF2 import './x.ts'" });
+      const table = createModuleTable([{ base: '/m/app', roots: [near] }]);
+      deepStrictEqual((await table.scan()).get('/m/app/assets/inter.woff2'), {
+        hashed: `/m/app/assets/inter.woff2?h=${fingerprint("wOF2 import './x.ts'")}`,
+        imports: [],
+      });
     });
 
     it('records the specifiers each module imports at runtime', async () => {
@@ -267,6 +276,15 @@ describe('createModuleTable', () => {
       const res = await send('/m/app/late.ts');
       strictEqual(res.body, 'export const late = 1;\n');
       strictEqual(res.headers.get('cache-control'), 'no-cache');
+    });
+
+    it('serves a font as is with its own type, cached for good at its fingerprint', async () => {
+      writeFileSync(join(roots[0] as string, 'inter.woff2'), 'wOF2 bytes');
+      await table.scan();
+      const res = await send(`/m/app/inter.woff2?h=${fingerprint('wOF2 bytes')}`);
+      strictEqual(new TextDecoder().decode(res.body as Uint8Array), 'wOF2 bytes');
+      strictEqual(res.headers.get('content-type'), 'font/woff2');
+      strictEqual(res.headers.get('cache-control'), 'public, max-age=31536000, immutable');
     });
 
     it('answers 404 for a path no root holds', async () => {

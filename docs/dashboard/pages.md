@@ -391,7 +391,7 @@ You set the port, the host, and the API base URL the browser talks to under
 The page names every module the dashboard can load up front, so the browser fetches them all at
 once instead of finding them one import at a time.
 
-The browser keeps each dashboard module until its content changes. A module's URL carries a
+The browser keeps each dashboard module and font until its content changes. Its URL carries a
 fingerprint of its bytes, so the browser caches it for good and never asks for it again. After a
 deploy or an edit, it downloads only the files that changed.
 
