@@ -21,7 +21,7 @@ export const devCommand = defineCommand({
     dashboard: {
       type: 'boolean',
       default: true,
-      description: 'Serve the dashboard; `--no-dashboard` runs the API alone.',
+      description: 'Run the API alone, without the dashboard.',
     },
   },
   async run({ values }) {
