@@ -2,16 +2,18 @@ import { flush } from '../../../src/utils/reactive/_scheduler.ts';
 import '../_fake-dom.ts';
 
 /**
- * The browser surface a router test drives: history writes it saw and a way to press back or forward.
+ * The browser surface a router test drives: history writes and reloads it saw, and a way to press back or forward.
  */
 export interface FakeBrowser {
   pushes: string[];
   replaces: string[];
+  reloads: number;
   popstate: (path: string) => void;
 }
 
 /**
  * Installs a location at `path`, a recording history, and the window and document hooks the router needs.
+ * The tab's session storage starts empty.
  */
 export function fakeBrowser(path: string): FakeBrowser {
   const location = {
@@ -21,6 +23,7 @@ export function fakeBrowser(path: string): FakeBrowser {
     get href() {
       return `http://dashboard${this.pathname}${this.search}${this.hash}`;
     },
+    reload: () => browser.reloads++,
   };
   const visit = (to: string) => {
     const url = new URL(to, location.href);
@@ -30,12 +33,14 @@ export function fakeBrowser(path: string): FakeBrowser {
   const browser: FakeBrowser = {
     pushes: [],
     replaces: [],
+    reloads: 0,
     popstate: (to) => {
       visit(to);
       for (const listener of listeners) listener();
     },
   };
   visit(path);
+  sessionStorage.clear();
   Object.assign(document, {
     title: '',
     addEventListener: () => {},

@@ -76,6 +76,12 @@ export type NavigationCause = 'load' | 'navigate' | 'popstate';
  */
 export type NavigationGuard = (target: string) => boolean | Promise<boolean>;
 
+/**
+ * The tab's mark that the dashboard already reloaded itself over a failed load.
+ * The shell sets and clears the same key, so the two share one reload.
+ */
+const RELOADED = 'ohne-reloaded';
+
 let pages: CompiledPage[] = [];
 const active = ref<Active | null>(null);
 const framed = ref(false);
@@ -330,6 +336,23 @@ function notFound(): Child {
 }
 
 /**
+ * Reloads the page once over a failed load, so a request the network dropped heals unseen.
+ * A tab that already reloaded keeps the failure on screen.
+ * The shell clears the mark once the dashboard boots, so a later failure reloads again.
+ * Storage that refuses access, as in some private windows, means no reload.
+ */
+function reloadOnce(): boolean {
+  try {
+    if (!isNull(sessionStorage.getItem(RELOADED))) return false;
+    sessionStorage.setItem(RELOADED, '1');
+    location.reload();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The page standing in for one whose module failed to load, centered in the frame or on the bare screen.
  * The browser keeps a failed module failed for the document's life, so its retry reloads the page.
  */
@@ -343,7 +366,7 @@ function loadFailed(frame: boolean): HTMLElement {
 /**
  * Matches the current location, loads its page module on demand, and publishes it as the active route.
  * A render superseded by a newer navigation publishes nothing, so a slow module never wins over a later page.
- * A module that fails to load still publishes its route, with `loadFailed` in place of the page.
+ * A module that fails to load reloads the page once, then publishes its route with `loadFailed` in its place.
  * Whether the page wants the frame is unknown then, so the failure keeps the frame on screen as it is.
  */
 async function render(): Promise<void> {
@@ -361,6 +384,7 @@ async function render(): Promise<void> {
   } catch (error) {
     if (mine !== token) return;
     console.error(error);
+    if (reloadOnce()) return;
     const frame = untracked(() => framed.value);
     component = defineDashboardPage(() => loadFailed(frame), { frame });
   }

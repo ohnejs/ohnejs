@@ -234,12 +234,28 @@ describe('startRouter with a page frame', () => {
     strictEqual(router.useRoute(), null);
   });
 
+  it('reloads the page once when a page module fails to load', async () => {
+    const logged = mock.method(console, 'error', () => {});
+    await router.navigate('/b');
+    await settle();
+    await router.navigate('/broken');
+    await settle();
+    logged.mock.restore();
+    strictEqual(browser.reloads, 1);
+    strictEqual(sessionStorage.getItem('ohne-reloaded'), '1');
+    strictEqual(failure(), undefined);
+  });
+
   it('renders a page whose module fails to load as a load failure on its route', async () => {
     const logged = mock.method(console, 'error', () => {});
+    sessionStorage.setItem('ohne-reloaded', '1');
+    await router.navigate('/b');
+    await settle();
     await router.navigate('/broken');
     await settle();
     logged.mock.restore();
     strictEqual(logged.mock.callCount(), 1);
+    strictEqual(browser.reloads, 1);
     strictEqual(container.textContent, '[Failed to loadRetry]');
     strictEqual(router.useRoute()?.path, '/broken');
     strictEqual(failure()?.classList.has('ohne-load-failed'), true);
@@ -248,6 +264,7 @@ describe('startRouter with a page frame', () => {
 
   it('keeps a bare page bare when the next page fails to load', async () => {
     const logged = mock.method(console, 'error', () => {});
+    sessionStorage.setItem('ohne-reloaded', '1');
     await router.navigate('/logout');
     await settle();
     await router.navigate('/broken');
