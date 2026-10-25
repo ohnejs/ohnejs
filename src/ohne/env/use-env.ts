@@ -40,7 +40,7 @@ registry.define('PORT', {
       );
     return port;
   },
-  flag: 'value',
+  flag: 'number',
 });
 registry.define('HOST', { default: undefined, parse: (raw) => raw, flag: 'value' });
 registry.define('API_URL', { default: undefined, parse: (raw) => raw, flag: 'value' });

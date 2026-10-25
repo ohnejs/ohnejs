@@ -85,6 +85,7 @@ export const initCommand = defineCommand({
   meta: {
     name: 'init',
     description: 'Scaffold a new project.',
+    positionals: '[dir]',
   },
   args: {
     name: { type: 'string', description: 'Package name. Derived from the directory by default.' },

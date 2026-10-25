@@ -19,7 +19,7 @@ interface EnvFlag {
   env: keyof Env & string;
   kebab: string;
   camel: string;
-  kind: 'boolean' | 'value';
+  kind: 'boolean' | 'number' | 'value';
 }
 
 /**
@@ -44,7 +44,7 @@ function envFlags(only?: Iterable<keyof Env & string>): EnvFlag[] {
 /**
  * The env vars' CLI flags as a `runCommand` `globals` schema.
  *
- * Each flagged var becomes one flag: a `'boolean'` var a switch, a `'value'` var a value flag.
+ * Each flagged var becomes one flag: a `'boolean'` var a switch, any other a value flag.
  * `runCommand` uses it to recognize the flags on every subcommand and to list them in the root help.
  * The keys are the camelCase arg names; the raw values are applied by `applyEnvFlags`.
  * Given `only`, the schema holds just those env vars' flags.
@@ -58,10 +58,8 @@ function envFlags(only?: Iterable<keyof Env & string>): EnvFlag[] {
 export function envGlobals(only?: Iterable<keyof Env & string>): ArgsSchema {
   const schema: ArgsSchema = {};
   for (const { env, camel, kind } of envFlags(only)) {
-    schema[camel] =
-      kind === 'boolean'
-        ? { type: 'boolean', description: `Sets ${env}` }
-        : { type: 'string', description: `Sets ${env}` };
+    const type = kind === 'value' ? 'string' : kind;
+    schema[camel] = { type, description: `Sets ${env}` };
   }
   return schema;
 }

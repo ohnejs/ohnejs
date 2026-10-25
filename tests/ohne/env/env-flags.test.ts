@@ -103,6 +103,7 @@ describe('env flags', () => {
     it('maps each flagged var to a camelCase arg of the right type', () => {
       const globals = envGlobals();
       deepStrictEqual(globals['host'], { type: 'string', description: 'Sets HOST' });
+      deepStrictEqual(globals['port'], { type: 'number', description: 'Sets PORT' });
       deepStrictEqual(globals['forceSync'], { type: 'boolean', description: 'Sets FORCE_SYNC' });
       deepStrictEqual(globals['noColor'], { type: 'boolean', description: 'Sets NO_COLOR' });
       strictEqual(globals['cookieSecret']?.type, 'string');

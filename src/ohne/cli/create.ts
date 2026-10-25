@@ -16,7 +16,8 @@ const command = {
   meta: {
     name: 'create-ohne',
     version,
-    description: 'Scaffold a new ohne project. The one argument is its directory.',
+    description: 'Scaffold a new ohne project.',
+    positionals: '[dir]',
   },
 };
 

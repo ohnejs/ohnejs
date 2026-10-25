@@ -47,7 +47,7 @@ describe('create', () => {
     const { status, output } = create(undefined, '--help');
     strictEqual(status, 0);
     match(output, /^create-ohne /);
-    match(output, /The one argument is its directory/);
+    match(output, /create-ohne \[dir\] \[options\]/);
     match(output, /--no-color/);
     doesNotMatch(output, /--port|--cwd/);
   });
