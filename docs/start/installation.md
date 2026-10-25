@@ -11,8 +11,12 @@ is no build step. It also limits you to syntax Node can strip, so you cannot use
 npm create ohne my-app
 ```
 
-`npm create ohne` asks for the project name, the package manager, and whether to initialize a git
-repository. To skip the prompts in CI or a script, pass [flags](../project/cli.md#npm-create-ohne).
+`npm create ohne` asks for the project name, whether to add a website, the package manager, and
+whether to initialize a git repository. To skip the prompts in CI or a script, pass
+[flags](../project/cli.md#npm-create-ohne).
+
+A Nuxt or Next website makes the project a [monorepo](../project/monorepo.md), with your app and
+the website side by side. This page follows the app alone.
 
 ## First run
 

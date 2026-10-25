@@ -37,7 +37,7 @@ npx ohne serve api --port 8080 --host 0.0.0.0
 
 `npm create ohne [dir]` scaffolds a new project: `ohne.config.ts`, `package.json`,
 `tsconfig.json`, and a `.gitignore`. In a terminal it asks for the location (when you did not pass
-`dir`), the project name, the package manager, and git, then installs the dependencies.
+`dir`), the project name, a website, the package manager, and git, then installs the dependencies.
 
 Flags cover every prompt. With npm, they go after `--`. npm reads every flag before it as its own,
 so `--yes`, `--name`, and `--pm` there never reach the scaffold:
@@ -57,6 +57,8 @@ pnpm create ohne@latest my-app --yes --git
   npm package name when it is not one: `My App` becomes `my-app`.
 - `--pm` sets the package manager, `npm` or `pnpm`. Without it, the default is pnpm when you start
   the scaffold with pnpm, npm otherwise.
+- `--web` adds a website, `nuxt` or `next`: a [monorepo](./monorepo.md) with your app in
+  `apps/backend` and the website in `apps/web`. It needs pnpm, so `--pm npm` is refused.
 - `--git` initializes a git repository.
 - `--force` (`-f`) deletes everything in a non-empty directory, then scaffolds into it. Without it,
   the scaffold asks twice in a terminal before it deletes anything. Outside a terminal it refuses a

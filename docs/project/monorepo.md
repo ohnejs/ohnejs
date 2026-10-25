@@ -17,6 +17,21 @@ my-site/
 └── pnpm-workspace.yaml
 ```
 
+## Creating it
+
+One command creates the whole repository:
+
+```sh
+pnpm create ohne@latest my-site --web nuxt
+```
+
+- `--web next` creates a Next website instead.
+- It needs pnpm, since the repository is a pnpm workspace.
+- In a terminal, you can leave `--web` out and pick the website when it asks.
+
+Then start both apps, as in [Running](#running). The sections below set up the same layout by
+hand, one file at a time.
+
 ## The workspace
 
 Start with the root. It makes the two apps one [pnpm workspace](https://pnpm.io/workspaces):
@@ -163,7 +178,7 @@ Create `apps/web` with these files:
     "build": "next build",
     "dev": "next dev",
     "start": "next start",
-    "typecheck": "tsc"
+    "typecheck": "next typegen && tsc"
   },
   "dependencies": {
     "next": "16.4.2",
@@ -238,7 +253,9 @@ next-env.d.ts
 .env*
 ```
 
-`next build` leaves this `tsconfig.json` as it is. Drop an option, and the build writes it back.
+- `next typegen` writes the types `tsc` reads, like `LayoutProps`, so `pnpm typecheck` works on a
+  fresh clone.
+- `next build` leaves this `tsconfig.json` as it is. Drop an option, and the build writes it back.
 
 ## Running
 
@@ -315,6 +332,7 @@ rewrites the file while `ohne dev` runs, whenever you change a collection or a b
 - Commit `ohne.ts`. The website then builds without the backend, even on a host that installs
   `apps/web` alone.
 - The website reads the CMS through its own server, so the CMS needs no CORS step.
+- Uploaded files land in `apps/backend/.uploads/`. Add `.uploads/` to the root `.gitignore`.
 - [Frameworks](../cms/frameworks.md) sets up the package, the page and its components.
 
 In CI, check that someone who changed a block also committed the new types:
