@@ -338,6 +338,7 @@ export * from './stream/lazy-stream.ts';
 export * from './stream/limit-stream.ts';
 export * from './stream/rechunk-stream.ts';
 export * from './svg/line-path.ts';
+export * from './tar/read-tar.ts';
 export * from './template/parse-template.ts';
 export * from './template/render-label.ts';
 export * from './template/render-template.ts';
