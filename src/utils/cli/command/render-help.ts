@@ -17,6 +17,7 @@ interface Row {
  * Includes the title, description, a usage line, the subcommand list, and the option list.
  * The usage line opens with `path`, the words that invoke the command.
  * Long flags are shown in kebab-case; `--help` (and `--version` when set) are appended automatically.
+ * A boolean that defaults to `true` shows as the `--no-` flag that turns it off.
  * A `globals` schema, when passed, is rendered under a `GLOBAL OPTIONS` section after the options.
  * The `colors` styler set tints the output; pass the plain set to emit no codes.
  *
@@ -93,13 +94,18 @@ function optionRows(command: Command, args: Command['args'], colors: ANSIColors)
 
 /**
  * Formats an arg's flags and aliases, with a value placeholder unless it is boolean.
+ * A boolean on by default shows only its `--no-` flag, since its aliases can only set the default.
  */
 function optionRow(name: string, def: ArgSchema, colors: ANSIColors): Row {
+  const desc = optionDesc(def);
+  if (def.type === 'boolean' && def.default === true) {
+    const flag = `--no-${toKebabCase(name)}`;
+    return { label: flag, styled: colors.cyan(flag), desc };
+  }
   const flags = [`--${toKebabCase(name)}`];
   for (const alias of toArray(def.alias ?? []))
     flags.push(alias.length === 1 ? `-${alias}` : `--${alias}`);
   const joined = flags.join(', ');
-  const desc = optionDesc(def);
   if (def.type === 'boolean') return { label: joined, styled: colors.cyan(joined), desc };
   const placeholder = `<${def.type === 'enum' ? def.options.join('|') : def.type}>`;
   return {
@@ -111,11 +117,13 @@ function optionRow(name: string, def: ArgSchema, colors: ANSIColors): Row {
 
 /**
  * Appends `(required)` or `(default: ...)` to an arg's description.
+ * A boolean's default needs no note: its flag reads as the change from it.
  */
 function optionDesc(def: ArgSchema): string {
   const parts: string[] = [];
   if (def.description) parts.push(def.description);
-  if (def.type !== 'boolean' && def.required) parts.push('(required)');
+  if (def.type === 'boolean') return parts.join(' ');
+  if (def.required) parts.push('(required)');
   else if (!isUndefined(def.default)) parts.push(`(default: ${def.default})`);
   return parts.join(' ');
 }

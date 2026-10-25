@@ -31,6 +31,28 @@ describe('renderHelp', () => {
     );
   });
 
+  it('shows a boolean that defaults to on as the `--no-` flag that turns it off', () => {
+    const serve = {
+      meta: { name: 'serve' },
+      args: {
+        watch: { type: 'boolean', default: true, alias: 'w', description: 'Serve once.' },
+        open: { type: 'boolean', default: false },
+      },
+    } as const;
+    strictEqual(
+      renderHelp(serve, plain),
+      'serve\n' +
+        '\n' +
+        'USAGE\n' +
+        '  serve [options]\n' +
+        '\n' +
+        'OPTIONS\n' +
+        '  --no-watch  Serve once.\n' +
+        '  --open\n' +
+        '  --help, -h  Show help\n',
+    );
+  });
+
   it('renders a group with a command list and version', () => {
     const cli = {
       meta: { name: 'app', version: '1.2.0', description: 'Demo CLI' },
