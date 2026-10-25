@@ -474,6 +474,13 @@ describe('serveDashboard', () => {
     match(res.headers['etag'] as string, /^W\//);
   });
 
+  it('reloads once over a failed boot, under the mark the router shares', async () => {
+    const port = await serve('boot-reload');
+    const body = (await req(port, '/')).body;
+    strictEqual(body.includes("sessionStorage.setItem('ohne-reloaded', '1');"), true);
+    strictEqual(body.includes("sessionStorage.removeItem('ohne-reloaded');"), true);
+  });
+
   it('holds a boot failure state in English when no catalog translates it', async () => {
     const port = await serve('boot-failed');
     const body = (await req(port, '/')).body;

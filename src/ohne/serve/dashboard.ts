@@ -92,6 +92,12 @@ const ICON_MAX_AGE = 86_400;
 const RELOAD_PATH = `${MODULE_BASE}/dashboard/reload`;
 
 /**
+ * The tab's mark that the dashboard already reloaded itself over a failed load.
+ * The kernel's router sets the same key, so a failed boot and a failed page share one reload.
+ */
+const RELOADED = 'ohne-reloaded';
+
+/**
  * The kernel's entry module, the one the shell loads.
  */
 const KERNEL_ENTRY = `${MODULE_BASE}/dashboard/boot.ts`;
@@ -515,8 +521,8 @@ function preloads(
  * The single-page shell: the pre-paint color-mode script, the config, the importmap, and the kernel.
  * A module script's `src` and a preload's `href` skip the importmap, so the shell writes fingerprinted URLs.
  * The preloads follow the importmap, since a browser ignores an importmap that comes after a module fetch.
- * Until the kernel announces `ohne-booted`, a failure to load or run it swaps `#app` for `failed`.
- * That covers a module the browser could not fetch, so a dropped request never leaves a blank page.
+ * Until the kernel announces `ohne-booted`, a failure to load or run it reloads the page once.
+ * A failure after that reload swaps `#app` for `failed`, so a dropped request never leaves a blank page.
  * The guard listens while capturing, since a script's fetch failure does not bubble.
  */
 function shellDocument(
@@ -567,12 +573,24 @@ function shellDocument(
         const fail = (event) => {
           if (event.target !== window && event.target !== kernel) return;
           removeEventListener('error', fail, true);
+          try {
+            if (sessionStorage.getItem('${RELOADED}') === null) {
+              sessionStorage.setItem('${RELOADED}', '1');
+              return location.reload();
+            }
+          } catch {}
           const failed = document.getElementById('ohne-boot-failed').content.cloneNode(true);
           failed.querySelector('button').addEventListener('click', () => location.reload());
           document.getElementById('app').replaceChildren(failed);
         };
         addEventListener('error', fail, true);
-        addEventListener('ohne-booted', () => removeEventListener('error', fail, true), { once: true });
+        const booted = () => {
+          removeEventListener('error', fail, true);
+          try {
+            sessionStorage.removeItem('${RELOADED}');
+          } catch {}
+        };
+        addEventListener('ohne-booted', booted, { once: true });
       }
     </script>${reloadClient}
   </body>
