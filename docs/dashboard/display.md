@@ -141,6 +141,12 @@ alert('Several plate wearers are below 20% durability.', {
 note('Changes to the roster go live after the next raid reset.')
 ```
 
+Give it a `tone` when the hint warns:
+
+```ts
+note('Once you save, this is no longer the home page.', { tone: 'warning', icon: 'alert-triangle' })
+```
+
 ## Facts
 
 `facts` shows labeled values in a grid, like a record's summary:

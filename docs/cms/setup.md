@@ -114,7 +114,7 @@ A route is a path pattern:
 Under `/[...slug]`, these slugs are special:
 
 - `index` is the home page. It shows at `/`, and `/index` redirects there.
-- `404` is the page your website shows when nothing else matches.
+- `404` is the page your website shows when nothing else matches, `/404` included.
 
 A slug must fit the route it shows under:
 
