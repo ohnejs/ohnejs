@@ -62,6 +62,10 @@ css`
     font-size: 1.125em;
   }
 
+  .ohne-prose > :where(h1, h2, h3, h4, h5, h6) {
+    line-height: 1.25;
+  }
+
   .ohne-prose > :where(hr) {
     margin: calc(2.5em + var(--ohne-spacing) * 0.5em) 0;
   }
