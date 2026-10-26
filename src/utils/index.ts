@@ -346,6 +346,7 @@ export * from './template/template-fields.ts';
 export * from './text/code-fences.ts';
 export * from './text/decode-text.ts';
 export * from './text/edit-range.ts';
+export * from './text/escape-markdown.ts';
 export * from './text/hash-text.ts';
 export * from './text/indent-lines.ts';
 export * from './text/initials.ts';
