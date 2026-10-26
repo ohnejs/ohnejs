@@ -99,6 +99,7 @@ import { activeContentLocale } from './content-language-switcher.ts';
 import { canDuplicate, duplicateAction } from './duplicate-action.ts';
 import { editableFieldCell } from './editable-field-cell.ts';
 import { filterPopup } from './filter-popup.ts';
+import { deleteNoticesOf } from './record-view.ts';
 import { sortingPopup } from './sorting-popup.ts';
 import { translationsCell, type TranslationsCellOptions } from './translations-cell.ts';
 import { translationsPopup } from './translations-popup.ts';
@@ -426,8 +427,12 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
 
   const onDelete = async (uuid: string): Promise<void> => {
     if (deleteBusy) return;
+    deleteBusy = true;
+    const notices = await deleteNoticesOf(collection, uuid);
+    deleteBusy = false;
     const action = await openDialog({
-      content: t('dashboard.table.confirmDeleteOne'),
+      content: () =>
+        [t('dashboard.table.confirmDeleteOne'), ...notices.map(translateMessage)].join('\n\n'),
       actions: [
         { name: 'cancel', label: t('dashboard.cancel') },
         { name: 'delete', label: t('dashboard.delete'), variant: 'destructive' },

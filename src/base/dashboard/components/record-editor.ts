@@ -25,6 +25,7 @@ import {
   openDialog,
   overlayCount,
   queueToast,
+  readAPIError,
   type RowVerdicts,
   seedLabel,
   signInCount,
@@ -66,7 +67,7 @@ import { canDuplicate, duplicateAction } from './duplicate-action.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History } from './history.ts';
-import { recordNotices } from './record-view.ts';
+import { deleteNoticesOf, recordNotices } from './record-view.ts';
 import { translationsPopup } from './translations-popup.ts';
 
 /**
@@ -551,8 +552,12 @@ export function useRecordEditor(
 
   const remove = async (): Promise<void> => {
     if (busy.value) return;
+    busy.value = true;
+    const notices = await deleteNoticesOf(collection, id);
+    busy.value = false;
     const action = await openDialog({
-      content: t('dashboard.record.confirmDelete'),
+      content: () =>
+        [t('dashboard.record.confirmDelete'), ...notices.map(translateMessage)].join('\n\n'),
       actions: [
         { name: 'cancel', label: t('dashboard.cancel') },
         { name: 'delete', label: t('dashboard.delete'), variant: 'destructive' },
@@ -560,9 +565,22 @@ export function useRecordEditor(
     });
     if (action !== 'delete') return;
     busy.value = true;
-    const gone = await deleteRecord(collection.segment, id);
+    const response = await deleteRecord(collection.segment, id);
     busy.value = false;
-    if (!gone) return;
+    if (response?.status === 404) {
+      history.clear();
+      redirectGone();
+      return;
+    }
+    if (response?.ok !== true) {
+      toast(
+        isUndefined(response)
+          ? t('dashboard.unreachable')
+          : (await readAPIError(response, t('dashboard.writeFailed'))).message,
+        { type: 'error' },
+      );
+      return;
+    }
     setTimeout(() => {
       history.clear();
       queueToast(t('dashboard.record.deleted'), { type: 'success', showAfterRouteChange: true });
@@ -904,9 +922,10 @@ async function write(
 }
 
 /**
- * Deletes the record, retrying once on a busy `503`; answers whether the delete landed.
+ * Deletes the record, retrying once on a busy `503`, and answers the final response.
+ * It answers `undefined` when the server is unreachable.
  */
-async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
+async function deleteRecord(segment: string, uuid: string): Promise<Response | undefined> {
   const send = (): Promise<Response> => api(`DELETE /collections/${segment}/${uuid}`);
   try {
     let response = await send();
@@ -914,9 +933,9 @@ async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
       await sleep(1000);
       response = await send();
     }
-    return response.ok;
+    return response;
   } catch {
-    return false;
+    return undefined;
   }
 }
 

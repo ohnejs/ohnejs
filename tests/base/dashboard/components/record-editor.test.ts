@@ -15,7 +15,7 @@ import { flush } from '../../../../src/utils/reactive/_scheduler.ts';
 import { FakeElement, type FakeNode, findElement, hasClass } from '../../../dashboard/_fake-dom.ts';
 import { shownInputs, toggleCard } from '../../../dashboard/fields/_cards.ts';
 import { inputOf, type } from '../../../dashboard/fields/_controls.ts';
-import { settle } from '../../../dashboard/router/_browser.ts';
+import { type FakeBrowser, settle } from '../../../dashboard/router/_browser.ts';
 import { fire } from '../../../dashboard/ui/_events.ts';
 import { shapeOfDOM } from '../../../dashboard/ui/_menu-shape.ts';
 import { baseBrowser } from '../_browser.ts';
@@ -107,9 +107,15 @@ describe('useRecordEditor', () => {
   let stored = 'thrall@x.example';
   // A read the next query waits on.
   let held: Promise<void> | undefined;
+  let deleted: () => Promise<Response> = async () => new Response(null, { status: 204 });
+  let browser!: FakeBrowser;
+  let dialogHost!: () => unknown;
+  let outlet!: FakeElement;
+  let noted: string | Promise<string | undefined> | undefined;
+  let asked: string[] = [];
 
   before(async () => {
-    baseBrowser('/collections/showcase/u1');
+    browser = baseBrowser('/collections/showcase/u1');
     Object.assign(document, {
       getElementById: () => ({
         textContent: JSON.stringify({
@@ -121,7 +127,16 @@ describe('useRecordEditor', () => {
     });
     Object.assign(FakeElement.prototype, { querySelector });
     editor = await import('../../../../src/base/dashboard/components/record-editor.ts');
+    const { registerDeleteNotice } =
+      await import('../../../../src/base/dashboard/components/record-view.ts');
+    registerDeleteNotice((collection, uuid) => {
+      asked = [collection.name, uuid];
+      return noted;
+    });
     ({ hasUnsavedChanges } = await import('../../../../src/dashboard/router/unsaved-changes.ts'));
+    ({ dialogHost } = await import('../../../../src/dashboard/ui/dialog.ts'));
+    const { toaster } = await import('../../../../src/dashboard/ui/toaster.ts');
+    outlet = toaster() as unknown as FakeElement;
     const { registerUntypedFieldType } =
       await import('../../../../src/dashboard/fields/field-type.ts');
     const { h } = await import('../../../../src/dashboard/render/h.ts');
@@ -172,6 +187,7 @@ describe('useRecordEditor', () => {
           await held;
           return Response.json({ records: [record] });
         }
+        if (init?.method === 'DELETE') return deleted();
         if (init?.method === 'PATCH' && url.endsWith('/collections/showcase/u1')) {
           const sent = JSON.parse(String(init.body)) as Record<string, unknown>;
           stored = (sent.contactEmail as string | undefined) ?? stored;
@@ -196,6 +212,106 @@ describe('useRecordEditor', () => {
     strictEqual(record.dirty(), false);
     return { record, scope };
   }
+
+  /**
+   * Deletes `u1` through the confirm dialog, answering the `DELETE` with `answer`.
+   * Resolves with the dialog's paragraphs, the toasts showing and the history pushes, once it has closed.
+   */
+  async function remove(answer: () => Promise<Response>): Promise<{
+    record: ReturnType<Editor['useRecordEditor']>;
+    paragraphs: string[];
+    toasts: string[];
+    pushes: string[];
+  }> {
+    browser.popstate('/collections/showcase/u1');
+    const { record, scope } = await open();
+    const { h } = await import('../../../../src/dashboard/render/h.ts');
+    const { classList } = document.body as unknown as { classList: Set<string> };
+    // The dialog's overlay undims the body and announces its close.
+    Object.assign(classList, { remove: (name: string) => classList.delete(name) });
+    Object.assign(window, { dispatchEvent: () => true });
+    const host = effectScope();
+    host.run(() => h('div', null, dialogHost() as Node));
+    deleted = answer;
+    const pushed = browser.pushes.length;
+    const removed = record.remove();
+    await settle();
+    const content = findElement(document.body as unknown as FakeElement, (element) =>
+      hasClass(element, 'ohne-dialog-content'),
+    )!;
+    const paragraphs = content.childNodes.map((paragraph) => paragraph.textContent);
+    fire(
+      findElement(
+        document.body as unknown as FakeElement,
+        (element) => element.tagName === 'BUTTON' && element.textContent === 'dashboard.delete',
+      )!,
+      'click',
+    );
+    await removed;
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await settle();
+    const toasts = outlet.childNodes
+      .flatMap((list) => list.childNodes.map((item) => item.textContent))
+      .filter((text) => text !== '');
+    host.dispose();
+    scope.dispose();
+    deleted = async () => new Response(null, { status: 204 });
+    return { record, paragraphs, toasts, pushes: browser.pushes.slice(pushed) };
+  }
+
+  it('asks to delete with each registered notice as its own paragraph under the question', async () => {
+    noted = 'It is pinned.';
+    const { paragraphs } = await remove(async () => new Response(null, { status: 204 }));
+    noted = undefined;
+    deepStrictEqual(
+      [paragraphs, asked],
+      [
+        ['dashboard.record.confirmDelete', 'It is pinned.'],
+        ['Showcase', 'u1'],
+      ],
+    );
+  });
+
+  it('asks to delete with a notice that answers once its read lands', async () => {
+    noted = Promise.resolve('It is pinned elsewhere.');
+    const { paragraphs } = await remove(async () => new Response(null, { status: 204 }));
+    noted = undefined;
+    deepStrictEqual(paragraphs, ['dashboard.record.confirmDelete', 'It is pinned elsewhere.']);
+  });
+
+  it('asks to delete with only the question when no notice concerns the record', async () => {
+    const { paragraphs } = await remove(async () => new Response(null, { status: 204 }));
+    deepStrictEqual(paragraphs, ['dashboard.record.confirmDelete']);
+  });
+
+  it('toasts the message of a refused delete and stays on the record', async () => {
+    const refused = { statusCode: 403, message: 'Only admins delete pages' };
+    const { record, toasts, pushes } = await remove(async () =>
+      Response.json(refused, { status: 403 }),
+    );
+    deepStrictEqual([toasts.includes('Only admins delete pages'), pushes], [true, []]);
+    strictEqual(record.busy.value, false);
+  });
+
+  it('toasts an unreachable server when the delete never answers', async () => {
+    const { record, toasts, pushes } = await remove(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    deepStrictEqual([toasts.includes('dashboard.unreachable'), pushes], [true, []]);
+    strictEqual(record.busy.value, false);
+  });
+
+  it('lands on the list after a delete', async () => {
+    const { pushes } = await remove(async () => new Response(null, { status: 204 }));
+    deepStrictEqual(pushes, ['/collections/showcase']);
+  });
+
+  it('leaves a record the delete cannot find for the list, with no error toast', async () => {
+    const { toasts, pushes } = await remove(async () =>
+      Response.json({ statusCode: 404, message: 'Not found' }, { status: 404 }),
+    );
+    deepStrictEqual([pushes, toasts.includes('Not found')], [['/collections/showcase'], false]);
+  });
 
   it('heads the page with the collection label translated, a message object included', async () => {
     const { loadLanguage } = await import('../../../../src/dashboard/runtime/messages.ts');

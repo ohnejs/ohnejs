@@ -290,7 +290,8 @@ describe('collectionTable sheet', () => {
     menuRows(menu).find((row) => labelOf(row) === label)!;
 
   /**
-   * Picks the menu row labelled `label` from the row's actions menu; without catalogs a label reads as its key.
+   * Picks the menu row labelled `label` from the row's actions menu.
+   * Without catalogs a label reads as its key.
    */
   const pickAction = (root: FakeElement, name: string, label: string): void => {
     dispatch(byClass(rowOf(root, name), 'ohne-table-kebab')[0]!, 'click');
@@ -1183,6 +1184,11 @@ describe('collectionTable row menu', () => {
     ({ collectionTable } =
       await import('../../../../src/base/dashboard/components/collection-table.ts'));
     ({ dialogHost } = await import('../../../../src/dashboard/ui/dialog.ts'));
+    const { registerDeleteNotice } =
+      await import('../../../../src/base/dashboard/components/record-view.ts');
+    registerDeleteNotice(async (collection, uuid) =>
+      collection.name === 'Guild' && uuid === 'u-jaina' ? 'Jaina leads the guild.' : undefined,
+    );
     invalidateDashboardMeta();
     dashboardMeta();
     await idle();
@@ -1215,6 +1221,33 @@ describe('collectionTable row menu', () => {
     strictEqual(
       texts.some((element) => element.textContent === 'dashboard.table.confirmDeleteOne'),
       false,
+    );
+    scope?.dispose();
+  });
+
+  it('asks to delete a row with each registered notice as its own paragraph', async () => {
+    const root = await sheet(['delete'], false);
+    const asked = (name: string): Promise<string[]> => {
+      pick(root, name, 'dashboard.delete');
+      return idle().then(() => {
+        const content = findAll(body(), (element) => hasClass(element, 'ohne-dialog-content'));
+        const paragraphs = content.at(-1)!.childNodes.map((paragraph) => paragraph.textContent);
+        const cancel = findAll(
+          body(),
+          (element) => element.tagName === 'BUTTON' && element.textContent === 'dashboard.cancel',
+        ).at(-1)!;
+        dispatch(cancel, 'click');
+        return paragraphs;
+      });
+    };
+    const jaina = await asked('Jaina');
+    await idle();
+    deepStrictEqual(
+      [jaina, await asked('Thrall')],
+      [
+        ['dashboard.table.confirmDeleteOne', 'Jaina leads the guild.'],
+        ['dashboard.table.confirmDeleteOne'],
+      ],
     );
     scope?.dispose();
   });

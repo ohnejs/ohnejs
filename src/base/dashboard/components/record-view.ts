@@ -1,4 +1,4 @@
-import type { Child, DashboardCollection } from 'ohnejs/dashboard';
+import type { Child, DashboardCollection, Text } from 'ohnejs/dashboard';
 
 import {
   alert,
@@ -9,7 +9,7 @@ import {
   useDashboardLanguage,
   useT,
 } from 'ohnejs/dashboard';
-import { isEmpty, isUndefined } from 'ohnejs/utils';
+import { compact, isEmpty, isUndefined } from 'ohnejs/utils';
 
 import type { RecordEditor } from './record-editor.ts';
 
@@ -21,6 +21,11 @@ export type RecordView = (collection: DashboardCollection, uuid: string | undefi
 
 const matchers: ((collection: DashboardCollection) => RecordView | undefined)[] = [];
 const notices: ((editor: RecordEditor) => Child)[] = [];
+type DeleteNotice = (
+  collection: DashboardCollection,
+  uuid: string,
+) => Text | undefined | Promise<Text | undefined>;
+const deleteNotices: DeleteNotice[] = [];
 
 css`
   .o-record-notices {
@@ -82,6 +87,34 @@ export function recordNotices(editor: RecordEditor): Child {
     changedNotice(editor),
     notices.map((render) => render(editor)),
   );
+}
+
+/**
+ * Registers a line for a record's delete confirmation, for what deleting the record also does.
+ * `notice` runs when the user asks to delete one record, from its page or its table row.
+ * It answers `undefined` for a record it does not concern.
+ * It may answer through a promise, and the dialog opens once every notice has answered.
+ * Each line shows as its own paragraph under the question, in registration order.
+ *
+ * @example
+ * ```ts
+ * registerDeleteNotice((collection, uuid) =>
+ *   pinned.has(uuid) ? 'It is pinned on the start page.' : undefined,
+ * )
+ * ```
+ */
+export function registerDeleteNotice(notice: DeleteNotice): void {
+  deleteNotices.push(notice);
+}
+
+/**
+ * The registered lines for deleting the record `uuid` of `collection`, in order.
+ */
+export async function deleteNoticesOf(
+  collection: DashboardCollection,
+  uuid: string,
+): Promise<Text[]> {
+  return compact(await Promise.all(deleteNotices.map((notice) => notice(collection, uuid))));
 }
 
 /**
