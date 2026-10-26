@@ -365,13 +365,72 @@ function isScalarField(meta: FieldQueryMeta): boolean {
 }
 
 /**
- * Processes one scope's fields through the two-phase pipeline, dispatching each field on its kind.
+ * One scope after phase A and its `when` gate: each settable field's outcome, plus the view a gate reads.
+ */
+export interface PreparedScope {
+  /**
+   * The settable field names, in declaration order: every field that carries a field type.
+   */
+  names: string[];
+
+  /**
+   * Each field's phase-A outcome, an inactive field's already replaced by its inactive fallback.
+   */
+  entries: Record<string, Prepared>;
+
+  /**
+   * The coerced values the gate read, which a nested scope's `when` climbs to with `../` or `/`.
+   */
+  values: ScopeValues;
+}
+
+/**
+ * Runs phase A over every settable field of one scope, then gates each on its `when` when `gate` is set.
  *
  * Phase A runs every field's default path, null gate, and coerce.
- * A create gates each field on its `when` between the phases, reading coerced siblings and ancestry.
+ * The gate reads the coerced siblings and the ancestry, never raw input.
  * An inactive field drops its value, `null` included, and takes its inactive fallback.
  * An absent one keeps the default phase A landed, so that callback default still runs once.
- * An update never gates here; its activation is per matched record, resolved by the executor.
+ */
+export async function prepareScope(
+  fields: Record<string, FieldQueryMeta>,
+  input: Readonly<Record<string, unknown>>,
+  ctx: ScopeContext,
+  gate: boolean,
+): Promise<PreparedScope> {
+  const names = Object.keys(fields).filter((name) => !isUndefined(fields[name].fieldType));
+  const entries: Record<string, Prepared> = {};
+  await Promise.all(
+    names.map(async (name) => {
+      const meta = fields[name];
+      entries[name] = isScalarField(meta)
+        ? await prepareScalar(name, meta, input, ctx)
+        : await prepareComposite(name, meta, input, ctx);
+    }),
+  );
+
+  const values = scopeValuesOf(names, entries);
+  if (!gate || !names.some((name) => !isUndefined(fields[name].when))) {
+    return { names, entries, values };
+  }
+  const resolve = conditionResolver(values, ctx.ancestors);
+  await Promise.all(
+    names.map(async (name) => {
+      const meta = fields[name];
+      if (isUndefined(meta.when) || evaluateCondition(meta.when, resolve)) return;
+      entries[name] = isProvided(input, name)
+        ? await defaultPath(name, meta, writeContext(name, meta, input, ctx), true)
+        : inactiveAbsent(meta, entries[name]);
+    }),
+  );
+  return { names, entries, values };
+}
+
+/**
+ * Processes one scope's fields through the two-phase pipeline, dispatching each field on its kind.
+ *
+ * Phase A and the gate run through `prepareScope`; only a create gates there.
+ * An update's activation is per matched record, resolved by the executor.
  * A nested update item's omitted gated subfield that needs input defers its failure to that gate.
  * Provided fields there validate once, whether active or not.
  * Phase B then validates and serializes each field in parallel, each owning its own error slice.
@@ -382,29 +441,18 @@ export async function processScope(
   input: Readonly<Record<string, unknown>>,
   ctx: ScopeContext,
 ): Promise<ProcessResult> {
-  const names = Object.keys(fields).filter((name) => !isUndefined(fields[name].fieldType));
+  const {
+    names,
+    entries,
+    values: scopeValues,
+  } = await prepareScope(fields, input, ctx, ctx.operation === 'create');
   const errors: FieldErrors = Object.create(null);
   const settable = new Set(names);
   for (const key of Object.keys(input)) {
     if (!settable.has(key)) errors[key] = 'validation.unknownField';
   }
 
-  const prepared: Record<string, Prepared> = {};
-  await Promise.all(
-    names.map(async (name) => {
-      const meta = fields[name];
-      prepared[name] = isScalarField(meta)
-        ? await prepareScalar(name, meta, input, ctx)
-        : await prepareComposite(name, meta, input, ctx);
-    }),
-  );
-
-  const scopeValues = scopeValuesOf(names, prepared);
   const descentCtx: ScopeContext = { ...ctx, ancestors: [...ctx.ancestors, scopeValues] };
-  const resolve =
-    ctx.operation === 'create' && names.some((name) => !isUndefined(fields[name].when))
-      ? conditionResolver(scopeValues, ctx.ancestors)
-      : undefined;
   const gated =
     ctx.operation === 'update' && ctx.path !== ''
       ? await gatedDefaultsOf(names, fields, input, ctx)
@@ -424,16 +472,7 @@ export async function processScope(
   await Promise.all(
     names.map(async (name) => {
       const meta = fields[name];
-      let entry = prepared[name];
-      if (
-        !isUndefined(resolve) &&
-        !isUndefined(meta.when) &&
-        !evaluateCondition(meta.when, resolve)
-      ) {
-        entry = isProvided(input, name)
-          ? await defaultPath(name, meta, writeContext(name, meta, input, ctx), true)
-          : inactiveAbsent(meta, entry);
-      }
+      let entry = entries[name];
       if (
         !isUndefined(gated) &&
         !isUndefined(meta.when) &&

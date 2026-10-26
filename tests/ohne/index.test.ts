@@ -13,6 +13,7 @@ import type {
 import { collectFieldTypes, readShapeType } from '../../src/ohne/codegen/read-shape.ts';
 import { fieldJSONType } from '../../src/ohne/fields/value-type.ts';
 import * as ohne from '../../src/ohne/index.ts';
+import { fillDefaults } from '../../src/ohne/query/fill-defaults.ts';
 import { busyError } from '../../src/ohne/query/write/busy.ts';
 import { referenceViolation, validationError } from '../../src/ohne/query/write/errors.ts';
 
@@ -43,5 +44,9 @@ describe('ohne', () => {
     strictEqual(ohne.readShapeType, readShapeType);
     strictEqual(ohne.fieldJSONType, fieldJSONType);
     strictEqual(ohne.collectFieldTypes, collectFieldTypes);
+  });
+
+  it('exports the fill that answers what a write would store', () => {
+    strictEqual(ohne.fillDefaults, fillDefaults);
   });
 });
