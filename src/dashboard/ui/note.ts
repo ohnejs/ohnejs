@@ -2,10 +2,13 @@ import type { Child } from '../render/insert.ts';
 import type { Text } from '../runtime/text.ts';
 import type { IconName } from './icon.ts';
 
+import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { proseChild } from './_text-child.ts';
 import { icon } from './icon.ts';
+import { STATUS_TONES, type Tone } from './tone.ts';
+import './_tones.ts';
 import './tokens.ts';
 
 /**
@@ -19,6 +22,13 @@ export interface NoteOptions {
    * 'info-circle'
    */
   icon?: IconName;
+
+  /**
+   * The meaning the note's color carries, painted as `alert` paints it.
+   * A status tone tints and rings the note, and a surface tone fills it, each coloring its icon.
+   * Omitted, or `primary`, keeps the quiet muted look.
+   */
+  tone?: Tone;
 }
 
 css`
@@ -37,6 +47,19 @@ css`
     margin-top: 0.125em;
   }
 
+  .ohne-note-toned {
+    background-color: hsl(var(--ohne-tone-soft));
+    color: hsl(var(--ohne-foreground));
+  }
+
+  .ohne-note-status {
+    box-shadow: inset 0 0 0 1px hsl(var(--ohne-tone-line));
+  }
+
+  .ohne-note-toned > svg {
+    color: hsl(var(--ohne-tone-ink));
+  }
+
   .ohne-note-content {
     flex: 1;
     min-width: 0;
@@ -51,12 +74,18 @@ css`
  * ```ts
  * note('Changes go live after the next deploy.')
  * note('Only officers can edit the guild bank.', { icon: 'lock' })
+ * note('Once you save, this is no longer the home page.', { tone: 'warning', icon: 'alert-triangle' })
  * ```
  */
 export function note(content: Text | Child, options: NoteOptions = {}): HTMLElement {
+  const { tone } = options;
+  const look =
+    isUndefined(tone) || tone === 'primary'
+      ? ''
+      : ` ohne-note-toned${STATUS_TONES.has(tone) ? ' ohne-note-status' : ''} ohne-tone-${tone}`;
   return h(
     'div',
-    { class: 'ohne-note' },
+    { class: `ohne-note${look}` },
     icon(options.icon ?? 'info-circle'),
     h('div', { class: 'ohne-note-content' }, proseChild(content)),
   );

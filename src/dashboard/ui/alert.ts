@@ -1,6 +1,5 @@
 import type { Child } from '../render/insert.ts';
 import type { IconName } from './icon.ts';
-import type { Tone } from './tone.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { css } from '../render/css.ts';
@@ -8,6 +7,7 @@ import { h } from '../render/h.ts';
 import { resolveText, type Text } from '../runtime/text.ts';
 import { proseChild } from './_text-child.ts';
 import { icon } from './icon.ts';
+import { STATUS_TONES, type Tone } from './tone.ts';
 import './_tones.ts';
 import './tokens.ts';
 
@@ -46,8 +46,6 @@ export interface AlertOptions {
    */
   size?: number;
 }
-
-const STATUS_TONES = new Set<Tone>(['destructive', 'success', 'warning', 'info']);
 
 css`
   .ohne-alert {

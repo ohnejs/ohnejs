@@ -12,3 +12,13 @@ export type Tone =
   | 'warning'
   | 'info'
   | 'neutral';
+
+/**
+ * The tones that report a status, painted with their own color rather than as a surface.
+ */
+export const STATUS_TONES: ReadonlySet<Tone> = new Set([
+  'destructive',
+  'success',
+  'warning',
+  'info',
+]);
