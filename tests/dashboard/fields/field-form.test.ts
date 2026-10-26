@@ -193,13 +193,75 @@ describe('createFieldForm', () => {
         { roster: [{ UUID: 'r1' }] },
         { mode: 'edit', path: '', language },
       );
-      deepStrictEqual(computed(() => form.snapshot()).value, {});
+      deepStrictEqual(computed(() => form.snapshot()).value, { roster: [{ UUID: 'r1' }] });
       deepStrictEqual(computed(() => form.draft()).value, { roster: [{ UUID: 'r1' }] });
       strictEqual(form.errored(), false);
     });
   });
 
-  it('drafts a value that fails its check as the user has it, where a snapshot keeps the fallback', () => {
+  it('snapshots past an empty required field at the top, where a read refuses it', () => {
+    effectScope().run(() => {
+      const form = createFieldForm(
+        [textField('lede', { required: false }), textField('title')],
+        {},
+        { mode: 'create', path: '', language },
+      );
+      const element = h('div', null, form.render());
+      type(inputOf(element), 'Hello');
+      deepStrictEqual(form.snapshot({}), { lede: 'Hello' });
+      deepStrictEqual(structuredClone(form.read()), { errors: { title: 'validation.required' } });
+    });
+  });
+
+  it('snapshots a nested item past its empty required field, where a read refuses it', () => {
+    effectScope().run(() => {
+      const crew = {
+        ...roster,
+        subfields: [textField('motto', { required: false }), textField('name')],
+      };
+      const form = createFieldForm(
+        [crew],
+        { roster: [{ UUID: 'r1' }] },
+        { mode: 'edit', path: '', language },
+      );
+      const element = h('div', null, form.render());
+      type(inputOf(element), 'For the Horde');
+      deepStrictEqual(form.snapshot({ roster: [{ UUID: 'r1', motto: 'old' }] }), {
+        roster: [{ motto: 'For the Horde', UUID: 'r1' }],
+      });
+      deepStrictEqual(structuredClone(form.read()), {
+        errors: { 'roster[0].name': 'validation.required' },
+      });
+    });
+  });
+
+  it('snapshots an object past its empty required subfield', () => {
+    effectScope().run(() => {
+      const form = createFieldForm([meta], { meta: {} }, { mode: 'edit', path: '', language });
+      deepStrictEqual(form.snapshot(), { meta: {} });
+    });
+  });
+
+  it('keeps a nested item field that stops parsing at its last snapshot', () => {
+    effectScope().run(() => {
+      const tally = {
+        ...roster,
+        subfields: [textField('n', { type: 'integer', logicalType: 'integer' })],
+      };
+      const form = createFieldForm(
+        [tally],
+        { roster: [{ UUID: 'r1' }] },
+        { mode: 'edit', path: '', language },
+      );
+      const element = h('div', null, form.render());
+      type(inputOf(element), '3');
+      deepStrictEqual(form.snapshot(), { roster: [{ n: 3, UUID: 'r1' }] });
+      type(inputOf(element), 'x');
+      deepStrictEqual(form.snapshot(), { roster: [{ n: 3, UUID: 'r1' }] });
+    });
+  });
+
+  it('drafts and snapshots a value that fails its check as the user has it, quietly', () => {
     effectScope().run(() => {
       const form = createFieldForm(
         [textField('raid', { options: { max: 4 } })],
@@ -209,7 +271,7 @@ describe('createFieldForm', () => {
       const element = h('div', null, form.render());
       type(inputOf(element), 'Naxxramas');
       deepStrictEqual(form.draft({ raid: 'Ony' }), { raid: 'Naxxramas' });
-      deepStrictEqual(form.snapshot({ raid: 'Ony' }), { raid: 'Ony' });
+      deepStrictEqual(form.snapshot({ raid: 'Ony' }), { raid: 'Naxxramas' });
       deepStrictEqual(structuredClone(form.read()), { errors: { raid: 'validation.maxLength' } });
       strictEqual(form.controlOf('raid')?.error(), '');
     });

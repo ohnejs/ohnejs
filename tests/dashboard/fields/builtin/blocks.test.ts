@@ -155,13 +155,48 @@ describe('blocksType control', () => {
       deepStrictEqual(structuredClone(reading), {
         errors: { 'sections[0].fields.title': 'validation.required' },
       });
-      deepStrictEqual(form.snapshot(), {});
+      deepStrictEqual(form.snapshot(), { sections: [{ block: 'Hero', UUID: 'b1', fields: {} }] });
       deepStrictEqual(form.draft(), { sections: [{ block: 'Hero', UUID: 'b1', fields: {} }] });
       strictEqual(form.errored(), false);
       strictEqual(form.setErrors(reading.errors ?? {}), '');
       strictEqual(form.controlOf('sections')?.errored?.(), true);
       strictEqual(form.setErrors({}), '');
       strictEqual(form.errored(), false);
+    });
+  });
+
+  it('snapshots one item per block in order, a new one with an empty required field among them', () => {
+    effectScope().run(() => {
+      const form = createFieldForm(
+        [{ ...SECTIONS, allow: ['Hero', 'Quote'] }],
+        {
+          sections: [
+            { block: 'Hero', fields: {} },
+            { block: 'Quote', UUID: 'b2', fields: { title: 'x' } },
+          ],
+        },
+        { mode: 'edit', path: '', language: () => 'en' },
+      );
+      deepStrictEqual(form.snapshot(), {
+        sections: [
+          { block: 'Hero', fields: {} },
+          { block: 'Quote', UUID: 'b2', fields: { title: 'x' } },
+        ],
+      });
+      deepStrictEqual(structuredClone(form.read()), {
+        errors: { 'sections[0].fields.title': 'validation.required' },
+      });
+    });
+  });
+
+  it('snapshots nothing while pristine over none', () => {
+    effectScope().run(() => {
+      const form = createFieldForm(
+        [SECTIONS],
+        {},
+        { mode: 'edit', path: '', language: () => 'en' },
+      );
+      deepStrictEqual(form.snapshot(), {});
     });
   });
 

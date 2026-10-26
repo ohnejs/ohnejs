@@ -148,6 +148,9 @@ export function addressType(spec: AddressSpec): FieldType<Record<never, never>> 
           const value = wire();
           return checkedReading(value, isString(value) && dirty() ? spec.check(value) : undefined);
         },
+        snapshot() {
+          return pristine() ? undefined : wire();
+        },
         draft() {
           if (pristine()) return undefined;
           return blank() ? parseTextValue(field, '') : raw.value;

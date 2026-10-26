@@ -57,6 +57,19 @@ describe('textType control', () => {
     });
   });
 
+  it('snapshots the text its read refuses, so a live view shows an emptied or long one', () => {
+    effectScope().run(() => {
+      const headline = control('Ony', { max: 4 });
+      headline.restore?.('Naxxramas');
+      const long = headline.snapshot?.();
+      headline.restore?.('');
+      deepStrictEqual(
+        [long, headline.snapshot?.(), headline.read()],
+        ['Naxxramas', '', { errors: { '': 'validation.emptyValue' } }],
+      );
+    });
+  });
+
   it('restores none to pristine over none, and `null` to an emptied nullable field', () => {
     effectScope().run(() => {
       const fresh = control(undefined);

@@ -168,7 +168,8 @@ export interface FieldForm {
   /**
    * Reads the whole value as far as it parses: a control that fails to parse keeps its `fallback` value.
    * A live consumer passes its last value, so one field mid-edit never stalls the rest.
-   * Required fields go unchecked.
+   * Required fields go unchecked at every depth.
+   * Omitted, `fallback` is the form's previous snapshot, so a nested item keeps its last value too.
    */
   snapshot(fallback?: Readonly<Record<string, unknown>>): Record<string, unknown>;
 
@@ -400,9 +401,11 @@ export function createFieldForm(
     }
     for (const row of selected) {
       if (!active(row.field.name)) continue;
-      if (mode === 'draft' && !isUndefined(row.control.draft)) {
-        const draft = row.control.draft();
-        if (!isUndefined(draft)) item[row.field.name] = draft;
+      const own =
+        mode === 'draft' ? row.control.draft : mode === 'parsed' ? row.control.snapshot : undefined;
+      if (!isUndefined(own)) {
+        const value = own.call(row.control);
+        if (!isUndefined(value)) item[row.field.name] = value;
         continue;
       }
       const reading = row.control.read();
@@ -422,6 +425,7 @@ export function createFieldForm(
     if (options.attachUUID === true && isString(seed?.UUID)) item.UUID = seed.UUID;
     return { item, errors };
   };
+  let parsed: Record<string, unknown> = {};
   const collect = (selected: readonly ControlRow[], withCarry: boolean): ControlReading => {
     const { item, errors } = gather(selected, withCarry, {}, 'checked');
     return isEmpty(errors) ? { value: item } : { errors };
@@ -507,8 +511,8 @@ export function createFieldForm(
         false,
       );
     },
-    snapshot(fallback) {
-      return gather(rows, true, fallback).item;
+    snapshot(fallback = parsed) {
+      return (parsed = gather(rows, true, fallback).item);
     },
     draft(fallback) {
       return gather(rows, true, fallback, 'draft').item;

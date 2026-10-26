@@ -76,7 +76,7 @@ describe('richTextType control', () => {
     });
   });
 
-  it('lands that tree in a form draft, where a snapshot keeps the fallback', () => {
+  it('lands that tree in a form draft and snapshot, which read alone refuses', () => {
     effectScope().run(() => {
       const form = createFieldForm(
         [field({ max: 4 })],
@@ -85,7 +85,7 @@ describe('richTextType control', () => {
       );
       form.restore({ body: paragraph('Onyxia') });
       const fallback = { body: paragraph('Ony') };
-      deepStrictEqual(form.snapshot(fallback), fallback);
+      deepStrictEqual(form.snapshot(fallback), { body: paragraph('Onyxia') });
       deepStrictEqual(form.draft(fallback), { body: paragraph('Onyxia') });
     });
   });

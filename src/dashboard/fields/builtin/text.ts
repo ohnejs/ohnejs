@@ -126,6 +126,7 @@ export const textType: FieldType<TextFieldOptions> = {
         );
       },
       draft,
+      snapshot: draft,
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         for (const [key, message] of Object.entries(errors)) {

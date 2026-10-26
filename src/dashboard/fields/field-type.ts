@@ -187,12 +187,21 @@ export interface FieldControl {
   /**
    * The value the control rebuilds from as `initial`, checks aside: what the user has, valid or not.
    * A text control answers its text as typed, so a step keeps its case and a mid-edit address.
-   * A composite answers its item forms' snapshots, so an item with an empty required field counts.
+   * A composite answers its item forms' drafts, so an item with an empty required field counts.
    * `undefined` omits the field, as `read` answering `{}` does for a pristine control over none.
    * The hosting form's `draft` collects it for an undo history, so one failing check never drops a step.
    * Omitted, the form takes `read`'s value, or its fallback when that read fails.
    */
   draft?(): unknown;
+
+  /**
+   * The value as far as it parses, required fields unchecked at every depth.
+   * A composite answers one item per item, in order, each its form's `snapshot`.
+   * A control whose read only checks a value it never parses answers that value, checks aside.
+   * `undefined` omits the field, as `read` answering `{}` does.
+   * Omitted, the hosting form's `snapshot` takes `read`'s value, or its fallback when that read fails.
+   */
+  snapshot?(): unknown;
 
   /**
    * Routes server messages keyed relative to this field; `''` addresses the control itself.
@@ -407,7 +416,9 @@ export function registerUntypedFieldType(type: string, fieldType: FieldType): vo
  * Everything else falls back to a generic type whose form control is a missing-component alert.
  * It renders primitives and string lists as text, other lists as counts, and objects as a dim mark.
  */
-export function fieldTypeFor(field: DashboardField): FieldType {
+export function fieldTypeFor(
+  field: Pick<DashboardField, 'type' | 'kind' | 'logicalType'>,
+): FieldType {
   return registeredFieldType(field) ?? FALLBACK;
 }
 
@@ -415,7 +426,9 @@ export function fieldTypeFor(field: DashboardField): FieldType {
  * The registered dashboard behaviour for `field`, or `undefined` when only the generic fallback applies.
  * A form uses it to decide whether a locked field can render a real disabled control.
  */
-export function registeredFieldType(field: DashboardField): FieldType | undefined {
+export function registeredFieldType(
+  field: Pick<DashboardField, 'type' | 'kind' | 'logicalType'>,
+): FieldType | undefined {
   const fieldType = isNull(field.type) ? undefined : registry.get(field.type);
   if (!isUndefined(fieldType)) return fieldType;
   if (field.kind === 'column') {

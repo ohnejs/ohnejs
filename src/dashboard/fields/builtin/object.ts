@@ -242,6 +242,11 @@ export const objectType: FieldType<ObjectFieldOptions> = {
         if (isUndefined(form)) return undefined;
         return isNull(form) ? null : form.draft();
       },
+      snapshot() {
+        const form = live();
+        if (isUndefined(form)) return undefined;
+        return isNull(form) ? null : form.snapshot();
+      },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         const rest = withoutRoot(errors);

@@ -139,6 +139,22 @@ describe('repeaterType control', () => {
     });
   });
 
+  it('snapshots a list below `min` whole, where a read refuses its count', () => {
+    effectScope().run(() => {
+      const form = createFieldForm(
+        [FAQ],
+        { faq: [{ UUID: 'q1', question: 'Why?', answer: 'Because.' }] },
+        { mode: 'edit', path: '', language },
+      );
+      const element = h('div', null, form.render());
+      type(inputOf(element), 'How?');
+      deepStrictEqual(form.snapshot(), {
+        faq: [{ question: 'How?', answer: 'Because.', UUID: 'q1' }],
+      });
+      deepStrictEqual(structuredClone(form.read()), { errors: { faq: 'validation.minItems' } });
+    });
+  });
+
   it('names each card by its item, live as the user types, and by its number while it is blank', () => {
     effectScope().run(() => {
       const stored = { quests: [{ UUID: 'q1', question: 'Why' }, { UUID: 'q2' }] };

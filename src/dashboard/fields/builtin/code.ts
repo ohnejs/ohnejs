@@ -121,6 +121,7 @@ export const codeType: FieldType<CodeFieldOptions> = {
         return checkedReading(value, isString(value) && dirty() ? check(value) : undefined);
       },
       draft,
+      snapshot: draft,
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         for (const [key, message] of Object.entries(errors)) {

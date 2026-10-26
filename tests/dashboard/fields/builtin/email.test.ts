@@ -67,6 +67,17 @@ describe('emailType control', () => {
     });
   });
 
+  it('snapshots the stored form of an address its read refuses', () => {
+    effectScope().run(() => {
+      const inbox = control();
+      type(inputOf(inbox.element), 'Jaina');
+      deepStrictEqual(
+        [inbox.snapshot?.(), inbox.read()],
+        ['jaina', { errors: { '': 'validation.invalidEmail' } }],
+      );
+    });
+  });
+
   it('drafts nothing for a pristine control over none, and `null` for an emptied nullable one', () => {
     effectScope().run(() => {
       const fresh = emailType.control!({

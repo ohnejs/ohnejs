@@ -495,6 +495,11 @@ export const blocksType: FieldType = {
       draft() {
         return pristine() ? undefined : nodes.value.map((node) => draftOf(node));
       },
+      snapshot() {
+        return pristine()
+          ? undefined
+          : nodes.value.map((node) => itemOf(node, node.form.snapshot()));
+      },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         let unplaced = '';

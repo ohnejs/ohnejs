@@ -379,6 +379,9 @@ export const repeaterType: FieldType<RepeaterFieldOptions> = {
       draft() {
         return pristine() ? undefined : entries.value.map(draftOf);
       },
+      snapshot() {
+        return pristine() ? undefined : entries.value.map((entry) => entry.form.snapshot());
+      },
       setErrors(errors) {
         routed.value = errors[''] ?? '';
         let unplaced = '';

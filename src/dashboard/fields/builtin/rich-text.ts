@@ -207,6 +207,7 @@ export const richTextType: FieldType<RichTextFieldOptions> = {
         return checkedReading(value, dirty() ? checkTree(value, field.options ?? {}) : undefined);
       },
       draft: drafted,
+      snapshot: drafted,
       setErrors(errors) {
         let first = '';
         const paths: number[][] = [];

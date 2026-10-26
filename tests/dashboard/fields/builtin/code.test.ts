@@ -90,6 +90,17 @@ describe('codeType control', () => {
     });
   });
 
+  it('snapshots the emptied code its read refuses', () => {
+    effectScope().run(() => {
+      const required = control();
+      type(areaOf(required.element), '');
+      deepStrictEqual(
+        [required.snapshot?.(), required.read()],
+        ['', { errors: { '': 'validation.emptyValue' } }],
+      );
+    });
+  });
+
   it('keeps a stored empty string on a nullable field, clean until edited', () => {
     effectScope().run(() => {
       const empty = control({ allowEmpty: true }, '', true);
