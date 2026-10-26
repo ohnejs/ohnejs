@@ -210,15 +210,11 @@ css`
     background-color: hsl(var(--ohne-primary) / 0.9);
   }
 
-  :is(.ohne-button-secondary, .ohne-button-ghost)[aria-haspopup][aria-expanded='true'] {
+  .ohne-button:not(.ohne-button-primary)[aria-haspopup][aria-expanded='true'] {
+    --ohne-ring: var(--ohne-primary);
     background-color: hsl(var(--ohne-primary));
+    border-color: hsl(var(--ohne-primary));
     color: hsl(var(--ohne-primary-foreground));
-  }
-
-  .ohne-button-outline[aria-haspopup][aria-expanded='true'] {
-    background-color: hsl(var(--ohne-accent));
-    border-color: hsl(var(--ohne-accent));
-    color: hsl(var(--ohne-accent-foreground));
   }
 
   .ohne-button:focus-visible {

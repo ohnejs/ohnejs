@@ -278,13 +278,18 @@ css`
     transition-property: background-color, color, box-shadow;
   }
 
-  .ohne-rich-text-tool:is([aria-pressed='true'], [aria-expanded='true']) {
+  .ohne-rich-text-tool[aria-pressed='true'] {
     background-color: hsl(var(--ohne-accent));
     color: hsl(var(--ohne-accent-foreground));
   }
 
+  .ohne-rich-text-tool[aria-expanded='true'] {
+    background-color: hsl(var(--ohne-primary));
+    color: hsl(var(--ohne-primary-foreground));
+  }
+
   @media (hover: hover) {
-    .ohne-rich-text-tool:hover:not(:disabled, [aria-pressed='true']) {
+    .ohne-rich-text-tool:hover:not(:disabled, [aria-pressed='true'], [aria-expanded='true']) {
       background-color: hsl(var(--ohne-accent));
       color: hsl(var(--ohne-accent-foreground));
     }
