@@ -142,6 +142,7 @@ export type * from './i18n/message-params.ts';
 export * from './i18n/number-options-from-skeleton.ts';
 export * from './i18n/parse-message.ts';
 export * from './i18n/plain-number-in.ts';
+export * from './i18n/resolve-catalog.ts';
 export * from './i18n/strip-code-spans.ts';
 export * from './i18n/suggest-message-params.ts';
 export type * from './icon/icon-name.ts';
