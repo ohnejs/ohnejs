@@ -1,13 +1,5 @@
 import { badRequest, defineHandler, notFound, useConfig, useMessages } from 'ohnejs';
-import {
-  canonicalizeLanguage,
-  isEmpty,
-  isNull,
-  isUndefined,
-  languageFallbacks,
-  messageGroup,
-  uniqueArray,
-} from 'ohnejs/utils';
+import { canonicalizeLanguage, isEmpty, isNull, resolveCatalog } from 'ohnejs/utils';
 
 import { translate } from '../../../../ohne/http/translate.ts';
 
@@ -30,17 +22,7 @@ export default defineHandler(
     const configured = useConfig().messages.defaultLanguage;
     const fallback = canonicalizeLanguage(configured) ?? configured;
     const group = params.group;
-    const catalogs = useMessages().all();
-
-    const result: Record<string, { template: string; language: string }> = {};
-    for (const lang of uniqueArray([...languageFallbacks(language), fallback]).reverse()) {
-      const catalog = catalogs[lang];
-      if (isUndefined(catalog)) continue;
-      for (const [key, template] of Object.entries(catalog)) {
-        if (messageGroup(key) === group) result[key] = { template, language: lang };
-      }
-    }
-
+    const result = resolveCatalog(useMessages().all(), group, language, fallback);
     if (isEmpty(result)) throw notFound(translate('api.messages.unknownGroup', { group }));
     return result;
   },
