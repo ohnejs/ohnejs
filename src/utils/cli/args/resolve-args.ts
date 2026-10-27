@@ -125,9 +125,8 @@ export function resolveArgs<const S extends ArgsSchema>(
     const raw = pickRaw(parsed.flags, name, def.alias);
 
     if (isUndefined(raw)) {
-      if (def.type === 'boolean') values[name] = def.default ?? false;
-      else if (!isUndefined(def.default)) values[name] = def.default;
-      else if (def.required) {
+      if (!isUndefined(def.default)) values[name] = def.default;
+      else if (def.type !== 'boolean' && def.required) {
         errors.push({ kind: 'missing', name, message: `Missing required flag \`--${flag}\`` });
       }
       continue;

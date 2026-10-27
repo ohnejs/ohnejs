@@ -27,9 +27,10 @@ describe('resolveArgs', () => {
     });
   });
 
-  it('defaults a boolean to false and reads --no- as false', () => {
+  it('leaves an absent boolean unset and reads --no- as false', () => {
     const schema = { force: { type: 'boolean' } } as const;
-    deepStrictEqual(resolveArgs(schema, []), {
+    deepStrictEqual(resolveArgs(schema, []), { ok: true, values: {}, positionals: [] });
+    deepStrictEqual(resolveArgs({ force: { type: 'boolean', default: false } }, []), {
       ok: true,
       values: { force: false },
       positionals: [],
@@ -53,11 +54,7 @@ describe('resolveArgs', () => {
       values: { noCache: true },
       positionals: [],
     });
-    deepStrictEqual(resolveArgs(schema, []), {
-      ok: true,
-      values: { noCache: false },
-      positionals: [],
-    });
+    deepStrictEqual(resolveArgs(schema, []), { ok: true, values: {}, positionals: [] });
   });
 
   it('accepts a valid enum value', () => {

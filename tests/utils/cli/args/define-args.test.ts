@@ -37,10 +37,10 @@ describe('ResolvedArgs', () => {
     strictEqual(type && required, true);
   });
 
-  it('makes a boolean arg always present', () => {
-    const type: Equal<Opts['force'], boolean> = true;
-    const required: IsRequired<Opts, 'force'> = true;
-    strictEqual(type && required, true);
+  it('keeps a boolean arg without a default optional', () => {
+    const type: Equal<Opts['force'], boolean | undefined> = true;
+    const optional: IsRequired<Opts, 'force'> = false;
+    strictEqual(type && !optional, true);
   });
 
   it('narrows an enum to its options union and keeps it optional', () => {

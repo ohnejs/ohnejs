@@ -85,7 +85,7 @@ interface NumberArg extends CommonArg {
 
 /**
  * A boolean-valued argument.
- * Always present in the resolved options, so it has no `required` field.
+ * It has no `required` field, since a switch is never missing, only unset.
  */
 interface BooleanArg extends CommonArg {
   /**
@@ -95,9 +95,7 @@ interface BooleanArg extends CommonArg {
 
   /**
    * Value used when the flag is absent.
-   *
-   * @default
-   * false
+   * Omitted, an absent flag resolves to `undefined`, so a command can tell it from `--no-<flag>`.
    */
   default?: boolean;
 }
@@ -151,17 +149,15 @@ type ArgValue<A extends ArgSchema> = A extends { type: 'boolean' }
         ? string
         : never;
 
-type IsDefined<A extends ArgSchema> = A extends { type: 'boolean' }
+type IsDefined<A extends ArgSchema> = A extends { default: {} }
   ? true
-  : A extends { default: {} }
+  : A extends { required: true }
     ? true
-    : A extends { required: true }
-      ? true
-      : false;
+    : false;
 
 /**
  * Maps an `ArgsSchema` to the typed options object `resolveArgs` produces on success.
- * A `boolean` arg, an arg with a `default`, and a `required` arg are always present.
+ * An arg with a `default` and a `required` arg are always present.
  * Every other arg is optional.
  *
  * @example
@@ -172,7 +168,7 @@ type IsDefined<A extends ArgSchema> = A extends { type: 'boolean' }
  *   force: { type: 'boolean' }
  *   mode: { type: 'enum'; options: ['dev', 'prod'] }
  * }>
- * // -> { name: string; port: number; force: boolean; mode?: 'dev' | 'prod' }
+ * // -> { name: string; port: number; force?: boolean; mode?: 'dev' | 'prod' }
  * ```
  */
 export type ResolvedArgs<S extends ArgsSchema> = DeepPrettify<

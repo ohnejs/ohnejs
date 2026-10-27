@@ -344,6 +344,33 @@ describe('ohne init', () => {
     strictEqual(output.join('').includes('git repository'), false);
   });
 
+  it('asks for git on a TTY when no flag answers it', async () => {
+    const dir = join(freshDir('app'), 'unflagged');
+    const { isTTY } = process.stdin;
+    const path = process.env.PATH;
+    const output: string[] = [];
+    const passThrough = process.stdout.write.bind(process.stdout);
+    const write = mock.method(process.stdout, 'write', (chunk: string | Uint8Array) => {
+      if (typeof chunk !== 'string') return passThrough(chunk);
+      output.push(chunk);
+      if (chunk.includes('?')) {
+        setImmediate(() => process.stdin.emit('keypress', '\r', { name: 'return' }));
+      }
+      return true;
+    });
+
+    process.stdin.isTTY = true;
+    process.env.PATH = '';
+    try {
+      await runCommand(ohne, ['init', dir, '--name', 'unflagged', '--pm', 'npm']);
+    } finally {
+      process.env.PATH = path;
+      write.mock.restore();
+      process.stdin.isTTY = isTTY;
+    }
+    match(output.join(''), /Initialize a git repository\?/);
+  });
+
   it('scaffolds a website from the starter with `--web`', async () => {
     const dir = join(freshDir('web'), 'my-site');
     const tarball = starterTarball(freshDir('tarball'));
