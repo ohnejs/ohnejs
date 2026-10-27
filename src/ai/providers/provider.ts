@@ -1,7 +1,8 @@
 import type { FlowQuestion, OhneError } from 'ohnejs';
 
-import { ohneError } from 'ohnejs';
+import { ohneError, usePrinter } from 'ohnejs';
 import { hasKey, isUndefined } from 'ohnejs/utils';
+import { codeSpan } from 'ohnejs/utils/ansi';
 
 /**
  * What one provider instance is built from: a `models` entry with its key already resolved.
@@ -522,6 +523,19 @@ export function providerError(init: ProviderErrorInit): ProviderError {
  */
 export function isProviderError(value: unknown): value is ProviderError {
   return value instanceof Error && hasKey(value, PROVIDER_ERROR);
+}
+
+/**
+ * Prints why `model` did not answer, since the browser hears only that it did not.
+ * A `401` or a `403` names the API key, its usual cause.
+ */
+export function warnProviderError(model: string, error: ProviderError): void {
+  const said = codeSpan(error.message);
+  const body = isUndefined(error.status)
+    ? [said]
+    : [`Its provider answered \`${error.status}\`: ${said}`];
+  if (error.status === 401 || error.status === 403) body.push('', 'Check its API key.');
+  usePrinter().warnBlock({ title: `The model ${codeSpan(model)} did not answer`, body });
 }
 
 /**

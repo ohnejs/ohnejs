@@ -14,6 +14,7 @@ import { useEnv } from '../../../src/ohne/env/use-env.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { useFlows } from '../../../src/ohne/flows/use-flows.ts';
 import { dispatch } from '../../../src/ohne/http/dispatch.ts';
+import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { parseSSE } from '../../../src/utils/sse/parse-sse.ts';
 import { call, route, signIn, syncSchema, userWith, withAI } from '../_fixture.ts';
 import { calls, readEvents, says } from '../api/ai/turns/_stand-in.ts';
@@ -197,6 +198,23 @@ describe('runStep', () => {
       strictEqual(turn?.reason, 'provider');
       deepStrictEqual(turn?.texts, ['Thinking']);
     });
+  });
+
+  it('prints why the model did not answer, naming the key on a `401`', async () => {
+    const printed: string[] = [];
+    usePrinter().configure({ color: false, stream: { write: (text) => printed.push(text) > 0 } });
+    try {
+      await withAI(AI, async () => {
+        server.answer({ status: 401, body: '{"error":{"message":"invalid x-api-key"}}' });
+        strictEqual((await loadTurn(await ask()))?.reason, 'provider');
+      });
+    } finally {
+      usePrinter().configure({ color: undefined, stream: { write: () => true } });
+    }
+    const out = printed.join('');
+    ok(out.includes('The model smart did not answer'), out);
+    ok(out.includes('Its provider answered 401: invalid x-api-key'), out);
+    ok(out.includes('Check its API key.'), out);
   });
 
   it('keeps only the text of the attempt a retry reran', async () => {

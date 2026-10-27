@@ -91,7 +91,15 @@ export default defineHandler(async ({ params }): Promise<unknown> => {
   await touchTurn(turn);
   const provider = await useProvider(model, user);
   const release = await acquireStepPermit(user);
-  return streamTransform({ user, proposal: entry.proposal, collection, read, provider, release });
+  return streamTransform({
+    user,
+    proposal: entry.proposal,
+    collection,
+    read,
+    model,
+    provider,
+    release,
+  });
 }, STREAMED);
 
 /**

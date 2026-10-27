@@ -38,7 +38,12 @@ import type {
 import type { Surface } from './surface.ts';
 
 import { useAIConfig } from '../config.ts';
-import { addUsage, estimatedUsage, isProviderError } from '../providers/provider.ts';
+import {
+  addUsage,
+  estimatedUsage,
+  isProviderError,
+  warnProviderError,
+} from '../providers/provider.ts';
 import { tagAutoAccept } from './auto-accept.ts';
 import { chargeTokens, stepSignal, tokenWait } from './limits.ts';
 import { buildPrompt, skillFence } from './prompt.ts';
@@ -232,6 +237,7 @@ export async function runStep(run: StepRun, stream: EventStream): Promise<void> 
       await closeTurn(turn, 'left');
       return;
     }
+    if (!deadline.aborted && isProviderError(error)) warnProviderError(running.model, error);
     const code = deadline.aborted ? 'timeout' : isProviderError(error) ? 'provider' : 'internal';
     // Closed before the browser hears of it, so a follow-up typed at once finds the turn closed.
     await closeTurn(turn, code);

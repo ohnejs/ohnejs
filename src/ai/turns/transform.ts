@@ -29,7 +29,7 @@ import type { Proposal, Transform } from './proposals.ts';
 import { listRecords, readReach, writeReach } from '../../base/collections-api/gate.ts';
 import { queryLocales } from '../../ohne/query/locale.ts';
 import { useAIConfig } from '../config.ts';
-import { estimatedUsage, isProviderError } from '../providers/provider.ts';
+import { estimatedUsage, isProviderError, warnProviderError } from '../providers/provider.ts';
 import { chargeTokens, stepSignal, tokenWait } from './limits.ts';
 
 /**
@@ -153,7 +153,12 @@ export interface TransformRun {
   read: TransformRead;
 
   /**
-   * The provider of the model that rewrites.
+   * The `ai.models` entry that rewrites.
+   */
+  model: string;
+
+  /**
+   * Its provider.
    */
   provider: Provider;
 
@@ -260,7 +265,7 @@ export function streamTransform(run: TransformRun): ReadableStream<Uint8Array> {
  * `done` counts the records rewritten and skipped.
  */
 export async function runTransform(
-  { user, proposal, collection, read, provider }: TransformRun,
+  { user, proposal, collection, read, model, provider }: TransformRun,
   stream: EventStream,
 ): Promise<void> {
   const { signal } = useRequest();
@@ -292,6 +297,7 @@ export async function runTransform(
       } catch (error) {
         await chargeTokens(user, estimatedUsage(request));
         if (!isProviderError(error) || deadline.aborted) throw error;
+        warnProviderError(model, error);
       }
       if (!isUndefined(completion)) await chargeTokens(user, completion.usage);
       const outcome = isUndefined(completion)

@@ -11,6 +11,7 @@ import { gateCollection } from '../../../src/base/collections-api/gate.ts';
 import { useCollections } from '../../../src/ohne/collections/use-collections.ts';
 import { field } from '../../../src/ohne/fields/field.ts';
 import { readJSONBody } from '../../../src/ohne/http/read-json-body.ts';
+import { usePrinter } from '../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../src/ohne/query/query.ts';
 import { useRoles } from '../../../src/ohne/roles/use-roles.ts';
 import { call, route, signIn, syncSchema, withAI } from '../_fixture.ts';
@@ -106,6 +107,7 @@ const TRANSFORM = route('POST', '/transform', async (): Promise<Streamed[]> => {
       proposal,
       collection: gate.collection,
       read,
+      model: 'test',
       provider,
       release: () => {},
     },
@@ -385,7 +387,12 @@ describe('readTransformRecords and runTransform', () => {
       deepStrictEqual(events.at(-1), { event: 'done', data: { transformed: 5, skipped: 20 } });
     }
     answer = (rows) => (rows.length === 20 ? undefined : shout(rows));
-    const events = await transform(everyItem(['name']), 'items', DATA);
+    const printed: string[] = [];
+    usePrinter().configure({ stream: { write: (text) => printed.push(text) > 0 } });
+    const events = await transform(everyItem(['name']), 'items', DATA).finally(() =>
+      usePrinter().configure({ stream: { write: () => true } }),
+    );
+    ok(printed.join('').includes('The model test did not answer'));
     deepStrictEqual(
       Object.values(skipped(events)),
       Array.from({ length: 20 }, () => 'failed'),
