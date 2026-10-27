@@ -53,6 +53,7 @@ export interface TypeImports {
  * `statements` renders one `import type { ... } from '...'` line per module.
  * Relative paths are re-expressed relative to `outputDir`; package specifiers pass through.
  * `reserved` names the file's own declarations, so an import named like one is aliased.
+ * `mapPath` rewrites each resolved local path before it is re-expressed.
  *
  * @example
  * ```ts
@@ -71,12 +72,16 @@ export interface TypeImports {
  * //    ]
  * ```
  */
-export function createTypeImports(outputDir: string, reserved: Iterable<string> = []): TypeImports {
+export function createTypeImports(
+  outputDir: string,
+  reserved: Iterable<string> = [],
+  mapPath: (path: string) => string = (path) => path,
+): TypeImports {
   const entries: { specifier: string; exportName: string; local: string }[] = [];
   const locals = new Set(reserved);
 
   const specifierOf = (fromDir: string, path: string): string =>
-    path.startsWith('.') ? importSpecifier(outputDir, resolvePath(path, fromDir)) : path;
+    path.startsWith('.') ? importSpecifier(outputDir, mapPath(resolvePath(path, fromDir))) : path;
 
   return {
     dir: outputDir,

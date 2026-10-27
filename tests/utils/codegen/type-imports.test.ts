@@ -70,6 +70,16 @@ describe('createTypeImports', () => {
     ]);
   });
 
+  it('rewrites each resolved path through `mapPath` before re-expressing it', () => {
+    const store = '/app/node_modules/.pnpm/geo@1.0.0/node_modules/geo';
+    const link = (path: string): string => path.replace(store, '/app/node_modules/geo');
+    const imports = createTypeImports('/app/.ohne', [], link);
+    imports.reference({ fromDir: `${store}/fields`, path: './geo.ts', exportName: 'LatLng' });
+    deepStrictEqual(imports.statements(), [
+      "import type { LatLng } from '../node_modules/geo/fields/geo.ts';",
+    ]);
+  });
+
   it('is empty before anything is referenced', () => {
     deepStrictEqual(createTypeImports('/app/.ohne').statements(), []);
   });
