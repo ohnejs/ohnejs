@@ -72,6 +72,15 @@ describe('pruneCodegen', () => {
     strictEqual(existsSync(ignore), true);
   });
 
+  it('leaves a write in flight in place', async () => {
+    const app = makeApp('in-flight');
+    const pending = join(app, '.ohne', 'node', 'roles.ts.bcb02f0fabaa25dc.tmp');
+    writeFileSync(pending, STAMPED);
+
+    deepStrictEqual(await pruneCodegen(app, []), []);
+    strictEqual(existsSync(pending), true);
+  });
+
   it('returns empty when the codegen dir does not exist', async () => {
     const app = join(root, 'bare');
     mkdirSync(app, { recursive: true });

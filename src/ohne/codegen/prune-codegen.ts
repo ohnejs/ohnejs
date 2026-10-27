@@ -7,7 +7,8 @@ import { BANNER_PREFIX, codegenDir } from './codegen-dir.ts';
  * `keep` is the complete output set of a full codegen, as absolute paths.
  * A file is removed only when it is not in `keep` and carries the ohne banner, whatever version wrote it.
  * A file without the banner is never touched, so a misconfigured `dirs.codegen` cannot destroy your work.
- * Hidden entries and directories are left in place.
+ * Hidden entries, directories and `.tmp` files are left in place.
+ * A `.tmp` file is another process's write in flight, so removing it would fail that write.
  * Returns the absolute paths removed, empty when there is no codegen directory.
  *
  * Call it only after a full codegen; a partial regen does not know the complete set.
@@ -22,7 +23,7 @@ export async function pruneCodegen(from: string, keep: readonly string[]): Promi
   const kept = new Set(keep);
   const removed: string[] = [];
   for (const entry of entries) {
-    if (kept.has(entry.path)) continue;
+    if (kept.has(entry.path) || entry.ext === '.tmp') continue;
     if (!(await generated(entry.path))) continue;
     await removeFile(entry.path);
     removed.push(entry.path);
