@@ -8,6 +8,8 @@ import { loadIntlData } from './intl.ts';
 
 const RETRY_DELAY = 3000;
 
+const FALLBACK_BASE = new URL('../../messages/', import.meta.url);
+
 /**
  * One resolved message: its ICU template and the language that template is written in.
  * The language is the fallback lookup's origin, so the client formats it with matching plural rules.
@@ -66,7 +68,7 @@ export async function loadLanguage(language: string): Promise<void> {
  * The result is `undefined` until the fetch resolves; callers fall back to the raw key meanwhile.
  * A `(language, group)` pair is fetched at most once: the cell is created before the request starts.
  * A missing catalog resolves to an empty one, so its keys render raw.
- * A fetch the API failed to answer does too, but is retried after a delay until an answer arrives.
+ * A fetch the API failed to answer resolves to the default language's, retried until the API answers.
  *
  * @example
  * ```ts
@@ -95,7 +97,8 @@ function open(language: string, group: string): Cell {
 
 /**
  * Stores the group's fetched catalog in `cell`.
- * A fetch the API failed to answer leaves an empty catalog and tries again after `RETRY_DELAY`.
+ * A fetch the API failed to answer takes the dashboard server's default-language catalog meanwhile.
+ * It then tries the API again after `RETRY_DELAY`.
  */
 async function fill(
   cell: Ref<MessageCatalog | undefined>,
@@ -104,11 +107,23 @@ async function fill(
 ): Promise<void> {
   const catalog = await fetchCatalog(language, group);
   if (isNull(catalog)) {
-    cell.value ??= {};
+    cell.value ??= await fetchFallback(group);
     setTimeout(() => void fill(cell, language, group), RETRY_DELAY);
     return;
   }
   cell.value = catalog;
+}
+
+/**
+ * Fetches a group's catalog in the default language from the dashboard server, or `{}` when it has none.
+ */
+async function fetchFallback(group: string): Promise<MessageCatalog> {
+  try {
+    const response = await fetch(new URL(encodeURIComponent(group), FALLBACK_BASE).href);
+    return response.ok ? ((await response.json()) as MessageCatalog) : {};
+  } catch {
+    return {};
+  }
 }
 
 /**

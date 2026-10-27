@@ -94,6 +94,24 @@ describe('loadLanguage', () => {
     deepStrictEqual(messageCatalog('it', 'nav'), NAV);
   });
 
+  it("shows the dashboard server's default-language catalog while the API cannot answer", async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const fallback = { 'nav.home': { template: 'Home', language: 'en' } };
+    const urls = serve((url) =>
+      url.startsWith('http://api/')
+        ? [503, {}]
+        : [200, url.endsWith('/messages/nav') ? fallback : {}],
+    );
+    await loadLanguage('nl');
+    deepStrictEqual(messageCatalog('nl', 'nav'), fallback);
+    strictEqual(urls.filter((url) => url.endsWith('/messages/nav')).length, 1);
+    mock.restoreAll();
+    serve(catalogs);
+    mock.timers.tick(3000);
+    await settle();
+    deepStrictEqual(messageCatalog('nl', 'nav'), NAV);
+  });
+
   it('loads the Intl data alongside only for a language the engine lacks', async () => {
     const Native = Intl.DateTimeFormat;
     const Stub = function (locales?: string | string[], options?: Intl.DateTimeFormatOptions) {

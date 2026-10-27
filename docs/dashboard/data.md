@@ -249,8 +249,8 @@ ready inside your page.
 Keep each `t` call inside a function child, so it follows a language switch and a catalog that arrives
 late. A call outside one is a snapshot: it renders once and never changes.
 
-If the API cannot answer, the page renders anyway, with the key itself in place of each missing message.
-The dashboard keeps retrying, and each live `t` call fills in once the catalogs arrive.
+If the API cannot answer, the page renders anyway, in the default language.
+The dashboard keeps retrying, and each live `t` call switches once the catalogs arrive.
 
 Labels from the discovery data, like a field's `label` or a menu row's, arrive as messages. Render them
 with `translateMessage`, inside a function child too:
