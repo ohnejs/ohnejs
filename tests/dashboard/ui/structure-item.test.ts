@@ -41,9 +41,12 @@ const handleOf = (root: FakeElement): FakeElement =>
  * The header row of `root`, laid out from (0, 0) to (600, 40).
  */
 const headerOf = (root: FakeElement): FakeElement =>
-  Object.assign(findElement(root, (element) => hasClass(element, 'ohne-structure-item-header'))!, {
-    getBoundingClientRect: () => ({ left: 0, top: 0, right: 600, bottom: 40 }),
-  });
+  Object.assign(
+    findElement(root, (element) => hasClass(element, 'ohne-structure-item-header'))!,
+    {
+      getBoundingClientRect: () => ({ left: 0, top: 0, right: 600, bottom: 40 }),
+    },
+  );
 
 /**
  * Every open menu panel on the body.

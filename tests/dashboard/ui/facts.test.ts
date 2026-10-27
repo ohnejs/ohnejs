@@ -52,7 +52,10 @@ describe('facts', () => {
       undefined,
     );
     strictEqual(
-      hasClass(findElement(element, (el) => hasClass(el, 'ohne-fact'))!, 'ohne-fact'),
+      hasClass(
+        findElement(element, (el) => hasClass(el, 'ohne-fact'))!,
+        'ohne-fact',
+      ),
       true,
     );
     rows.value = [{ label: 'Faction', value: 'Alliance' }];

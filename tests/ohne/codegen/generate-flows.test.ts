@@ -42,7 +42,10 @@ describe('generateFlows', () => {
   });
 
   function bucket(paths: string[] | null, name: string): string {
-    return readFileSync(paths!.find((path) => path.endsWith(`/.ohne/${name}/flows.ts`))!, 'utf8');
+    return readFileSync(
+      paths!.find((path) => path.endsWith(`/.ohne/${name}/flows.ts`))!,
+      'utf8',
+    );
   }
 
   it('emits the shared name table, the `KnownFlows` extension, and registrations', async () => {

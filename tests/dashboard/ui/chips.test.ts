@@ -104,7 +104,10 @@ describe('chips', () => {
       let focused = false;
       Object.assign(input, { focus: () => (focused = true) });
       Object.assign(document, { activeElement: document.body });
-      fire(findElement(root, (el) => hasClass(el, 'ohne-chips-remove'))!, 'click');
+      fire(
+        findElement(root, (el) => hasClass(el, 'ohne-chips-remove'))!,
+        'click',
+      );
       await nextTick();
       Object.assign(document, { activeElement: null });
       strictEqual(focused, true);

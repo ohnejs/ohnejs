@@ -72,7 +72,7 @@ export function applyANSIMarkup(text: string, emphasize: boolean, colors: ANSICo
   const frames: Frame[] = [
     { start: 0, end: text.length, cursor: 0, out: '', style: (part) => part },
   ];
-  for (let index = 0; ; ) {
+  for (let index = 0; ;) {
     const frame = frames.at(-1)!;
     if (index >= frame.end) {
       const done = frame.style(frame.out + text.slice(frame.cursor, frame.end));

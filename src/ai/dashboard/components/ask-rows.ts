@@ -152,14 +152,12 @@ export function askRows(options: AskRowsOptions): AskRowGroup[] {
     const matching = new Set(searchByKeywords(options.recent, query, 'title'));
     const recent = options.recent.filter((chat) => matching.has(chat));
     if (!options.settled || recent.length === 0) return [ask];
-    const rows = recent.map(
-      (chat): AskRow => ({
-        label: chat.title,
-        icon: 'history',
-        time: chat.updatedAt,
-        onSelect: () => options.resume(chat.id),
-      }),
-    );
+    const rows = recent.map((chat): AskRow => ({
+      label: chat.title,
+      icon: 'history',
+      time: chat.updatedAt,
+      onSelect: () => options.resume(chat.id),
+    }));
     return [ask, { key: 'ai:recent', label: t('ai.dashboard.recentChats'), rows }];
   }
   const [name = '', ...rest] = query.slice(1).split(WHITESPACE);
@@ -172,13 +170,11 @@ export function askRows(options: AskRowsOptions): AskRowGroup[] {
   const group = (kind: Starter['kind'], label: string): AskRowGroup[] => {
     const rows = found
       .filter((starter) => starter.kind === kind)
-      .map(
-        (starter): AskRow => ({
-          label: starter.title,
-          icon: starter.kind === 'flow' ? 'route' : 'sparkles',
-          onSelect: () => options.start(words === '' ? starter.title : words, starter),
-        }),
-      );
+      .map((starter): AskRow => ({
+        label: starter.title,
+        icon: starter.kind === 'flow' ? 'route' : 'sparkles',
+        onSelect: () => options.start(words === '' ? starter.title : words, starter),
+      }));
     return rows.length === 0 ? [] : [{ key: `ai:${kind}`, label, rows }];
   };
   return [...group('skill', t('ai.dashboard.skills')), ...group('flow', t('ai.dashboard.flows'))];

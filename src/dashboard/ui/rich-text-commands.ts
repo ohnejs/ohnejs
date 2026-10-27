@@ -835,7 +835,7 @@ function build<C extends string>(lines: readonly Line<C>[]): Built<C> {
   const used = new Set<object>();
   const doc: RichText<C> = [];
   const paths: number[][] = [];
-  for (let start = 0; start < lines.length; ) {
+  for (let start = 0; start < lines.length;) {
     const line = lines[start]!;
     if (line.kind !== 'item') {
       paths[start] = [doc.length];

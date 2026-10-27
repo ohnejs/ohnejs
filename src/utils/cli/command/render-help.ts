@@ -46,13 +46,11 @@ export function renderHelp(
   lines.push('', colors.bold('USAGE'), `  ${usage.join(' ')}`);
 
   if (subCommands) {
-    const rows = Object.entries(subCommands).map(
-      ([name, sub]): Row => ({
-        label: name,
-        styled: colors.cyan(name),
-        desc: sub.meta.description ?? '',
-      }),
-    );
+    const rows = Object.entries(subCommands).map(([name, sub]): Row => ({
+      label: name,
+      styled: colors.cyan(name),
+      desc: sub.meta.description ?? '',
+    }));
     lines.push('', colors.bold('COMMANDS'), ...renderRows(rows));
   }
 

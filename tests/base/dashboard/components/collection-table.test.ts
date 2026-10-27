@@ -261,8 +261,8 @@ describe('collectionTable sheet', () => {
     byTag(byTag(root, 'THEAD')[0]!, 'INPUT')[0]! as FakeElement & { checked: boolean };
   const checked = (root: FakeElement): string[] =>
     bodyRows(root).flatMap((row) =>
-      findAll(row, (element) => element.getAttribute('role') === 'checkbox').map(
-        (box) => box.getAttribute('aria-checked')!,
+      findAll(row, (element) => element.getAttribute('role') === 'checkbox').map((box) =>
+        box.getAttribute('aria-checked')!,
       ),
     );
 

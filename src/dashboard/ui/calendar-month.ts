@@ -194,25 +194,24 @@ function weeks(options: CalendarMonthOptions): DayCell[][] {
     };
   });
 
-  const prevMonthFiller = Array.from(
-    { length: startDayIndex },
-    (_, i): DayCell => ({
-      day: prevMonthDays - startDayIndex + i + 1,
-      disabled: true,
-      selected: false,
-      isToday: false,
-    }),
-  );
+  const prevMonthFiller = Array.from({ length: startDayIndex }, (_, i): DayCell => ({
+    day: prevMonthDays - startDayIndex + i + 1,
+    disabled: true,
+    selected: false,
+    isToday: false,
+  }));
 
   let calendarDays = [...prevMonthFiller, ...currentMonthDays];
 
   const nextMonthDaysNeeded = 7 - (calendarDays.length % 7 || 7);
 
   if (nextMonthDaysNeeded < 7) {
-    const nextMonthFiller = Array.from(
-      { length: nextMonthDaysNeeded },
-      (_, i): DayCell => ({ day: i + 1, disabled: true, selected: false, isToday: false }),
-    );
+    const nextMonthFiller = Array.from({ length: nextMonthDaysNeeded }, (_, i): DayCell => ({
+      day: i + 1,
+      disabled: true,
+      selected: false,
+      isToday: false,
+    }));
     calendarDays = [...calendarDays, ...nextMonthFiller];
   }
 

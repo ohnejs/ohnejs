@@ -199,7 +199,7 @@ function parseLine(line: string, links: Links): ProseInline[] {
   const parse = (start: number, end: number): ProseInline[] => {
     const content: ProseInline[] = [];
     let cursor = start;
-    for (let index = start; index < end; ) {
+    for (let index = start; index < end;) {
       const found = token(index, end);
       if (isUndefined(found)) {
         index++;
@@ -361,7 +361,7 @@ function parseList(
   };
   const items: ProseItem[] = [];
   let cursor = index;
-  for (let match = sibling(lines[cursor]); !isNull(match); ) {
+  for (let match = sibling(lines[cursor]); !isNull(match);) {
     const column = match[0].length - match[4]!.length;
     let end = cursor + 1;
     for (; end < lines.length; end++) {
@@ -437,7 +437,7 @@ function parseBlock(
  */
 function parseBlocks(lines: readonly string[], links: Links, quotes: number): ProseBlock[] {
   const blocks: ProseBlock[] = [];
-  for (let index = nextFilled(lines, 0); index < lines.length; ) {
+  for (let index = nextFilled(lines, 0); index < lines.length;) {
     const [block, next] = parseBlock(lines, index, links, quotes);
     blocks.push(block);
     index = nextFilled(lines, next);

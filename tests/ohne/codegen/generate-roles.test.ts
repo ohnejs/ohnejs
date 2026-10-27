@@ -35,7 +35,10 @@ describe('generateRoles', () => {
   });
 
   function bucket(paths: string[] | null, name: string): string {
-    return readFileSync(paths!.find((path) => path.endsWith(`/.ohne/${name}/roles.ts`))!, 'utf8');
+    return readFileSync(
+      paths!.find((path) => path.endsWith(`/.ohne/${name}/roles.ts`))!,
+      'utf8',
+    );
   }
 
   it('emits the shared name table, both `KnownRoles` extensions, and registrations', async () => {

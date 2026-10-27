@@ -38,7 +38,10 @@ describe('generateSkills', () => {
   });
 
   function bucket(paths: string[] | null, name: string): string {
-    return readFileSync(paths!.find((path) => path.endsWith(`/.ohne/${name}/skills.ts`))!, 'utf8');
+    return readFileSync(
+      paths!.find((path) => path.endsWith(`/.ohne/${name}/skills.ts`))!,
+      'utf8',
+    );
   }
 
   it('emits the shared name table, the `KnownSkills` extension, and registrations', async () => {

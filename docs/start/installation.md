@@ -63,7 +63,7 @@ export default defineConfig({
     "ohnejs": "0.5.1"
   },
   "devDependencies": {
-    "@types/node": "26.0.0",
+    "@types/node": "26.6.5",
     "typescript": "7.0.2"
   },
   "engines": {

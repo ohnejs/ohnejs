@@ -75,14 +75,12 @@ export function otherName(): string {
  * Past `SLOTS` series, the series from the last slot on fold into one "Other" that sums them.
  */
 export function plotSeries<T>(rows: readonly T[], series: readonly Series<T>[]): PlottedSeries[] {
-  const plotted = series.map(
-    (one, index): PlottedSeries => ({
-      name: () => resolveText(one.name),
-      values: rows.map((row) => one.value(row)),
-      dashed: one.dashed === true,
-      slot: index + 1,
-    }),
-  );
+  const plotted = series.map((one, index): PlottedSeries => ({
+    name: () => resolveText(one.name),
+    values: rows.map((row) => one.value(row)),
+    dashed: one.dashed === true,
+    slot: index + 1,
+  }));
   if (plotted.length <= SLOTS) return plotted;
   const kept = plotted.slice(0, SLOTS - 1);
   const folded = plotted.slice(SLOTS - 1);

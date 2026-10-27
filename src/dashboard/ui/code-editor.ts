@@ -393,7 +393,7 @@ export function codeEditor(model: Ref<string>, options: CodeEditorOptions = {}):
 function splitLines(text: string, tokens: readonly HighlightToken[]): CodeLine[] {
   const lines: CodeLine[] = [];
   let at = 0;
-  for (let from = 0; from <= text.length; ) {
+  for (let from = 0; from <= text.length;) {
     const close = text.indexOf('\n', from);
     const to = close === -1 ? text.length : close;
     const line = text.slice(from, to);

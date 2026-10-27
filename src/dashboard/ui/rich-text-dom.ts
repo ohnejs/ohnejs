@@ -208,7 +208,7 @@ export function createRichTextView<C extends string>(
   const runNodes = (runs: readonly RichTextRun<C>[]): Node[] => {
     if (runs.length === 0) return [h('br')];
     const nodes: Node[] = [];
-    for (let start = 0; start < runs.length; ) {
+    for (let start = 0; start < runs.length;) {
       const { link } = runs[start]!;
       let end = start + 1;
       while (link && end < runs.length && deepEqual(runs[end]!.link, link)) end++;

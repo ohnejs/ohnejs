@@ -310,14 +310,12 @@ export async function runTransform(
       }
       transformed += part.length;
       send('records', {
-        records: part.map(
-          ({ UUID, values, fallback }): TransformedRecord => ({
-            UUID,
-            source: values,
-            proposed: outcome.get(UUID) as TransformValues,
-            ...(isUndefined(fallback) ? {} : { fallback }),
-          }),
-        ),
+        records: part.map(({ UUID, values, fallback }): TransformedRecord => ({
+          UUID,
+          source: values,
+          proposed: outcome.get(UUID) as TransformValues,
+          ...(isUndefined(fallback) ? {} : { fallback }),
+        })),
       });
     }
     send('done', { transformed, skipped: left });

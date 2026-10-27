@@ -275,13 +275,11 @@ registerFieldType('roles', {
     const element = chips(model, {
       disabled: () => context.disabled === true,
       choices: () =>
-        (dashboardMeta()?.roles ?? []).map(
-          ({ name, label, description }): ChipsChoice => ({
-            value: name,
-            label: translateMessage(label),
-            tooltip: isUndefined(description) ? undefined : translateMessage(description),
-          }),
-        ),
+        (dashboardMeta()?.roles ?? []).map(({ name, label, description }): ChipsChoice => ({
+          value: name,
+          label: translateMessage(label),
+          tooltip: isUndefined(description) ? undefined : translateMessage(description),
+        })),
       erroredItems: () => erroredIndices.value,
       name: context.path,
       noResultsLabel: () => t('dashboard.noResultsFound'),

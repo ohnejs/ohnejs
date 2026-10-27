@@ -8,8 +8,6 @@ import { defineHandler, queryUntyped } from 'ohnejs';
  * The check reads past any app scope, so a hidden user still disarms it.
  * The route is public; it reveals only that an account exists, never which one.
  */
-export default defineHandler(
-  async (): Promise<{ required: boolean }> => ({
-    required: !(await queryUntyped('Users').unscoped().exists()),
-  }),
-);
+export default defineHandler(async (): Promise<{ required: boolean }> => ({
+  required: !(await queryUntyped('Users').unscoped().exists()),
+}));
