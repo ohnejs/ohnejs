@@ -483,6 +483,15 @@ export function useRecordEditor(
     }
   }
 
+  // An expired session opens the sign-in dialog; the save runs again once it succeeds.
+  let resave = false;
+  effect(() => {
+    void signInCount();
+    if (!resave) return;
+    resave = false;
+    untracked(() => void save());
+  });
+
   const save = async (): Promise<void> => {
     const live = form.value;
     if (isUndefined(live) || busy.value || !canWrite()) return;
@@ -543,6 +552,10 @@ export function useRecordEditor(
     if (outcome.kind === 'gone') {
       history.clear();
       redirectGone();
+      return;
+    }
+    if (outcome.kind === 'unauthorized') {
+      resave = true;
       return;
     }
     toast(t(outcome.kind === 'unreachable' ? 'dashboard.unreachable' : 'dashboard.writeFailed'), {
@@ -877,6 +890,7 @@ type WriteOutcome =
   | { kind: 'saved'; record: RecordRow }
   | { kind: 'invalid'; errors: Readonly<Record<string, string>> }
   | { kind: 'gone' }
+  | { kind: 'unauthorized' }
   | { kind: 'unreachable' }
   | { kind: 'writeFailed' };
 
@@ -915,6 +929,7 @@ async function write(
       return { kind: 'invalid', errors };
     }
     if (response.status === 404) return { kind: 'gone' };
+    if (response.status === 401) return { kind: 'unauthorized' };
     return { kind: 'writeFailed' };
   } catch {
     return { kind: 'unreachable' };

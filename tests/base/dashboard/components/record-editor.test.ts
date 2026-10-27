@@ -113,6 +113,7 @@ describe('useRecordEditor', () => {
   let outlet!: FakeElement;
   let noted: string | Promise<string | undefined> | undefined;
   let asked: string[] = [];
+  let expired = false;
 
   before(async () => {
     browser = baseBrowser('/collections/showcase/u1');
@@ -189,6 +190,7 @@ describe('useRecordEditor', () => {
         }
         if (init?.method === 'DELETE') return deleted();
         if (init?.method === 'PATCH' && url.endsWith('/collections/showcase/u1')) {
+          if (expired) return Response.json({ statusCode: 401 }, { status: 401 });
           const sent = JSON.parse(String(init.body)) as Record<string, unknown>;
           stored = (sent.contactEmail as string | undefined) ?? stored;
           return Response.json({ UUID: 'u1', ...sent, contactEmail: stored });
@@ -429,6 +431,36 @@ describe('useRecordEditor', () => {
     });
     deepStrictEqual([record.dirty(), hasUnsavedChanges()], [false, false]);
     stored = 'thrall@x.example';
+    scope.dispose();
+  });
+
+  it('saves again once you sign in after the session expired, with no error toast', async () => {
+    const { record, scope } = await open();
+    const knob = findElement(
+      record.form.value!.controlOf('featured')!.element as unknown as FakeElement,
+      (element) => hasClass(element, 'ohne-switch-control'),
+    ) as FakeElement & { checked: boolean };
+    knob.checked = true;
+    fire(knob, 'change');
+    flush();
+    const patches = (): number => requests.filter((line) => line.startsWith('PATCH')).length;
+    const before = patches();
+    expired = true;
+    await record.save();
+    flush();
+    const toasts = outlet.childNodes.flatMap((list) =>
+      list.childNodes.map((item) => item.textContent),
+    );
+    deepStrictEqual(
+      [patches() - before, toasts.includes('dashboard.writeFailed'), record.dirty()],
+      [1, false, true],
+    );
+    expired = false;
+    const { login } = await import('../../../../src/dashboard/runtime/session.ts');
+    await login('admin@example.com', 'secret');
+    await settle();
+    flush();
+    deepStrictEqual([patches() - before, record.dirty()], [2, false]);
     scope.dispose();
   });
 
