@@ -1,5 +1,6 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { beforeEach, describe, it } from 'node:test';
+import { stripVTControlCharacters } from 'node:util';
 
 import type { CompleteRequest, Provider } from '../../../src/ai/providers/provider.ts';
 import type { Proposal } from '../../../src/ai/turns/proposals.ts';
@@ -392,7 +393,7 @@ describe('readTransformRecords and runTransform', () => {
     const events = await transform(everyItem(['name']), 'items', DATA).finally(() =>
       usePrinter().configure({ stream: { write: () => true } }),
     );
-    ok(printed.join('').includes('The model test did not answer'));
+    ok(stripVTControlCharacters(printed.join('')).includes('The model test did not answer'));
     deepStrictEqual(
       Object.values(skipped(events)),
       Array.from({ length: 20 }, () => 'failed'),

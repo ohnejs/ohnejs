@@ -1,5 +1,6 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { after, describe, it } from 'node:test';
+import { stripVTControlCharacters } from 'node:util';
 
 import type { Turn } from '../../../src/ai/turns/state.ts';
 import type { StreamedEvent } from '../api/ai/turns/_stand-in.ts';
@@ -202,16 +203,16 @@ describe('runStep', () => {
 
   it('prints why the model did not answer, naming the key on a `401`', async () => {
     const printed: string[] = [];
-    usePrinter().configure({ color: false, stream: { write: (text) => printed.push(text) > 0 } });
+    usePrinter().configure({ stream: { write: (text) => printed.push(text) > 0 } });
     try {
       await withAI(AI, async () => {
         server.answer({ status: 401, body: '{"error":{"message":"invalid x-api-key"}}' });
         strictEqual((await loadTurn(await ask()))?.reason, 'provider');
       });
     } finally {
-      usePrinter().configure({ color: undefined, stream: { write: () => true } });
+      usePrinter().configure({ stream: { write: () => true } });
     }
-    const out = printed.join('');
+    const out = stripVTControlCharacters(printed.join(''));
     ok(out.includes('The model smart did not answer'), out);
     ok(out.includes('Its provider answered 401: invalid x-api-key'), out);
     ok(out.includes('Check its API key.'), out);
