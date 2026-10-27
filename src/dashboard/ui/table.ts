@@ -33,8 +33,8 @@ import { menu } from './menu.ts';
 import { pagination } from './pagination.ts';
 import { emptyState, errorState, skeleton } from './states.ts';
 import { rangeSelect, sortRows, toggleSort } from './table-model.ts';
-import { attachTooltip } from './tooltip.ts';
 import './tokens.ts';
+import { attachTooltip } from './tooltip.ts';
 
 /**
  * Options for `table`.
@@ -144,6 +144,13 @@ const shiftHeld = ref(false);
 let shiftTracked = false;
 
 css`
+  /* Only this factor animates, so a scroll moves the actions column's offset at once. */
+  @property --ohne-table-actions-hidden {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 0;
+  }
+
   .ohne-table {
     --ohne-table-check: calc(1rem + var(--ohne-table-button) * 0.125rem + 1.875rem);
     --ohne-table-kebab: calc(2 * (1rem + var(--ohne-table-button) * 0.125rem) + 1.75rem);
@@ -238,7 +245,12 @@ css`
       }
 
       & :where(th, td).ohne-table-actions {
-        right: calc(-1 * var(--ohne-table-kebab) - 2.5rem);
+        --ohne-table-actions-hidden: 1;
+
+        /* Near the scroll end the hidden cell still peeks in, so its shadow would show. */
+        &::before {
+          opacity: 0;
+        }
       }
     }
   }
@@ -332,11 +344,15 @@ css`
   .ohne-table-grid :where(th, td).ohne-table-actions {
     position: sticky;
     z-index: 12;
-    right: 0;
+    /* Clamped to what is left to scroll, so near the end the slide spans the whole transition. */
+    right: calc(
+      -1 * var(--ohne-table-actions-hidden) *
+        min(var(--ohne-table-kebab) + 2.5rem, var(--ohne-table-scroll-end, 0px))
+    );
     width: var(--ohne-table-kebab);
     min-width: var(--ohne-table-kebab);
     background-color: var(--ohne-table-bg);
-    transition: right 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition: --ohne-table-actions-hidden 300ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .ohne-table-grid :where(th):is(.ohne-table-check, .ohne-table-actions) {
@@ -1028,6 +1044,10 @@ export function table<T, K extends string | number, C extends string = string>(
     viewport.classList.toggle(
       'ohne-table-overflow-end',
       scrollLeft + clientWidth < scrollWidth - 1,
+    );
+    viewport.style.setProperty(
+      '--ohne-table-scroll-end',
+      `${scrollWidth - scrollLeft - clientWidth}px`,
     );
     viewport.style.setProperty('--ohne-table-scrollbar-y', `${offsetWidth - clientWidth}px`);
     viewport.style.setProperty('--ohne-table-scrollbar-x', `${offsetHeight - clientHeight}px`);
