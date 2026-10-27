@@ -169,7 +169,7 @@ export default defineConfig({
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "ohnejs": ">=0.5.1 <0.6.0-0"
+    "ohnejs": ">=0.6.0 <0.7.0-0"
   }
 }
 ```
@@ -215,7 +215,7 @@ line, since the next line may break it:
 
 ```json
 {
-  "peerDependencies": { "ohnejs": ">=0.5.1 <0.6.0-0" }
+  "peerDependencies": { "ohnejs": ">=0.6.0 <0.7.0-0" }
 }
 ```
 
@@ -359,7 +359,7 @@ export interface KnownCategories {}
   "type": "module",
   "exports": "./index.ts",
   "peerDependencies": {
-    "ohnejs": ">=0.5.1 <0.6.0-0"
+    "ohnejs": ">=0.6.0 <0.7.0-0"
   }
 }
 ```
