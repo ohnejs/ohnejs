@@ -19,16 +19,19 @@ script, so the types are ready for `npm run typecheck` in CI. The server regener
 anyway, so it never runs with outdated types. [`SKIP_CODEGEN=1`](../project/env.md#the-built-ins)
 skips that step when the install has already prepared them.
 
-The API and the dashboard are separate processes on separate ports. Run each under your process
-manager, each with its own `PORT`:
+The API and the dashboard are separate processes on separate ports, set by
+[`api.port`](../project/config.md#the-api-server) and
+[`dashboard.port`](../project/config.md#the-dashboard). Run each under your process manager:
 
 ```sh
-PORT=8080 npx ohne serve api
-PORT=8081 npx ohne serve dashboard
+npx ohne serve api
+npx ohne serve dashboard
 ```
 
-The dashboard tells the browser where the API is. It builds the address from the `api` config. That
-only works when the browser can reach that host directly. Behind a proxy or across domains:
+The dashboard tells the browser where the API is, and the API lets the dashboard's origin call it.
+Both addresses come from the config, so `PORT` moves only the process it is set on. That only works
+when the browser can reach those hosts directly. Behind a proxy, across domains, or when your
+platform assigns each process a `PORT`:
 
 - Set [`dashboard.apiURL`](../project/config.md#the-dashboard), or the `API_URL` env var, to the
   public API base URL, `api.basePath` included.

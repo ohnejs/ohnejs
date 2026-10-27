@@ -323,7 +323,7 @@ Use it to read what a record held before the write, then act on the change in
 // boot/title-history.ts
 import { hook, query, type Transaction } from 'ohnejs';
 
-const before = new WeakMap<Transaction, Map<string, unknown>>();
+const before = new WeakMap<Transaction, Map<string, string>>();
 
 hook('record:before-update', async (ctx) => {
   if (ctx.collection !== 'Posts') return;
@@ -336,9 +336,10 @@ hook('record:before-update', async (ctx) => {
 });
 
 hook('record:after-update', async (record, ctx) => {
-  const old = before.get(ctx.tx)?.get(record.UUID);
-  if (ctx.collection !== 'Posts' || old === record.title) return;
-  await query('TitleHistory').use(ctx.tx).create({ post: record.UUID, title: old });
+  const post = record.UUID as string;
+  const old = before.get(ctx.tx)?.get(post);
+  if (ctx.collection !== 'Posts' || old === undefined || old === record.title) return;
+  await query('TitleHistory').use(ctx.tx).create({ post, title: old });
 });
 ```
 

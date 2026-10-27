@@ -228,7 +228,7 @@ async function send(file: File): Promise<void> {
 
 `useT` returns a translator with the same typed keys as the server's. Codegen copies
 [`KnownMessages`](../i18n/messages.md#typed-keys) into the browser, so an unknown key or a wrong
-parameter is a compile error:
+parameter is a compile error. Here with the `inbox` catalog from [Messages](../i18n/messages.md):
 
 ```ts
 // dashboard/pages/index.ts
@@ -237,8 +237,8 @@ import { defineDashboardPage, h, useT } from 'ohnejs/dashboard';
 const t = useT();
 
 export default defineDashboardPage(() => [
-  h('h1', null, () => t('page.title')),
-  h('p', null, () => t('field.minLength', { min: 3 })),
+  h('h1', null, () => t('inbox.empty')),
+  h('p', null, () => t('inbox.unread', { count: 3 })),
 ]);
 ```
 

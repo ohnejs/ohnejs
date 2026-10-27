@@ -56,7 +56,7 @@ export default defineCollection({
   singleton: true,
   api: { read: 'public', update: true },
   fields: {
-    copyright: field('text', { default: '' }),
+    copyright: field('text', { nullable: true }),
     menu: field('repeater', {
       fields: {
         label: field('text'),
