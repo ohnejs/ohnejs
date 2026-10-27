@@ -27,7 +27,8 @@ Throw or return an [`HTTPError`](./errors.md), and the response uses its status.
 Middleware lives in each layer's [`dirs.middleware`](../project/config.md#directories) directory,
 `middleware/` by default. Where a file sits decides when it runs:
 
-- Under `global/`, it runs on every request, before any opt-in middleware.
+- Under `global/`, it runs on every request a route answers, before any opt-in middleware. A path
+  no route matches answers `404` or `405` before any middleware.
 - Anywhere else, it is opt-in, so it runs only on the [routes that select it](#route-middleware).
 
 Globals from every layer run together in name order, so a numeric prefix orders them:

@@ -342,9 +342,30 @@ export default defineLayer({
 });
 ```
 
-`KnownCategories` is an empty interface that the layer exports. The generated file fills it with the
-app's values, so a field typed `keyof KnownCategories` autocompletes the categories that app
-configured.
+`KnownCategories` is an empty interface that the layer exports from its package entry:
+
+`index.ts`
+
+```ts files
+export interface KnownCategories {}
+```
+
+`package.json`
+
+```json files
+{
+  "name": "@acme/blog",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": "./index.ts",
+  "peerDependencies": {
+    "ohnejs": ">=0.5.1 <0.6.0-0"
+  }
+}
+```
+
+The generated file fills it with the app's values, so a field typed `keyof KnownCategories`
+autocompletes the categories that app configured.
 
 - `bucket` picks which TypeScript program sees the file: `node` for `ohnejs` augmentations and
   server types, `browser` for `ohnejs/dashboard` ones, `shared` for pure types both include.

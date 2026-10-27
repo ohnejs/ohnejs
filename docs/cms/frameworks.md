@@ -499,7 +499,9 @@ createServer(async (request, response) => {
     return;
   }
   if (page.kind === 'notFound') {
-    response.writeHead(404, { 'content-type': 'text/html' }).end('<h1>Not found</h1>');
+    response
+      .writeHead(404, { 'content-type': 'text/html; charset=utf-8' })
+      .end('<h1>Not found</h1>');
     return;
   }
 
@@ -511,7 +513,7 @@ createServer(async (request, response) => {
       </section>`,
   );
   response.writeHead(200, {
-    'content-type': 'text/html',
+    'content-type': 'text/html; charset=utf-8',
     ...(token ? ohne.previewHeaders() : {}),
   });
   response.end(`<!doctype html>
