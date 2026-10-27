@@ -72,6 +72,16 @@ describe('ohne init', () => {
     strictEqual(existsSync(join(dir, '.gitignore')), true);
   });
 
+  it('names the session cookie after the project', async () => {
+    const dir = join(freshDir('app'), 'Blog Site');
+
+    await runCommand(ohne, ['init', dir, '--yes']);
+    match(
+      readFileSync(join(dir, 'ohne.config.ts'), 'utf8'),
+      /auth: \{ cookieName: 'blog-site-session' \}/,
+    );
+  });
+
   it('names the package after the target directory', async () => {
     const dir = join(freshDir('app'), 'widgets');
 

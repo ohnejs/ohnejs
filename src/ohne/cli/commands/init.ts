@@ -28,6 +28,7 @@ import { colorOverride } from '../../env/color-override.ts';
 import { toolchain } from '../../meta/toolchain.ts';
 import { version } from '../../meta/version.ts';
 import { usePrinter } from '../../printer/use-printer.ts';
+import { sessionCookie } from '../session-cookie.ts';
 import { readStarter, webRefusal, writeStarter } from '../starter.ts';
 
 // A shell, because Windows starts the `.cmd` shims of npm and pnpm only through one.
@@ -38,13 +39,6 @@ const CONTROL = /\p{Cc}/u;
 const NAME_RULE = 'Use lowercase letters, digits, and `-`, as in `my-app`.';
 
 const NPM_FLAGS = 'With npm, flags go after `--`: `npm create ohne my-app -- --yes`.';
-
-const CONFIG_FILE = `import { defineConfig } from 'ohnejs';
-
-export default defineConfig({
-  layers: ['ohnejs/base'],
-});
-`;
 
 const TSCONFIG_FILE = `{
   "extends": "ohnejs/tsconfig.node.json",
@@ -298,10 +292,23 @@ function runScript(pm: string, script: string): string {
 }
 
 /**
+ * The scaffold's `ohne.config.ts`, its session cookie named after the project.
+ */
+function configFile(name: string): string {
+  return `import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  auth: { cookieName: '${sessionCookie(name)}' },
+});
+`;
+}
+
+/**
  * Writes the starter project files into `target`, with `ohnejs` as the dependency's version or local path.
  */
 async function scaffold(target: string, name: string, ohne: string): Promise<void> {
-  await writeFile(joinPath(target, 'ohne.config.ts'), CONFIG_FILE);
+  await writeFile(joinPath(target, 'ohne.config.ts'), configFile(name));
   await writeJSON(joinPath(target, 'package.json'), {
     name,
     type: 'module',

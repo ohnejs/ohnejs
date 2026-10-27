@@ -269,7 +269,25 @@ describe('writeStarter', () => {
     }
   });
 
-  it('transforms only the root `package.json` and `pnpm-workspace.yaml`', async () => {
+  it("names the backend's session cookie after the project, below its layers", async () => {
+    const config = "export default defineConfig({\n  layers: ['ohnejs/base'],\n  cms: {},\n});\n";
+    const odd = 'export default defineConfig({ layers: [] });\n';
+    const dir = await written([
+      { path: 'apps/backend/ohne.config.ts', type: 'file', data: encoder.encode(config) },
+    ]);
+    strictEqual(
+      readFileSync(join(dir, 'apps/backend/ohne.config.ts'), 'utf8'),
+      "export default defineConfig({\n  layers: ['ohnejs/base'],\n" +
+        '  // Two apps on one host share cookies, so each names its own session cookie.\n' +
+        "  auth: { cookieName: 'my-site-session' },\n  cms: {},\n});\n",
+    );
+    const kept = await written([
+      { path: 'apps/backend/ohne.config.ts', type: 'file', data: encoder.encode(odd) },
+    ]);
+    strictEqual(readFileSync(join(kept, 'apps/backend/ohne.config.ts'), 'utf8'), odd);
+  });
+
+  it('transforms a `package.json` or `pnpm-workspace.yaml` only at the root', async () => {
     const data = encoder.encode('{ "name": "web" }\n');
     const yaml = encoder.encode('minimumReleaseAgeExclude:\n  - ohnejs\n');
     const dir = await written([

@@ -40,6 +40,7 @@ import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   layers: ['ohnejs/base'],
+  auth: { cookieName: 'my-app-session' },
 });
 ```
 
@@ -102,7 +103,8 @@ node_modules/
 
 - `ohne.config.ts` - the project's [config](../project/config.md), and what marks the directory as
   an ohne project. `layers: ['ohnejs/base']` puts the framework's own
-  [layer](../project/layers.md#what-the-base-layer-ships) under your app.
+  [layer](../project/layers.md#what-the-base-layer-ships) under your app. The session cookie is
+  named after the project, since two apps on one machine would otherwise sign each other out.
 - `package.json` - scripts for `dev` and the rest of the [CLI](../project/cli.md). `ohnejs` is the
   only dependency; TypeScript is there to type-check, never to compile.
 - `tsconfig.json` - type-checks your Node code against the config ohne ships. `dashboard/` is

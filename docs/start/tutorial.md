@@ -193,6 +193,7 @@ import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   layers: ['ohnejs/base'],
+  auth: { cookieName: 'blog-session' },
   dashboard: {
     menu: {
       posts: { parent: 'general', to: '/posts', label: 'Posts', icon: 'article' },
@@ -316,6 +317,7 @@ import { defineConfig } from 'ohnejs';
 
 export default defineConfig({
   layers: ['ohnejs/base'],
+  auth: { cookieName: 'blog-session' },
   dashboard: {
     menu: {
       posts: { parent: 'general', to: '/posts', label: 'Posts', icon: 'article' },

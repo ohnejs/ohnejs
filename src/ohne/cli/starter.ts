@@ -21,6 +21,7 @@ import {
 } from '../../utils/index.ts';
 import { isOhneError, ohneError } from '../error/ohne-error.ts';
 import { version } from '../meta/version.ts';
+import { sessionCookie } from './session-cookie.ts';
 
 const unzip = promisify(gunzip);
 
@@ -29,6 +30,8 @@ const COMPRESSED = parseBytes('5mb');
 const UNPACKED = parseBytes('20mb');
 
 const RETRY = 'Check your connection and run it again.';
+
+const BACKEND_CONFIG = 'apps/backend/ohne.config.ts';
 
 /**
  * Why `--web` cannot run with this package manager and `ohnejs` version, or `undefined` when it can.
@@ -105,6 +108,7 @@ export async function readStarter(web: 'nuxt' | 'next', tarball?: string): Promi
 /**
  * Writes a starter's files under `target` and names its root package `name`.
  * It drops `minimumReleaseAgeExclude` from `pnpm-workspace.yaml`, so you keep pnpm's full age gate.
+ * The backend's config names its session cookie after the project.
  * Every other file is written byte for byte.
  *
  * @example
@@ -124,6 +128,7 @@ export async function writeStarter(
     if (entry.type === 'directory') await ensureDir(path);
     else if (entry.path === 'package.json') await writeFile(path, renamed(entry.data, name));
     else if (entry.path === 'pnpm-workspace.yaml') await writeFile(path, ageGated(entry.data));
+    else if (entry.path === BACKEND_CONFIG) await writeFile(path, withCookie(entry.data, name));
     else await writeFile(path, entry.data);
   }
 }
@@ -174,6 +179,23 @@ function downloadFailed(web: 'nuxt' | 'next', cause: string): Error {
  */
 function renamed(data: Uint8Array, name: string): string {
   return `${JSON.stringify(Object.assign(JSON.parse(decodeText(data)), { name }), null, 2)}\n`;
+}
+
+/**
+ * The backend's config with its session cookie named after the project, after its `layers` line.
+ * A config without that line is left as it is.
+ */
+function withCookie(data: Uint8Array, name: string): string {
+  const lines = decodeText(data).split('\n');
+  const at = lines.findIndex((line) => /^  layers: \[.*\],$/.test(line));
+  if (at === -1) return lines.join('\n');
+  lines.splice(
+    at + 1,
+    0,
+    '  // Two apps on one host share cookies, so each names its own session cookie.',
+    `  auth: { cookieName: '${sessionCookie(name)}' },`,
+  );
+  return lines.join('\n');
 }
 
 /**
