@@ -10,7 +10,7 @@
     "url": "git+https://github.com/ohnejs/ohnejs.git"
   },
   "bin": {
-    "ohne": "./src/ohne/cli/bin.js"
+    "ohne": "src/ohne/cli/bin.js"
   },
   "files": [
     "src",
