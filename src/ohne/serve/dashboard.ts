@@ -9,6 +9,7 @@ import {
   canonicalizeLanguage,
   escapeXML,
   formatMessage,
+  isEmpty,
   isNull,
   isPathInside,
   isPort,
@@ -22,6 +23,7 @@ import {
   normalizeBasePath,
   type PageRoute,
   relativePath,
+  resolveCatalog,
   resolvePath,
   safeResolve,
   uniqueArray,
@@ -78,6 +80,12 @@ const APP_MODULE_BASE = `${MODULE_BASE}/app`;
  * `src/dashboard/ui/icon.ts` resolves it against its own served URL, so the two cannot drift.
  */
 const ICON_BASE = `${MODULE_BASE}/icon`;
+
+/**
+ * URL prefix the dashboard server answers a group's fallback messages under, as `/m/messages/<group>`.
+ * `src/dashboard/runtime/messages.ts` resolves it against its own served URL, so the two cannot drift.
+ */
+const MESSAGES_BASE = `${MODULE_BASE}/messages`;
 
 /**
  * How long a served shape stays fresh, in seconds.
@@ -262,6 +270,10 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
       serveFrom(modules, appRoots, params.path),
     ),
     synthetic(`${ICON_BASE}/[name]`, serveIcon),
+    synthetic(`${MESSAGES_BASE}/[group]`, async ({ params }: HandlerContext) => {
+      const messages = await collectMessages(layers, { disable: useConfig().disable.messages });
+      return fallbackCatalog(messages, params.group, defaultLanguage);
+    }),
     synthetic(`${MODULE_BASE}/[...path]`, ({ params }: HandlerContext) =>
       serveModule(modules, params.path),
     ),
@@ -319,6 +331,23 @@ function serveIcon({ params }: HandlerContext): string | undefined {
     return undefined;
   }
   return shape;
+}
+
+/**
+ * Serves one group's messages in the default language, for a dashboard whose API cannot answer them.
+ * A group no catalog defines is a `404`.
+ */
+function fallbackCatalog(
+  messages: MessageMeta[],
+  group: string,
+  defaultLanguage: string,
+): Record<string, { template: string; language: string }> {
+  const catalogs: Record<string, Record<string, string>> = {};
+  for (const { language, key, template } of messages) (catalogs[language] ??= {})[key] = template;
+  const catalog = resolveCatalog(catalogs, group, defaultLanguage, defaultLanguage);
+  if (isEmpty(catalog)) throw notFound('Not Found');
+  useResponse().headers.set('cache-control', cacheControl({ noCache: true }));
+  return catalog;
 }
 
 /**

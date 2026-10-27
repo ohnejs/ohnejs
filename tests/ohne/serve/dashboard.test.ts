@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 
-import { match, notStrictEqual, rejects, strictEqual } from 'node:assert';
+import { deepStrictEqual, match, notStrictEqual, rejects, strictEqual } from 'node:assert';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -508,6 +508,25 @@ describe('serveDashboard', () => {
       body.includes('<button type="button" class="ohne-raw">Nochmal {versuchen}</button>'),
       true,
     );
+  });
+
+  it('answers a group in the default language down its chain, for an API that cannot', async () => {
+    const dir = makeApp('fallback-messages');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { messages: { defaultLanguage: 'de-AT' } }\n",
+    );
+    mkdirSync(join(dir, 'messages', 'shop'), { recursive: true });
+    writeFileSync(join(dir, 'messages', 'shop', 'de.json'), JSON.stringify({ cart: 'Warenkorb' }));
+    writeFileSync(join(dir, 'messages', 'shop', 'fr.json'), JSON.stringify({ cart: 'Panier' }));
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    const res = await req(port, '/m/messages/shop');
+    strictEqual(res.status, 200);
+    deepStrictEqual(JSON.parse(res.body), {
+      'shop.cart': { template: 'Warenkorb', language: 'de' },
+    });
+    strictEqual((await req(port, '/m/messages/nothing')).status, 404);
   });
 
   it('omits the reload client and its stream route by default', async () => {
