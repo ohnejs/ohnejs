@@ -56,6 +56,11 @@ css`
     box-shadow: inset 0 0 0 1px hsl(var(--ohne-tone-line));
   }
 
+  .ohne-note-toned > .ohne-note-content {
+    --ohne-accent: var(--ohne-tone-ink) / 0.15;
+    --ohne-accent-foreground: var(--ohne-tone-ink);
+  }
+
   .ohne-note-toned > svg {
     color: hsl(var(--ohne-tone-ink));
   }

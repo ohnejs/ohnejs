@@ -83,6 +83,12 @@ css`
     color: hsl(var(--ohne-tone-foreground));
   }
 
+  .ohne-alert-surface > .ohne-alert-main {
+    --ohne-accent: var(--ohne-tone-ink) / 0.15;
+    --ohne-accent-foreground: var(--ohne-tone-ink);
+    --ohne-input: var(--ohne-tone-ink) / 0.2;
+  }
+
   .ohne-alert-icon {
     flex-shrink: 0;
     font-size: 1.5em;
@@ -112,8 +118,8 @@ css`
 
 /**
  * A static callout box with an optional icon, title, and actions.
- * A status tone rethemes `--ohne-accent` to a `0.15` wash of its color.
- * Nested ghost and outline buttons therefore hover in the alert's own color.
+ * Any tone but `primary` rethemes `--ohne-accent` to a `0.15` wash of its color.
+ * Nested code, ghost and outline buttons therefore take the alert's own color.
  *
  * @example
  * ```ts
