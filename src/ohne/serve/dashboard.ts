@@ -1,4 +1,6 @@
 import type { MessageMeta } from '../messages/messages.ts';
+import type { MessageCatalog } from '../messages/use-messages.ts';
+import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 import type { HandlerContext, Route } from '../routes/route.ts';
 
 import { etag } from '../../utils/etag/etag.ts';
@@ -24,6 +26,7 @@ import {
   type PageRoute,
   relativePath,
   resolveCatalog,
+  swapRegistry,
   resolvePath,
   safeResolve,
   uniqueArray,
@@ -53,6 +56,7 @@ import { useConfig } from '../layers/use-config.ts';
 import { onShutdown } from '../lifecycle/on-shutdown.ts';
 import { useShutdown } from '../lifecycle/use-shutdown.ts';
 import { collectMessages } from '../messages/collect-messages.ts';
+import { useMessages } from '../messages/use-messages.ts';
 import { SRC_ROOT } from '../meta/src-root.ts';
 import { usePrinter } from '../printer/use-printer.ts';
 import { loadProjectEnv } from '../project/load-project-env.ts';
@@ -229,6 +233,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const failedIcon = iconShape('cloud-off') ?? '';
   const modules = createModuleTable([...KERNEL_MOUNTS, { base: APP_MODULE_BASE, roots: appRoots }]);
   await modules.scan();
+  await loadMessages(layers);
 
   // A framed dashboard could be clickjacked into a save or a delete; only listed pages may frame it.
   const renderShell = async (): Promise<string | undefined> => {
@@ -236,7 +241,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
     response.headers.set('content-security-policy', framing);
     response.headers.set('cache-control', cacheControl({ noCache: true }));
     const scanned = await modules.scan();
-    const messages = await collectMessages(layers, { disable: useConfig().disable.messages });
+    const messages = await loadMessages(layers);
     const pages = buildDashboardPageManifest(await collectDashboardPages(layers), APP_MODULE_BASE);
     const boot = (await collectDashboardBoot(layers)).map(
       (file) => `${APP_MODULE_BASE}/${file.module}`,
@@ -271,8 +276,8 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
     ),
     synthetic(`${ICON_BASE}/[name]`, serveIcon),
     synthetic(`${MESSAGES_BASE}/[group]`, async ({ params }: HandlerContext) => {
-      const messages = await collectMessages(layers, { disable: useConfig().disable.messages });
-      return fallbackCatalog(messages, params.group, defaultLanguage);
+      await loadMessages(layers);
+      return fallbackCatalog(params.group, defaultLanguage);
     }),
     synthetic(`${MODULE_BASE}/[...path]`, ({ params }: HandlerContext) =>
       serveModule(modules, params.path),
@@ -301,6 +306,18 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
 }
 
 /**
+ * Collects the stack's messages and registers them as the process's catalogs.
+ * The dashboard server then translates its own errors, as the API does.
+ */
+async function loadMessages(layers: OhneLayer[]): Promise<MessageMeta[]> {
+  const messages = await collectMessages(layers, { disable: useConfig().disable.messages });
+  const catalogs: Record<string, MessageCatalog> = {};
+  for (const { language, key, template } of messages) (catalogs[language] ??= {})[key] = template;
+  swapRegistry(useMessages(), Object.entries(catalogs));
+  return messages;
+}
+
+/**
  * A `GET` route the dashboard server registers itself, with no backing file or layer.
  */
 function synthetic(pattern: string, handler: Route['handler']): Route {
@@ -316,7 +333,7 @@ function synthetic(pattern: string, handler: Route['handler']): Route {
  */
 function serveIcon({ params }: HandlerContext): string | undefined {
   const shape = iconShape(params.name);
-  if (isUndefined(shape)) throw notFound('Not Found');
+  if (isUndefined(shape)) throw notFound();
 
   const response = useResponse();
   response.headers.set('content-type', 'text/plain; charset=utf-8');
@@ -338,14 +355,11 @@ function serveIcon({ params }: HandlerContext): string | undefined {
  * A group no catalog defines is a `404`.
  */
 function fallbackCatalog(
-  messages: MessageMeta[],
   group: string,
   defaultLanguage: string,
 ): Record<string, { template: string; language: string }> {
-  const catalogs: Record<string, Record<string, string>> = {};
-  for (const { language, key, template } of messages) (catalogs[language] ??= {})[key] = template;
-  const catalog = resolveCatalog(catalogs, group, defaultLanguage, defaultLanguage);
-  if (isEmpty(catalog)) throw notFound('Not Found');
+  const catalog = resolveCatalog(useMessages().all(), group, defaultLanguage, defaultLanguage);
+  if (isEmpty(catalog)) throw notFound();
   useResponse().headers.set('cache-control', cacheControl({ noCache: true }));
   return catalog;
 }
@@ -358,7 +372,7 @@ function serveModule(modules: ModuleTable, path: string): Promise<string | Uint8
   const resolved = safeResolve(SRC_ROOT, path);
   const roots = KERNEL_MOUNTS.flatMap((mount) => mount.roots);
   if (isNull(resolved) || !roots.some((root) => isPathInside(resolved, root))) {
-    throw notFound('Not Found');
+    throw notFound();
   }
   return serveFrom(modules, [SRC_ROOT], path);
 }
@@ -372,9 +386,7 @@ function serveFrom(
   roots: string[],
   path: string,
 ): Promise<string | Uint8Array | undefined> {
-  return isFingerprinted(path)
-    ? modules.send(roots, path)
-    : sendFile(roots, path, { notFound: 'Not Found' });
+  return isFingerprinted(path) ? modules.send(roots, path) : sendFile(roots, path);
 }
 
 /**

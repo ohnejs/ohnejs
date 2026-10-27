@@ -529,6 +529,24 @@ describe('serveDashboard', () => {
     strictEqual((await req(port, '/m/messages/nothing')).status, 404);
   });
 
+  it('answers its errors in the default language, as the API does', async () => {
+    const dir = makeApp('translated-errors');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { messages: { defaultLanguage: 'de' } }\n",
+    );
+    mkdirSync(join(dir, 'messages', 'api'), { recursive: true });
+    writeFileSync(
+      join(dir, 'messages', 'api', 'de.json'),
+      JSON.stringify({ http: { notFound: 'Nicht gefunden' } }),
+    );
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    for (const path of ['/m/messages/..%2F..', '/m/icon/not-an-icon', '/m/messages/nothing']) {
+      strictEqual(JSON.parse((await req(port, path)).body).message, 'Nicht gefunden');
+    }
+  });
+
   it('omits the reload client and its stream route by default', async () => {
     const port = await serve('no-reload');
     strictEqual(
