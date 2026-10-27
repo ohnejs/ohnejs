@@ -10,6 +10,7 @@ import { collectFlows } from '../flows/collect-flows.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
+import { linkedPaths } from './linked-paths.ts';
 
 /**
  * Options for `generateFlows`.
@@ -50,6 +51,7 @@ export async function generateFlows(
 ): Promise<string[] | null> {
   const sharedDir = await codegenBucket(from, 'shared');
   const nodeDir = await codegenBucket(from, 'node');
+  const linked = await linkedPaths(from);
   if (isNull(sharedDir) || isNull(nodeDir)) return null;
 
   const { fresh = false } = options;
@@ -77,7 +79,9 @@ export async function generateFlows(
   code.line("import type { GeneratedFlows } from '../shared/flows.ts';");
   if (flows.length > 0) code.line("import { useFlows } from 'ohnejs';");
   flows.forEach((flow, index) => {
-    code.line(`import f${index} from ${literalString(importSpecifier(nodeDir, flow.file))};`);
+    code.line(
+      `import f${index} from ${literalString(importSpecifier(nodeDir, linked(flow.file)))};`,
+    );
   });
   code.line();
 

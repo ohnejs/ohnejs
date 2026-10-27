@@ -12,6 +12,7 @@ import { useConfig } from '../layers/use-config.ts';
 import { collectRoutes } from '../routes/collect-routes.ts';
 import { type RouteMeta, routeID } from '../routes/route.ts';
 import { BANNER, codegenDir } from './codegen-dir.ts';
+import { linkedPaths } from './linked-paths.ts';
 
 /**
  * Generates the route table from every layer's API directory.
@@ -36,6 +37,7 @@ import { BANNER, codegenDir } from './codegen-dir.ts';
 export async function generateRoutes(from: string = process.cwd()): Promise<string[]> {
   const dir = await codegenDir(from);
   if (isNull(dir)) return [];
+  const linked = await linkedPaths(from);
 
   const routes = await collectRoutes(stackedLayers(), {
     disable: useConfig().disable.routes,
@@ -43,7 +45,7 @@ export async function generateRoutes(from: string = process.cwd()): Promise<stri
 
   return Promise.all([
     writeShared(joinPath(dir, 'shared'), routes),
-    writeNode(joinPath(dir, 'node'), routes),
+    writeNode(joinPath(dir, 'node'), routes, linked),
     writeBrowser(joinPath(dir, 'browser')),
   ]);
 }
@@ -65,13 +67,17 @@ async function writeShared(dir: string, routes: readonly RouteMeta[]): Promise<s
 /**
  * Writes `node/routes.ts`: augments `ohnejs`'s `KnownRoutes` with handler types, registers each route.
  */
-async function writeNode(dir: string, routes: readonly RouteMeta[]): Promise<string> {
+async function writeNode(
+  dir: string,
+  routes: readonly RouteMeta[],
+  linked: (path: string) => string,
+): Promise<string> {
   const code = createCodeBuilder();
   code.line(
     routes.length === 0 ? "import type {} from 'ohnejs';" : "import { useRoutes } from 'ohnejs';",
   );
   routes.forEach((route, i) => {
-    code.line(`import h${i} from ${literalString(importSpecifier(dir, route.file))};`);
+    code.line(`import h${i} from ${literalString(importSpecifier(dir, linked(route.file)))};`);
   });
   code.line();
 

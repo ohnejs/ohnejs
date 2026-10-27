@@ -8,6 +8,7 @@ import { isNull } from '../../utils/index.ts';
 import { useLayers } from '../layers/use-layers.ts';
 import { resolveDependencyLayerNames } from '../project/resolve-dependency-layer-names.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
+import { linkedPaths } from './linked-paths.ts';
 import { scanLayerAugmentations } from './scan-layer-augmentations.ts';
 
 /**
@@ -31,6 +32,7 @@ import { scanLayerAugmentations } from './scan-layer-augmentations.ts';
 export async function generateLayerName(from: string = process.cwd()): Promise<string | null> {
   const dir = await codegenBucket(from, 'node');
   if (isNull(dir)) return null;
+  const linked = await linkedPaths(from);
 
   const names = await resolveDependencyLayerNames(from);
   const layers = useLayers().layers().slice(0, -1);
@@ -43,7 +45,7 @@ export async function generateLayerName(from: string = process.cwd()): Promise<s
     code.line("import type {} from 'ohnejs';");
   } else {
     for (const file of files) {
-      code.line(`import type {} from ${literalString(importSpecifier(dir, file))};`);
+      code.line(`import type {} from ${literalString(importSpecifier(dir, linked(file)))};`);
     }
   }
   code.line();

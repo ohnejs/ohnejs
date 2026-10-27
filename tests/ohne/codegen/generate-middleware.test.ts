@@ -14,6 +14,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { BANNER } from '../../../src/ohne/codegen/codegen-dir.ts';
 import { generateMiddleware, loadLayers, useLayers } from '../../../src/ohne/index.ts';
+import '../../../src/ohne/runtime/register.js';
 
 interface PackageSpec {
   name: string;
@@ -57,6 +58,29 @@ describe('generateMiddleware', () => {
 
   afterEach(() => {
     for (const layer of useLayers().layers()) useLayers().remove(layer.path);
+  });
+
+  it('imports a store-installed layer through `node_modules`, so an upgrade keeps the import', async () => {
+    const app = join(root, 'stored');
+    writePackage(app, { name: 'app', ohne: true, layers: ['a'], dependencies: { a: '*' } });
+    const store = (version: string): string => {
+      const dir = join(app, 'node_modules', '.pnpm', `a@${version}`, 'node_modules', 'a');
+      writePackage(dir, { name: 'a', ohne: true });
+      writeMiddleware(dir, 'auth.ts');
+      return dir;
+    };
+    symlinkSync(store('1.0.0'), join(app, 'node_modules', 'a'), 'dir');
+
+    await loadLayers(app);
+    const path = (await generateMiddleware(app))!;
+    const before = readFileSync(path, 'utf8');
+    strictEqual(before.includes("import m0 from '../../node_modules/a/middleware/auth.ts';"), true);
+
+    rmSync(join(app, 'node_modules', 'a'));
+    symlinkSync(store('2.0.0'), join(app, 'node_modules', 'a'), 'dir');
+    for (const layer of useLayers().layers()) useLayers().remove(layer.path);
+    await loadLayers(app);
+    strictEqual(readFileSync((await generateMiddleware(app))!, 'utf8'), before);
   });
 
   it('emits imports and registrations, globals first', async () => {

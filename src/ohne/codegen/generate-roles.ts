@@ -10,6 +10,7 @@ import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { collectRoles } from '../roles/collect-roles.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
+import { linkedPaths } from './linked-paths.ts';
 
 /**
  * Options for `generateRoles`.
@@ -52,6 +53,7 @@ export async function generateRoles(
   const sharedDir = await codegenBucket(from, 'shared');
   const nodeDir = await codegenBucket(from, 'node');
   const browserDir = await codegenBucket(from, 'browser');
+  const linked = await linkedPaths(from);
   if (isNull(sharedDir) || isNull(nodeDir) || isNull(browserDir)) return null;
 
   const { fresh = false } = options;
@@ -79,7 +81,9 @@ export async function generateRoles(
   code.line("import type { GeneratedRoles } from '../shared/roles.ts';");
   if (roles.length > 0) code.line("import { useRoles } from 'ohnejs';");
   roles.forEach((role, index) => {
-    code.line(`import r${index} from ${literalString(importSpecifier(nodeDir, role.file))};`);
+    code.line(
+      `import r${index} from ${literalString(importSpecifier(nodeDir, linked(role.file)))};`,
+    );
   });
   code.line();
 

@@ -10,6 +10,7 @@ import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { collectSkills } from '../skills/collect-skills.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
+import { linkedPaths } from './linked-paths.ts';
 
 /**
  * Options for `generateSkills`.
@@ -50,6 +51,7 @@ export async function generateSkills(
 ): Promise<string[] | null> {
   const sharedDir = await codegenBucket(from, 'shared');
   const nodeDir = await codegenBucket(from, 'node');
+  const linked = await linkedPaths(from);
   if (isNull(sharedDir) || isNull(nodeDir)) return null;
 
   const { fresh = false } = options;
@@ -77,7 +79,9 @@ export async function generateSkills(
   code.line("import type { GeneratedSkills } from '../shared/skills.ts';");
   if (skills.length > 0) code.line("import { useSkills } from 'ohnejs';");
   skills.forEach((skill, index) => {
-    code.line(`import s${index} from ${literalString(importSpecifier(nodeDir, skill.file))};`);
+    code.line(
+      `import s${index} from ${literalString(importSpecifier(nodeDir, linked(skill.file)))};`,
+    );
   });
   code.line();
 

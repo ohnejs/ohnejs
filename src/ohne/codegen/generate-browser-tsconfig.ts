@@ -7,6 +7,7 @@ import { first, isNull, isUndefined, relativePath } from '../../utils/index.ts';
 import { dashboardRoots } from '../dashboard/dashboard-roots.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
+import { linkedPaths } from './linked-paths.ts';
 
 /**
  * Generates `browser/tsconfig.json`, the base of the app's browser type program.
@@ -28,8 +29,9 @@ export async function generateBrowserTSConfig(
 ): Promise<string | null> {
   const dir = await codegenBucket(from, 'browser');
   if (isNull(dir)) return null;
+  const linked = await linkedPaths(from);
 
-  const roots = dashboardRoots(stackedLayers()).map((root) => relativePath(dir, root));
+  const roots = dashboardRoots(stackedLayers()).map((root) => relativePath(dir, linked(root)));
   const own = first(roots);
   const include = isUndefined(own) ? [] : [`${own}/**/*.ts`];
   include.push('../shared/**/*.ts', './**/*.ts');

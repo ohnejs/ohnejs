@@ -9,6 +9,7 @@ import { isNull } from '../../utils/index.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
 import { collectMiddleware } from '../middleware/collect-middleware.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
+import { linkedPaths } from './linked-paths.ts';
 
 /**
  * Generates the middleware table from every layer's middleware directory.
@@ -31,6 +32,7 @@ import { BANNER, codegenBucket } from './codegen-dir.ts';
 export async function generateMiddleware(from: string = process.cwd()): Promise<string | null> {
   const dir = await codegenBucket(from, 'node');
   if (isNull(dir)) return null;
+  const linked = await linkedPaths(from);
 
   const middleware = await collectMiddleware(stackedLayers());
   const indexed = middleware.map((entry, index) => ({ ...entry, index }));
@@ -43,7 +45,9 @@ export async function generateMiddleware(from: string = process.cwd()): Promise<
       : "import { useMiddleware } from 'ohnejs';",
   );
   indexed.forEach((entry) => {
-    code.line(`import m${entry.index} from ${literalString(importSpecifier(dir, entry.file))};`);
+    code.line(
+      `import m${entry.index} from ${literalString(importSpecifier(dir, linked(entry.file)))};`,
+    );
   });
   code.line();
 

@@ -47,6 +47,7 @@ import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { collectMessages } from '../messages/collect-messages.ts';
 import { BANNER, codegenDir } from './codegen-dir.ts';
+import { linkedPaths } from './linked-paths.ts';
 import {
   allowedBlocksOf,
   blockArm,
@@ -181,6 +182,7 @@ export async function generateDatabase(
     collectMessages(stackedLayers(), { disable: disable.messages }),
   ]);
   const resolveText = messageResolver(messages);
+  const linked = await linkedPaths(from);
 
   return Promise.all([
     writeShared(
@@ -192,8 +194,17 @@ export async function generateDatabase(
       helpers,
       locales,
       resolveText,
+      linked,
     ),
-    writeNode(joinPath(dir, 'node'), collections, fields, blocks, migrations, disable.fields),
+    writeNode(
+      joinPath(dir, 'node'),
+      collections,
+      fields,
+      blocks,
+      migrations,
+      disable.fields,
+      linked,
+    ),
     writeBrowser(joinPath(dir, 'browser')),
   ]);
 }
@@ -239,8 +250,9 @@ async function writeShared(
   helpers: readonly string[],
   locales: readonly string[],
   resolveText: MessageResolver,
+  linked: (path: string) => string,
 ): Promise<string> {
-  const imports = createTypeImports(dir, DECLARED);
+  const imports = createTypeImports(dir, DECLARED, linked);
   const context: EmissionContext = {
     types: emittableFieldTypes(fields, disabledFields),
     blocks: blocks.map((block) => block.name),
@@ -617,6 +629,7 @@ async function writeNode(
   blocks: readonly CollectedBlock[],
   migrations: readonly ScannedMigration[],
   disabledFields: readonly string[],
+  linked: (path: string) => string,
 ): Promise<string> {
   const builtins = new Set(useFields().keys());
   const deletions = disabledFields.filter((name) => builtins.has(name));
@@ -634,16 +647,16 @@ async function writeNode(
     code.line();
   }
   collections.forEach((collection, i) => {
-    code.line(`import c${i} from ${literalString(importSpecifier(dir, collection.file))};`);
+    code.line(`import c${i} from ${literalString(importSpecifier(dir, linked(collection.file)))};`);
   });
   fields.forEach((fieldType, i) => {
-    code.line(`import f${i} from ${literalString(importSpecifier(dir, fieldType.file))};`);
+    code.line(`import f${i} from ${literalString(importSpecifier(dir, linked(fieldType.file)))};`);
   });
   blocks.forEach((block, i) => {
-    code.line(`import b${i} from ${literalString(importSpecifier(dir, block.file))};`);
+    code.line(`import b${i} from ${literalString(importSpecifier(dir, linked(block.file)))};`);
   });
   migrations.forEach((migration, i) => {
-    code.line(`import m${i} from ${literalString(importSpecifier(dir, migration.file))};`);
+    code.line(`import m${i} from ${literalString(importSpecifier(dir, linked(migration.file)))};`);
   });
   if (collections.length + fields.length + blocks.length + migrations.length > 0) code.line();
 
@@ -671,7 +684,7 @@ async function writeNode(
       code.line('interface KnownFields {');
       code.indent(() => {
         for (const fieldType of augmented) {
-          const specifier = literalString(importSpecifier(dir, fieldType.file));
+          const specifier = literalString(importSpecifier(dir, linked(fieldType.file)));
           code.line(`${propertyKey(fieldType.name)}: typeof import(${specifier}).default;`);
         }
       });

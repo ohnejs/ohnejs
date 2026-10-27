@@ -8,6 +8,7 @@ import { isNull } from '../../utils/index.ts';
 import { dashboardRoots } from '../dashboard/dashboard-roots.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
 import { BANNER, codegenBucket } from './codegen-dir.ts';
+import { linkedPaths } from './linked-paths.ts';
 import { scanLayerAugmentations } from './scan-layer-augmentations.ts';
 
 /**
@@ -28,6 +29,7 @@ import { scanLayerAugmentations } from './scan-layer-augmentations.ts';
 export async function generateBrowserLayers(from: string = process.cwd()): Promise<string | null> {
   const dir = await codegenBucket(from, 'browser');
   if (isNull(dir)) return null;
+  const linked = await linkedPaths(from);
 
   const roots = dashboardRoots(stackedLayers().slice(0, -1)).reverse();
   const files = (
@@ -39,7 +41,7 @@ export async function generateBrowserLayers(from: string = process.cwd()): Promi
     code.line("import type {} from 'ohnejs/dashboard';");
   } else {
     for (const file of files) {
-      code.line(`import type {} from ${literalString(importSpecifier(dir, file))};`);
+      code.line(`import type {} from ${literalString(importSpecifier(dir, linked(file)))};`);
     }
   }
 
