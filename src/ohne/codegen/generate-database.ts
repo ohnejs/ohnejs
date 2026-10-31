@@ -42,7 +42,7 @@ import { forbidsEmpty } from '../fields/forbids-empty.ts';
 import { resolveFieldStorage } from '../fields/resolve-field.ts';
 import { useFields } from '../fields/use-fields.ts';
 import { fieldBaseType } from '../fields/value-type.ts';
-import { DEFAULTS } from '../layers/config.ts';
+import { defaultLanguage } from '../http/translate.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { collectMessages } from '../messages/collect-messages.ts';
@@ -216,7 +216,7 @@ export async function generateDatabase(
  * A key with no default-language template resolves to nothing, so the headline falls back in turn.
  */
 function messageResolver(messages: readonly MessageMeta[]): MessageResolver {
-  const language = useConfig().messages?.defaultLanguage ?? DEFAULTS.messages.defaultLanguage;
+  const language = defaultLanguage();
   const templates = new Map<string, string>();
   for (const message of messages) {
     if (message.language === language) templates.set(message.key, message.template);

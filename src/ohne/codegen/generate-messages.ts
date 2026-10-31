@@ -22,6 +22,7 @@ import {
   uniqueArray,
 } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { defaultLanguage } from '../http/translate.ts';
 import { stackedLayers } from '../layers/stacked-layers.ts';
 import { useConfig } from '../layers/use-config.ts';
 import { collectMessages } from '../messages/collect-messages.ts';
@@ -50,6 +51,7 @@ interface Translation {
  * Layers come from the registered stack, so `loadLayers` must have run first.
  * Keys matched by `Config.disable.messages` are dropped before the catalog and its types are emitted.
  * A key's parameters must match across every language that defines it, or generation throws.
+ * So does a default language with no catalog, once any catalog exists.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Output lands in the app's own `dirs.codegen` (default `.ohne`), resolved against that root.
@@ -66,6 +68,16 @@ export async function generateMessages(from: string = process.cwd()): Promise<st
   });
   const keyParams = unifyKeyParams(messages);
   const languages = uniqueArray(messages.map((message) => message.language)).sort();
+  const fallback = defaultLanguage();
+  if (languages.length > 0 && !languages.includes(fallback)) {
+    throw ohneError({
+      title: `Default language ${codeSpan(fallback)} has no catalog`,
+      body: [
+        `The catalogs hold ${languages.map((language) => codeSpan(language)).join(', ')}, and the default must be one of them.`,
+        `Add a catalog for ${codeSpan(fallback)}, or set \`messages.defaultLanguage\` to one of those languages.`,
+      ],
+    });
+  }
 
   return Promise.all([
     writeShared(joinPath(dir, 'shared'), keyParams, languages),

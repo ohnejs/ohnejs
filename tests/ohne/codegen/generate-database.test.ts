@@ -397,6 +397,26 @@ describe('generateDatabase', () => {
     ok(inserts.includes(' * Heading'));
   });
 
+  it('resolves a headline key in the canonical default language', async () => {
+    const app = join(root, 'field-docs-language');
+    writePackage(
+      app,
+      'field-docs-language',
+      undefined,
+      "export default { messages: { defaultLanguage: 'DE' } };\n",
+    );
+    write(app, 'messages/promo/de.json', JSON.stringify({ tag: 'Werbung!' }));
+    write(
+      app,
+      'collections/Pages.ts',
+      "export default { fields: { tagline: { type: 'text', options: { label: 'promo.tag' } } } };\n",
+    );
+
+    await loadLayers(app);
+    const shared = readFileSync((await generateDatabase(app))[0] ?? '', 'utf8');
+    ok(shared.includes(' * Werbung!'));
+  });
+
   it('carries a field `when` into GeneratedQueryFields as a type literal', async () => {
     const app = join(root, 'when');
     writePackage(app, 'when');

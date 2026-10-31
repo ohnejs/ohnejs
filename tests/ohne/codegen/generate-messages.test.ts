@@ -158,6 +158,15 @@ describe('generateMessages', () => {
     );
   });
 
+  it('throws when the default language has no catalog', async () => {
+    const app = join(root, 'no-default');
+    writePackage(app, { name: 'no-default', ohne: true });
+    writeMessages(app, 'de.json', { hello: 'Hallo' });
+
+    await loadLayers(app);
+    await rejects(generateMessages(app), /Default language `en` has no catalog/);
+  });
+
   it('narrows a parameter each language writes differently', async () => {
     const app = join(root, 'narrow');
     writePackage(app, { name: 'narrow', ohne: true });
