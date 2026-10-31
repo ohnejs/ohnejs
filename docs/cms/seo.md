@@ -89,7 +89,8 @@ The CMS builds both from every page a visitor may see:
 - `/cms/robots.txt` opens the site and names the sitemap.
 
 A hidden page, the `404` page, and a page whose slug no longer fits its route stay out of the
-sitemap. A hidden site lists nothing, and its `robots.txt` closes everything.
+sitemap. A hidden site lists nothing, and its `robots.txt` stays open, so search engines can read
+each page's `noindex`.
 
 Search engines look for both at your website's root. `@ohnejs/nuxt` serves them there, and
 `@ohnejs/next` gives you a route handler for each, as [Frameworks](./frameworks.md#next) shows. Any
