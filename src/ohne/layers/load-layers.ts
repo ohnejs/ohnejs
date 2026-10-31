@@ -1,6 +1,6 @@
 import type { LayerLoadOptions } from '../project/read-layer-config.ts';
 
-import { merge } from '../../utils/index.ts';
+import { withDefaults } from '../../utils/index.ts';
 import { resolveLayerStack, type ResolvedLayer } from '../project/resolve-layer-stack.ts';
 import { DEFAULTS } from './config.ts';
 import { useLayers } from './use-layers.ts';
@@ -45,7 +45,10 @@ export async function loadLayers(
       path: layer.dir,
       name: layer.name,
       input: layer.input,
-      defaults: i === 0 ? merge(DEFAULTS, layer.defaults) : layer.defaults,
+      defaults:
+        i === 0
+          ? withDefaults(layer.defaults, DEFAULTS, { strategies: layers.strategies() })
+          : layer.defaults,
       codegen: layer.codegen,
     });
   });

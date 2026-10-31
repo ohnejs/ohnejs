@@ -59,6 +59,19 @@ describe('loadLayers', { skip: process.platform === 'win32' }, () => {
     deepStrictEqual(useConfig().printer, { silent: true });
   });
 
+  it('lets the furthest layer replace the default locales', async () => {
+    const solo = join(root, 'solo');
+    mkdirSync(solo);
+    writeManifest(solo, 'solo', [], {});
+    writeFileSync(
+      join(solo, 'ohne.layer.ts'),
+      "export default { defaults: { collections: { locales: ['de'], defaultLocale: 'de' } } };\n",
+    );
+
+    await loadLayers(solo);
+    deepStrictEqual(useConfig().collections, { locales: ['de'], defaultLocale: 'de' });
+  });
+
   it('reloads in place, replacing the previous stack', async () => {
     const reload = join(root, 'reload');
     mkdirSync(reload, { recursive: true });
