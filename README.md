@@ -4,7 +4,8 @@
 [![license](https://img.shields.io/npm/l/ohnejs?style=flat&colorA=18181b&colorB=2563eb)](LICENSE)
 
 **Website:** [https://ohne.dev](https://ohne.dev)<br>
-**Documentation:** [https://ohne.dev/docs](https://ohne.dev/docs)
+**Documentation:** [https://ohne.dev/docs](https://ohne.dev/docs)<br>
+**Follow:** [Bluesky](https://bsky.app/profile/ohne.dev) · [X](https://x.com/ohnejs)
 
 ---
 
