@@ -163,6 +163,12 @@ describe('generateProject', () => {
         '});\n',
     );
     seed(join(app, 'messages', 'de.json'), '{ "hello": "Hallo" }\n');
+    writeFileSync(
+      join(app, 'probe.ts'),
+      "import { useConfig } from 'ohnejs';\n\n" +
+        "export const locale: 'de' = useConfig().collections.defaultLocale;\n" +
+        "export const language: 'de' = useConfig().messages.defaultLanguage;\n",
+    );
     await loadLayers(app);
     await generateProject(app);
 

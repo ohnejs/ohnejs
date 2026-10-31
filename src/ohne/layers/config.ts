@@ -4,6 +4,7 @@ import type {
   LayerStrategies,
   LiteralUnion,
   RequireByShape,
+  WidenStrings,
 } from '../../utils/index.ts';
 import type { KnownBlocks } from '../blocks/known-blocks.ts';
 import type { KnownCollections } from '../collections/known-collections.ts';
@@ -814,24 +815,13 @@ export interface Config {
 export interface ConfigExtensions {}
 
 /**
- * `Config` with the fields codegen narrows to the app's sets widened back to `string`.
- * `DEFAULTS` must hold in every app, including one whose locales or languages leave out `en`.
- */
-type UnnarrowedConfig = Omit<Config, 'collections' | 'messages'> & {
-  collections?: Omit<NonNullable<Config['collections']>, 'defaultLocale'> & {
-    defaultLocale?: string;
-  };
-  messages?: Omit<NonNullable<Config['messages']>, 'defaultLanguage'> & {
-    defaultLanguage?: string;
-  };
-};
-
-/**
  * Framework config defaults, applied beneath every layer.
  * Merged into the furthest layer's own defaults, so any layer or the app can override them.
  *
  * Every `'own'` key in `BASE_STRATEGIES` is absent, since a merged default never applies to one.
  * Their defaults apply at point of use, such as `DIR_DEFAULTS` and `DEFAULT_API_PORT`.
+ *
+ * Checked against `WidenStrings<Config>`: codegen narrows fields like `defaultLocale` to each app's sets.
  */
 export const DEFAULTS = {
   layers: [],
@@ -863,7 +853,7 @@ export const DEFAULTS = {
     trustProxy: [],
     allowedHosts: [],
   },
-} satisfies UnnarrowedConfig;
+} satisfies WidenStrings<Config>;
 
 /**
  * Default per-layer directories.
