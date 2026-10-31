@@ -1,5 +1,14 @@
 import { deepStrictEqual, strictEqual } from 'node:assert';
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
@@ -8,6 +17,7 @@ import { BANNER } from '../../../src/ohne/codegen/codegen-dir.ts';
 import { generateProject, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 
 const ohne = new URL('../../../src/ohne/index.ts', import.meta.url).href;
+const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
 
 describe('generateProject', () => {
   let root: string;
@@ -125,6 +135,42 @@ describe('generateProject', () => {
     const written = await generateProject(app, { paths: true });
     strictEqual(written.at(-1), join(app, 'out.ts'));
     strictEqual(existsSync(join(app, 'out.ts')), true);
+  });
+
+  it('typechecks an app whose locales and languages leave out `en`', async () => {
+    const app = join(root, 'german');
+    mkdirSync(join(app, 'node_modules', '@types'), { recursive: true });
+    symlinkSync(FRAMEWORK, join(app, 'node_modules', 'ohnejs'), 'dir');
+    symlinkSync(
+      join(FRAMEWORK, 'node_modules', '@types', 'node'),
+      join(app, 'node_modules', '@types', 'node'),
+      'dir',
+    );
+    writeFileSync(join(app, 'package.json'), JSON.stringify({ name: 'german', type: 'module' }));
+    writeFileSync(
+      join(app, 'tsconfig.json'),
+      JSON.stringify({
+        extends: 'ohnejs/tsconfig.node.json',
+        include: ['**/*.ts', '.ohne/shared/**/*.ts', '.ohne/node/**/*.ts'],
+      }),
+    );
+    writeFileSync(
+      join(app, 'ohne.config.ts'),
+      "import { defineConfig } from 'ohnejs';\n\n" +
+        'export default defineConfig({\n' +
+        "  collections: { locales: ['de'], defaultLocale: 'de' },\n" +
+        "  messages: { defaultLanguage: 'de' },\n" +
+        '});\n',
+    );
+    seed(join(app, 'messages', 'de.json'), '{ "hello": "Hallo" }\n');
+    await loadLayers(app);
+    await generateProject(app);
+
+    execFileSync(
+      process.execPath,
+      [join(FRAMEWORK, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', app],
+      { encoding: 'utf8' },
+    );
   });
 
   it('returns an empty list and writes nothing when no package.json is found', async () => {

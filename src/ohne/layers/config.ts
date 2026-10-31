@@ -814,6 +814,19 @@ export interface Config {
 export interface ConfigExtensions {}
 
 /**
+ * `Config` with the fields codegen narrows to the app's sets widened back to `string`.
+ * `DEFAULTS` must hold in every app, including one whose locales or languages leave out `en`.
+ */
+type UnnarrowedConfig = Omit<Config, 'collections' | 'messages'> & {
+  collections?: Omit<NonNullable<Config['collections']>, 'defaultLocale'> & {
+    defaultLocale?: string;
+  };
+  messages?: Omit<NonNullable<Config['messages']>, 'defaultLanguage'> & {
+    defaultLanguage?: string;
+  };
+};
+
+/**
  * Framework config defaults, applied beneath every layer.
  * Merged into the furthest layer's own defaults, so any layer or the app can override them.
  *
@@ -850,7 +863,7 @@ export const DEFAULTS = {
     trustProxy: [],
     allowedHosts: [],
   },
-} satisfies Config;
+} satisfies UnnarrowedConfig;
 
 /**
  * Default per-layer directories.
