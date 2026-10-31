@@ -366,6 +366,7 @@ export type * from './types/defaults-marker.ts';
 export type * from './types/defined.ts';
 export type * from './types/literal-union.ts';
 export type * from './types/require-by-shape.ts';
+export type * from './types/widen-strings.ts';
 export * from './unique-name/unique-name.ts';
 export * from './uri/canonical-path.ts';
 export * from './uri/encode-rfc3986.ts';
