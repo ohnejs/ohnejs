@@ -16,6 +16,8 @@ export * from './array/reconcile.ts';
 export * from './array/to-array.ts';
 export * from './array/unique-array.ts';
 export * from './authorization/parse-authorization.ts';
+export * from './base32/decode-base32.ts';
+export * from './base32/encode-base32.ts';
 export * from './bytes/format-bytes.ts';
 export * from './bytes/parse-bytes.ts';
 export * from './cache-control/cache-control.ts';
