@@ -22,6 +22,7 @@ import {
 import { isDashboardPath } from './is-dashboard-path.ts';
 import { resolveDevPorts } from './resolve-ports.ts';
 import { createConfigTarget } from './targets/config.ts';
+import { createContractsTarget } from './targets/contracts.ts';
 import { createDatabaseTarget } from './targets/database.ts';
 import { createFlowsTarget } from './targets/flows.ts';
 import { createLayerCodegenTarget } from './targets/layer-codegen.ts';
@@ -122,6 +123,7 @@ export async function dev(
   const roles = createRolesTarget(from);
   const skills = createSkillsTarget(from);
   const flows = createFlowsTarget(from);
+  const contracts = createContractsTarget(from);
   const layerCodegen = createLayerCodegenTarget(from);
   const config = createConfigTarget(from, [
     registry,
@@ -132,8 +134,19 @@ export async function dev(
     roles,
     skills,
     flows,
+    contracts,
   ]);
-  const targets = [registry, routes, middleware, messages, database, roles, skills, flows];
+  const targets = [
+    registry,
+    routes,
+    middleware,
+    messages,
+    database,
+    roles,
+    skills,
+    flows,
+    contracts,
+  ];
 
   const wantDashboard = options.dashboard ?? true;
   const reviveUptime = options.reviveUptime ?? REVIVE_UPTIME;

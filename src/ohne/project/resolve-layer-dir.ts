@@ -1,31 +1,16 @@
 import { readJSON, resolveModuleDir } from '../../utils/fs/index.ts';
 import {
-  dirname,
-  hasKey,
-  isNull,
-  isObject,
-  isString,
-  joinPath,
-  normalizePath,
-} from '../../utils/index.ts';
+  type PackageSpecifier,
+  parsePackageSpecifier,
+  resolvePackageExports,
+} from '../../utils/imports/index.ts';
+import { dirname, isNull, isObject, joinPath, normalizePath } from '../../utils/index.ts';
 import { isOhneProject } from './is-ohne-project.ts';
 
 /**
  * A layer specifier split into the package it names and the `exports` subpath within it.
  */
-export interface LayerSpecifier {
-  /**
-   * The package name, scope included: `@acme/kit` for `@acme/kit/auth`.
-   */
-  name: string;
-
-  /**
-   * The `exports` subpath: `./auth` for `@acme/kit/auth`, or `.` for a bare name.
-   */
-  subpath: string;
-}
-
-const CONDITIONS = new Set(['node', 'import', 'default']);
+export type LayerSpecifier = PackageSpecifier;
 
 /**
  * Resolves a layer specifier to the directory that holds its `ohne.config.ts`.
@@ -70,21 +55,14 @@ export async function resolveLayerDir(specifier: string, from: string): Promise<
  * ```
  */
 export function parseLayerSpecifier(specifier: string): LayerSpecifier {
-  const segments = specifier.split('/');
-  const count = specifier.startsWith('@') ? 2 : 1;
-  const name = segments.slice(0, count).join('/');
-  const rest = segments.slice(count).join('/');
-  return { name, subpath: rest ? `./${rest}` : '.' };
+  return parsePackageSpecifier(specifier);
 }
 
 /**
  * Resolves an `exports` subpath within package `root` to the directory that holds its `ohne.config.ts`.
  *
  * The `.` subpath is the root itself.
- * Any other subpath maps through the package's `exports`: an exact key first, else a `*` pattern.
- * Among patterns, the longest prefix before the `*` wins, then the longest key, as Node ranks them.
- * A conditional target resolves like Node does: the first of `node`, `import`, or `default`, in key order.
- * `types` never counts.
+ * Any other subpath maps through the package's `exports` as `resolvePackageExports` maps it.
  *
  * Returns the absolute, normalized directory, or `null` when the subpath is not exported.
  *
@@ -131,51 +109,6 @@ export async function resolveLayerSubpaths(root: string, name: string): Promise<
  * The directory an `exports` subpath's target lives in, absolute and normalized, or `null` when unexported.
  */
 function subpathDir(root: string, exports: unknown, subpath: string): string | null {
-  const target = resolveExports(exports, subpath);
+  const target = resolvePackageExports(exports, subpath);
   return isNull(target) ? null : normalizePath(dirname(joinPath(root, target)));
-}
-
-/**
- * Maps an `exports` subpath to its target string, or `null` when the map does not export it.
- * An exact key is authoritative; otherwise the best matching `*` pattern wins and its fill is substituted.
- */
-function resolveExports(exports: unknown, subpath: string): string | null {
-  if (!isObject(exports)) return null;
-  if (hasKey(exports, subpath)) return resolveTarget(exports[subpath]);
-
-  let target: string | null = null;
-  let bestStar = -1;
-  let bestLength = -1;
-  for (const [key, value] of Object.entries(exports)) {
-    const star = key.indexOf('*');
-    if (star === -1 || star < bestStar || (star === bestStar && key.length <= bestLength)) continue;
-    const prefix = key.slice(0, star);
-    const suffix = key.slice(star + 1);
-    if (subpath.length < key.length) continue;
-    if (!subpath.startsWith(prefix) || !subpath.endsWith(suffix)) continue;
-    const pattern = resolveTarget(value);
-    if (isNull(pattern)) continue;
-    const fill = subpath.slice(prefix.length, subpath.length - suffix.length);
-    target = pattern.replaceAll('*', fill);
-    bestStar = star;
-    bestLength = key.length;
-  }
-  return target;
-}
-
-/**
- * Unwraps an `exports` target to a string.
- * A string passes as is.
- * A conditions object resolves through its first matching condition, in key order.
- * Only `node`, `import`, and `default` count; `types` and unknown conditions never resolve.
- */
-function resolveTarget(target: unknown): string | null {
-  if (isString(target)) return target;
-  if (!isObject(target)) return null;
-  for (const [condition, value] of Object.entries(target)) {
-    if (!CONDITIONS.has(condition)) continue;
-    const resolved = resolveTarget(value);
-    if (!isNull(resolved)) return resolved;
-  }
-  return null;
 }

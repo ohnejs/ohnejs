@@ -15,6 +15,7 @@ import {
 import { ohneError } from '../error/ohne-error.ts';
 import { useLayers } from '../layers/use-layers.ts';
 import { appRoot, BANNER, codegenDir } from './codegen-dir.ts';
+import { apiTypesCodegen } from './generate-api-types.ts';
 import { withStackRegistries } from './with-stack-registries.ts';
 
 const PARENT_IS_FILE = {
@@ -40,6 +41,7 @@ const PLAIN_TS_NAME = /^[\w-]+(?:\.[\w-]+)*\.ts$/;
 
 const OHNE_FILES = new Set([
   'collections.ts',
+  'contracts.ts',
   'database.ts',
   'flows.ts',
   'layer-name.ts',
@@ -77,6 +79,7 @@ export interface GenerateLayerCodegenOptions {
 
 /**
  * Generates every file the stacked layers declare under `codegen` in their `ohne.layer.ts`.
+ * The framework's own `api.types` file is a path entry of `ohnejs`, run first.
  *
  * Layers run furthest-first.
  * Each entry's `code` runs against the loaded stack, so it reads the merged config.
@@ -109,9 +112,14 @@ export async function generateLayerCodegen(
   const owners = new Map<string, string>();
   const jobs: { path: string; write: (code: string) => Promise<boolean>; entry: LayerCodegen }[] =
     [];
-  for (const layer of useLayers().layers()) {
-    const name = layer.name ?? basename(layer.path);
-    for (const entry of layer.codegen ?? []) {
+  const sources = [
+    { name: 'ohnejs', codegen: [apiTypesCodegen] },
+    ...useLayers()
+      .layers()
+      .map((layer) => ({ name: layer.name ?? basename(layer.path), codegen: layer.codegen ?? [] })),
+  ];
+  for (const { name, codegen } of sources) {
+    for (const entry of codegen) {
       if ('bucket' in entry) {
         assertBucketFile(entry, name);
         const gen = createCodeGenerator({ dir: joinPath(dir, entry.bucket), banner: BANNER });

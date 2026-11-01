@@ -30,6 +30,7 @@ const FRAMEWORK_KEYS: KeyTree = {
     host: true,
     rateLimitStore: true,
     rateLimitDatabase: true,
+    types: true,
   } satisfies Section<Config['api']>,
   dashboard: {
     port: true,

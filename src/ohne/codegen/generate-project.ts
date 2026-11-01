@@ -1,6 +1,7 @@
 import { isString } from '../../utils/index.ts';
 import { generateBrowserLayers } from './generate-browser-layers.ts';
 import { generateBrowserTSConfig } from './generate-browser-tsconfig.ts';
+import { generateContracts } from './generate-contracts.ts';
 import { generateDatabase } from './generate-database.ts';
 import { generateFlows } from './generate-flows.ts';
 import { generateLayerCodegen } from './generate-layer-codegen.ts';
@@ -52,6 +53,7 @@ export async function generateProject(
       generateBrowserTSConfig(from),
       generateBrowserLayers(from),
       generateRoutes(from),
+      generateContracts(from),
       generateMiddleware(from),
       generateMessages(from),
       generateDatabase(from),

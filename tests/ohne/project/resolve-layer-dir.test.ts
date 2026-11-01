@@ -4,32 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import {
-  parseLayerSpecifier,
-  resolveLayerDir,
-  resolveLayerSubpath,
-} from '../../../src/ohne/index.ts';
-
-describe('parseLayerSpecifier', () => {
-  it('splits a scoped name from its subpath', () => {
-    deepStrictEqual(parseLayerSpecifier('@acme/kit/auth'), {
-      name: '@acme/kit',
-      subpath: './auth',
-    });
-  });
-
-  it('splits a plain name from a nested subpath', () => {
-    deepStrictEqual(parseLayerSpecifier('ohnejs/layers/uploads'), {
-      name: 'ohnejs',
-      subpath: './layers/uploads',
-    });
-  });
-
-  it('yields the root subpath for a bare name', () => {
-    deepStrictEqual(parseLayerSpecifier('@acme/base'), { name: '@acme/base', subpath: '.' });
-    deepStrictEqual(parseLayerSpecifier('ohnejs'), { name: 'ohnejs', subpath: '.' });
-  });
-});
+import { resolveLayerDir, resolveLayerSubpath } from '../../../src/ohne/index.ts';
 
 describe('resolveLayerDir', { skip: process.platform === 'win32' }, () => {
   let root: string;

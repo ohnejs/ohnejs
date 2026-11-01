@@ -342,6 +342,56 @@ pnpm --filter backend exec ohne prepare
 git diff --exit-code apps/web/ohne.ts
 ```
 
+## Typing your routes
+
+When the website calls your own routes, the backend can hand it their types. Set `api.types` to a
+path in the website, and the backend writes the types into a file there:
+
+```ts
+// apps/backend/ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  api: { types: '../web/routes.ts' },
+});
+```
+
+Then declare what each route reads and answers in `ohne.contract.ts`, beside `ohne.config.ts`:
+
+```ts
+// apps/backend/ohne.contract.ts
+export interface Post {
+  title: string;
+  publishedAt: string;
+}
+
+export interface Routes {
+  'GET /posts': { query: { tag?: string }; response: Post[] };
+  'POST /posts': { body: { title: string }; response: Post };
+}
+```
+
+- `ohne dev` rewrites `routes.ts` whenever you change a route or a contract, and so does every
+  `pnpm install`. Commit it, and check it in CI as for the CMS.
+- A route without an entry answers `unknown`. `ohnejs/base` already types the `/auth` routes.
+- A contract holds only types, since its text is copied into `routes.ts`. It may `import type` from
+  other `.ts` modules, which follow the same rule.
+- Your own exports read as `Contract.Post` in `routes.ts`.
+- The backend's `pnpm typecheck` fails when a handler answers something its contract does not
+  declare, as the answer reaches the website: a `Date` reads as `string`.
+
+The website then passes `Routes` to `createAPI` from `@ohnejs/client`:
+
+```ts
+import { createAPI } from '@ohnejs/client';
+
+import type { Routes } from './routes.ts';
+
+const api = createAPI<Routes>({ api: 'http://localhost:9001' });
+const posts = await api.call('GET /posts', { query: { tag: 'news' } });
+```
+
 ## Deploying
 
 Each app deploys on its own:

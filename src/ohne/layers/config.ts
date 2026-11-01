@@ -626,6 +626,19 @@ export interface Config {
      * On SQLite, point it at its own file, never the main one, so counting never waits on your writes.
      */
     rateLimitDatabase?: DatabaseName;
+
+    /**
+     * A file that ohne writes your routes' types into, for a frontend in another package.
+     * The path is relative to your project, and ohne overwrites the file, so keep your own code out of it.
+     * `ohne dev` keeps it current, and `ohne prepare` writes it.
+     * Each layer's `ohne.contract.ts` types its routes; any other route answers `unknown`.
+     *
+     * @example
+     * ```ts
+     * '../web/routes.ts'
+     * ```
+     */
+    types?: string;
   };
 
   /**
