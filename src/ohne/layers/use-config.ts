@@ -1,9 +1,14 @@
 import type { Config, ResolvedConfig } from './config.ts';
 
-import { computed, type ComputedRef } from '../../utils/index.ts';
+import { computed, type ComputedRef, isUndefined } from '../../utils/index.ts';
+import { canonicalCollections } from '../collections/resolve-locales.ts';
 import { useLayers } from './use-layers.ts';
 
-const cached: ComputedRef<Config> = computed(() => useLayers().resolve());
+const cached: ComputedRef<Config> = computed(() => {
+  const config: Config = useLayers().resolve();
+  if (isUndefined(config.collections)) return config;
+  return { ...config, collections: canonicalCollections(config.collections) };
+});
 
 /**
  * Returns the resolved config: the project's `ohne.config.ts` merged with every layer it extends.

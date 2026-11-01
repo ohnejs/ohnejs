@@ -1,7 +1,10 @@
 import { deepStrictEqual, throws } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { resolveLocales } from '../../../src/ohne/collections/resolve-locales.ts';
+import {
+  canonicalCollections,
+  resolveLocales,
+} from '../../../src/ohne/collections/resolve-locales.ts';
 
 describe('resolveLocales', () => {
   it('resolves the defaults when the group is absent', () => {
@@ -45,5 +48,21 @@ describe('resolveLocales', () => {
       () => resolveLocales({ locales: ['de', 'fr'], defaultLocale: 'it' }),
       /Default locale `it` is not a content locale/,
     );
+  });
+});
+
+describe('canonicalCollections', () => {
+  it('canonicalizes the locales and the default, keeping an invalid tag as written', () => {
+    deepStrictEqual(
+      canonicalCollections({ locales: ['EN', 'de-at', 'en_US'], defaultLocale: 'eN' }),
+      {
+        locales: ['en', 'de-AT', 'en_US'],
+        defaultLocale: 'en',
+      },
+    );
+  });
+
+  it('adds no key the group does not set', () => {
+    deepStrictEqual(canonicalCollections({}), {});
   });
 });

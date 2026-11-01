@@ -1,3 +1,5 @@
+import type { LocaleCode } from './known-locales.ts';
+
 import { canonicalizeLanguage, isNull, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { type Config, DEFAULTS } from '../layers/config.ts';
@@ -39,7 +41,6 @@ export interface ResolvedLocales {
  */
 export function resolveLocales(collections: Config['collections']): ResolvedLocales {
   const locales: string[] = [];
-  const sources = new Map<string, string>();
   for (const tag of collections?.locales ?? DEFAULTS.collections.locales) {
     const canonical = canonicalizeLanguage(tag);
     if (isNull(canonical)) {
@@ -48,14 +49,12 @@ export function resolveLocales(collections: Config['collections']): ResolvedLoca
         body: ['Set `collections.locales` entries to valid BCP-47 tags, like `en` or `de-AT`.'],
       });
     }
-    const seen = sources.get(canonical);
-    if (!isUndefined(seen)) {
+    if (locales.includes(canonical)) {
       throw ohneError({
         title: `Duplicate content locale \`${canonical}\``,
-        body: [`\`${seen}\` and \`${tag}\` both canonicalize to \`${canonical}\`.`, 'Drop one.'],
+        body: ['`collections.locales` lists it more than once, whatever the casing.', 'Drop one.'],
       });
     }
-    sources.set(canonical, tag);
     locales.push(canonical);
   }
   if (locales.length === 0) {
@@ -85,4 +84,33 @@ export function resolveLocales(collections: Config['collections']): ResolvedLoca
     });
   }
   return { locales, defaultLocale };
+}
+
+/**
+ * Canonicalizes every tag of the `collections` config group, as `useConfig` hands it out.
+ *
+ * @example
+ * ```ts
+ * canonicalCollections({ locales: ['en', 'de-at'], defaultLocale: 'EN' })
+ * // -> { locales: ['en', 'de-AT'], defaultLocale: 'en' }
+ * ```
+ */
+export function canonicalCollections(
+  collections: NonNullable<Config['collections']>,
+): NonNullable<Config['collections']> {
+  const { locales, defaultLocale } = collections;
+  return {
+    ...collections,
+    ...(!isUndefined(locales) && { locales: locales.map(canonicalTag) }),
+    ...(!isUndefined(defaultLocale) && {
+      defaultLocale: canonicalTag(defaultLocale) as LocaleCode,
+    }),
+  };
+}
+
+/**
+ * The canonical form of `tag`, or `tag` when it has none.
+ */
+function canonicalTag(tag: string): string {
+  return canonicalizeLanguage(tag) ?? tag;
 }
