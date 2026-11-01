@@ -6,7 +6,7 @@ const PADDING = /=+$/;
 
 /**
  * Decodes RFC 4648 base32 into bytes.
- * Lowercase letters, whitespace, and trailing `=` padding are accepted, as hand-typed secrets need.
+ * Lowercase letters, whitespace, and trailing `=` padding are accepted.
  * Throws on a character outside the alphabet or a length no encoding produces.
  *
  * @example

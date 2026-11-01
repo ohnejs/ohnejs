@@ -2,7 +2,6 @@ import { BASE32_ALPHABET } from './_alphabet.ts';
 
 /**
  * Encodes `bytes` as RFC 4648 base32, uppercase and unpadded.
- * The alphabet survives case-insensitive and hand-typed transport, as authenticator secrets need.
  *
  * @example
  * ```ts

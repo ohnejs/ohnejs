@@ -5,7 +5,7 @@ import { hotp } from './_hotp.ts';
 import { secureCompare } from './secure-compare.ts';
 
 /**
- * The options `verifyTOTP` takes: the code parameters plus the tolerated clock drift.
+ * The options `verifyTOTP` takes.
  */
 export interface VerifyTOTPOptions extends TOTPOptions {
   /**

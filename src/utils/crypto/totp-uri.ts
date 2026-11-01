@@ -24,7 +24,6 @@ export interface TOTPEnrollment extends Omit<TOTPOptions, 'time'> {
 
 /**
  * Builds the `otpauth://totp/` URI an authenticator app enrolls from, usually shown as a QR code.
- * Parameters left at their defaults are omitted, since some apps reject any they do not expect.
  *
  * @example
  * ```ts

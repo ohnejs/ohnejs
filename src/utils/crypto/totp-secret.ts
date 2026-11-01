@@ -4,7 +4,6 @@ import { encodeBase32 } from '../base32/encode-base32.ts';
 
 /**
  * Generates a random TOTP secret, base32-encoded as authenticator apps expect.
- * `size` is a count of random bytes; the default 20 is the 160 bits RFC 4226 recommends.
  *
  * @example
  * ```ts

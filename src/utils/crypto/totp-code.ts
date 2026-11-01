@@ -7,7 +7,7 @@ import { hotp } from './_hotp.ts';
 export type TOTPAlgorithm = 'sha1' | 'sha256' | 'sha512';
 
 /**
- * The parameters of a TOTP code, each optional and defaulting to what authenticator apps assume.
+ * The parameters of a TOTP code.
  */
 export interface TOTPOptions {
   /**
@@ -45,7 +45,6 @@ export interface TOTPOptions {
 
 /**
  * Computes the RFC 6238 time-based one-time code for a base32 `secret`.
- * It matches what an authenticator app shows for the same secret at the same moment.
  *
  * @example
  * ```ts
