@@ -1,5 +1,7 @@
 import type { RoleName } from 'ohnejs';
 
+import type { User as ContractUser } from '../ohne.contract.ts';
+
 declare module 'ohnejs' {
   interface EventContext {
     /**
@@ -16,65 +18,12 @@ declare module 'ohnejs' {
  * The `password` hash never appears here, so it cannot leak through a helper's return value.
  * The auth routes also answer every readable field the account layout places beyond these members.
  */
-export interface User {
-  /**
-   * The user's stable identifier.
-   */
-  UUID: string;
-
-  /**
-   * The user's email, stored trimmed and lowercased.
-   */
-  email: string;
-
-  /**
-   * The user's first name; `null` when not given.
-   */
-  firstName: string | null;
-
-  /**
-   * The user's last name; `null` when not given.
-   */
-  lastName: string | null;
-
+export interface User extends ContractUser {
   /**
    * The role names the user holds.
    * The capabilities of every held role union; resolve them with `userCapabilities`.
    */
   roles: RoleName[];
-
-  /**
-   * The language the dashboard renders in, as a canonical BCP-47 tag like `de-AT`.
-   * `null` leaves the dashboard on the app's default language.
-   */
-  dashboardLanguage: string | null;
-
-  /**
-   * The content locale the dashboard opens records in, one of the configured `collections.locales`.
-   * `null` leaves it on the default locale.
-   */
-  contentLanguage: string | null;
-
-  /**
-   * The IANA time zone the dashboard displays and edits instants in, like `Europe/Berlin`.
-   * `null` leaves it on the device's own time zone.
-   */
-  timezone: string | null;
-
-  /**
-   * The pattern the dashboard formats dates with, like `YYYY-MM-DD`.
-   */
-  dateFormat: string;
-
-  /**
-   * The pattern the dashboard formats times with, like `HH:mm:ss`.
-   */
-  timeFormat: string;
-
-  /**
-   * Whether the dashboard watches the clipboard in the background, so a copied record pastes at once.
-   */
-  smartClipboard: boolean;
 }
 
 /**
