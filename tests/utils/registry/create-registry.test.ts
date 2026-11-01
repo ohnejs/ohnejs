@@ -15,6 +15,19 @@ describe('createRegistry', () => {
     deepStrictEqual(r.all(), nullObj({}));
   });
 
+  it('registers its initial entries in order, under the merger', () => {
+    const r = createRegistry<number>({
+      entries: [
+        ['b', 1],
+        ['a', 2],
+        ['b', 3],
+      ],
+      merge: (existing, incoming) => existing + incoming,
+    });
+    deepStrictEqual(r.keys(), ['b', 'a']);
+    strictEqual(r.get('b'), 4);
+  });
+
   it('registers and retrieves values', () => {
     const r = createRegistry<number>();
     r.register('a', 1);

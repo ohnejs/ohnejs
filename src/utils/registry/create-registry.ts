@@ -16,6 +16,11 @@ export interface RegistryOptions<V> {
    * If omitted, the incoming value replaces the existing one wholesale.
    */
   merge?: Merger<V>;
+
+  /**
+   * Entries registered on creation, in order and under `merge`.
+   */
+  entries?: Iterable<readonly [string, V]>;
 }
 
 /**
@@ -80,6 +85,8 @@ export interface Registry<V> {
  * r.register('a', 2)
  * r.get('a') // -> 2
  *
+ * createRegistry({ entries: [['a', 1]] }).get('a') // -> 1
+ *
  * const sums = createRegistry<number>({
  *   merge: (existing, incoming) => existing + incoming,
  * })
@@ -125,6 +132,7 @@ export function createRegistry<V>(options?: RegistryOptions<V>): Registry<V> {
       return store.size;
     },
   };
+  for (const [key, value] of options?.entries ?? []) registry.register(key, value);
 
   return registry;
 }
