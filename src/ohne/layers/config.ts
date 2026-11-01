@@ -820,8 +820,6 @@ export interface ConfigExtensions {}
  *
  * Every `'own'` key in `BASE_STRATEGIES` is absent, since a merged default never applies to one.
  * Their defaults apply at point of use, such as `DIR_DEFAULTS` and `DEFAULT_API_PORT`.
- *
- * Checked against `WidenStrings<Config>`: codegen narrows fields like `defaultLocale` to each app's sets.
  */
 export const DEFAULTS = {
   layers: [],

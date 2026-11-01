@@ -51,7 +51,6 @@ interface Translation {
  * Layers come from the registered stack, so `loadLayers` must have run first.
  * Keys matched by `Config.disable.messages` are dropped before the catalog and its types are emitted.
  * A key's parameters must match across every language that defines it, or generation throws.
- * So does a default language with no catalog, once any catalog exists.
  *
  * The app root is the nearest `package.json` above `from` (default `process.cwd()`).
  * Output lands in the app's own `dirs.codegen` (default `.ohne`), resolved against that root.
