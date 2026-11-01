@@ -22,6 +22,7 @@ import {
   propertyKey,
 } from '../../utils/codegen/index.ts';
 import {
+  createRegistry,
   formatMessage,
   hasKey,
   isArray,
@@ -35,6 +36,7 @@ import { collectBlocks } from '../blocks/collect-blocks.ts';
 import { collectCollections } from '../collections/collect-collections.ts';
 import { resolveLocales } from '../collections/resolve-locales.ts';
 import { collectMigrations } from '../database/migrations/collect-migrations.ts';
+import { buildDesiredSchema } from '../database/schema/desired.ts';
 import { ohneError } from '../error/ohne-error.ts';
 import { collectFields } from '../fields/collect-fields.ts';
 import { resolveFieldOptions } from '../fields/field.ts';
@@ -63,6 +65,7 @@ import {
   type ShapeContext,
   type ShapeOwner,
 } from './read-shape.ts';
+import { schemaEntries } from './with-stack-registries.ts';
 
 /**
  * Options for `generateDatabase`.
@@ -181,6 +184,13 @@ export async function generateDatabase(
     collectMigrations(stackedLayers()),
     collectMessages(stackedLayers(), { disable: disable.messages }),
   ]);
+  const schema = schemaEntries(collections, blocks, fields, disable.fields);
+  // Resolves every reference, so a relation to a dropped collection fails here instead of in `tsc`.
+  buildDesiredSchema(
+    createRegistry({ entries: schema.collections }),
+    createRegistry({ entries: schema.fields }),
+    createRegistry({ entries: schema.blocks }),
+  );
   const resolveText = messageResolver(messages);
   const linked = await linkedPaths(from);
 

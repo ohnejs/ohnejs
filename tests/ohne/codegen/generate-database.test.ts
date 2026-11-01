@@ -1,4 +1,4 @@
-import { ok, rejects, strictEqual } from 'node:assert';
+import { match, ok, rejects, strictEqual } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import {
   mkdirSync,
@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { BANNER } from '../../../src/ohne/codegen/codegen-dir.ts';
+import { isOhneError } from '../../../src/ohne/error/ohne-error.ts';
 import { generateDatabase, loadLayers, useLayers } from '../../../src/ohne/index.ts';
 
 const FRAMEWORK = join(import.meta.dirname, '..', '..', '..');
@@ -956,6 +957,57 @@ describe('generateDatabase', () => {
 
     await loadLayers(app);
     await rejects(generateDatabase(app), /Unknown block `CTA`/);
+  });
+
+  it('rejects a record field still relating to a disabled collection, naming the file', async () => {
+    const app = join(root, 'disabled-target');
+    writePackage(
+      app,
+      'disabled-target',
+      undefined,
+      "export default { disable: { collections: ['Authors'] } };\n",
+    );
+    write(app, 'collections/Authors.ts', 'export default { fields: {} };\n');
+    write(
+      app,
+      'collections/Posts.ts',
+      "export default { fields: { author: { type: 'record', options: { collection: 'Authors' } } } };\n",
+    );
+
+    await loadLayers(app);
+    await rejects(generateDatabase(app), (error: unknown) => {
+      ok(isOhneError(error));
+      match(error.title ?? '', /Unknown collection `Authors`/);
+      match(error.path ?? '', /collections\/Posts\.ts$/);
+      return true;
+    });
+  });
+
+  it('rejects a records field relating to an unknown collection', async () => {
+    const app = join(root, 'unknown-target');
+    writePackage(app, 'unknown-target');
+    write(
+      app,
+      'collections/Posts.ts',
+      "export default { fields: { tags: { type: 'records', options: { collection: 'Tags' } } } };\n",
+    );
+
+    await loadLayers(app);
+    await rejects(generateDatabase(app), /Unknown collection `Tags`/);
+  });
+
+  it("checks a unique composite index against the stack's own field types", async () => {
+    const app = join(root, 'composite-type');
+    writePackage(app, 'composite-type');
+    write(app, 'fields/blob.ts', "export default { columnType: 'json', unique: false };\n");
+    write(
+      app,
+      'collections/Posts.ts',
+      "export default { fields: { data: { type: 'blob', options: {} } }, compositeIndexes: [{ fields: ['data'], unique: true }] };\n",
+    );
+
+    await loadLayers(app);
+    await rejects(generateDatabase(app), /A unique composite index includes `blob` field `data`/);
   });
 
   it('registers a built-in override without augmenting its name', async () => {

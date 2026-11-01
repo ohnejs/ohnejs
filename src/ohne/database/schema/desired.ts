@@ -187,7 +187,7 @@ function buildCollectionTables(
   reachable: Set<string>,
 ): TableSchema[] {
   validateCollectionName(meta.name);
-  validateCollectionDefinition(meta.collection, meta.name);
+  validateCollectionDefinition(meta.collection, meta.name, registries.fields);
 
   const parent: DerivedParent = {
     owner: { kind: 'collection', name: meta.name },

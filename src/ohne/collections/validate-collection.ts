@@ -1,4 +1,6 @@
+import type { Registry } from '../../utils/index.ts';
 import type { FieldInstance } from '../fields/field.ts';
+import type { FieldTypeMeta } from '../fields/use-fields.ts';
 import type { CollectionDefinition, CompositeIndex } from './define-collection.ts';
 
 import {
@@ -58,17 +60,18 @@ const SAMPLE_UUID = '00000000-0000-0000-0000-000000000000';
 export function validateCollectionDefinition<TFields extends Record<string, FieldInstance>>(
   definition: CollectionDefinition<TFields>,
   collection?: string,
+  types: Registry<FieldTypeMeta> = useFields(),
 ): void {
   validateLabel(definition.label, collection);
   const fieldNames = Object.keys(definition.fields);
   for (const name of fieldNames) validateFieldName(name, collection);
   validateUniqueNames(fieldNames, 'field', collection);
-  validateCompositeIndexes(definition.compositeIndexes ?? [], definition.fields, collection);
+  validateCompositeIndexes(definition.compositeIndexes ?? [], definition.fields, types, collection);
   validateAPI(definition.api, collection);
   validateSingleton(definition.singleton, definition.api, collection);
   validateCopyTranslation(definition.copyTranslation, definition.fields, collection);
   validateDuplicate(definition.duplicate, definition.singleton, collection);
-  validateDashboard(definition.dashboard, definition.fields, collection);
+  validateDashboard(definition.dashboard, definition.fields, types, collection);
 }
 
 /**
@@ -94,6 +97,7 @@ const DASHBOARD_KEYS = new Set(['icon', 'recordLabel', 'recordPath', 'table', 'l
 function validateDashboard(
   dashboard: unknown,
   fields: Record<string, FieldInstance>,
+  types: Registry<FieldTypeMeta>,
   collection?: string,
 ): void {
   if (isUndefined(dashboard)) return;
@@ -119,7 +123,7 @@ function validateDashboard(
     }
   }
   validateIcon(dashboard.icon, 'dashboard.icon', scope);
-  validateRecordLabel(dashboard.recordLabel, fields, collection);
+  validateRecordLabel(dashboard.recordLabel, fields, types, collection);
   validateRecordPath(dashboard.recordPath, collection);
   validateTable(dashboard.table, fields, collection);
   validateLayout(dashboard.layout, Object.keys(fields), 'dashboard.layout', scope);
@@ -320,6 +324,7 @@ function validateRecordPath(recordPath: unknown, collection?: string): void {
 function validateRecordLabel(
   recordLabel: unknown,
   fields: Record<string, FieldInstance>,
+  types: Registry<FieldTypeMeta>,
   collection?: string,
 ): void {
   if (isUndefined(recordLabel)) return;
@@ -394,7 +399,7 @@ function validateRecordLabel(
       });
     }
     seen.add(name);
-    const meta = useFields().get(instance.type);
+    const meta = types.get(instance.type);
     if (isUndefined(meta)) continue;
     if (meta.fieldType.columnType !== 'text' || !isUndefined(meta.fieldType.schema)) {
       throw ohneError({
@@ -589,6 +594,7 @@ function validateTableOrder(
 function validateCompositeIndexes(
   entries: readonly CompositeIndex[],
   fields: Readonly<Record<string, FieldInstance>>,
+  types: Registry<FieldTypeMeta>,
   collection?: string,
 ): void {
   const scope = isUndefined(collection) ? '' : ` in collection \`${collection}\``;
@@ -617,7 +623,7 @@ function validateCompositeIndexes(
       }
       within.add(name);
       const { type } = fields[name]!;
-      if (entry.unique === true && useFields().get(type)?.fieldType.unique === false) {
+      if (entry.unique === true && types.get(type)?.fieldType.unique === false) {
         throw ohneError({
           title: `A unique composite index includes \`${type}\` field \`${name}\``,
           body: [
