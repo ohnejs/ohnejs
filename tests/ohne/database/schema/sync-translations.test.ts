@@ -15,6 +15,7 @@ import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { isOhneError } from '../../../../src/ohne/error/ohne-error.ts';
 import { field } from '../../../../src/ohne/fields/field.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { DEFAULTS } from '../../../../src/ohne/layers/config.ts';
 import { createRegistry } from '../../../../src/utils/index.ts';
 import { connectTest, dialect } from '../../../_dialect.ts';
 
@@ -364,6 +365,28 @@ describe('syncDatabase fan-out, off -> on', () => {
       const live = await dialect.describeTable(db, table.name);
       deepStrictEqual(diffSchemas([live], [table], dialect), []);
     }
+    await db.close();
+  });
+
+  it('lands values on the config default locale when none is passed', async () => {
+    const db = await connectTest();
+    await syncDatabase(db, dialect, {
+      desired: desiredOf({ name: 'Posts', collection: { fields: { title: field('text') } } }),
+    });
+    await db.run('INSERT INTO "Posts" ("UUID", "_updatedAt", "title") VALUES (?, ?, ?)', [
+      'p1',
+      0,
+      'Hello',
+    ]);
+    await syncDatabase(db, dialect, {
+      desired: desiredOf({
+        name: 'Posts',
+        collection: { fields: { title: field('text', { translatable: true }) } },
+      }),
+    });
+    deepStrictEqual(await db.query('SELECT "_localeCode" AS "locale" FROM "Posts__translations"'), [
+      Object.assign(Object.create(null), { locale: DEFAULTS.collections.defaultLocale }),
+    ]);
     await db.close();
   });
 

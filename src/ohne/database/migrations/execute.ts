@@ -34,6 +34,7 @@ import {
   uuidv7,
 } from '../../../utils/index.ts';
 import { ohneError } from '../../error/ohne-error.ts';
+import { DEFAULTS } from '../../layers/config.ts';
 import { isValidColumn } from '../../query/pipeline/preflight.ts';
 import {
   collectionTableName,
@@ -162,7 +163,7 @@ export async function executeMigrations(
     desired: options.desired,
     force: options.force,
     ownership: options.ownership ?? true,
-    defaultLocale: options.defaultLocale ?? 'en',
+    defaultLocale: options.defaultLocale ?? DEFAULTS.collections.defaultLocale,
     names: new Set(await dialect.listTables(db)),
     claimed: jsonClone(options.claimed),
     deletions: [],

@@ -1,7 +1,6 @@
-import type { Config } from '../layers/config.ts';
-
 import { canonicalizeLanguage, isNull, isUndefined } from '../../utils/index.ts';
 import { ohneError } from '../error/ohne-error.ts';
+import { type Config, DEFAULTS } from '../layers/config.ts';
 
 /**
  * The content-locale settings, canonicalized and validated.
@@ -41,7 +40,7 @@ export interface ResolvedLocales {
 export function resolveLocales(collections: Config['collections']): ResolvedLocales {
   const locales: string[] = [];
   const sources = new Map<string, string>();
-  for (const tag of collections?.locales ?? ['en']) {
+  for (const tag of collections?.locales ?? DEFAULTS.collections.locales) {
     const canonical = canonicalizeLanguage(tag);
     if (isNull(canonical)) {
       throw ohneError({
@@ -64,11 +63,11 @@ export function resolveLocales(collections: Config['collections']): ResolvedLoca
       title: 'Content locales cannot be empty',
       body: [
         '`collections.locales` holds no entries, so no record could hold content.',
-        'List at least one locale, or drop the field to keep the default `en`.',
+        `List at least one locale, or drop the field to keep the default \`${DEFAULTS.collections.defaultLocale}\`.`,
       ],
     });
   }
-  const configured = collections?.defaultLocale ?? 'en';
+  const configured = collections?.defaultLocale ?? DEFAULTS.collections.defaultLocale;
   const defaultLocale = canonicalizeLanguage(configured);
   if (isNull(defaultLocale)) {
     throw ohneError({
