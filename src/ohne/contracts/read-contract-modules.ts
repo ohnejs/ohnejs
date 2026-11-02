@@ -1,7 +1,14 @@
 import { codeSpan } from '../../utils/ansi/index.ts';
 import { readFile } from '../../utils/fs/index.ts';
 import { resolveImport, resolvePackageImport, stripFile } from '../../utils/imports/index.ts';
-import { isArray, isNull, isUndefined, lineCount, relativePath } from '../../utils/index.ts';
+import {
+  isArray,
+  isEmpty,
+  isNull,
+  isUndefined,
+  lineCount,
+  relativePath,
+} from '../../utils/index.ts';
 import { isOhneError, ohneError } from '../error/ohne-error.ts';
 
 /**
@@ -41,7 +48,7 @@ interface Rewrite {
   target: string;
   via: string;
   exports: string[];
-  render: (namespace: string) => string;
+  render: (namespace: string, exported: Set<string>) => string;
 }
 
 interface Parsed {
@@ -275,10 +282,16 @@ async function aliases(
     target,
     via: `${file}:${textPosition(source, at)}`,
     exports: keyword === 'import' ? [] : names,
-    render: (ns) =>
+    // `export import` binds the name too, and oxlint refuses a name aliased twice.
+    render: (ns, exported) =>
       isUndefined(list)
-        ? `${keyword} ${match[1]} = ${ns};`
-        : pairs.map(([name, alias]) => `${keyword} ${alias} = ${ns}.${name};`).join('\n'),
+        ? keyword === 'import' && exported.has(match[1]!)
+          ? ''
+          : `${keyword} ${match[1]} = ${ns};`
+        : pairs
+            .filter(([, alias]) => keyword !== 'import' || !exported.has(alias))
+            .map(([name, alias]) => `${keyword} ${alias} = ${ns}.${name};`)
+            .join('\n'),
   };
 }
 
@@ -348,11 +361,13 @@ function render(module: Parsed, names: Map<string, string>): string {
   const begin = source.search(/\S/);
   if (begin === -1) return '';
   const finish = source.trimEnd().length;
+  const exported = new Set(rewrites.flatMap((rewrite) => rewrite.exports));
   let out = '  ';
   let at = begin;
   for (const { start, end, target, render } of rewrites) {
-    out += indent(source, at, start, literal) + render(names.get(target)!).replaceAll('\n', '\n  ');
-    at = end;
+    const text = render(names.get(target)!, exported);
+    out += indent(source, at, start, literal) + text.replaceAll('\n', '\n  ');
+    at = isEmpty(text) ? end + /^\s*/.exec(source.slice(end))![0].length : end;
   }
   return out + indent(source, at, finish, literal);
 }

@@ -97,9 +97,7 @@ describe('generateAPITypes', () => {
     );
     strictEqual(text.includes('declare namespace L0 {\n  export interface User {'), true);
     strictEqual(
-      text.includes(
-        'export declare namespace Contract {\n  import Site = M2.Site;\n\n  export import Site = M2.Site;',
-      ),
+      text.includes('export declare namespace Contract {\n  export import Site = M2.Site;\n'),
       true,
     );
     strictEqual(text.includes('declare namespace M2 {\n  /**\n   * One site.\n   */'), true);

@@ -70,8 +70,7 @@ describe('readContractModules', () => {
     );
     strictEqual(
       modules[0]!.text,
-      '  import Row = M1.Row;\n' +
-        '  import K = M1.Kind;\n' +
+      '  import K = M1.Kind;\n' +
         '  import T = M1;\n' +
         '  export import Row = M1.Row;\n' +
         '  export import Shared = M1;\n\n' +
@@ -81,6 +80,24 @@ describe('readContractModules', () => {
     strictEqual(
       modules[1]!.text,
       "  export interface Row {\n    id: string;\n  }\n\n  export type Kind = 'a' | 'b';",
+    );
+  });
+
+  it('aliases a name it imports and re-exports only once', async () => {
+    const at = dir();
+    write(join(at, 'types.ts'), 'export type Row = 1;\n');
+    const entry = write(
+      join(at, 'ohne.contract.ts'),
+      "import type { Row } from './types.ts';\n" +
+        "export type { Row } from './types.ts';\n\n" +
+        "export interface Routes {\n  'GET /a': { response: Row };\n}\n",
+    );
+
+    const [contract] = await readContractModules([entry], { app: entry });
+
+    strictEqual(
+      contract!.text,
+      "  export import Row = M1.Row;\n\n  export interface Routes {\n    'GET /a': { response: Row };\n  }",
     );
   });
 
