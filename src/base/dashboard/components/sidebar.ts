@@ -8,7 +8,7 @@ import {
   icon,
   type Translate,
   translateMessage,
-  useRoute,
+  useLocationPath,
   useT,
   verticalMenu,
   type VerticalMenuItemModel,
@@ -69,7 +69,7 @@ function menuSection(
       verticalMenu({
         title: section().label === '' ? undefined : () => translateMessage(section().label),
         items: () => {
-          const active = activeTarget(dashboardMeta()?.menu ?? [], useRoute()?.path ?? '/');
+          const active = activeTarget(dashboardMeta()?.menu ?? [], useLocationPath());
           return section().items.map((node) => menuModel(node, active));
         },
         expandedState,
