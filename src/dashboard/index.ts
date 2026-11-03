@@ -93,7 +93,7 @@ export { defineDashboardPage } from './router/define-dashboard-page.ts';
 export type { DashboardPageOptions } from './router/define-dashboard-page.ts';
 export { registerPageFrame, useFrame } from './router/page-frame.ts';
 export type { FrameOptions, PageFrame, PageFrameContext } from './router/page-frame.ts';
-export { lastNavigation, navigate, useRoute } from './router/router.ts';
+export { lastNavigation, navigate, useLocationPath, useRoute } from './router/router.ts';
 export type { DashboardPage, NavigationCause, RouteContext } from './router/router.ts';
 export { useSearchParam } from './router/search-param.ts';
 export type { SearchParamOptions } from './router/search-param.ts';

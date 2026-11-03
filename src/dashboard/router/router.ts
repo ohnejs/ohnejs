@@ -3,6 +3,8 @@ import type { PageRoute } from '../../utils/route/page-route.ts';
 import type { SearchParamValue } from '../../utils/search-params/coerce-token.ts';
 import type { Child } from '../render/insert.ts';
 
+import { afterPaint } from '../../utils/frame/after-paint.ts';
+import { isEmpty } from '../../utils/is/is-empty.ts';
 import { isNull } from '../../utils/is/is-null.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { batchedEffect } from '../../utils/reactive/batched-effect.ts';
@@ -84,6 +86,7 @@ const RELOADED = 'ohne-reloaded';
 
 let pages: CompiledPage[] = [];
 const active = ref<Active | null>(null);
+const pathname = ref('');
 const framed = ref(false);
 const framedRoute = ref<Active | null>(null);
 const bareRoute = ref<Active | null>(null);
@@ -294,18 +297,34 @@ export function setNavigationGuard(next: NavigationGuard | null): void {
  * Reads the active route; `null` before the first render and on an unmatched URL.
  * The read is reactive: a binding reading it re-renders on every navigation that swaps the page.
  * A query-only step keeps the same route object and updates its `query` in place.
- * Components outside the page tree, like a sidebar, use it to follow the location.
+ * Components outside the page tree use it to follow the page.
  *
  * @example
  * ```ts
- * h('a', {
- *   href: '/posts',
- *   'aria-current': () => (useRoute()?.path === '/posts' ? 'page' : false),
+ * effect(() => {
+ *   void useRoute()
+ *   main.scrollTop = 0
  * })
  * ```
  */
 export function useRoute(): RouteContext | null {
   return active.value;
+}
+
+/**
+ * Reads the pathname the dashboard is on or heading to.
+ * It moves as a navigation starts, so a link can light up before a slow page builds.
+ *
+ * @example
+ * ```ts
+ * h('a', {
+ *   href: '/posts',
+ *   'aria-current': () => (useLocationPath() === '/posts' ? 'page' : false),
+ * })
+ * ```
+ */
+export function useLocationPath(): string {
+  return pathname.value;
 }
 
 /**
@@ -365,6 +384,7 @@ function loadFailed(frame: boolean): HTMLElement {
 
 /**
  * Matches the current location, loads its page module on demand, and publishes it as the active route.
+ * Past the first page, a frame paints before publishing, so a slow page build never hides the click.
  * A render superseded by a newer navigation publishes nothing, so a slow module never wins over a later page.
  * A module that fails to load reloads the page once, then publishes its route with `loadFailed` in its place.
  * Whether the page wants the frame is unknown then, so the failure keeps the frame on screen as it is.
@@ -373,6 +393,7 @@ async function render(): Promise<void> {
   const mine = ++token;
   rendered = here();
   at = entryIndex() ?? 0;
+  pathname.value = location.pathname;
   const match = matchPages(pages, location.pathname);
   if (isNull(match)) {
     publish(mine, null);
@@ -388,6 +409,7 @@ async function render(): Promise<void> {
     const frame = untracked(() => framed.value);
     component = defineDashboardPage(() => loadFailed(frame), { frame });
   }
+  if (published !== 0) await afterPaint();
   if (mine !== token) return;
   const search = ref(location.search);
   const query = computed(() => parseSearchParams(search.value));
@@ -436,10 +458,10 @@ function interceptLink(event: MouseEvent): void {
   if (!(target instanceof Element)) return;
   const anchor = target.closest('a');
   if (isNull(anchor) || !anchor.hasAttribute('href')) return;
-  if (anchor.target !== '' || anchor.hasAttribute('download')) return;
+  if (!isEmpty(anchor.target) || anchor.hasAttribute('download')) return;
   const url = URL.parse(anchor.href);
   if (isNull(url) || url.origin !== location.origin) return;
-  if (url.pathname === location.pathname && url.search === location.search && url.hash !== '') {
+  if (url.pathname === location.pathname && url.search === location.search && !isEmpty(url.hash)) {
     return;
   }
   event.preventDefault();

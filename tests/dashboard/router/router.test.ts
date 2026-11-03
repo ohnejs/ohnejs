@@ -307,6 +307,17 @@ describe('startRouter with a page frame', () => {
     router.setNavigationGuard(null);
   });
 
+  it('moves `useLocationPath` before the arriving page publishes', async () => {
+    void router.navigate('/slow');
+    await settle();
+    strictEqual(router.useLocationPath(), '/slow');
+    strictEqual(router.useRoute()?.path, '/');
+    void router.navigate('/');
+    await settle();
+    strictEqual(router.useLocationPath(), '/');
+    strictEqual(container.textContent, '[home]');
+  });
+
   it('renders in full on a query step while a render is pending', async () => {
     const builds = counts.home;
     void router.navigate('/slow');

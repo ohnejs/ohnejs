@@ -226,7 +226,7 @@ css`
     color: hsl(var(--ohne-muted-foreground));
     text-decoration: none;
     transition: var(--ohne-transition);
-    transition-property: background-color, box-shadow, color;
+    transition-property: box-shadow;
   }
 
   .ohne-vertical-menu-item-button,
@@ -251,6 +251,7 @@ css`
     .ohne-vertical-menu-item-button:hover {
       background-color: hsl(var(--ohne-secondary));
       color: hsl(var(--ohne-secondary-foreground));
+      transition-property: background-color, box-shadow;
     }
   }
 
@@ -265,6 +266,7 @@ css`
     > .ohne-vertical-menu-item-button {
     background-color: hsl(var(--ohne-accent));
     color: hsl(var(--ohne-accent-foreground));
+    transition-duration: 0s;
   }
 
   .ohne-vertical-menu-item-active
@@ -272,6 +274,23 @@ css`
     > .ohne-vertical-menu-item-button {
     color: hsl(var(--ohne-accent-foreground));
     font-weight: 500;
+  }
+
+  .ohne-vertical-menu-item-wrapper > a.ohne-vertical-menu-item-button:active {
+    background-color: hsl(var(--ohne-accent));
+    color: hsl(var(--ohne-accent-foreground));
+    font-weight: 500;
+    transition-duration: 0s;
+  }
+
+  /* A pressed link takes the highlight before its click navigates. */
+  :root:has(a.ohne-vertical-menu-item-button:active)
+    .ohne-vertical-menu-item-active
+    > .ohne-vertical-menu-item-wrapper
+    > .ohne-vertical-menu-item-button:not(:active) {
+    background-color: transparent;
+    color: hsl(var(--ohne-muted-foreground));
+    font-weight: normal;
   }
 
   .ohne-vertical-menu-item-button > svg {
