@@ -60,7 +60,7 @@ export default defineConfig({
     "typecheck": "tsc"
   },
   "dependencies": {
-    "ohnejs": "0.6.0"
+    "ohnejs": "0.7.0"
   },
   "devDependencies": {
     "@types/node": "26.6.5",
