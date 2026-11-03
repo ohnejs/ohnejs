@@ -100,6 +100,7 @@ export * from './field-layout/layout-problems.ts';
 export * from './field-layout/parse-layout-item.ts';
 export * from './field-layout/resolve-layout-nodes.ts';
 export * from './forwarded/parse-forwarded.ts';
+export * from './frame/after-paint.ts';
 export * from './fuzzy/fuzzy.ts';
 export * from './gate/create-gate.ts';
 export * from './glob/compile-glob.ts';
