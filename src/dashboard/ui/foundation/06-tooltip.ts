@@ -111,9 +111,9 @@ css`
   }
 
   .ohne-tooltip :not(pre) > code {
-    padding: 0.25em 0.5em;
+    padding: 0.125em 0.375em;
     background-color: hsl(var(--ohne-accent) / 0.2);
-    border-radius: 0.5em;
+    border-radius: 0.375em;
     font-size: 0.875em;
     font-weight: 500;
     font-style: normal;

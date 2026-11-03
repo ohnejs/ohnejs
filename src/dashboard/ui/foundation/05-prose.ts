@@ -106,9 +106,9 @@ css`
   }
 
   .ohne-prose :where(:not(pre)) :where(code) {
-    padding: 0.25em 0.5em;
+    padding: 0.125em 0.375em;
     background-color: hsl(var(--ohne-accent));
-    border-radius: 0.5em;
+    border-radius: 0.375em;
     color: hsl(var(--ohne-accent-foreground));
     font-size: calc(1em - 0.0625rem);
     font-weight: 500;
