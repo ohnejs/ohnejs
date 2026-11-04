@@ -1,5 +1,6 @@
 import { isRealNumber } from '../is/is-real-number.ts';
 import { roundTo } from '../number/round-to.ts';
+import { byteExponent } from './byte-exponent.ts';
 
 const UNITS = ['b', 'kb', 'mb', 'gb', 'tb', 'pb'];
 
@@ -26,8 +27,6 @@ export function formatBytes(bytes: number, decimals: number = 2): string {
     throw new Error(`Invalid byte size: ${bytes}`);
   }
 
-  const shown = (unit: number) => roundTo(bytes / 1024 ** unit, unit === 0 ? 0 : decimals);
-  let exp = 0;
-  while (exp < UNITS.length - 1 && shown(exp) >= 1024) exp++;
-  return `${shown(exp)}${UNITS[exp]}`;
+  const exponent = byteExponent(bytes, decimals);
+  return `${roundTo(bytes / 1024 ** exponent, exponent === 0 ? 0 : decimals)}${UNITS[exponent]}`;
 }
