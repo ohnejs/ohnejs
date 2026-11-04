@@ -1,4 +1,5 @@
 import type { Child } from '../../render/insert.ts';
+import type { ValueFormat } from './_format.ts';
 import type { PlottedSeries, Series } from './_series.ts';
 import type { TooltipRow } from './_tooltip.ts';
 
@@ -12,9 +13,9 @@ import { linePath } from '../../../utils/svg/line-path.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { svg } from '../../render/svg.ts';
-import { formatNumber } from '../../runtime/number.ts';
 import { useWidth } from '../use-width.ts';
 import { axisLabel, textWidth, yAxis } from './_axis.ts';
+import { chartFormat } from './_format.ts';
 import { dataFrame, dataTable } from './_frame.ts';
 import { keyStep } from './_keys.ts';
 import { chartLegend } from './_legend.ts';
@@ -55,9 +56,10 @@ export interface LineChartOptions<T> {
 
   /**
    * Formats a value for the axis, the tooltip and the screen reader table.
+   * `formatNumber` options also step the axis in their unit, each tick as precise as its step needs.
    * Omitted writes the number in the dashboard language, compact on the axis.
    */
-  format?: (value: number) => string;
+  format?: ValueFormat;
 
   /**
    * Whether a row covers only part of its span, like today, so the lines into it draw lighter.
@@ -148,10 +150,8 @@ export function lineChart<T>(
  * The drawn chart for rows that have arrived.
  */
 function plot<T>(rows: () => readonly T[], options: LineChartOptions<T>, height: number): Child {
-  const format = options.format ?? ((value: number) => formatNumber(value));
-  const axisFormat =
-    options.format ??
-    ((value: number) => formatNumber(value, { compact: Math.abs(value) >= 1000 }));
+  const resolved = chartFormat(options.format);
+  const format = resolved.value;
   const plotted = computed(() => plotSeries(rows(), options.series));
   const active = ref<number | null>(null);
   const tooltip = chartTooltip();
@@ -222,7 +222,7 @@ function plot<T>(rows: () => readonly T[], options: LineChartOptions<T>, height:
     const { left, inner, bottom, y } = yAxis(canvas, {
       peak: Math.max(0, ...values),
       whole: values.every((value) => Number.isInteger(value)),
-      format: axisFormat,
+      format: resolved,
       size: [total, height],
       margin: { top: TOP, bottom: BOTTOM, right },
     });
@@ -242,7 +242,9 @@ function plot<T>(rows: () => readonly T[], options: LineChartOptions<T>, height:
       const anchor = last ? 'end' : first ? 'start' : 'middle';
       const at = last ? left + inner : x(index);
       const start = anchor === 'start' ? at : anchor === 'end' ? at - width : at - width / 2;
-      if (start < left - LABEL_SPACE || start + width > previous - LABEL_SPACE) break;
+      if (start < left - LABEL_SPACE) break;
+      // The newest label sits flush right, so the one before it can crowd it while later ones fit.
+      if (start + width > previous - LABEL_SPACE) continue;
       canvas.append(axisLabel(labels[index]!, at, height - 6, anchor));
       previous = start;
     }

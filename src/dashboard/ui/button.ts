@@ -2,6 +2,7 @@ import type { Child } from '../render/insert.ts';
 import type { IconName } from './icon.ts';
 import type { Step } from './layout.ts';
 
+import { stripCodeSpans } from '../../utils/i18n/strip-code-spans.ts';
 import { isFunction } from '../../utils/is/is-function.ts';
 import { isNull } from '../../utils/is/is-null.ts';
 import { isPlainObject } from '../../utils/is/is-plain-object.ts';
@@ -11,6 +12,7 @@ import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { resolveText, type Text } from '../runtime/text.ts';
+import { textChild } from './_text-child.ts';
 import { icon } from './icon.ts';
 import { STEP_WIDTHS } from './layout.ts';
 import { attachTooltip } from './tooltip.ts';
@@ -206,6 +208,14 @@ css`
     }
   }
 
+  @media (hover: none) {
+    .ohne-button-destructive-hover:active {
+      background-color: hsl(var(--ohne-destructive) / 0.9);
+      border-color: hsl(var(--ohne-destructive));
+      color: hsl(var(--ohne-destructive-foreground));
+    }
+  }
+
   .ohne-button-primary[aria-haspopup][aria-expanded='true'] {
     background-color: hsl(var(--ohne-primary) / 0.9);
   }
@@ -350,13 +360,13 @@ export function button(label: Text | Child, options: ButtonOptions = {}): HTMLEl
   const labelEl =
     isUndefined(text) || iconOnly === true
       ? null
-      : h('span', { class: 'ohne-button-label' }, () => resolveText(text));
+      : h('span', { class: 'ohne-button-label' }, () => stripCodeSpans(resolveText(text)));
   const content =
     iconOnly === true || !isUndefined(text)
       ? labelEl
       : isFunction(label) && !isNull(leading)
-        ? h('span', { class: 'ohne-button-label' }, label)
-        : (label as Child);
+        ? h('span', { class: 'ohne-button-label' }, textChild(label))
+        : textChild(label);
   const name = ariaLabel ?? (isUndefined(iconOnly) ? undefined : text);
   const el = h(
     tag,
@@ -369,14 +379,14 @@ export function button(label: Text | Child, options: ButtonOptions = {}): HTMLEl
       href: tag === 'a' ? options.href : undefined,
       type: options.type ?? (tag === 'button' ? 'button' : undefined),
       class: () =>
-        `ohne-button ohne-raw ohne-button-${options.variant ?? 'primary'}` +
+        `ohne-button ohne-hit ohne-raw ohne-button-${options.variant ?? 'primary'}` +
         (options.destructiveHover ? ' ohne-button-destructive-hover' : '') +
         (disabled?.() ? ' ohne-button-disabled' : '') +
         (loading?.() ? ' ohne-button-loading' : '') +
         (isString(iconOnly) ? ` ohne-button-icon-only-${iconOnly}` : '') +
         (options.class ? ` ${options.class}` : ''),
       style: isUndefined(options.size) ? undefined : `--ohne-size: ${options.size}`,
-      'aria-label': isUndefined(name) ? undefined : () => resolveText(name),
+      'aria-label': isUndefined(name) ? undefined : () => stripCodeSpans(resolveText(name)),
       onClick: options.onClick,
     },
     h('span', { class: 'ohne-button-inner' }, leading, content),

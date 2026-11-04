@@ -333,6 +333,19 @@ css`
     pointer-events: none;
   }
 
+  @media (pointer: coarse) {
+    .ohne-dynamic-chips-item {
+      position: relative;
+    }
+
+    .ohne-dynamic-chips-remove::after {
+      content: '';
+      position: absolute;
+      inset: 0 0 0 auto;
+      width: 1.875em;
+    }
+  }
+
   .ohne-dynamic-chips-remove:focus-visible {
     box-shadow:
       0 0 0 0.125rem hsl(var(--ohne-background)),

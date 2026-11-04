@@ -48,4 +48,15 @@ describe('page', () => {
     strictEqual(element.textContent, 'BackThrallWarchiefSon of DurotanEdit');
     scope.dispose();
   });
+
+  it('labels the back link and keeps backticks out of the tab', () => {
+    const scope = effectScope();
+    const element = scope.run(() =>
+      page({ title: 'Site `orgrimmar`', back: '/sites', backLabel: 'Sites' }),
+    )!;
+    strictEqual(find(element, 'A')?.textContent, 'Sites');
+    strictEqual(find(element, 'CODE')?.textContent, 'orgrimmar');
+    strictEqual(document.title, 'Site orgrimmar - ohne');
+    scope.dispose();
+  });
 });

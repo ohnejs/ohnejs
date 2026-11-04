@@ -239,7 +239,7 @@ export function checkbox(
         disabled: options.disabled,
         role: 'checkbox',
         type: 'button',
-        class: 'ohne-checkbox-button ohne-raw',
+        class: 'ohne-checkbox-button ohne-hit ohne-raw',
         onClick: () => input.click(),
       },
       () => markIcon(options.indeterminate?.() ?? false),

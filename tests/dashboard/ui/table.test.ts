@@ -191,7 +191,7 @@ describe('table', () => {
       [
         ['Thrall', 'Shaman!', '80'],
         ['Jaina', 'Mage!', '1,234'],
-        ['Sylvanas', 'Hunter!', ''],
+        ['Sylvanas', 'Hunter!', '-'],
         ['Anduin', 'Priest!', '70'],
       ],
     );
@@ -673,6 +673,18 @@ describe('table context menu', () => {
       ],
       [0, false],
     );
+  });
+
+  it('drops the actions column while no row has an action', () => {
+    const offered = ref(false);
+    const root = raidTable(() => RAIDERS, {
+      actions: () => [[offered.value && { label: 'Invite' }]],
+    });
+    const actionCells = (): number => byClass(root, 'ohne-table-actions').length;
+    strictEqual(actionCells(), 0);
+    offered.value = true;
+    flush();
+    strictEqual(actionCells(), RAIDERS.length + 1);
   });
 
   it('names the kebab more actions', () => {

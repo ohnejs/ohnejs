@@ -10,6 +10,9 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { sleep } from '../../utils/sleep/sleep.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
+import { defaultText, type Text } from '../runtime/text.ts';
+import { inlineChild } from './_text-child.ts';
+import { button } from './button.ts';
 import { container } from './container.ts';
 import { isEditingText } from './hotkeys.ts';
 import { acquireOverlay, FOCUSABLE, type OverlayHandle } from './overlay.ts';
@@ -62,6 +65,12 @@ export interface PopupOptions {
    * 300
    */
   overlayTransitionDuration?: number;
+
+  /**
+   * The popup's title, in a header with a close button that calls `onClose`.
+   * A `header` replaces this header.
+   */
+  title?: Text;
 
   /**
    * The header slot, rendered above the content with a bottom border.
@@ -195,6 +204,11 @@ css`
     border-bottom-width: 1px;
   }
 
+  .ohne-popup-title {
+    min-width: 0;
+    font-weight: 500;
+  }
+
   .ohne-popup-full-height .ohne-popup-header {
     position: sticky;
     top: 0;
@@ -234,6 +248,10 @@ css`
     .ohne-popup {
       padding: 0.5rem;
     }
+
+    .ohne-popup-title.ohne-truncate {
+      white-space: normal;
+    }
   }
 `;
 
@@ -266,7 +284,12 @@ export function popup(
   const width = options.width ?? '50rem';
   const fullHeight = options.fullHeight ?? false;
   const duration = options.overlayTransitionDuration ?? 300;
-  const header = options.header;
+  const { title } = options;
+  const header =
+    options.header ??
+    (isUndefined(title)
+      ? undefined
+      : (headerClose: PopupClose) => titleRow(title, headerClose, options.onClose));
   const footer = options.footer;
   const visible = ref(false);
 
@@ -429,4 +452,25 @@ export function popup(
   });
 
   return { root, content: contentRoot, close, focus: focusRoot };
+}
+
+/**
+ * The header a `title` builds: the title, then a close button when the popup has an `onClose`.
+ */
+function titleRow(title: Text, close: PopupClose, onClose: PopupOptions['onClose']): HTMLElement {
+  return h(
+    'div',
+    { class: 'ohne-row' },
+    h('span', { class: 'ohne-popup-title ohne-truncate' }, inlineChild(title)),
+    isUndefined(onClose)
+      ? null
+      : button(() => defaultText('dashboard.close', 'Close'), {
+          icon: 'x',
+          iconOnly: true,
+          size: -2,
+          variant: 'ghost',
+          class: 'ohne-ml-auto',
+          onClick: () => onClose(close),
+        }),
+  );
 }

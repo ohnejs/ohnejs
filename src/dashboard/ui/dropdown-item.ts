@@ -69,6 +69,11 @@ css`
     white-space: nowrap;
     text-decoration: none;
   }
+  @media (pointer: coarse) {
+    .ohne-dropdown-item {
+      height: 2.5rem;
+    }
+  }
 
   .ohne-dropdown-item-indent {
     padding-left: calc(2em + 0.125rem);

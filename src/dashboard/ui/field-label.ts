@@ -66,13 +66,13 @@ css`
     line-height: round(calc(1.25 * 1em), 1px);
   }
 
-  .ohne-field-label :not(p) {
+  .ohne-field-label :not(p, .ohne-button, .ohne-button *) {
     font-size: calc(1em - 0.125rem);
     line-height: 1.25;
     line-height: round(calc(1.25 * 1em), 1px);
   }
 
-  .ohne-field-label svg {
+  .ohne-field-label svg:not(.ohne-button *) {
     font-size: calc(1em - 0.0625rem);
   }
 `;

@@ -8,7 +8,7 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
-import { textChild } from './_text-child.ts';
+import { inlineChild } from './_text-child.ts';
 import { icon } from './icon.ts';
 import './tokens.ts';
 
@@ -139,7 +139,7 @@ export function disclosure(content: () => Child, options: DisclosureOptions): HT
     h(
       'summary',
       { class: 'ohne-disclosure-summary' },
-      h('span', { class: 'ohne-disclosure-label' }, textChild(options.summary)),
+      h('span', { class: 'ohne-disclosure-label' }, inlineChild(options.summary)),
       isUndefined(options.badge)
         ? null
         : h('span', { class: 'ohne-disclosure-badge' }, options.badge),

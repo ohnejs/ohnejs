@@ -1,7 +1,8 @@
+import type { ChartFormat } from './_format.ts';
+
 import { isNull } from '../../../utils/is/is-null.ts';
 import { getOrSet } from '../../../utils/map/get-or-set.ts';
 import { clamp } from '../../../utils/number/clamp.ts';
-import { niceScale } from '../../../utils/number/nice-scale.ts';
 import { css } from '../../render/css.ts';
 import { svg } from '../../render/svg.ts';
 import '../tokens.ts';
@@ -46,9 +47,9 @@ export interface AxisOptions {
   whole: boolean;
 
   /**
-   * Formats a tick label.
+   * The chart's format, which steps the scale and writes its tick labels.
    */
-  format: (value: number) => string;
+  format: ChartFormat;
 
   /**
    * The plot's width and height in pixels.
@@ -102,12 +103,12 @@ export function yAxis(plot: SVGSVGElement, options: AxisOptions): Axis {
   const { margin } = options;
   const [width, height] = options.size;
   const bottom = height - margin.bottom;
-  const scale = niceScale(
+  const scale = options.format.scale(
     options.peak,
     clamp(Math.floor((bottom - margin.top) / 40), 2, 5),
     options.whole,
   );
-  const labels = scale.ticks.map((tick) => options.format(tick));
+  const { labels } = scale;
   const left = Math.ceil(Math.max(...labels.map((label) => textWidth(label)))) + LABEL_GAP;
   const inner = Math.max(1, width - left - margin.right);
   const y = (value: number): number =>

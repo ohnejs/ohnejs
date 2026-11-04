@@ -1017,7 +1017,7 @@ function createToaster(): HTMLElement {
           ? h(
               'button',
               {
-                class: 'ohne-button ohne-button-primary ohne-raw',
+                class: 'ohne-button ohne-hit ohne-button-primary ohne-raw',
                 'data-button': '',
                 'data-action': '',
                 onClick: (event: MouseEvent) => {

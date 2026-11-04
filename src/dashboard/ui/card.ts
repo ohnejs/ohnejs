@@ -10,6 +10,7 @@ import { ref } from '../../utils/reactive/ref.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { defaultText, resolveText, type Text } from '../runtime/text.ts';
+import { inlineChild } from './_text-child.ts';
 import { button } from './button.ts';
 import { icon } from './icon.ts';
 import { errorState } from './states.ts';
@@ -197,6 +198,10 @@ css`
     margin-left: auto;
   }
 
+  .ohne-card-end:has(.ohne-button) {
+    margin: -0.25rem -0.25rem -0.25rem auto;
+  }
+
   .ohne-card-more {
     display: inline-flex;
     align-items: center;
@@ -338,7 +343,7 @@ function builtHeader(
     'div',
     { class: 'ohne-card-header ohne-card-head' },
     isUndefined(options.icon) ? null : cardIcon(options.icon),
-    isUndefined(title) ? null : h('h3', { class: 'ohne-card-title' }, () => resolveText(title)),
+    isUndefined(title) ? null : h('h3', { class: 'ohne-card-title' }, inlineChild(title)),
     isUndefined(badge) ? null : h('span', { class: 'ohne-card-badge' }, badge),
     end
       ? h(
@@ -367,7 +372,7 @@ function cardIcon(name: IconName): SVGSVGElement {
 function moreLink(href: string, label: Text | undefined): HTMLElement {
   return h(
     'a',
-    { class: 'ohne-card-more ohne-raw', href },
+    { class: 'ohne-card-more ohne-hit ohne-raw', href },
     h('span', null, () =>
       isUndefined(label) ? defaultText('dashboard.viewAll', 'View all') : resolveText(label),
     ),

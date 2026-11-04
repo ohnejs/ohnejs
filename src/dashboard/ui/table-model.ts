@@ -18,7 +18,7 @@ export interface TableColumn<T> {
 
   /**
    * The row's value in this column: the sort key, and the cell text when there is no `render`.
-   * Numbers show in the dashboard language with tabular digits; `null` and `undefined` show nothing.
+   * Numbers show in the dashboard language with tabular digits; `null` and `undefined` show a dash.
    */
   value?: (row: T) => string | number | null | undefined;
 
@@ -52,7 +52,7 @@ export interface TableColumn<T> {
 
   /**
    * Lets the cells wrap onto more lines, at least `minWidth` wide.
-   * Without it, an auto-layout cell stays on one line.
+   * Without it, a cell stays on one line.
    *
    * @default
    * false

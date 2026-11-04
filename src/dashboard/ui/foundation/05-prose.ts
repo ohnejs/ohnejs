@@ -101,18 +101,15 @@ css`
     vertical-align: -0.125em;
   }
 
-  .ohne-prose :where(code) {
-    font-family: var(--ohne-font-mono);
-  }
-
-  .ohne-prose :where(:not(pre)) :where(code) {
+  .ohne-prose :where(:not(pre)) :where(code),
+  .ohne-inline-code {
     padding: 0.125em 0.375em;
     background-color: hsl(var(--ohne-accent));
     border-radius: 0.375em;
     color: hsl(var(--ohne-accent-foreground));
-    font-size: calc(1em - 0.0625rem);
     font-weight: 500;
     font-style: normal;
+    text-transform: none;
     overflow-wrap: anywhere;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
@@ -128,8 +125,6 @@ css`
     border-radius: var(--ohne-radius);
     outline: none;
     color: hsl(var(--ohne-primary-foreground));
-    font-family: var(--ohne-font-mono);
-    font-size: calc(1em - 0.0625rem);
     font-style: normal;
   }
 

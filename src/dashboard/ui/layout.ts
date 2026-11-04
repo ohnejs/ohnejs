@@ -6,7 +6,7 @@ import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { resolveText, type Text } from '../runtime/text.ts';
-import { proseChild } from './_text-child.ts';
+import { inlineChild, proseChild } from './_text-child.ts';
 import './tokens.ts';
 
 /**
@@ -448,6 +448,12 @@ css`
     align-items: center;
   }
 
+  .ohne-toolbar > :is(.ohne-select-wrapper, .ohne-input) {
+    flex: 1 1 14rem;
+    width: auto;
+    max-width: 24rem;
+  }
+
   .ohne-toolbar-sticky {
     position: sticky;
     top: 0;
@@ -496,7 +502,7 @@ export function section(...args: (SectionOptions | Child)[]): HTMLElement {
             { class: 'ohne-section-heading' },
             isUndefined(title)
               ? null
-              : h('h2', { class: 'ohne-section-title' }, () => resolveText(title)),
+              : h('h2', { class: 'ohne-section-title' }, inlineChild(title)),
             isUndefined(description)
               ? null
               : h('div', { class: 'ohne-section-description' }, proseChild(description)),

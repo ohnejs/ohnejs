@@ -35,12 +35,26 @@ css`
 
 /**
  * The muted info icon beside a label, its help in a tooltip on hover and focus.
- * On touch a tap pins the help.
+ * On touch a tap pins the help and does nothing else.
  */
 export function helpIcon(help: Text): HTMLElement {
+  let touched = false;
   const element = h(
     'span',
-    { class: 'ohne-help', tabindex: 0, role: 'note', 'aria-label': () => resolveText(help) },
+    {
+      class: 'ohne-help ohne-hit',
+      tabindex: 0,
+      role: 'note',
+      'aria-label': () => resolveText(help),
+      onPointerdown: (event: PointerEvent) => {
+        touched = event.pointerType === 'touch';
+      },
+      onClick: (event: MouseEvent) => {
+        if (!touched) return;
+        event.preventDefault();
+        event.stopPropagation();
+      },
+    },
     icon('info-circle-filled'),
   );
   onCleanup(

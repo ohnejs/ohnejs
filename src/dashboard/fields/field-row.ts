@@ -330,7 +330,7 @@ export function fieldRow(options: FieldRowOptions, control: Child): Child {
       {
         type: 'button',
         class: () =>
-          `ohne-field-description-toggle ohne-raw${expanded.value ? ' ohne-field-description-expanded' : ''}`,
+          `ohne-field-description-toggle ohne-raw ohne-hit${expanded.value ? ' ohne-field-description-expanded' : ''}`,
         'aria-expanded': () => String(expanded.value),
         onClick: () => {
           expanded.value = !expanded.value;

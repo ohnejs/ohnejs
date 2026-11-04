@@ -248,6 +248,13 @@ css`
     visibility: hidden;
   }
 
+  /* The field grows to 16px on touch, so its mirror grows with it. */
+  @media (pointer: coarse) {
+    .ohne-number-input-shadow {
+      font-size: max(1em, 16px);
+    }
+  }
+
   .ohne-number-steppers {
     flex-shrink: 0;
     display: flex;

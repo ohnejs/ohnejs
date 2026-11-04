@@ -1,18 +1,19 @@
 import type { Child } from '../../render/insert.ts';
+import type { ChartFormat, ValueFormat } from './_format.ts';
 import type { PlottedSeries, Series } from './_series.ts';
 
 import { isNull } from '../../../utils/is/is-null.ts';
 import { isUndefined } from '../../../utils/is/is-undefined.ts';
-import { niceScale } from '../../../utils/number/nice-scale.ts';
+import { clamp } from '../../../utils/number/clamp.ts';
 import { computed } from '../../../utils/reactive/computed.ts';
 import { effect } from '../../../utils/reactive/effect.ts';
 import { ref } from '../../../utils/reactive/ref.ts';
 import { css } from '../../render/css.ts';
 import { h } from '../../render/h.ts';
 import { svg } from '../../render/svg.ts';
-import { formatNumber } from '../../runtime/number.ts';
 import { useWidth } from '../use-width.ts';
 import { axisLabel, fitText, textWidth, yAxis } from './_axis.ts';
+import { chartFormat } from './_format.ts';
 import { dataFrame, dataTable } from './_frame.ts';
 import { keyStep } from './_keys.ts';
 import { chartLegend } from './_legend.ts';
@@ -62,9 +63,10 @@ export interface BarChartOptions<T> {
 
   /**
    * Formats a value for the axis, the labels, the tooltip and the screen reader table.
+   * `formatNumber` options also step the axis in their unit, each tick as precise as its step needs.
    * Omitted writes the number in the dashboard language, compact on the axis.
    */
-  format?: (value: number) => string;
+  format?: ValueFormat;
 }
 
 /**
@@ -91,8 +93,7 @@ interface Layout {
   total: number;
   tall: number;
   band: number;
-  format: (value: number) => string;
-  axisFormat: (value: number) => string;
+  format: ChartFormat;
 }
 
 /**
@@ -174,10 +175,8 @@ export function barChart<T>(
 function plot<T>(rows: () => readonly T[], options: BarChartOptions<T>, height: number): Child {
   const horizontal = options.horizontal === true;
   const stacked = options.stacked === true;
-  const format = options.format ?? ((value: number) => formatNumber(value));
-  const axisFormat =
-    options.format ??
-    ((value: number) => formatNumber(value, { compact: Math.abs(value) >= 1000 }));
+  const resolved = chartFormat(options.format);
+  const format = resolved.value;
   const plotted = computed(() => plotSeries(rows(), options.series));
   const lanes = (): number => (stacked ? 1 : plotted.value.length);
   const band = (): number =>
@@ -276,8 +275,7 @@ function plot<T>(rows: () => readonly T[], options: BarChartOptions<T>, height: 
       total,
       tall,
       band: band(),
-      format,
-      axisFormat,
+      format: resolved,
     };
     const draw = horizontal ? sideways(canvas, layout) : upright(canvas, layout);
     bands = draw.bands;
@@ -347,7 +345,7 @@ function upright(canvas: SVGSVGElement, context: Layout): Drawing {
   const { left, inner, y } = yAxis(canvas, {
     peak: context.peak,
     whole: context.whole,
-    format: context.axisFormat,
+    format: context.format,
     size: [context.total, tall],
     margin: { top: TOP, bottom: BOTTOM, right: RIGHT },
   });
@@ -360,7 +358,9 @@ function upright(canvas: SVGSVGElement, context: Layout): Drawing {
   const ticks = labels.flatMap((label, index) => {
     if (index % every !== 0) return [];
     const text = fits ? fitted[index]! : label;
-    return [axisLabel(text, left + size * (index + 0.5), tall - 6, 'middle')];
+    const half = textWidth(text) / 2;
+    const at = clamp(left + size * (index + 0.5), half, Math.max(half, context.total - half));
+    return [axisLabel(text, at, tall - 6, 'middle')];
   });
   const { lanes } = context;
   const thickness = fit(size, lanes);
@@ -395,11 +395,15 @@ function sideways(canvas: SVGSVGElement, context: Layout): Drawing {
     total * 0.4,
   );
   const tips = single
-    ? series[0]!.values.map((value) => (isNull(value) ? '' : context.format(value)))
+    ? series[0]!.values.map((value) => (isNull(value) ? '' : context.format.value(value)))
     : [];
   const right = single ? Math.max(...tips.map((tip) => textWidth(tip))) + LABEL_SPACE : RIGHT;
   const inner = Math.max(1, total - room - right);
-  const scale = niceScale(context.peak, Math.max(2, Math.floor(inner / TICK_GAP)), context.whole);
+  const scale = context.format.scale(
+    context.peak,
+    Math.max(2, Math.floor(inner / TICK_GAP)),
+    context.whole,
+  );
   const top = single ? Math.max(context.peak, Number.MIN_VALUE) : scale.max;
   const x = (value: number): number => room + (Math.max(0, value) / top) * inner;
   const bottom = TOP + labels.length * band;
@@ -418,7 +422,7 @@ function sideways(canvas: SVGSVGElement, context: Layout): Drawing {
         }),
       );
       drawn.push(
-        axisLabel(context.axisFormat(tick), x(tick), tall - 6, index === 0 ? 'start' : 'middle'),
+        axisLabel(scale.labels[index]!, x(tick), tall - 6, index === 0 ? 'start' : 'middle'),
       );
     }
   }

@@ -1,11 +1,11 @@
 import type { Child } from '../render/insert.ts';
+import type { Text } from '../runtime/text.ts';
 import type { IconName } from './icon.ts';
 
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
-import { resolveText, type Text } from '../runtime/text.ts';
-import { proseChild } from './_text-child.ts';
+import { inlineChild, proseChild } from './_text-child.ts';
 import { icon } from './icon.ts';
 import { STATUS_TONES, type Tone } from './tone.ts';
 import './_tones.ts';
@@ -145,7 +145,7 @@ export function alert(content: Text | Child, options: AlertOptions = {}): HTMLEl
     h(
       'div',
       { class: 'ohne-alert-main' },
-      isUndefined(title) ? null : h('p', { class: 'ohne-alert-title' }, () => resolveText(title)),
+      isUndefined(title) ? null : h('p', { class: 'ohne-alert-title' }, inlineChild(title)),
       h('div', { class: 'ohne-alert-content' }, proseChild(content)),
       isUndefined(actions) ? null : h('div', { class: 'ohne-alert-actions' }, actions),
     ),

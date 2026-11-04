@@ -1,4 +1,5 @@
 import { last } from '../../utils/array/last.ts';
+import { stripCodeSpans } from '../../utils/i18n/strip-code-spans.ts';
 import { isFunction } from '../../utils/is/is-function.ts';
 import { effectScope, onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
@@ -39,5 +40,5 @@ export function useDocumentTitle(title: Text | (() => string | undefined)): void
  */
 function writeTitle(): void {
   const title = last(titles.value)?.();
-  document.title = title ? `${title} - ohne` : 'ohne';
+  document.title = title ? `${stripCodeSpans(title)} - ohne` : 'ohne';
 }

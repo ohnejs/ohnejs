@@ -139,6 +139,14 @@ css`
     visibility: visible;
     transform: translate3d(-50%, -50%, 0) scale(1);
   }
+
+  @media (hover: none) {
+    .ohne-resizer-handle {
+      opacity: 1;
+      visibility: visible;
+      transform: translate3d(-50%, -50%, 0) scale(1);
+    }
+  }
 `;
 
 /**
@@ -234,7 +242,7 @@ export function resizer(model: Ref<number>, options: ResizerOptions = {}): HTMLE
     },
     h(
       'span',
-      { class: 'ohne-resizer-handle' },
+      { class: 'ohne-resizer-handle ohne-hit' },
       icon(side === 'left' || side === 'right' ? 'grip-vertical' : 'grip-horizontal'),
     ),
   );

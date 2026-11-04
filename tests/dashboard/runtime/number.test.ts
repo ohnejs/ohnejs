@@ -48,4 +48,17 @@ describe('formatNumber', () => {
     strictEqual(formatNumber(3.14159, { decimals: 2 }), '3.14');
     strictEqual(formatNumber(12.5, { currency: 'EUR', decimals: 0 }), '€13');
   });
+
+  it('writes a byte count in the unit that suits it', () => {
+    strictEqual(formatNumber(512, { bytes: true }), '512 bytes');
+    strictEqual(formatNumber(1536, { bytes: true }), '1.5 kB');
+    strictEqual(formatNumber(8_400_000_000, { bytes: true }), '7.8 GB');
+    strictEqual(formatNumber(1024 ** 2 - 1, { bytes: true }), '1 MB');
+    strictEqual(formatNumber(-1536, { bytes: true }), '-1.5 kB');
+  });
+
+  it('pins a byte unit when named', () => {
+    strictEqual(formatNumber(256 * 1024 ** 2, { bytes: 'gigabyte', decimals: 2 }), '0.25 GB');
+    strictEqual(formatNumber(1024 ** 3, { bytes: 'megabyte' }), '1,024 MB');
+  });
 });

@@ -298,14 +298,20 @@ css`
   .ohne-table-grid :where(td) {
     padding: 0.5rem 0 0.5rem 0.75rem;
     color: hsl(var(--ohne-muted-foreground));
+    font-feature-settings: 'calt' 0;
   }
 
   .ohne-table-grid :where(th, td):last-child {
     padding-right: 0.75rem;
   }
 
-  .ohne-table-grid:not(.ohne-table-fixed) :where(th, td) {
+  .ohne-table-grid :where(th, td) {
     white-space: nowrap;
+  }
+
+  .ohne-table-fixed :where(td):not(.ohne-table-check, .ohne-table-actions, .ohne-table-wrap) {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .ohne-table-grid :where(th, td).ohne-table-wrap {
@@ -314,6 +320,11 @@ css`
 
   .ohne-table-grid :where(th, td).ohne-table-end {
     text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ohne-table-grid .ohne-table-end + :where(th, td):not(.ohne-table-end, .ohne-table-actions) {
+    padding-left: 1.5rem;
   }
 
   .ohne-table-grid :where(th, td).ohne-table-check {
@@ -333,6 +344,11 @@ css`
   /* The pinned box keeps its own gap, so the columns scrolling under it stay clear of it. */
   .ohne-table-grid .ohne-table-check + :where(th, td) {
     padding-left: 0.25rem;
+  }
+
+  /* Static, so the hit box below spans the whole pinned cell. */
+  .ohne-table-check .ohne-checkbox-button {
+    position: static;
   }
 
   .ohne-table-check .ohne-checkbox-button::after {
@@ -442,6 +458,14 @@ css`
     }
   }
 
+  /* Shown in every row without a hover, so it rests as a quiet icon, not a dark square. */
+  @media (hover: none), (pointer: coarse) {
+    .ohne-table-kebab:not([aria-expanded='true']) {
+      background-color: transparent;
+      color: hsl(var(--ohne-muted-foreground));
+    }
+  }
+
   .ohne-table-text {
     display: block;
     overflow: hidden;
@@ -533,7 +557,7 @@ css`
   }
 
   @container (max-width: 30rem) {
-    .ohne-table-grid:not(.ohne-table-fixed) :where(th, td).ohne-table-first {
+    .ohne-table-grid:not(.ohne-table-fixed) :where(td).ohne-table-first:has(> .ohne-table-text) {
       max-width: 10rem;
       white-space: normal;
     }
@@ -620,8 +644,11 @@ export function table<T, K extends string | number, C extends string = string>(
   const selected = (): ReadonlySet<K> => selection?.selected.value ?? NO_KEYS;
   const admits = (row: T): boolean => selection?.selectable?.(row) ?? true;
   const showChecks = (): boolean => !isUndefined(selection) && (selection.checkboxes?.() ?? true);
+  const hasActions = computed(
+    () => !isUndefined(actions) && shown().some((row) => menuActions(actions(row)).length > 0),
+  );
   const columnCount = (): number =>
-    entries.length + (showChecks() ? 1 : 0) + (isUndefined(actions) ? 0 : 1);
+    entries.length + (showChecks() ? 1 : 0) + (hasActions.value ? 1 : 0);
 
   effect(() => {
     const last = lastPage();
@@ -726,7 +753,7 @@ export function table<T, K extends string | number, C extends string = string>(
           'button',
           {
             type: 'button',
-            class: 'ohne-table-sort ohne-raw',
+            class: 'ohne-table-sort ohne-hit ohne-raw',
             title: () =>
               ariaSort(name) === 'ascending'
                 ? defaultText('dashboard.sort.descending', 'Sort in descending order')
@@ -858,7 +885,8 @@ export function table<T, K extends string | number, C extends string = string>(
   const bodyCell = (column: TableColumn<T>, row: T): Child => {
     if (column.render) return column.render(row);
     const value = column.value?.(row);
-    if (isNullish(value) || Number.isNaN(value)) return '';
+    if (isNullish(value) || Number.isNaN(value))
+      return h('span', { class: 'ohne-table-text' }, '-');
     return isNumber(value)
       ? h('span', { class: 'ohne-table-text ohne-table-number' }, formatNumber(value))
       : h('span', { class: 'ohne-table-text' }, value);
@@ -916,7 +944,12 @@ export function table<T, K extends string | number, C extends string = string>(
       entries.map(([, column], position) =>
         h('td', { class: cellClass(column, position) }, () => bodyCell(column, row())),
       ),
-      isUndefined(actions) ? null : kebabCell(actions, row),
+      isUndefined(actions)
+        ? null
+        : when(
+            () => hasActions.value,
+            () => kebabCell(actions, row),
+          ),
     );
     return isUndefined(actions)
       ? el
@@ -942,7 +975,10 @@ export function table<T, K extends string | number, C extends string = string>(
           entries.map(([, column], position) =>
             h('td', { class: cellClass(column, position) }, skeleton()),
           ),
-          isUndefined(actions) ? null : h('td', { class: 'ohne-table-actions' }),
+          when(
+            () => hasActions.value,
+            () => h('td', { class: 'ohne-table-actions' }),
+          ),
         ),
       ),
     );
@@ -1004,7 +1040,10 @@ export function table<T, K extends string | number, C extends string = string>(
               ),
             }),
           ),
-          isUndefined(actions) ? null : h('col', { class: 'ohne-table-actions-col' }),
+          when(
+            () => hasActions.value,
+            () => h('col', { class: 'ohne-table-actions-col' }),
+          ),
         )
       : null,
     h(
@@ -1015,7 +1054,10 @@ export function table<T, K extends string | number, C extends string = string>(
         null,
         when(showChecks, selectAllCell),
         entries.map(([name, column], index) => headerCell(name, column, index)),
-        isUndefined(actions) ? null : h('th', { class: 'ohne-table-actions' }),
+        when(
+          () => hasActions.value,
+          () => h('th', { class: 'ohne-table-actions' }),
+        ),
       ),
     ),
     keyed(() => phase.value, body),
@@ -1035,7 +1077,7 @@ export function table<T, K extends string | number, C extends string = string>(
   effect(() => {
     const filled = phase.value === 'rows' || phase.value === 'loading';
     viewport.classList.toggle('ohne-table-pinned-start', filled && showChecks());
-    viewport.classList.toggle('ohne-table-pinned-end', filled && !isUndefined(actions));
+    viewport.classList.toggle('ohne-table-pinned-end', filled && hasActions.value);
   });
   const measureOverflow = (): void => {
     const { scrollLeft, clientWidth, scrollWidth, offsetWidth, clientHeight, offsetHeight } =

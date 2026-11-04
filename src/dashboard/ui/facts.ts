@@ -5,7 +5,7 @@ import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { type MaybeGetter, toValue } from '../../utils/reactive/to-value.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
-import { resolveText } from '../runtime/text.ts';
+import { inlineChild } from './_text-child.ts';
 import { skeleton } from './states.ts';
 import './tokens.ts';
 
@@ -72,6 +72,12 @@ css`
   .ohne-fact > dd {
     margin: 0;
     overflow-wrap: anywhere;
+    font-feature-settings: 'calt' 0;
+  }
+
+  .ohne-fact > dd:empty::before {
+    content: '-';
+    color: hsl(var(--ohne-muted-foreground));
   }
 `;
 
@@ -103,7 +109,7 @@ export function facts(
           h(
             'div',
             { class: 'ohne-fact' },
-            h('dt', null, () => resolveText(row.label)),
+            h('dt', null, inlineChild(row.label)),
             h('dd', null, row.value),
           ),
         );

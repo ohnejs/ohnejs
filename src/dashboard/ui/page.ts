@@ -5,7 +5,7 @@ import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { useDocumentTitle } from '../runtime/title.ts';
-import { proseChild } from './_text-child.ts';
+import { inlineChild, proseChild } from './_text-child.ts';
 import { icon } from './icon.ts';
 import { gapClass } from './layout.ts';
 import './tokens.ts';
@@ -33,6 +33,14 @@ export interface PageOptions {
    * The destination of a small back link above the heading.
    */
   back?: string;
+
+  /**
+   * The back link's label.
+   *
+   * @default
+   * 'dashboard.back'
+   */
+  backLabel?: Text;
 
   /**
    * Content on the title's line at the header's end, usually buttons.
@@ -112,12 +120,17 @@ css`
   @container ohne-page (width >= 48rem) {
     .ohne-page-header {
       grid-template-columns: minmax(0, 1fr) fit-content(50%);
+      align-items: start;
     }
 
     .ohne-page-back,
     .ohne-page-title-row,
     .ohne-page-description {
       grid-column: 1;
+    }
+
+    .ohne-page-title-row {
+      min-height: calc(2em + 0.25rem);
     }
 
     .ohne-page-actions {
@@ -128,6 +141,19 @@ css`
 
     .ohne-page-back ~ .ohne-page-actions {
       grid-row: 2;
+    }
+
+    .ohne-page-description + .ohne-page-actions {
+      grid-row-end: span 2;
+    }
+
+    /* Wrapped actions grow the description's row, never the title's. */
+    .ohne-page-header:has(> .ohne-page-description) {
+      grid-template-rows: auto 1fr;
+    }
+
+    .ohne-page-header:has(> .ohne-page-back):has(> .ohne-page-description) {
+      grid-template-rows: auto auto 1fr;
     }
   }
 `;
@@ -148,7 +174,7 @@ css`
  * ```
  */
 export function page(options: PageOptions, ...children: Child[]): HTMLElement {
-  const { actions, back, badge, description, title } = options;
+  const { actions, back, backLabel, badge, description, title } = options;
   useDocumentTitle(title);
   return h(
     'div',
@@ -158,13 +184,13 @@ export function page(options: PageOptions, ...children: Child[]): HTMLElement {
       { class: 'ohne-page-header' },
       isUndefined(back)
         ? null
-        : h('a', { class: 'ohne-page-back', href: back }, icon('arrow-left'), () =>
-            defaultText('dashboard.back', 'Back'),
+        : h('a', { class: 'ohne-page-back ohne-hit', href: back }, icon('arrow-left'), () =>
+            isUndefined(backLabel) ? defaultText('dashboard.back', 'Back') : resolveText(backLabel),
           ),
       h(
         'div',
         { class: 'ohne-page-title-row' },
-        h('h1', { class: 'ohne-page-title' }, () => resolveText(title)),
+        h('h1', { class: 'ohne-page-title' }, inlineChild(title)),
         badge,
       ),
       isUndefined(description)

@@ -77,6 +77,17 @@ export interface TextInputOptions {
   spellcheck?: boolean;
 
   /**
+   * The `autocapitalize` attribute of the input element.
+   * `'off'` keeps an on-screen keyboard from capitalizing a hostname or an address.
+   */
+  autocapitalize?: 'off' | 'sentences' | 'words' | 'characters';
+
+  /**
+   * The `inputmode` attribute of the input element: which on-screen keyboard it opens.
+   */
+  inputMode?: 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url';
+
+  /**
    * The `autofocus` attribute of the input element.
    *
    * @default
@@ -186,6 +197,13 @@ css`
     visibility: hidden;
   }
 
+  /* The field grows to 16px on touch, so its mirror grows with it. */
+  @media (pointer: coarse) {
+    .ohne-input-shadow {
+      font-size: max(1em, 16px);
+    }
+  }
+
   .ohne-input > .ohne-button {
     --ohne-size: calc(var(--ohne-base-size) - 1);
     width: calc(2em + 0.125rem);
@@ -218,10 +236,12 @@ css`
  */
 export function textInput(model: Ref<string>, options: TextInputOptions = {}): HTMLElement {
   const input = h('input', {
+    autocapitalize: options.autocapitalize,
     autocomplete: options.autocomplete ?? 'off',
     autofocus: options.autofocus ?? false,
     disabled: options.disabled,
     id: options.id,
+    inputmode: options.inputMode,
     maxlength: options.maxLength,
     minlength: options.minLength,
     name: options.name,

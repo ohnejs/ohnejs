@@ -164,6 +164,19 @@ css`
     transition-property: background-color, box-shadow, color;
   }
 
+  /* A scrolling group clips its items, so they fill it rather than take ohne-hit. */
+  @media (pointer: coarse) {
+    .ohne-icon-group-item {
+      position: relative;
+    }
+
+    .ohne-icon-group-item::after {
+      content: '';
+      position: absolute;
+      inset: -0.125rem -0.0625rem;
+    }
+  }
+
   .ohne-icon-group-primary .ohne-icon-group-item-active {
     background-color: hsl(var(--ohne-primary));
     color: hsl(var(--ohne-primary-foreground));

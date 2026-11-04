@@ -9,6 +9,7 @@ import { css } from '../render/css.ts';
 import { each } from '../render/each.ts';
 import { h } from '../render/h.ts';
 import { resolveText, type Text } from '../runtime/text.ts';
+import { revealActive } from './_reveal-active.ts';
 import { listenTrigger } from './trigger.ts';
 import './tokens.ts';
 
@@ -135,6 +136,19 @@ css`
     font-weight: 500;
     transition: var(--ohne-transition);
     transition-property: background-color, box-shadow, color;
+  }
+
+  /* A scrolling group clips its items, so they fill it rather than take ohne-hit. */
+  @media (pointer: coarse) {
+    .ohne-button-group-item {
+      position: relative;
+    }
+
+    .ohne-button-group-item::after {
+      content: '';
+      position: absolute;
+      inset: -0.125rem -0.0625rem;
+    }
   }
 
   .ohne-button-group-primary .ohne-button-group-item-active {
@@ -266,6 +280,8 @@ export function buttonGroup<T extends Primitive>(
       hidden: true,
     }),
   );
+
+  revealActive(root, () => model.value, '.ohne-button-group-item-active');
 
   if (options.id) {
     listenTrigger(`focus:${options.id}`, () => {

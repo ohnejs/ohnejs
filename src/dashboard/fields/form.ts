@@ -174,7 +174,7 @@ export interface Form<F extends FieldSpecs> {
 }
 
 css`
-  .ohne-form {
+  :where(.ohne-form) {
     min-inline-size: auto;
     margin: 0;
     padding: 0;

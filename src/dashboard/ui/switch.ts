@@ -72,7 +72,7 @@ css`
     transition-property: background-color, box-shadow;
   }
 
-  .ohne-switch-button::after {
+  .ohne-switch-button::before {
     content: '';
     width: calc(1em + 0.125rem);
     height: calc(1em + 0.125rem);
@@ -90,7 +90,7 @@ css`
     background-color: hsl(var(--ohne-accent));
   }
 
-  .ohne-switch-control[data-checked='true'] + .ohne-switch-button::after {
+  .ohne-switch-control[data-checked='true'] + .ohne-switch-button::before {
     transform: translateX(100%);
   }
 
@@ -178,7 +178,7 @@ export function switchInput(
       disabled: options.disabled,
       role: 'switch',
       type: 'button',
-      class: 'ohne-switch-button ohne-raw',
+      class: 'ohne-switch-button ohne-hit ohne-raw',
       onClick: () => input.click(),
     }),
     isUndefined(label)

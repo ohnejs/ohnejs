@@ -149,4 +149,26 @@ describe('lineChart', () => {
     }) as unknown as FakeElement;
     strictEqual(lines(element).length, 1);
   });
+
+  it('keeps labelling the x axis past a label that crowds the newest', () => {
+    const hours = Array.from({ length: 20 }, (_, hour) => ({ at: `${hour + 10}:00`, load: hour }));
+    const element = lineChart(() => hours, {
+      x: (row) => row.at,
+      series: [{ name: 'Load', value: (row) => row.load }],
+    }) as unknown as FakeElement;
+    const labels = allByClass(element, 'ohne-chart-axis')
+      .map((label) => label.textContent)
+      .filter((text) => text.includes(':'));
+    deepStrictEqual(labels.slice(0, 3), ['29:00', '25:00', '23:00']);
+  });
+
+  it('steps a byte axis in one unit', () => {
+    const element = lineChart(() => [{ used: 300 * 1024 ** 2 }, { used: 900 * 1024 ** 2 }], {
+      x: () => 'now',
+      format: { bytes: true },
+      series: [{ name: 'Memory', value: (row) => row.used }],
+    }) as unknown as FakeElement;
+    const labels = allByClass(element, 'ohne-chart-axis').map((label) => label.textContent);
+    deepStrictEqual(labels.slice(0, 2), ['0 MB', '200 MB']);
+  });
 });

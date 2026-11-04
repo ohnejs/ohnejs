@@ -84,6 +84,15 @@ css`
     font-weight: 600;
   }
 
+  :where(code, kbd, samp, pre) {
+    font-family: var(--ohne-font-mono);
+    font-size: calc(1em - 0.0625rem);
+  }
+
+  :where(pre) :where(code, kbd, samp) {
+    font-size: inherit;
+  }
+
   :where(hr) {
     width: 100%;
     border-top-width: 1px;
@@ -104,6 +113,17 @@ css`
 
   :where([role='button'], button) {
     cursor: pointer;
+  }
+
+  @media (pointer: coarse) {
+    :where(a, button, input, label, select, summary, textarea, [role='button']) {
+      touch-action: manipulation;
+    }
+
+    /* iOS zooms the page into a focused field set under 16px. */
+    :is(input, select, textarea):not([type='checkbox'], [type='radio'], [type='range']) {
+      font-size: max(1em, 16px);
+    }
   }
 
   :where(button, select) {
