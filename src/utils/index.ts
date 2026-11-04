@@ -272,6 +272,7 @@ export * from './path/with-leading-slash.ts';
 export * from './path/with-trailing-slash.ts';
 export * from './path/without-leading-slash.ts';
 export * from './path/without-trailing-slash.ts';
+export * from './qr/qr-matrix.ts';
 export * from './range/parse-content-range.ts';
 export * from './range/parse-range.ts';
 export * from './rate-limit/create-memory-rate-limit-store.ts';
