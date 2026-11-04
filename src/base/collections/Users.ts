@@ -49,13 +49,11 @@ const users = defineCollection({
     email: field('email', {
       unique: true,
       label: 'auth.users.email.label',
-      description: 'auth.users.email.description',
     }),
 
     password: field('password', {
       readable: false,
       label: 'auth.users.password.label',
-      description: 'auth.users.password.description',
       validators: [
         (value, { tx }) =>
           passwordRehashes.has(tx)

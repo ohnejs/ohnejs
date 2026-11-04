@@ -530,8 +530,10 @@ function paletteMeta(meta: DashboardMeta | undefined): PaletteMeta {
     })),
     menu: menuSections(meta.menu).map((section) => ({
       label: translateMessage(section.label),
-      items: flattenTree(section.items).flatMap(({ to, label }) =>
-        isUndefined(to) ? [] : [{ to, label: translateMessage(label) }],
+      items: flattenTree(section.items).flatMap((item) =>
+        isUndefined(item.to)
+          ? []
+          : [{ to: item.to, label: translateMessage(item.label), icon: item.icon }],
       ),
     })),
     blocks: meta.blocks.map((block) => ({

@@ -762,3 +762,18 @@ describe('recordEditorFooter menu', () => {
     scope?.dispose();
   });
 });
+
+describe('editFields', () => {
+  it('drops the required mark of a write-only field alone', async () => {
+    const { editFields } =
+      await import('../../../../src/base/dashboard/components/record-editor.ts');
+    const secret = { ...EMAIL, name: 'secret', type: 'password', readable: false };
+    deepStrictEqual(
+      editFields([EMAIL, secret]).map((field) => [field.name, field.required]),
+      [
+        ['contactEmail', true],
+        ['secret', false],
+      ],
+    );
+  });
+});

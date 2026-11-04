@@ -39,7 +39,7 @@ const BLOCKS = [
 ];
 
 const MENU = [
-  { label: '', items: [{ to: '/', label: 'Overview' }] },
+  { label: '', items: [{ to: '/', label: 'Overview', icon: 'layout-dashboard' as const }] },
   {
     label: 'Collections',
     items: [
@@ -60,9 +60,13 @@ const VIA_ITEMS = { collection: 'Items', targets: [ASHBRINGER] };
 const VIA_CHARACTERS = { collection: 'Characters', targets: [] };
 
 describe('paletteGroups', () => {
-  it('lists every menu row for a blank query, numbering rows across groups', () => {
+  it('lists every menu row for a blank query, numbering rows across groups and keeping icons', () => {
     deepStrictEqual(paletteGroups('', [], META), [
-      { key: 'menu:0', label: '', entries: [{ key: 'menu:0\n/', label: 'Overview', to: '/' }] },
+      {
+        key: 'menu:0',
+        label: '',
+        entries: [{ key: 'menu:0\n/', label: 'Overview', to: '/', icon: 'layout-dashboard' }],
+      },
       {
         key: 'menu:1',
         label: 'Collections',

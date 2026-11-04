@@ -29,6 +29,7 @@ import { contentLocale } from './content-language-switcher.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History } from './history.ts';
+import { editFields } from './record-editor.ts';
 
 /**
  * The account form's values, as the form reads them.
@@ -188,7 +189,7 @@ export function accountEditor(): Child {
     }
 
     const live = createFieldForm(
-      meta.accountFields,
+      editFields(meta.accountFields),
       { ...user },
       {
         mode: 'edit',

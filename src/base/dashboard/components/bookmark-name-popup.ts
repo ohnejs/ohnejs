@@ -118,15 +118,6 @@ export function bookmarkNamePopup(options: BookmarkNamePopupOptions): Popup {
     void save.run();
   };
 
-  const closeButton = button(() => t('dashboard.close'), {
-    icon: 'x',
-    iconOnly: true,
-    size: -2,
-    variant: 'ghost',
-    class: 'ohne-ml-auto',
-    onClick: () => options.onClose(handle.close),
-  });
-
   const handle = popup(
     [
       formField(control, {
@@ -150,14 +141,7 @@ export function bookmarkNamePopup(options: BookmarkNamePopupOptions): Popup {
     {
       size: -1,
       width: '26rem',
-      header: h(
-        'div',
-        { class: 'ohne-row' },
-        h('span', null, () =>
-          t(renamed ? 'dashboard.bookmarks.renameBookmark' : 'dashboard.bookmarks.newBookmark'),
-        ),
-        closeButton,
-      ),
+      title: renamed ? 'dashboard.bookmarks.renameBookmark' : 'dashboard.bookmarks.newBookmark',
       onClose: (close) => options.onClose(close),
       onKeydown: (event) => {
         if (

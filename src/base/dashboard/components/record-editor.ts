@@ -298,8 +298,9 @@ export function useRecordEditor(
   const buildForm = (
     initial: RecordRow | undefined,
     folds?: FieldFormOptions['folds'],
-  ): FieldForm =>
-    createFieldForm(lockOutside(formFields, verdicts.value?.select), initial, {
+  ): FieldForm => {
+    const fields = lockOutside(formFields, verdicts.value?.select);
+    return createFieldForm(create ? fields : editFields(fields), initial, {
       mode: create ? 'create' : 'edit',
       path: '',
       readOnlyRows: true,
@@ -315,6 +316,7 @@ export function useRecordEditor(
         else void history.pushDebounced(state);
       },
     });
+  };
 
   // The form lives in its own ref so a save or a restore rebuilds only the fieldset, not the body.
   const state = ref<'loading' | 'ready' | 'failed'>(create ? 'ready' : 'loading');
@@ -963,6 +965,16 @@ function changedSince(full: RecordRow, original: RecordRow): RecordRow {
     if (!deepEqual(value, original[key])) changed[key] = value;
   }
   return changed;
+}
+
+/**
+ * The fields an edit form shows, each required write-only one cloned with `required: false`.
+ * Left empty on a stored record, a write-only field keeps its stored value, so it carries no required mark.
+ */
+export function editFields(fields: readonly DashboardField[]): readonly DashboardField[] {
+  return fields.map((field) =>
+    field.required && !field.readable ? { ...field, required: false } : field,
+  );
 }
 
 /**

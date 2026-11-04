@@ -20,12 +20,10 @@
   "users": {
     "label": "Korisnici",
     "email": {
-      "label": "Email",
-      "description": "Adresa kojom se korisnik prijavljuje. Pohranjuje se malim slovima, pa je jedinstvena bez obzira na velika i mala slova."
+      "label": "Email"
     },
     "password": {
-      "label": "Lozinka",
-      "description": "Prima lozinku u čistom tekstu i pohranjuje samo njen scrypt hash. Sama lozinka se nikada ne pohranjuje."
+      "label": "Lozinka"
     },
     "firstName": {
       "label": "Ime"
@@ -59,7 +57,7 @@
     },
     "smartClipboard": {
       "label": "Pametni međuspremnik",
-      "description": "Praćenje međuspremnika u pozadini za trenutnu spremnost lijepljenja. Ova funkcija će zatražiti dozvolu preglednika za pristup vašem međuspremniku.",
+      "description": "Zalijepite kopirane zapise direktno u polja. Traži pristup međuspremniku.",
       "enabled": "Uključeno",
       "disabled": "Isključeno"
     }

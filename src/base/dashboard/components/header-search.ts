@@ -98,7 +98,7 @@ export function headerSearch(): HTMLElement {
     'button',
     {
       type: 'button',
-      class: 'o-header-search ohne-raw',
+      class: 'o-header-search ohne-hit ohne-raw',
       'aria-label': () => t('dashboard.palette.label'),
       title: () => t('dashboard.palette.label'),
       onClick: () => openPalette(),

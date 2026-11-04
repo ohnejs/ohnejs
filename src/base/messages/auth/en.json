@@ -20,12 +20,10 @@
   "users": {
     "label": "Users",
     "email": {
-      "label": "Email",
-      "description": "The address the user signs in with. Stored lowercased, so it stays unique across letter case."
+      "label": "Email"
     },
     "password": {
-      "label": "Password",
-      "description": "Takes a plaintext password and stores only its scrypt hash. The password itself is never stored."
+      "label": "Password"
     },
     "firstName": {
       "label": "First name"
@@ -59,7 +57,7 @@
     },
     "smartClipboard": {
       "label": "Smart clipboard",
-      "description": "Background clipboard monitoring for instant paste readiness. This feature will request browser permission to access your clipboard.",
+      "description": "Paste copied records straight into fields. Asks for clipboard access.",
       "enabled": "Enabled",
       "disabled": "Disabled"
     }

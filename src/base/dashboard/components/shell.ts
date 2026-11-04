@@ -222,6 +222,12 @@ css`
     }
   }
 
+  @media (pointer: coarse) {
+    .o-sidebar-expanded .o-main {
+      overflow: hidden;
+    }
+  }
+
   .o-layout-wide {
     max-width: 100%;
   }

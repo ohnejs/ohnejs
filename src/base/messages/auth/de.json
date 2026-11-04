@@ -20,12 +20,10 @@
   "users": {
     "label": "Benutzer",
     "email": {
-      "label": "E-Mail",
-      "description": "Die Adresse, mit der sich der Benutzer anmeldet. Wird kleingeschrieben gespeichert und ist daher unabhängig von der Groß- und Kleinschreibung eindeutig."
+      "label": "E-Mail"
     },
     "password": {
-      "label": "Passwort",
-      "description": "Nimmt ein Klartext-Passwort entgegen und speichert nur dessen scrypt-Hash. Das Passwort selbst wird nie gespeichert."
+      "label": "Passwort"
     },
     "firstName": {
       "label": "Vorname"
@@ -59,7 +57,7 @@
     },
     "smartClipboard": {
       "label": "Intelligente Zwischenablage",
-      "description": "Hintergrund-Zwischenablageüberwachung für sofortige Einfügebereitschaft. Diese Funktion fordert die Berechtigung des Browsers an, auf deine Zwischenablage zuzugreifen.",
+      "description": "Kopierte Datensätze direkt in Felder einfügen. Fragt nach Zugriff auf die Zwischenablage.",
       "enabled": "Aktiviert",
       "disabled": "Deaktiviert"
     }

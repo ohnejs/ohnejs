@@ -156,9 +156,9 @@ export interface PaletteMenuGroup {
   label: string;
 
   /**
-   * The rows, each a dashboard path and its label.
+   * The rows, each a dashboard path, its label, and the icon the sidebar shows beside it.
    */
-  items: readonly { to: string; label: string }[];
+  items: readonly { to: string; label: string; icon?: IconName }[];
 }
 
 /**
@@ -506,7 +506,7 @@ export function paletteGroups(
   (command ? [] : meta.menu).forEach((group, at) => {
     const items = searchByKeywords(group.items, query, 'label');
     if (items.length === 0) return;
-    const entries = items.map(({ to, label }) => ({ key: '', label, to }));
+    const entries = items.map((item) => ({ key: '', ...item }));
     groups.push({ key: `menu:${at}`, label: group.label, entries });
   });
   groups.push(...related);

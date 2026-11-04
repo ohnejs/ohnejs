@@ -137,6 +137,13 @@ css`
     border-radius: var(--ohne-radius);
   }
 
+  /* Without a hover a tap opens the row's record, so a button in every cell would only crowd it. */
+  @media (hover: none) {
+    .o-editable-field-cell .o-editable-field-cell-button {
+      display: none;
+    }
+  }
+
   @container (max-width: 6rem) {
     .o-editable-field-cell-button {
       position: absolute;
