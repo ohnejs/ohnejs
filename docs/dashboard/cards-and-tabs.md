@@ -177,6 +177,21 @@ tabs(
 - A value no tab carries shows the first tab.
 - Omitted, the tabs keep their own state and start on the first.
 
+## Tabs that link
+
+When each tab is a page of its own, `navTabs` draws the same row as links:
+
+```ts
+navTabs([
+  { label: 'Overview', href: `/guilds/${id}`, icon: 'home' },
+  { label: 'Members', href: `/guilds/${id}/members`, icon: 'users' },
+])
+```
+
+- Put the row on each page it links to.
+- The tab whose `href` sits closest above the current path is active, so `/guilds/7/members/12`
+  lights Members.
+
 ## Disclosure
 
 `disclosure` hides content behind a row that opens it:

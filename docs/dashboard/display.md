@@ -1,8 +1,8 @@
 # Display
 
 The pieces that show a value or a state: badges, status lights, icons, avatars, alerts, notes,
-labeled facts, lists, meters, and times. None of them takes input. They show what your data says,
-and follow it when it changes.
+labeled facts, lists, meters, QR codes, and times. None of them takes input. They show what your
+data says, and follow it when it changes.
 
 ```ts
 // dashboard/pages/thrall.ts
@@ -194,6 +194,17 @@ meter(() => bank.value?.usedSlots, { max: 500, label: 'Guild bank slots', tone: 
 - Omitted, `max` is `100`.
 - `label` shows above the bar with the share in percent.
 - `undefined` shows a placeholder bar.
+
+## QR code
+
+`qrCode` draws a code a phone can scan:
+
+```ts
+qrCode(() => enrolment.value.uri, { label: 'Authenticator setup code' })
+```
+
+- `label` names the code for screen readers.
+- Omitted, `size` is `12em`.
 
 ## Relative time
 

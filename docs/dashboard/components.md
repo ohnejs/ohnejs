@@ -32,8 +32,8 @@ Try every component live in the [kit](https://kit.ohne.dev).
   <img alt="A card header with an icon, a title, a count badge, and an Invite button" src="../images/kit/card-title-icon-badge-actions-light.png">
 </picture>
 
-`card`, `tabs`, and `disclosure`. [Cards and tabs](./cards-and-tabs.md) group a page into
-surfaces.
+`card`, `tabs`, `navTabs`, and `disclosure`. [Cards and tabs](./cards-and-tabs.md) group a page
+into surfaces.
 
 ## Actions
 
@@ -53,8 +53,8 @@ surfaces.
 </picture>
 
 `badge`, `statusBadge`, `statusDot`, `icon`, `avatar`, `alert`, `note`, `facts`, `list`, `meter`,
-`relativeTime`, and the empty, error, and loading states. [Display](./display.md) shows values and
-states.
+`qrCode`, `relativeTime`, and the empty, error, and loading states. [Display](./display.md) shows
+values and states.
 
 ## Feedback
 
@@ -98,5 +98,6 @@ selection.
 </picture>
 
 `form`, `field`, `fieldInput`, and `formField`. [Forms](./forms.md) asks for input and saves it.
+Each control `formField` wraps is live in the kit's [inputs](https://kit.ohne.dev/inputs) page.
 
 To see them working together, build [your first page](./first-page.md).
