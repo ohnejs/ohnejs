@@ -69,6 +69,7 @@ describe('ohne init', () => {
     strictEqual(existsSync(join(dir, 'ohne.config.ts')), true);
     strictEqual(existsSync(join(dir, 'package.json')), true);
     strictEqual(existsSync(join(dir, 'tsconfig.json')), true);
+    strictEqual(existsSync(join(dir, 'dashboard', 'tsconfig.json')), true);
     strictEqual(existsSync(join(dir, '.gitignore')), true);
   });
 
@@ -101,7 +102,7 @@ describe('ohne init', () => {
       typescript: pkg.devDependencies.typescript,
     });
     deepStrictEqual(manifest.engines, pkg.engines);
-    strictEqual(manifest.scripts.typecheck, 'tsc');
+    strictEqual(manifest.scripts.typecheck, 'tsc && tsc -p dashboard/tsconfig.json');
   });
 
   it('scripts `test` to prepare, then run the tests under Node with `ohnejs/register`', async () => {
@@ -285,11 +286,12 @@ describe('ohne init', () => {
     deepStrictEqual(tsconfig.exclude, ['dashboard']);
   });
 
-  it('does not scaffold a dashboard folder', async () => {
+  it('extends the generated browser config from dashboard/tsconfig.json', async () => {
     const dir = join(freshDir('app'), 'browser');
 
     await runCommand(ohne, ['init', dir, '--yes']);
-    strictEqual(existsSync(join(dir, 'dashboard')), false);
+    const tsconfig = JSON.parse(readFileSync(join(dir, 'dashboard', 'tsconfig.json'), 'utf8'));
+    deepStrictEqual(tsconfig, { extends: '../.ohne/browser/tsconfig.json' });
   });
 
   it('refuses a non-empty directory without --force and exits 1', async () => {

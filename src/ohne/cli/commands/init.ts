@@ -47,6 +47,11 @@ const TSCONFIG_FILE = `{
 }
 `;
 
+const DASHBOARD_TSCONFIG_FILE = `{
+  "extends": "../.ohne/browser/tsconfig.json"
+}
+`;
+
 const GITIGNORE_FILE = `# Dependencies
 node_modules/
 
@@ -66,10 +71,10 @@ node_modules/
 /**
  * The `ohne init` command.
  * Scaffolds a new ohne project.
- * Writes `ohne.config.ts`, `package.json`, `tsconfig.json`, and `.gitignore`.
+ * Writes `ohne.config.ts`, `package.json`, `tsconfig.json`, `dashboard/tsconfig.json`, and `.gitignore`.
  *
- * `tsconfig.json` type-checks the Node code and excludes `dashboard/`.
- * No dashboard is scaffolded; `serve dashboard` suggests a `dashboard/tsconfig.json` when one appears.
+ * `tsconfig.json` type-checks the Node code, and `dashboard/tsconfig.json` the browser code with the DOM lib.
+ * `typecheck` runs both.
  *
  * The target directory comes from the one positional, where a leading `~` stands for the home directory.
  * When it is omitted, a TTY prompts for the location and a non-TTY defaults to the current directory.
@@ -319,12 +324,13 @@ async function scaffold(target: string, name: string, ohne: string): Promise<voi
       'serve:dashboard': 'ohne serve dashboard',
       prepare: 'ohne prepare',
       test: 'ohne prepare && node --test --import ohnejs/register "tests/**/*.test.ts"',
-      typecheck: 'tsc',
+      typecheck: 'tsc && tsc -p dashboard/tsconfig.json',
     },
     dependencies: { ohnejs: ohne },
     ...toolchain,
   });
   await writeFile(joinPath(target, 'tsconfig.json'), TSCONFIG_FILE);
+  await writeFile(joinPath(target, 'dashboard', 'tsconfig.json'), DASHBOARD_TSCONFIG_FILE);
   await writeFile(joinPath(target, '.gitignore'), GITIGNORE_FILE);
 }
 

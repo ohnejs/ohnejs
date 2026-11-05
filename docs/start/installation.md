@@ -31,7 +31,7 @@ user - that account gets the [`admin` role](../auth/roles.md#assigning-roles).
 
 ## The project files
 
-`npm create ohne` writes four files:
+`npm create ohne` writes these files:
 
 `ohne.config.ts`
 
@@ -57,7 +57,7 @@ export default defineConfig({
     "serve:dashboard": "ohne serve dashboard",
     "prepare": "ohne prepare",
     "test": "ohne prepare && node --test --import ohnejs/register \"tests/**/*.test.ts\"",
-    "typecheck": "tsc"
+    "typecheck": "tsc && tsc -p dashboard/tsconfig.json"
   },
   "dependencies": {
     "ohnejs": "0.8.0"
@@ -79,6 +79,14 @@ export default defineConfig({
   "extends": "ohnejs/tsconfig.node.json",
   "include": ["**/*.ts", ".ohne/shared/**/*.ts", ".ohne/node/**/*.ts"],
   "exclude": ["dashboard"]
+}
+```
+
+`dashboard/tsconfig.json`
+
+```json files
+{
+  "extends": "../.ohne/browser/tsconfig.json"
 }
 ```
 
@@ -107,8 +115,9 @@ node_modules/
   named after the project, since two apps on one machine would otherwise sign each other out.
 - `package.json` - scripts for `dev` and the rest of the [CLI](../project/cli.md). `ohnejs` is the
   only dependency; TypeScript is there to type-check, never to compile.
-- `tsconfig.json` - type-checks your Node code against the config ohne ships. `dashboard/` is
-  browser code and gets a [config of its own](../dashboard/pages.md#type-checking) when you add one.
+- `tsconfig.json` - type-checks your Node code against the config ohne ships.
+- `dashboard/tsconfig.json` - type-checks your [dashboard](../dashboard/pages.md#type-checking), which
+  is browser code. `typecheck` runs both.
 - `.gitignore` - keeps dependencies, generated files, the
   [local database](../database/engine.md#where-the-database-lives), and
   [`.env`](../project/env.md#the-env-file) out of git.

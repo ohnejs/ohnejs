@@ -402,8 +402,8 @@ nothing. If a proxy or CDN sits in front of the dashboard, see
 ## Type checking
 
 Dashboard code is browser code: it has DOM types and no `node:` imports. So it type-checks as its
-own program. The [scaffold's root `tsconfig.json`](../start/installation.md#the-project-files)
-excludes `dashboard/`, so the directory needs its own:
+own program, with the `tsconfig.json` the [scaffold](../start/installation.md#the-project-files)
+writes into `dashboard/`:
 
 ```jsonc
 // dashboard/tsconfig.json
@@ -427,7 +427,7 @@ The file exists once `prepare` has run, which an install does for you. Your own 
 `compilerOptions`; an `include` of your own would replace the generated one, so leave that to
 codegen.
 
-Plain `tsc` skips this program, so set the `typecheck` script in `package.json` to
+Plain `tsc` skips this program, so the scaffold's `typecheck` script runs
 `tsc && tsc -p dashboard/tsconfig.json`.
 
 The dashboard server warns at boot when the file is missing. The warning prints the `extends` line

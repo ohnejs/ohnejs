@@ -207,21 +207,6 @@ is the page's path, `label` shows as written, and `icon` names a
 [Tabler icon](https://tabler.io/icons). [The sidebar](../dashboard/pages.md#the-sidebar) covers
 sections, nesting, and moving what a layer declares.
 
-One last file. Browser code type-checks against DOM types, not Node's, so the root `tsconfig.json`
-excludes `dashboard/`. Give the dashboard its own
-[`dashboard/tsconfig.json`](../dashboard/pages.md#type-checking):
-
-```jsonc
-// dashboard/tsconfig.json
-{
-  "extends": "../.ohne/browser/tsconfig.json"
-}
-```
-
-Codegen keeps the file it extends up to date: the DOM lib, `app/` imports, and the generated types.
-To check it with your Node code, set the `typecheck` script in `package.json` to
-`tsc && tsc -p dashboard/tsconfig.json`.
-
 Pick **Posts** in the sidebar, or open `http://localhost:9000/posts`, and your posts are on screen.
 From here, every dashboard save reloads the browser, and nothing restarts.
 
