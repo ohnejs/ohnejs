@@ -1,4 +1,4 @@
-import { errorMessage, hasKey, mapValues } from 'ohnejs/utils';
+import { errorMessage, hasKey, isUndefined, mapValues } from 'ohnejs/utils';
 
 import type { ImageTransforms } from './transforms.ts';
 
@@ -72,6 +72,7 @@ export function imageVariantTokens(): Record<string, string> {
 /**
  * Checks every configured variant, throwing on the first invalid one with its name in the title.
  * A name is a camelCase identifier, and a preset must ask the service for something.
+ * Each `srcset` entry must name a variant with a `width`.
  * The boot file runs it on `server:ready`, so a typo fails the process instead of a page.
  *
  * @example
@@ -80,7 +81,8 @@ export function imageVariantTokens(): Record<string, string> {
  * ```
  */
 export function validateImageVariants(): void {
-  for (const [name, transforms] of Object.entries(useUploadsConfig().images.variants)) {
+  const { variants, srcset } = useUploadsConfig().images;
+  for (const [name, transforms] of Object.entries(variants)) {
     if (!VARIANT_NAME.test(name)) {
       throw invalidVariant(name, [
         'A variant name is a camelCase identifier: a lowercase letter, then letters and digits.',
@@ -91,6 +93,20 @@ export function validateImageVariants(): void {
       throw invalidVariant(name, [
         'Its transforms ask the image service for nothing, so every URL would point at the original.',
         'Give it a `width`, a `height`, or a `format` under `uploads.images.variants`.',
+      ]);
+    }
+  }
+  for (const name of srcset) {
+    if (!hasKey(variants, name)) {
+      throw invalidSrcSet(name, [
+        'It names no configured variant.',
+        'Define it under `uploads.images.variants`, or drop it from `uploads.images.srcset`.',
+      ]);
+    }
+    if (isUndefined(variants[name].width)) {
+      throw invalidSrcSet(name, [
+        'Its variant has no `width`, which the `w` descriptor needs.',
+        'Give it a `width` under `uploads.images.variants`.',
       ]);
     }
   }
@@ -105,6 +121,13 @@ function tokensOf(name: string, transforms: ImageTransforms): string {
   } catch (error) {
     throw invalidVariant(name, [errorMessage(error), 'Fix it under `uploads.images.variants`.']);
   }
+}
+
+/**
+ * The error every invalid `uploads.images.srcset` entry reports, `body` holding the cause and the fix.
+ */
+function invalidSrcSet(name: string, body: string[]): OhneError {
+  return ohneError({ title: `Invalid \`srcset\` entry \`${name}\``, body });
 }
 
 /**

@@ -78,8 +78,7 @@ export default defineConfig({
   `thumbnail: { width: 200 }` does not keep the shipped height.
 - A name that is not an identifier, or a preset with no transforms, fails at boot.
 
-Every [read of an image](./uploads.md#the-collection) carries `variants`, one signed URL per name,
-when a service is configured:
+Every [read of an image](./uploads.md#the-collection) carries `variants`, one signed URL per name:
 
 ```ts
 const upload = await query('Uploads').where('UUID', uuid).findFirst();
@@ -91,10 +90,10 @@ upload.variants.card;
 // -> 'https://img.example.com/.../w_640,h_360,f_webp/photos/sunset.jpg'
 ```
 
-Without a service, for a file that is not an image, or for a
-[private image](./private-files.md#the-secret) while `UPLOADS_SECRET` is unset, `variants` is
-absent. A private image's variants expire with its `url`. The dashboard's
-[details popup](./uploads.md#the-dashboard) lists them under Variants.
+Without a service, each variant is the original's URL, so your pages read the same on your own
+machine. For a file that is not an image, or for a [private image](./private-files.md#the-secret)
+while `UPLOADS_SECRET` is unset, `variants` is absent. A private image's variants expire with its
+`url`. The dashboard's [details popup](./uploads.md#the-dashboard) lists them under Variants.
 
 In server code, pass the name instead of a transforms object:
 
@@ -150,6 +149,34 @@ imageSrcSet(upload, [
 ]);
 // -> 'https://img.example.com/.../w_400,f_webp/photos/sunset.jpg 400w, https://img.example.com/.../w_800,f_webp/photos/sunset.jpg 800w'
 ```
+
+`imageSrcSet` runs on the server, since it signs every URL. A frontend that reads images over the
+API, like a [website](../cms/website.md), gets the `srcset` with each image instead. Name its
+variants under `uploads.images.srcset`:
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base', 'ohnejs/uploads'],
+  uploads: {
+    images: {
+      url: 'https://img.example.com',
+      variants: {
+        small: { width: 480, fit: 'inside', format: 'webp' },
+        medium: { width: 960, fit: 'inside', format: 'webp' },
+        large: { width: 1600, fit: 'inside', format: 'webp' },
+      },
+      srcset: ['small', 'medium', 'large'],
+    },
+  },
+});
+```
+
+Every image you read then carries a ready `srcset`. Put it on the `<img>` next to a `sizes` that
+matches your layout. Give those variants a `width` and no `height`, so every candidate keeps the
+image's shape.
 
 [`format: 'auto'`](./image-service.md#what-a-service-does) lets the service pick the format from the
 browser's `Accept` header. Use it only behind a CDN that normalizes `Accept`; without one, every

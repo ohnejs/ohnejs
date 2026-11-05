@@ -28,8 +28,9 @@ const page = await ohne.resolve('/blog/hello');
 In `record`, each [block](../database/blocks.md) reads as `{ block, UUID, fields }`.
 
 - Every image and file arrives as an upload, wherever it sits: `UUID`, `name`, `type`, `size`,
-  `width`, `height`, `description`, `focalX`, `focalY`, an absolute `url`, and `variants` when
-  [named variants](../uploads/image-variants.md#named-variants) are set.
+  `width`, `height`, `description`, `focalX`, `focalY`, and an absolute `url`. An image adds its
+  [`variants`](../uploads/image-variants.md#named-variants) and, when you name them, a
+  [`srcset`](../uploads/image-variants.md#responsive-images).
 - A private file or a folder reads `null`, or drops out of its list.
 - Any other relation loads one level deep. A related record keeps its own relations as `UUID`s,
   and carries its `path` when it has a route.

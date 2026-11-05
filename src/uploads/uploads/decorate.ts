@@ -1,15 +1,19 @@
-import { isNumber, isString, isUndefined } from 'ohnejs/utils';
+import { isEmpty, isNumber, isString, isUndefined } from 'ohnejs/utils';
 
-import { hasImageService, imageVariantURLs, isOptimizableImage } from '../images/image-url.ts';
+import type { ImageVariantName } from '../images/variants.ts';
+
+import { useUploadsConfig } from '../config.ts';
+import { imageSrcSet, imageVariantURLs, isOptimizableImage } from '../images/image-url.ts';
 import { privateExpiry } from './_expiry.ts';
 import { uploadPath } from './path.ts';
 import { uploadURL } from './url.ts';
 
 /**
  * Adds `path` and `url` to an `Uploads` record in place.
- * Adds `variants` too, one signed URL per configured variant, when the image service can render them.
+ * An image gets `variants` too, one signed URL per configured variant, and a `srcset` over `images.srcset`.
+ * Without an image service each of them points at the original.
  * A private file gets the API route as `url`, signed and with `expires` while an `UPLOADS_SECRET` is set.
- * Without the secret it is the bare route, which only a signed-in reader can open, and `variants` is absent.
+ * Without the secret it is the bare route, which only a signed-in reader can open, with no variants.
  * A file whose `select` left out `private` is decorated as private, since it may be one.
  * A folder gets `path` alone: it has no bytes to serve.
  * A record whose `select` left out `kind` is decorated as a file.
@@ -33,9 +37,9 @@ export function decorateUpload(record: Record<string, unknown>): void {
   if (!isUndefined(expires)) record.expires = expires;
   record.url = uploadURL({ directory, name, private: locked, expires });
   const { type, focalX, focalY } = record;
-  if (!isString(type) || !isOptimizableImage(type) || !hasImageService()) return;
+  if (!isString(type) || !isOptimizableImage(type)) return;
   if (locked && isUndefined(expires)) return;
-  record.variants = imageVariantURLs({
+  const image = {
     directory,
     name,
     type,
@@ -43,7 +47,10 @@ export function decorateUpload(record: Record<string, unknown>): void {
     focalY: numberOrNull(focalY),
     private: locked,
     expires,
-  });
+  };
+  record.variants = imageVariantURLs(image);
+  const { srcset } = useUploadsConfig().images;
+  if (!isEmpty(srcset)) record.srcset = imageSrcSet(image, srcset as ImageVariantName[]);
 }
 
 /**

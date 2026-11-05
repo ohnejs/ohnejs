@@ -135,7 +135,7 @@ declare module 'ohnejs' {
       images?: {
         /**
          * The service origin, the prefix of every variant URL.
-         * Omitted, every image URL points at the original and no record carries `variants`.
+         * Omitted, every image URL points at the original.
          */
         url?: string;
 
@@ -148,6 +148,14 @@ declare module 'ohnejs' {
          * { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } }
          */
         variants?: Record<string, ImageTransforms>;
+
+        /**
+         * The variants every image read joins into its `srcset`, by name.
+         *
+         * @default
+         * []
+         */
+        srcset?: string[];
       };
 
       /**
@@ -283,6 +291,11 @@ export interface ResolvedUploadsConfig {
      * The named transform presets, the shipped `thumbnail` included.
      */
     variants: Record<string, ImageTransforms>;
+
+    /**
+     * The variants every image read joins into its `srcset`.
+     */
+    srcset: string[];
   };
 
   /**
@@ -315,7 +328,10 @@ export const UPLOADS_DEFAULTS = {
   privateMaxAge: '1h',
   linkMaxAge: '30d',
   sessionMaxAge: '1d',
-  images: { variants: { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } } },
+  images: {
+    variants: { thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' } },
+    srcset: [],
+  },
   fetch: { allow: [], timeout: '2m' },
 } satisfies ResolvedUploadsConfig;
 

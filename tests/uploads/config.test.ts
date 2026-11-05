@@ -30,6 +30,7 @@ describe('useUploadsConfig', () => {
     });
     deepStrictEqual(useUploadsConfig().images, {
       variants: { thumbnail: { width: 200 }, hero: { width: 1200 } },
+      srcset: [],
     });
   });
 

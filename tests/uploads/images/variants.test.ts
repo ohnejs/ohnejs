@@ -1,6 +1,8 @@
 import { deepStrictEqual, doesNotThrow, throws } from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 
+import type { OhneError } from '../../../src/ohne/error/ohne-error.ts';
+
 import { useLayers } from '../../../src/ohne/layers/use-layers.ts';
 import {
   imageVariantTokens,
@@ -10,8 +12,8 @@ import {
 
 const PATH = '/variants-test';
 
-function configure(variants: Record<string, object>): void {
-  useLayers().add({ path: PATH, input: { uploads: { images: { variants } } } });
+function configure(variants: Record<string, object>, srcset: string[] = []): void {
+  useLayers().add({ path: PATH, input: { uploads: { images: { variants, srcset } } } });
 }
 
 describe('resolveImageVariant', () => {
@@ -80,5 +82,32 @@ describe('validateImageVariants', () => {
   it('rejects a preset with an out-of-range value, naming the variant', () => {
     configure({ card: { width: 0 } });
     throws(validateImageVariants, /Invalid image variant `card`/);
+  });
+
+  it('accepts a srcset of variants with a width', () => {
+    configure({ small: { width: 320 } }, ['small']);
+    doesNotThrow(validateImageVariants);
+  });
+
+  it('rejects a srcset entry that names no variant', () => {
+    configure({ small: { width: 320 } }, ['large']);
+    throws(validateImageVariants, (error: OhneError) => {
+      deepStrictEqual(
+        [error.message, error.body?.[0]],
+        ['Invalid `srcset` entry `large`', 'It names no configured variant.'],
+      );
+      return true;
+    });
+  });
+
+  it('rejects a srcset entry whose variant has no width', () => {
+    configure({ square: { height: 320 } }, ['square']);
+    throws(validateImageVariants, (error: OhneError) => {
+      deepStrictEqual(
+        error.body?.[0],
+        'Its variant has no `width`, which the `w` descriptor needs.',
+      );
+      return true;
+    });
   });
 });

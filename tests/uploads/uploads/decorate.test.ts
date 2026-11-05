@@ -10,6 +10,10 @@ import { alignExpiry, parseDuration } from '../../../src/utils/index.ts';
 
 const SERVICE = 'https://img.example.com';
 
+function image(name: string): Record<string, unknown> {
+  return { directory: '', name, type: 'image/png', private: false };
+}
+
 function locked(name: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
   return { directory: 'locked', name, type: 'image/png', private: true, ...extra };
 }
@@ -36,10 +40,50 @@ describe('decorateUpload', () => {
     deepStrictEqual(noDirectory, { name: 'sunset.jpg' });
   });
 
-  it('never sets variants without a service', () => {
-    const record: Record<string, unknown> = { directory: '', name: 'a.png', type: 'image/png' };
+  it('points every variant at the original without a service', () => {
+    const record = image('a.png');
+    decorateUpload(record);
+    deepStrictEqual(record.variants, { thumbnail: '/uploads/a.png' });
+    strictEqual(record.srcset, undefined);
+  });
+
+  it('gives no variants to a file that is not an image', () => {
+    const record: Record<string, unknown> = {
+      directory: '',
+      name: 'a.pdf',
+      type: 'application/pdf',
+    };
     decorateUpload(record);
     deepStrictEqual(Object.keys(record).sort(), ['directory', 'name', 'path', 'type', 'url']);
+  });
+
+  it('joins the images.srcset variants into a srcset', () => {
+    const variants = {
+      small: { width: 320, format: 'webp' as const },
+      large: { width: 640, dpr: 2 },
+    };
+    const srcset = ['small', 'large'];
+    useLayers().add({
+      path: '/decorate-srcset',
+      input: { uploads: { images: { variants, srcset } } },
+    });
+    try {
+      const original = image('a.png');
+      decorateUpload(original);
+      strictEqual(original.srcset, '/uploads/a.png 320w, /uploads/a.png 1280w');
+      useLayers().add({
+        path: '/decorate-srcset/service',
+        input: { uploads: { images: { url: SERVICE } } },
+      });
+      const rendered = image('a.png');
+      decorateUpload(rendered);
+      const { small, large } = rendered.variants as Record<string, string>;
+      strictEqual(rendered.srcset, `${small} 320w, ${large} 1280w`);
+      match(small, /^https:\/\/img\.example\.com\/unsigned\/w_320,f_webp\/a\.png$/);
+    } finally {
+      useLayers().remove('/decorate-srcset/service');
+      useLayers().remove('/decorate-srcset');
+    }
   });
 
   it('decorates a public record the same with a secret set', () => {
@@ -54,6 +98,7 @@ describe('decorateUpload', () => {
         'private',
         'type',
         'url',
+        'variants',
       ]);
       strictEqual(record.url, '/uploads/locked/open.png');
     } finally {
@@ -74,7 +119,7 @@ describe('decorateUpload', () => {
         record.url,
         `/uploads/locked/a.png?e=${expires}&s=${signUploadLink('locked/a.png', expires, 'secret')}`,
       );
-      strictEqual(record.variants, undefined);
+      deepStrictEqual(record.variants, { thumbnail: record.url });
     } finally {
       useEnv().unset('UPLOADS_SECRET');
     }

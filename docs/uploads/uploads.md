@@ -74,8 +74,9 @@ Every read is decorated with extra fields:
 
 - `path` joins `directory` and `name`.
 - `url` is where a file's bytes are served from.
-- `variants` holds one signed URL per [named variant](./image-variants.md#named-variants), when an
-  image service is configured.
+- `variants` holds one signed URL per [named variant](./image-variants.md#named-variants), on an
+  image.
+- `srcset` joins the variants you [name for it](./image-variants.md#responsive-images).
 - `expires` says when a [private file's](./private-files.md) `url` and `variants` stop working.
 
 A folder is decorated with `path` only. A read that narrows its `select` keeps `kind`, or a folder
@@ -260,6 +261,7 @@ export default defineConfig({
       variants: {
         thumbnail: { width: 320, height: 320, fit: 'inside', format: 'webp' },
       },
+      srcset: [],
     },
     fetch: { allow: [], timeout: '2m' },
   },
@@ -288,9 +290,9 @@ Sizes take bytes or a string like `'8mb'`. Durations take milliseconds or a stri
 - `linkMaxAge` - the longest any [private file's](./private-files.md) link may last.
 - `sessionMaxAge` - how long a [resumable upload](./resumable.md) has from its first request to
   completion.
-- `images` - the [image service](./image-variants.md) that renders resized variants, and the named
-  variants every image read carries. `url` has no default, and without it every image URL points at
-  the original.
+- `images` - the [image service](./image-variants.md) that renders resized variants, the named
+  variants every image read carries, and the ones its `srcset` joins. `url` has no default, and
+  without it every image URL points at the original.
 - `fetch` - the `allow` list and the `timeout` of [uploads from a URL](./from-a-url.md).
 
 ## Where files live

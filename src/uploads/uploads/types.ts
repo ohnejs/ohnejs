@@ -17,13 +17,19 @@ export interface UploadDecorations<Variant extends string = string> {
   url?: string;
 
   /**
-   * One signed image service URL per configured variant, keyed by name.
-   * Present only for an optimizable image when a service is configured.
+   * One signed image service URL per configured variant, keyed by name, the original's without a service.
+   * Present only for an optimizable image.
    */
   variants?: Record<Variant, string>;
 
   /**
-   * When the `url` and `variants` of a private file stop working, in epoch milliseconds.
+   * A `srcset` over the variants `uploads.images.srcset` names, as `imageSrcSet` builds it.
+   * Present only for an optimizable image while `uploads.images.srcset` names any.
+   */
+  srcset?: string;
+
+  /**
+   * When the `url`, `variants` and `srcset` of a private file stop working, in epoch milliseconds.
    * Present only on a private file, or one read without `private`, while `UPLOADS_SECRET` is set.
    */
   expires?: number;
