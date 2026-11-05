@@ -95,7 +95,7 @@ function overview(): Child {
 
   const field = searchInput(search.query, {
     size: -1,
-    placeholder: () => t('dashboard.search'),
+    placeholder: () => t('dashboard.overview.searchPlaceholder'),
     label: () => t('dashboard.search'),
   });
 
@@ -128,7 +128,7 @@ function overview(): Child {
   return stack(
     { gap: 2 },
     ...shellSlots('overview').map((render) => render()),
-    field.box,
+    section({ title: 'dashboard.search' }, field.box),
     sections,
     when(
       () => search.active() && !search.hasAnyResults(),
