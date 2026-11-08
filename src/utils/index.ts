@@ -380,6 +380,7 @@ export * from './uri/display-url.ts';
 export * from './uri/encode-rfc3986.ts';
 export * from './uri/href-path.ts';
 export * from './uri/is-fetchable-url.ts';
+export * from './uri/join-url.ts';
 export * from './uri/mailto-href.ts';
 export * from './uri/normalize-http-url.ts';
 export * from './uri/percent-decode.ts';
