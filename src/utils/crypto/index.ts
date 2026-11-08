@@ -7,6 +7,7 @@ export * from './password-needs-rehash.ts';
 export * from './random-token.ts';
 export * from './secure-compare.ts';
 export * from './sha256.ts';
+export * from './sign-jwt.ts';
 export * from './sign-value.ts';
 export * from './totp-code.ts';
 export * from './totp-secret.ts';
