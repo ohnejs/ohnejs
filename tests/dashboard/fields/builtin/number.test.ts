@@ -56,6 +56,29 @@ describe('numberType control', () => {
     });
   });
 
+  it('shows a changed value out of `min` and `max` on blur, and an unchanged one never', () => {
+    effectScope().run(() => {
+      const control = numberType.control!({
+        field: GOLD,
+        initial: 5000,
+        mode: 'edit',
+        path: 'gold',
+        language: () => 'en',
+        onInput() {},
+      })!;
+      const input = inputOf(control.element);
+      fire(input, 'blur');
+      strictEqual(control.error?.(), '');
+      type(input, '-3');
+      fire(input, 'blur');
+      strictEqual(control.error?.(), 'validation.minValue');
+      type(input, '250');
+      strictEqual(control.error?.(), '');
+      fire(input, 'blur');
+      strictEqual(control.error?.(), '');
+    });
+  });
+
   it("edits in the language's decimal mark, and reads either mark", () => {
     effectScope().run(() => {
       const control = numberType.control!({

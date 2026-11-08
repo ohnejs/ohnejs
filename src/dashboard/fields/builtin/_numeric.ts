@@ -243,7 +243,10 @@ export function numericFieldType<O extends NumberFieldOptions>(kind: NumericKind
       });
       input.addEventListener('blur', () => {
         const parsed = notation.value.parse(raw.value);
-        local.value = isUndefined(parsed.error) ? '' : translateMessage(parsed.error);
+        const failure =
+          parsed.error ??
+          (isNumber(parsed.value) && dirty() ? notation.value.check(parsed.value) : undefined);
+        local.value = isUndefined(failure) ? '' : translateMessage(failure);
         if (notation.value.canonical && isNumber(parsed.value)) {
           raw.value = notation.value.text(parsed.value);
         }
