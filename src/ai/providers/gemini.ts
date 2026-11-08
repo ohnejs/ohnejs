@@ -9,7 +9,7 @@ import {
   isUndefined,
   last,
   merge,
-  withoutTrailingSlash,
+  joinURL,
 } from 'ohnejs/utils';
 
 import type {
@@ -104,7 +104,7 @@ const MALFORMED: Record<string, string> = {
  * ```
  */
 export function createGeminiProvider(options: ProviderOptions): Provider {
-  const base = withoutTrailingSlash(options.baseURL ?? API);
+  const base = joinURL(options.baseURL ?? API);
   const url = `${base}/v1beta/models/${options.model}:streamGenerateContent?alt=sse`;
   const key: Record<string, string> = isUndefined(options.key)
     ? {}

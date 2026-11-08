@@ -1,6 +1,6 @@
 import type { SSEMessage } from 'ohnejs/utils';
 
-import { isNull, isPlainObject, merge, withoutTrailingSlash } from 'ohnejs/utils';
+import { isNull, isPlainObject, merge, joinURL } from 'ohnejs/utils';
 
 import type {
   Completion,
@@ -78,10 +78,10 @@ const ANSWER = 'answer';
  * ```
  */
 export function createOpenAICompatibleProvider(options: ProviderOptions): Provider {
-  const base = withoutTrailingSlash(options.baseURL ?? API);
+  const base = joinURL(options.baseURL ?? API);
   const url = `${base}/chat/completions`;
   const cap = {
-    [base === withoutTrailingSlash(API) ? 'max_completion_tokens' : 'max_tokens']:
+    [base === API ? 'max_completion_tokens' : 'max_tokens']:
       options.maxOutput ?? DEFAULT_MAX_OUTPUT,
   };
   const headers = { ...bearer(options.key), ...options.headers };

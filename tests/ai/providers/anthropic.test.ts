@@ -170,6 +170,18 @@ describe('createAnthropicProvider', () => {
     ]);
   });
 
+  it('posts to the public API by default, with the scheme intact', async (t) => {
+    const fetch = globalThis.fetch;
+    const urls: string[] = [];
+    t.mock.method(globalThis, 'fetch', (url: string, init: RequestInit) => {
+      urls.push(url);
+      return fetch(`${server.url}/v1/messages`, init);
+    });
+    server.answer({ body: hello() });
+    await Array.fromAsync(createAnthropicProvider({ model: 'claude-test' }).step(request, signal));
+    deepStrictEqual(urls, ['https://api.anthropic.com/v1/messages']);
+  });
+
   it("sends the model's maxOutput as its cap, beside a thinking budget", async () => {
     const thinking = { type: 'enabled', budget_tokens: 16000 };
     const own = createAnthropicProvider({

@@ -1,6 +1,6 @@
 import type { SSEMessage } from 'ohnejs/utils';
 
-import { isPlainObject, merge, withoutTrailingSlash } from 'ohnejs/utils';
+import { isPlainObject, merge, joinURL } from 'ohnejs/utils';
 
 import type {
   Completion,
@@ -61,7 +61,7 @@ const ANSWER = 'answer';
  * ```
  */
 export function createOpenAIProvider(options: ProviderOptions): Provider {
-  const url = `${withoutTrailingSlash(options.baseURL ?? API)}/responses`;
+  const url = joinURL(options.baseURL ?? API, 'responses');
   const headers = { ...bearer(options.key), ...options.headers };
   const cap = options.maxOutput ?? DEFAULT_MAX_OUTPUT;
   const post = (body: Record<string, unknown>, signal: AbortSignal) =>

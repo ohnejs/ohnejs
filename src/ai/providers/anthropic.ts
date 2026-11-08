@@ -1,6 +1,6 @@
 import type { SSEMessage } from 'ohnejs/utils';
 
-import { isPlainObject, isUndefined, merge, withoutTrailingSlash } from 'ohnejs/utils';
+import { isPlainObject, isUndefined, merge, joinURL } from 'ohnejs/utils';
 
 import type {
   Completion,
@@ -97,7 +97,7 @@ const STOPS: Record<string, StopReason> = {
  * ```
  */
 export function createAnthropicProvider(options: ProviderOptions): Provider {
-  const url = `${withoutTrailingSlash(options.baseURL ?? API)}/v1/messages`;
+  const url = joinURL(options.baseURL ?? API, 'v1/messages');
   const key: Record<string, string> = isUndefined(options.key) ? {} : { 'x-api-key': options.key };
   const headers = { ...key, 'anthropic-version': VERSION, ...options.headers };
   const cap = options.maxOutput ?? DEFAULT_MAX_OUTPUT;

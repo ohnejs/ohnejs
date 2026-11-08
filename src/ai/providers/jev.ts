@@ -1,13 +1,6 @@
 import type { FlowQuestion } from 'ohnejs';
 
-import {
-  hasKey,
-  isNumber,
-  isPlainObject,
-  isString,
-  merge,
-  withoutTrailingSlash,
-} from 'ohnejs/utils';
+import { hasKey, isNumber, isPlainObject, isString, merge, joinURL } from 'ohnejs/utils';
 
 import type { DecideAnswer, Decider, Decision, ProviderOptions, Usage } from './provider.ts';
 
@@ -61,7 +54,7 @@ const SCORE_INSTRUCTIONS = 'Where on this scale does the message fall, lowest le
  * ```
  */
 export function createJevProvider(options: ProviderOptions): Decider {
-  const url = `${withoutTrailingSlash(options.baseURL ?? API)}/v1/systemone`;
+  const url = joinURL(options.baseURL ?? API, 'v1/systemone');
   const headers = { ...bearer(options.key), ...options.headers };
   return {
     decide(request, signal) {
