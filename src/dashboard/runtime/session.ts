@@ -37,7 +37,7 @@ export interface SessionUser {
 
   /**
    * The language the dashboard renders in, as a canonical BCP-47 tag like `de-AT`.
-   * `null` leaves the dashboard on the app's default language.
+   * `null` leaves it to `setLanguageFallback`, else the app's default language.
    */
   dashboardLanguage: DashboardLanguage | null;
 
@@ -113,6 +113,7 @@ export type UpdateOutcome =
       status: number;
     };
 
+let fallback: ((user: SessionUser | null) => DashboardLanguage | undefined) | null = null;
 const user = ref<SessionUser | null | undefined>(undefined);
 const signIns = ref(0);
 let requested = false;
@@ -148,6 +149,22 @@ export function sessionUser(): SessionUser | null | undefined {
  */
 export function signInCount(): number {
   return signIns.value;
+}
+
+/**
+ * Picks the dashboard language for a user who has none, or for no user while signed out.
+ * Returning `undefined` keeps the app's default.
+ * Call it from a dashboard boot file, so the first page already builds in the picked language.
+ *
+ * @example
+ * ```ts
+ * setLanguageFallback(() => (navigator.language.startsWith('en') ? 'en' : undefined))
+ * ```
+ */
+export function setLanguageFallback(
+  next: ((user: SessionUser | null) => DashboardLanguage | undefined) | null,
+): void {
+  fallback = next;
 }
 
 /**
@@ -213,7 +230,7 @@ export async function updateSessionUser(patch: Record<string, unknown>): Promise
 
 /**
  * Signs out: `sessionUser` becomes `null` and the discovery store resets.
- * The dashboard language returns to the app's default.
+ * The dashboard language returns to the fallback's pick, else the app's default.
  * The server-side session is revoked too; an unreachable API still signs the browser out locally.
  */
 export async function logout(): Promise<void> {
@@ -246,14 +263,14 @@ async function resolve(): Promise<void> {
 }
 
 /**
- * The dashboard language `user` renders in: their own, or the app's default when signed out or unset.
+ * The dashboard language `user` renders in: their own, else the fallback's pick, else the app's default.
  */
 function languageOf(user: SessionUser | null): DashboardLanguage {
-  return user?.dashboardLanguage ?? dashboardConfig().defaultLanguage;
+  return user?.dashboardLanguage ?? fallback?.(user) ?? dashboardConfig().defaultLanguage;
 }
 
 /**
- * Stores a user and applies their dashboard language, the app's default for a signed-out or unset one.
+ * Stores a user and applies their dashboard language, as `languageOf` picks it.
  * Its catalogs must have loaded first, through `loadLanguage`, so the text switches with every message ready.
  * The discovery store empties on a new identity, since it describes what one user may see.
  * Otherwise `refresh` refetches it in place, keeping the current data until the answer lands.

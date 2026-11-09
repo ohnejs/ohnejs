@@ -1,8 +1,15 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { before, describe, it, mock } from 'node:test';
 
 import '../_fake-dom.ts';
-import { login, signInCount } from '../../../src/dashboard/runtime/session.ts';
+import {
+  login,
+  logout,
+  sessionUser,
+  setLanguageFallback,
+  signInCount,
+} from '../../../src/dashboard/runtime/session.ts';
+import { requestedLanguage } from '../../../src/dashboard/runtime/use-dashboard-language.ts';
 import { flush } from '../../../src/utils/reactive/_scheduler.ts';
 import { effect } from '../../../src/utils/reactive/effect.ts';
 
@@ -18,26 +25,47 @@ const USER = {
   smartClipboard: false,
 };
 
-describe('signInCount', () => {
-  let accept = true;
+let accept = true;
 
-  before(() => {
-    Object.assign(document, {
-      getElementById: () => ({
-        textContent: JSON.stringify({
-          apiURL: 'http://api',
-          defaultLanguage: 'en',
-          messageGroups: [],
-        }),
+before(() => {
+  Object.assign(document, {
+    getElementById: () => ({
+      textContent: JSON.stringify({
+        apiURL: 'http://api',
+        defaultLanguage: 'en',
+        messageGroups: [],
       }),
+    }),
+  });
+  mock.method(globalThis, 'fetch', async (url: string) => {
+    if (url.endsWith('/auth/login') && !accept) return new Response(null, { status: 401 });
+    if (url.endsWith('/dashboard')) return new Response(JSON.stringify({ collections: [] }));
+    return new Response(JSON.stringify(USER));
+  });
+});
+
+describe('setLanguageFallback', () => {
+  it('picks the language of a user without one before the user is stored', async () => {
+    setLanguageFallback((user) => (user ? 'de' : undefined));
+    const seen: string[] = [];
+    effect(() => {
+      if (sessionUser()) seen.push(requestedLanguage().value);
     });
-    mock.method(globalThis, 'fetch', async (url: string) => {
-      if (url.endsWith('/auth/login') && !accept) return new Response(null, { status: 401 });
-      if (url.endsWith('/dashboard')) return new Response(JSON.stringify({ collections: [] }));
-      return new Response(JSON.stringify(USER));
-    });
+    while (!sessionUser()) await new Promise((resolve) => setTimeout(resolve, 1));
+    flush();
+    deepStrictEqual(seen, ['de']);
+    setLanguageFallback(null);
   });
 
+  it('picks the language of a signed-out visitor on sign-out', async () => {
+    setLanguageFallback((user) => (user ? undefined : 'bs'));
+    await logout();
+    strictEqual(requestedLanguage().value, 'bs');
+    setLanguageFallback(null);
+  });
+});
+
+describe('signInCount', () => {
   it('reruns a reader on each successful sign-in, and only then', async () => {
     const seen: number[] = [];
     effect(() => {

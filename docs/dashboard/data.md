@@ -269,6 +269,8 @@ the server fills it from the [fallback chain](../i18n/messages.md#translating-wi
 - It starts at the configured [default language](../project/config.md#messages).
 - It switches to the signed-in user's [dashboard language](./account.md#the-settings) once the
   session has loaded.
+- A user without one, or a signed-out visitor, gets what `setLanguageFallback` picks. Call it in a
+  [boot file](./pages.md#boot-files), so the first page already builds in that language.
 
 To switch it yourself, call `setDashboardLanguage`. It loads the new language's catalogs, then switches
 the text in place. The page keeps its state, like a draft or the scroll position:

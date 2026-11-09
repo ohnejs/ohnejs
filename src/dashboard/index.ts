@@ -150,7 +150,14 @@ export type {
   DashboardOperations,
   DashboardTable,
 } from './runtime/meta.ts';
-export { login, logout, sessionUser, signInCount, updateSessionUser } from './runtime/session.ts';
+export {
+  login,
+  logout,
+  sessionUser,
+  setLanguageFallback,
+  signInCount,
+  updateSessionUser,
+} from './runtime/session.ts';
 export type { LoginOutcome, SessionUser, UpdateOutcome } from './runtime/session.ts';
 export { countVerdicts, loadVerdicts } from './runtime/verdicts.ts';
 export type { RowVerdicts, VerdictCounts } from './runtime/verdicts.ts';
