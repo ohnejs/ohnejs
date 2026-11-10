@@ -405,7 +405,6 @@ css`
   .ohne-split {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    align-items: start;
   }
 
   ${Object.entries(STEP_WIDTHS)
