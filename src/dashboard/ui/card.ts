@@ -178,7 +178,7 @@ css`
     min-width: 0;
     margin: 0;
     overflow: hidden;
-    font-size: calc(1em - 0.125rem);
+    font-size: 1em;
     font-weight: 500;
     line-height: 1.5;
     text-overflow: ellipsis;
