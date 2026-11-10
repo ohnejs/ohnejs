@@ -1,7 +1,9 @@
 {
   "account": {
     "appDefault": "App default",
+    "changePassword": "Change password",
     "confirmSignOutOtherDevices": "Are you sure you want to sign out from all other devices? Your current session will remain active.",
+    "currentPassword": "Current password",
     "noAccess": "You do not have access to the page `{page}`",
     "preview": "Preview",
     "signedOut": "Signed out",

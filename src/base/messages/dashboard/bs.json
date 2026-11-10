@@ -1,7 +1,9 @@
 {
   "account": {
     "appDefault": "Zadano u aplikaciji",
+    "changePassword": "Promijeni lozinku",
     "confirmSignOutOtherDevices": "Da li zaista želite da se odjavite sa svih drugih uređaja? Vaša trenutna sesija ostaje aktivna.",
+    "currentPassword": "Trenutna lozinka",
     "noAccess": "Nemate pristup stranici `{page}`",
     "preview": "Pretpregled",
     "signedOut": "Odjavljeno",

@@ -44,6 +44,8 @@ const SMART_CLIPBOARD: DashboardField = {
   options: { display: 'switch' },
 };
 
+const PASSWORD: DashboardField = { ...FIRST_NAME, name: 'password', label: 'Password' };
+
 const ADMIN = {
   UUID: 'u',
   email: 'admin@example.com',
@@ -69,24 +71,32 @@ function configOnly(id: string): { textContent: string } | null {
 describe('accountEditor', () => {
   let account!: Account;
   let hasUnsavedChanges!: Guard['hasUnsavedChanges'];
+  const patches: unknown[] = [];
 
   before(async () => {
     baseBrowser('/account');
     Object.assign(FakeElement.prototype, { querySelector });
     Object.assign(document, { getElementById: configOnly });
+    // A closing popup unlocks the body and announces the animation through these.
+    const classes = document.body.classList as unknown as Set<string>;
+    Object.assign(classes, {
+      remove: (...names: string[]) => names.forEach((n) => classes.delete(n)),
+    });
+    Object.assign(window, { dispatchEvent: () => true });
     Object.assign(globalThis, {
       ResizeObserver: class {
         observe() {}
         disconnect() {}
       },
-      fetch: async (url: string) => {
+      fetch: async (url: string, init: RequestInit = {}) => {
+        if (init.method === 'PATCH') patches.push(JSON.parse(String(init.body)));
         if (url.endsWith('/dashboard')) {
           return Response.json({
             collections: [],
             locales: [],
             menu: [],
             blocks: [],
-            accountFields: [FIRST_NAME, SMART_CLIPBOARD, OMEN],
+            accountFields: [FIRST_NAME, SMART_CLIPBOARD, OMEN, PASSWORD],
           });
         }
         return Response.json(ADMIN);
@@ -126,6 +136,17 @@ describe('accountEditor', () => {
       scope,
       input: byID('field-firstName-input') as FakeElement & { value: string },
       omen: byID('field-omen-input'),
+      password: byID('field-password-input') as FakeElement & { value: string },
+      save: () => {
+        fire(
+          findElement(
+            root,
+            (element) => element.tagName === 'BUTTON' && element.textContent === 'dashboard.save',
+          )!,
+          'click',
+        );
+        flush();
+      },
       knob: findElement(root, (element) =>
         hasClass(element, 'ohne-switch-control'),
       ) as FakeElement & {
@@ -155,6 +176,30 @@ describe('accountEditor', () => {
     redo();
     deepStrictEqual([input.value, knob.checked], ['Jaina Proudmoore', true]);
     scope.dispose();
+  });
+
+  it('asks for the current password before it sends a new one', async () => {
+    const { scope, password, save } = await open();
+    type(password, 'new horse');
+    save();
+    await settle();
+    deepStrictEqual(patches, []);
+    const current = findElement(
+      document.body as unknown as FakeElement,
+      (element) => element.getAttribute('id') === 'o-current-password',
+    ) as FakeElement & { value: string };
+    type(current, 'correct horse');
+    fire(
+      findElement(
+        document.body as unknown as FakeElement,
+        (element) => element.tagName === 'BUTTON' && element.textContent === 'dashboard.save',
+      )!,
+      'click',
+    );
+    await settle();
+    deepStrictEqual(patches, [{ password: 'new horse', currentPassword: 'correct horse' }]);
+    scope.dispose();
+    document.body.replaceChildren();
   });
 
   it('guards leaving on form dirt the history cannot see', async () => {

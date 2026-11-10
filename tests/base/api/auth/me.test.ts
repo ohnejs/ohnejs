@@ -25,6 +25,7 @@ import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
 import { hook } from '../../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
+import { DEFAULTS } from '../../../../src/ohne/layers/config.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { useMessages } from '../../../../src/ohne/messages/use-messages.ts';
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
@@ -37,6 +38,7 @@ usePrinter().configure({ stream: { write: () => true } });
 // A tiny scrypt cost keeps hashing and the login timing-equalizer (`dummyVerify`) fast.
 useLayers().add({
   path: '/auth-me-test',
+  defaults: DEFAULTS,
   input: {
     auth: { password: { cost: 1024 } },
     collections: { locales: ['en', 'de'], defaultLocale: 'en' },
@@ -89,6 +91,7 @@ interface CallOptions {
   json?: unknown;
   cookie?: string;
   bearer?: string;
+  ip?: string;
 }
 
 async function call(r: Route, options: CallOptions = {}): Promise<Response> {
@@ -102,7 +105,7 @@ async function call(r: Route, options: CallOptions = {}): Promise<Response> {
     headers,
     body: sendBody ? JSON.stringify(options.json) : undefined,
   });
-  const { response } = await dispatch(r, request, new URL(request.url), {});
+  const { response } = await dispatch(r, request, new URL(request.url), {}, { ip: options.ip });
   return response;
 }
 
@@ -286,13 +289,67 @@ describe('PATCH /auth/me', () => {
 
   it('changes the password, which the next login verifies, without echoing it', async () => {
     const cookie = await signIn('rotate@example.com', 'old horse');
-    const response = await patch(cookie, { password: 'new horse' });
+    const response = await patch(cookie, { password: 'new horse', currentPassword: 'old horse' });
     strictEqual(response.status, 200);
     strictEqual('password' in ((await response.json()) as object), false);
 
     const email = 'rotate@example.com';
     strictEqual((await call(ROUTES.login, { json: { email, password: 'old horse' } })).status, 401);
     strictEqual((await call(ROUTES.login, { json: { email, password: 'new horse' } })).status, 200);
+  });
+
+  it('refuses a new password without the current one, or with a wrong one', async () => {
+    const email = 'takeover@example.com';
+    const cookie = await signIn(email);
+    for (const currentPassword of [undefined, '', 42]) {
+      deepStrictEqual(
+        await errorsOf(await patch(cookie, { password: 'new horse', currentPassword })),
+        {
+          currentPassword: 'validation.required',
+        },
+      );
+    }
+    deepStrictEqual(
+      await errorsOf(
+        await patch(cookie, { password: 'new horse', currentPassword: 'wrong horse' }),
+      ),
+      { currentPassword: 'auth.incorrectPassword' },
+    );
+
+    strictEqual((await call(ROUTES.get, { cookie })).status, 200);
+    const login = { email, password: 'correct horse' };
+    strictEqual((await call(ROUTES.login, { json: login })).status, 200);
+  });
+
+  it('ignores a current password sent without a new one', async () => {
+    const cookie = await signIn('unchanged@example.com');
+    const response = await patch(cookie, { timezone: 'UTC', currentPassword: 'wrong horse' });
+    strictEqual(response.status, 200);
+    strictEqual(((await response.json()) as User).timezone, 'UTC');
+  });
+
+  it('refuses a password the layout does not place before checking the current one', async () => {
+    const cookie = await signIn('unplaced@example.com');
+    hook('auth:account-layout', () => [{ card: ['timezone'] }]);
+    try {
+      deepStrictEqual(await errorsOf(await patch(cookie, { password: 'new horse' })), {
+        password: 'validation.unknownField',
+      });
+    } finally {
+      useHooks().delete('auth:account-layout');
+    }
+  });
+
+  it('counts current password checks toward the login rate limit', async () => {
+    const email = 'guesser@example.com';
+    const cookie = await signIn(email);
+    const ip = '198.51.100.7';
+    const json = { password: 'new horse', currentPassword: 'wrong horse' };
+    for (let n = 0; n < 10; n++)
+      strictEqual((await call(ROUTES.patch, { cookie, ip, json })).status, 422);
+    strictEqual((await call(ROUTES.patch, { cookie, ip, json })).status, 429);
+    const login = { email, password: 'correct horse' };
+    strictEqual((await call(ROUTES.login, { ip, json: login })).status, 429);
   });
 
   it('answers 401 without a session', async () => {

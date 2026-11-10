@@ -1,7 +1,9 @@
 {
   "account": {
     "appDefault": "App-Standard",
+    "changePassword": "Passwort ändern",
     "confirmSignOutOtherDevices": "Möchtest du dich wirklich von allen anderen Geräten abmelden? Deine aktuelle Sitzung bleibt aktiv.",
+    "currentPassword": "Aktuelles Passwort",
     "noAccess": "Du hast keinen Zugriff auf die Seite `{page}`",
     "preview": "Vorschau",
     "signedOut": "Abgemeldet",

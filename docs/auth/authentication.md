@@ -75,9 +75,9 @@ carries the password hash.
 - **`PATCH /auth/me`** - accepts the fields the
   [`auth:account-layout` hook](../dashboard/account.md#extending-the-page) places, by default the
   name, the account settings, and `password`. The write runs through the field pipeline, so a bad
-  time zone or a blank format answers `422` exactly as a collection write would. A new password is
-  hashed before it is stored, and changing it does not require the current password. `email` and
-  `roles` are not accepted: an administrator changes those through the `Users` collection.
+  time zone or a blank format answers `422` exactly as a collection write would. A new `password`
+  needs `currentPassword`. `email` and `roles` are not accepted: an administrator changes those
+  through the `Users` collection.
 - **`/auth/install`** - is what the dashboard's install page calls. While `Users` is empty, the
   dashboard opens that page instead of the login, and it creates the first account with the `admin`
   role and signs it in.

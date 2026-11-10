@@ -29,7 +29,7 @@ describe('ohnejs/base contract', () => {
     deepStrictEqual(Object.keys(declared).sort(), served.sort());
   });
 
-  it('types the `PATCH /auth/me` body as the fields the default account layout places', () => {
+  it('types the `PATCH /auth/me` body as the default account layout fields and `currentPassword`', () => {
     const declared: Record<keyof Routes['PATCH /auth/me']['body'], true> = {
       firstName: true,
       lastName: true,
@@ -40,8 +40,12 @@ describe('ohnejs/base contract', () => {
       timeFormat: true,
       smartClipboard: true,
       password: true,
+      currentPassword: true,
     };
 
-    deepStrictEqual(Object.keys(declared).sort(), layoutFieldNames(DEFAULT_ACCOUNT_LAYOUT).sort());
+    deepStrictEqual(
+      Object.keys(declared).sort(),
+      [...layoutFieldNames(DEFAULT_ACCOUNT_LAYOUT), 'currentPassword'].sort(),
+    );
   });
 });

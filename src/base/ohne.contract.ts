@@ -106,6 +106,10 @@ export interface AccountBody extends Partial<
    * The new password.
    */
   password?: string;
+  /**
+   * The password `password` replaces, required alongside it.
+   */
+  currentPassword?: string;
 }
 
 /**

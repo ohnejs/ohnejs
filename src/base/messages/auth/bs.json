@@ -1,5 +1,6 @@
 {
   "alreadyInstalled": "Već instalirano",
+  "incorrectPassword": "Pogrešna lozinka",
   "invalidCredentials": "Netačna email adresa ili lozinka",
   "invalidRoles": "Uloge moraju biti lista naziva uloga",
   "invalidTimezone": "Nevažeća vremenska zona `{timezone}`",

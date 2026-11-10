@@ -1,5 +1,6 @@
 {
   "alreadyInstalled": "Bereits installiert",
+  "incorrectPassword": "Falsches Passwort",
   "invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch",
   "invalidRoles": "Rollen müssen eine Liste von Rollennamen sein",
   "invalidTimezone": "Ungültige Zeitzone `{timezone}`",

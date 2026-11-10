@@ -15,6 +15,7 @@ import {
   queueToast,
   sessionUser,
   toast,
+  type UpdateOutcome,
   updateSessionUser,
   useDashboardLanguage,
   useDocumentTitle,
@@ -23,9 +24,20 @@ import {
   useUnsavedChanges,
   when,
 } from 'ohnejs/dashboard';
-import { effect, isEmpty, isNullish, isUndefined, onCleanup, ref, untracked } from 'ohnejs/utils';
+import {
+  effect,
+  hasKey,
+  isEmpty,
+  isNull,
+  isNullish,
+  isUndefined,
+  onCleanup,
+  ref,
+  untracked,
+} from 'ohnejs/utils';
 
 import { contentLocale } from './content-language-switcher.ts';
+import { currentPasswordPopup } from './current-password-popup.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History } from './history.ts';
@@ -78,6 +90,7 @@ css`
  * Leaving dirty edits asks first, in-app and on tab close, while the history or the form reads dirty.
  * Cmd/Ctrl+S saves while no overlay is open.
  * Save patches the dirty fields through `updateSessionUser`; a `422` routes onto the rows it names.
+ * A new password asks for the current one first.
  * A saved language change keeps the form: its labels follow the language in place.
  */
 export function accountEditor(): Child {
@@ -87,6 +100,7 @@ export function accountEditor(): Child {
   const history = new History({ watchUnsavedChanges: false });
   const form = ref<FieldForm | undefined>(undefined);
   const busy = ref(false);
+  const confirming = ref<AccountState | null>(null);
 
   // The form reads dirty before its typing lands in the history, so the guard asks on either.
   const dirty = (): boolean => history.isDirty.value || form.value?.dirty() === true;
@@ -112,6 +126,10 @@ export function accountEditor(): Child {
       settle(live);
       return;
     }
+    if (hasKey(patch, 'password')) {
+      confirming.value = patch;
+      return;
+    }
     const focused = document.activeElement;
     const localeBefore = sessionUser()?.contentLanguage ?? null;
     busy.value = true;
@@ -119,6 +137,10 @@ export function accountEditor(): Child {
     busy.value = false;
     // The saving fieldset blurs whatever was focused; the element survives the save, so restore.
     if (focused instanceof HTMLElement && focused.isConnected) focused.focus();
+    land(live, outcome, localeBefore);
+  };
+
+  const land = (live: FieldForm, outcome: UpdateOutcome, localeBefore: string | null): void => {
     if (outcome.kind === 'saved') {
       live.rebase({ ...outcome.user });
       settle(live);
@@ -285,7 +307,25 @@ export function accountEditor(): Child {
       ),
     );
 
-    return h('div', { class: 'o-account-editor' }, containerEl, footerEl);
+    const confirmHost = when(
+      () => !isNull(confirming.value),
+      () => {
+        const patch = confirming.value;
+        if (isNull(patch)) return null;
+        const localeBefore = sessionUser()?.contentLanguage ?? null;
+        currentPasswordPopup({
+          submit: (currentPassword) => updateSessionUser({ ...patch, currentPassword }),
+          onClose: (close, outcome) =>
+            void close().then(() => {
+              confirming.value = null;
+              if (!isUndefined(outcome)) land(live, outcome, localeBefore);
+            }),
+        });
+        return null;
+      },
+    );
+
+    return h('div', { class: 'o-account-editor' }, containerEl, footerEl, confirmHost);
   }
 }
 

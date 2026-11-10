@@ -100,7 +100,11 @@ describe('the sessions boot file', () => {
     const laptop = await login('self@example.com');
     const bystander = await login('bystander@example.com');
 
-    strictEqual((await call(ROUTES.patch, phone, { password: 'new horse' })).status, 200);
+    strictEqual(
+      (await call(ROUTES.patch, phone, { password: 'new horse', currentPassword: 'correct horse' }))
+        .status,
+      200,
+    );
 
     strictEqual(await status(phone), 200);
     strictEqual(await status(laptop), 204);
@@ -159,7 +163,11 @@ describe('the sessions boot file', () => {
     const phone = await login('after-rehash@example.com');
     const laptop = await login('after-rehash@example.com');
 
-    strictEqual((await call(ROUTES.patch, phone, { password: 'new horse' })).status, 200);
+    strictEqual(
+      (await call(ROUTES.patch, phone, { password: 'new horse', currentPassword: 'correct horse' }))
+        .status,
+      200,
+    );
 
     strictEqual(await status(phone), 200);
     strictEqual(await status(laptop), 204);
