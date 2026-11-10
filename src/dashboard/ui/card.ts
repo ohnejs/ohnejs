@@ -172,6 +172,7 @@ css`
   .ohne-card-icon {
     flex-shrink: 0;
     color: hsl(var(--ohne-muted-foreground));
+    font-size: calc(1em + 0.125rem);
   }
 
   .ohne-card-title {
