@@ -7,6 +7,7 @@ import {
   logout,
   sessionUser,
   setLanguageFallback,
+  settleSessionLanguage,
   signInCount,
 } from '../../../src/dashboard/runtime/session.ts';
 import { requestedLanguage } from '../../../src/dashboard/runtime/use-dashboard-language.ts';
@@ -45,6 +46,13 @@ before(() => {
 });
 
 describe('setLanguageFallback', () => {
+  it('picks the signed-out language while the session is unknown', async () => {
+    setLanguageFallback((user) => (user ? undefined : 'bs'));
+    settleSessionLanguage();
+    strictEqual(requestedLanguage().value, 'bs');
+    setLanguageFallback(null);
+  });
+
   it('picks the language of a user without one before the user is stored', async () => {
     setLanguageFallback((user) => (user ? 'de' : undefined));
     const seen: string[] = [];
@@ -54,6 +62,13 @@ describe('setLanguageFallback', () => {
     while (!sessionUser()) await new Promise((resolve) => setTimeout(resolve, 1));
     flush();
     deepStrictEqual(seen, ['de']);
+    setLanguageFallback(null);
+  });
+
+  it('switches a resolved user without a language to a fallback set later', async () => {
+    setLanguageFallback(() => 'bs');
+    settleSessionLanguage();
+    strictEqual(requestedLanguage().value, 'bs');
     setLanguageFallback(null);
   });
 

@@ -13,6 +13,7 @@ import { dashboardConfig } from './config.ts';
 import { loadLanguage } from './messages.ts';
 import { invalidateDashboardMeta, resetDashboardMeta } from './meta.ts';
 import { requestDashboardLanguage } from './set-dashboard-language.ts';
+import { requestedLanguage } from './use-dashboard-language.ts';
 
 export type { LoginOutcome };
 
@@ -192,9 +193,9 @@ export async function login(
   }
   if (!response.ok) return loginRefusal(response);
   const answer = (await response.json()) as SessionUser;
-  await loadLanguage(languageOf(answer));
+  const language = await loadLanguageOf(answer);
   startSession();
-  apply(answer, true);
+  apply(answer, language, true);
   signIns.value += 1;
   return { kind: 'signed-in' };
 }
@@ -212,8 +213,7 @@ export async function updateSessionUser(patch: Record<string, unknown>): Promise
     });
     if (response.ok) {
       const answer = (await response.json()) as SessionUser;
-      await loadLanguage(languageOf(answer));
-      apply(answer);
+      apply(answer, await loadLanguageOf(answer));
       return { kind: 'saved', user: answer };
     }
     if (response.status === 422) {
@@ -238,8 +238,16 @@ export async function logout(): Promise<void> {
   try {
     await api('POST /auth/logout');
   } catch {}
-  await loadLanguage(languageOf(null));
-  apply(null);
+  apply(null, await loadLanguageOf(null));
+}
+
+/**
+ * Requests the language `languageOf` picks now, once the boot files set the fallback.
+ * A session still resolving takes the signed-out pick, since only signed-out pages show before it lands.
+ */
+export function settleSessionLanguage(): void {
+  const language = languageOf(user.value ?? null);
+  if (requestedLanguage().value !== language) requestDashboardLanguage(language);
 }
 
 /**
@@ -252,14 +260,14 @@ async function resolve(): Promise<void> {
     const response = await api('GET /auth/me');
     if (response.status === 200) answer = (await response.json()) as SessionUser;
   } catch {}
-  await loadLanguage(languageOf(answer));
+  const language = await loadLanguageOf(answer);
   if (!isUndefined(user.value)) return;
   if (isNull(answer)) {
-    apply(null);
+    apply(null, language);
     return;
   }
   startSession();
-  apply(answer, true);
+  apply(answer, language, true);
 }
 
 /**
@@ -270,14 +278,26 @@ function languageOf(user: SessionUser | null): DashboardLanguage {
 }
 
 /**
- * Stores a user and applies their dashboard language, as `languageOf` picks it.
- * Its catalogs must have loaded first, through `loadLanguage`, so the text switches with every message ready.
+ * Loads the catalogs of the language `user` renders in, and answers it.
+ * A boot file that sets the fallback meanwhile changes the pick, so it loads once more.
+ */
+async function loadLanguageOf(user: SessionUser | null): Promise<DashboardLanguage> {
+  const language = languageOf(user);
+  await loadLanguage(language);
+  const now = languageOf(user);
+  if (now !== language) await loadLanguage(now);
+  return now;
+}
+
+/**
+ * Stores a user and applies their dashboard `language`.
+ * Its catalogs load first, through `loadLanguageOf`, so the text switches with every message ready.
  * The discovery store empties on a new identity, since it describes what one user may see.
  * Otherwise `refresh` refetches it in place, keeping the current data until the answer lands.
  */
-function apply(next: SessionUser | null, refresh = false): void {
+function apply(next: SessionUser | null, language: DashboardLanguage, refresh = false): void {
   const previous = user.value;
-  requestDashboardLanguage(languageOf(next));
+  requestDashboardLanguage(language);
   if (!sameIdentity(previous, next)) resetDashboardMeta();
   else if (refresh) invalidateDashboardMeta();
   user.value = next;
