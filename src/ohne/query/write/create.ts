@@ -7,7 +7,6 @@ import type { CollectionQueryMeta } from '../metadata.ts';
 import type { ProcessedScope, RecordWriteContext } from '../pipeline/run-record.ts';
 import type { QueryRecord } from '../read/find.ts';
 import type { ReachResolver } from '../wire/reach.ts';
-import type { FieldErrors } from './errors.ts';
 import type { LinkReach } from './references.ts';
 
 import { isEmpty, isNull, isUndefined, uuidv7 } from '../../../utils/index.ts';
@@ -21,6 +20,7 @@ import { runRecord } from '../pipeline/run-record.ts';
 import { readRows } from '../read/find.ts';
 import { commitEffects } from './committed.ts';
 import { emptyCompanionPlan, splitColumns, upsertCompanion } from './companion.ts';
+import { type FieldErrors, isValidationError } from './errors.ts';
 import { applyReconcile, createPlan } from './reconcile.ts';
 import { checkReferences } from './references.ts';
 import { runWrite } from './run-write.ts';
@@ -128,6 +128,7 @@ export async function runCreate(
     (tx) => attemptCreate(tx, meta, dialect, input, locale, unscoped, linkResolver, fills, writing),
     (error) => {
       const at = isUndefined(writing.locale) ? {} : { locale: writing.locale };
+      if (isValidationError(error)) return { ok: false, errors: error.errors, ...at };
       if (dialect.isUniqueViolation(error)) {
         const errors = uniqueRaceErrors(meta, dialect.indexViolationTarget(error));
         return { ok: false, errors, ...at };

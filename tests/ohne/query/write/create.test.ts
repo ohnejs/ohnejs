@@ -17,7 +17,7 @@ import { hook } from '../../../../src/ohne/hooks/hook.ts';
 import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
-import { isValidationError } from '../../../../src/ohne/query/write/errors.ts';
+import { isValidationError, validationError } from '../../../../src/ohne/query/write/errors.ts';
 import { connectTest, dialect } from '../../../_dialect.ts';
 import { linksField } from './_links-field.ts';
 
@@ -225,6 +225,16 @@ describe('runCreate hooks', () => {
     strictEqual(result.errors.title, 'validation.custom');
     const after = await db.query('SELECT "UUID" FROM "CPost"');
     strictEqual(after.length, before.length);
+  });
+
+  it('returns the field errors a hook throws, writing nothing', async () => {
+    hook('record:after-create', () => {
+      throw validationError({ title: 'validation.custom' });
+    });
+    const before = await db.query('SELECT "UUID" FROM "CPost"');
+    const result = await runCreate('CPost', { ...base, title: 'HookThrows' }, null);
+    deepStrictEqual(result, { ok: false, errors: { title: 'validation.custom' } });
+    strictEqual((await db.query('SELECT "UUID" FROM "CPost"')).length, before.length);
   });
 
   it('reshapes the returned record through `record:after-create`', async () => {

@@ -15,6 +15,7 @@ import { useHooks } from '../../../../src/ohne/hooks/use-hooks.ts';
 import { useLayers } from '../../../../src/ohne/layers/use-layers.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { runCreate } from '../../../../src/ohne/query/write/create.ts';
+import { validationError } from '../../../../src/ohne/query/write/errors.ts';
 import { runUpdate } from '../../../../src/ohne/query/write/update.ts';
 import { connectTest, dialect } from '../../../_dialect.ts';
 import { linksField } from './_links-field.ts';
@@ -783,6 +784,16 @@ describe('runUpdate hooks', () => {
     ok((await runUpdate('UPost', { views: 2 }, uuidIs('none'), null)).ok);
     ok(!(await runUpdate('UPost', { views: 'many' }, uuidIs(a.UUID as string), null)).ok);
     strictEqual(fired, 0);
+  });
+
+  it('returns the field errors a hook throws, writing nothing', async () => {
+    const a = await seedPost({ views: 4 });
+    hook('record:after-update', () => {
+      throw validationError({ views: 'validation.custom' });
+    });
+    const result = await runUpdate('UPost', { views: 5 }, uuidIs(a.UUID as string), null);
+    deepStrictEqual(result, { ok: false, errors: { views: 'validation.custom' } });
+    strictEqual(await views(a.UUID as string), 4);
   });
 
   it('narrows the matched set through `record:condition`', async () => {

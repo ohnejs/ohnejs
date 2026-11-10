@@ -14,7 +14,6 @@ import type { ScopeValues } from '../pipeline/when.ts';
 import type { QueryRecord } from '../read/find.ts';
 import type { ReachResolver } from '../wire/reach.ts';
 import type { RecordMutateContext } from './create.ts';
-import type { FieldErrors } from './errors.ts';
 import type { ReconcileTarget } from './reconcile.ts';
 import type { LinkReach } from './references.ts';
 
@@ -57,6 +56,7 @@ import {
 import { blockInstancesUnder } from './blocks.ts';
 import { commitEffects } from './committed.ts';
 import { materializeFailure, planCompanion, splitColumns, upsertCompanion } from './companion.ts';
+import { type FieldErrors, isValidationError } from './errors.ts';
 import { applyReconcile, columnTypes, planReconcile } from './reconcile.ts';
 import { checkReferences } from './references.ts';
 import { runWrite } from './run-write.ts';
@@ -244,6 +244,7 @@ export async function runUpdate(
     (o) => !o.ok,
     (tx) => attemptUpdate(tx, meta, dialect, input, scoped, locale, unscoped, linkResolver),
     (error) => {
+      if (isValidationError(error)) return { ok: false, errors: error.errors };
       if (dialect.isUniqueViolation(error)) {
         return { ok: false, errors: uniqueRaceErrors(meta, dialect.indexViolationTarget(error)) };
       }
