@@ -1174,10 +1174,14 @@ describe('collectionTable row menu', () => {
 
   before(async () => {
     Object.assign(globalThis, {
-      fetch: async (url: string) => {
+      fetch: async (url: string, init?: RequestInit) => {
         const path = new URL(url).pathname;
         if (path === '/dashboard') return Response.json(META);
         if (path.endsWith('/query')) return Response.json(PAGE);
+        if (init?.method === 'DELETE' && path.endsWith('/u-jaina')) {
+          const refused = { statusCode: 409, message: 'Jaina is the last admin' };
+          return Response.json(refused, { status: 409 });
+        }
         return new Response(null, { status: 404 });
       },
     });
@@ -1249,6 +1253,22 @@ describe('collectionTable row menu', () => {
         ['dashboard.table.confirmDeleteOne'],
       ],
     );
+    scope?.dispose();
+  });
+
+  it('toasts the message of a refused row delete', async () => {
+    const { toaster } = await import('../../../../src/dashboard/ui/toaster.ts');
+    const outlet = toaster() as unknown as FakeElement;
+    const root = await sheet(['delete'], false);
+    pick(root, 'Jaina', 'dashboard.delete');
+    await idle();
+    const confirm = findAll(
+      body(),
+      (element) => element.tagName === 'BUTTON' && element.textContent === 'dashboard.delete',
+    ).at(-1)!;
+    dispatch(confirm, 'click');
+    await idle();
+    strictEqual(outlet.textContent.includes('Jaina is the last admin'), true);
     scope?.dispose();
   });
 });

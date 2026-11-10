@@ -3,6 +3,7 @@
   "invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch",
   "invalidRoles": "Rollen müssen eine Liste von Rollennamen sein",
   "invalidTimezone": "Ungültige Zeitzone `{timezone}`",
+  "lastAdmin": "Den letzten Administrator kannst du nicht entfernen",
   "roleNotGrantable": "Die Rolle `{role}` kannst du nicht vergeben",
   "unknownRole": "Unbekannte Rolle `{role}`",
   "unknownLanguage": "Unbekannte Sprache `{language}`",

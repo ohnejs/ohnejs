@@ -24,6 +24,7 @@ import {
   overlayCount,
   pagination,
   queueToast,
+  readAPIError,
   type RouteContext,
   type RowVerdicts,
   signInCount,
@@ -440,12 +441,19 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
     });
     if (action !== 'delete') return;
     deleteBusy = true;
-    const gone = await deleteRecord(segment, uuid);
+    const response = await deleteRecord(segment, uuid);
     deleteBusy = false;
-    if (gone) {
+    if (response?.ok === true) {
       queueToast(t('dashboard.deleted', { count: 1 }), { type: 'success' });
-    } else {
+    } else if (response?.status === 404) {
       toast(t('dashboard.deletedPartial', { count: 0, failed: 1 }), { type: 'error' });
+    } else {
+      toast(
+        isUndefined(response)
+          ? t('dashboard.unreachable')
+          : (await readAPIError(response, t('dashboard.writeFailed'))).message,
+        { type: 'error' },
+      );
     }
     refresh();
   };
@@ -482,7 +490,7 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
     const uuids = allSelected.value ? await allUUIDs() : [...selected.value].filter(isString);
     let lost = 0;
     for (const uuid of uuids) {
-      if (!(await deleteRecord(segment, uuid))) lost += 1;
+      if ((await deleteRecord(segment, uuid))?.ok !== true) lost += 1;
     }
     deleteBusy = false;
     if (lost === 0) {
@@ -927,10 +935,10 @@ function tableView(collection: DashboardCollection, search: string): HTMLElement
 }
 
 /**
- * Deletes one record, retrying once on a busy `503`, and resolves whether the delete landed.
- * A `404` is a row outside the caller's delete scope as often as a vanished one, so it never counts.
+ * Deletes one record, retrying once on a busy `503`, and answers the final response.
+ * It answers `undefined` when the server is unreachable.
  */
-async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
+async function deleteRecord(segment: string, uuid: string): Promise<Response | undefined> {
   const send = (): Promise<Response> => api(`DELETE /collections/${segment}/${uuid}`);
   try {
     let response = await send();
@@ -938,8 +946,8 @@ async function deleteRecord(segment: string, uuid: string): Promise<boolean> {
       await sleep(1000);
       response = await send();
     }
-    return response.ok;
+    return response;
   } catch {
-    return false;
+    return undefined;
   }
 }

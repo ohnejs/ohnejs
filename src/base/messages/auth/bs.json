@@ -3,6 +3,7 @@
   "invalidCredentials": "Netačna email adresa ili lozinka",
   "invalidRoles": "Uloge moraju biti lista naziva uloga",
   "invalidTimezone": "Nevažeća vremenska zona `{timezone}`",
+  "lastAdmin": "Ne možete ukloniti posljednjeg administratora",
   "roleNotGrantable": "Ne možete dodijeliti ulogu `{role}`",
   "unknownRole": "Nepoznata uloga `{role}`",
   "unknownLanguage": "Nepoznat jezik `{language}`",
