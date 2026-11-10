@@ -202,7 +202,7 @@ export async function login(
 
 /**
  * Writes a partial of the signed-in user's own record through `PATCH /auth/me` and stores the answer.
- * The patch takes the account fields and `password`; an unknown key is a `422`, like a collection write.
+ * The patch takes the account fields and `password` with its `currentPassword`; an unknown key is a `422`.
  * A saved answer applies at once: the dashboard language switches, and every preference reads fresh.
  */
 export async function updateSessionUser(patch: Record<string, unknown>): Promise<UpdateOutcome> {
