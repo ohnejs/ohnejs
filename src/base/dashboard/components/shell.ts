@@ -137,11 +137,6 @@ css`
     grid-area: main;
     position: relative;
     margin: -0.5rem;
-    padding: 0.5rem;
-  }
-
-  .o-main-fill {
-    padding: 0;
   }
 
   .o-main-fill > .ohne-container-content {
@@ -150,6 +145,11 @@ css`
 
   .o-main-content {
     height: 100%;
+    padding: 0.75rem;
+  }
+
+  .o-main-fill .o-main-content {
+    padding: 0;
   }
 
   .o-default-layout .ohne-base-content {
