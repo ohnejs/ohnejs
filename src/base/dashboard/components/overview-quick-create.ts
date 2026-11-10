@@ -9,7 +9,6 @@ import {
   icon,
   type IconName,
   translateMessage,
-  useT,
   when,
 } from 'ohnejs/dashboard';
 import { computed, effect, isUndefined, naturalCompare, onCleanup } from 'ohnejs/utils';
@@ -31,19 +30,6 @@ css`
     --ohne-padding-body: 0.75rem;
   }
 
-  .o-overview-quick-create-header {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-
-  .o-overview-quick-create-header svg {
-    color: hsl(var(--ohne-muted-foreground));
-    font-size: 1rem;
-  }
-
   .o-overview-quick-create-grid {
     display: flex;
     flex-wrap: wrap;
@@ -62,8 +48,6 @@ css`
  * The shared `search` filters them and the card hides while nothing matches.
  */
 export function overviewQuickCreate(search: OverviewSearch): Child {
-  const t = useT();
-
   const shortcuts = computed<QuickCreateShortcut[]>(() => {
     const items: QuickCreateShortcut[] = [];
     const meta = dashboardMeta();
@@ -123,12 +107,8 @@ export function overviewQuickCreate(search: OverviewSearch): Child {
           ),
         ),
         {
-          header: h(
-            'div',
-            { class: 'o-overview-quick-create-header' },
-            icon('plus'),
-            h('span', null, () => t('dashboard.overview.quickCreate')),
-          ),
+          title: 'dashboard.overview.quickCreate',
+          icon: 'plus',
         },
       );
       el.classList.add('o-overview-quick-create');

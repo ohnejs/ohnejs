@@ -11,7 +11,6 @@ import {
   each,
   fallbackLabel,
   h,
-  icon,
   joinLabel,
   relativeTime,
   type Text,
@@ -71,19 +70,6 @@ css`
   .o-overview-recent {
     --ohne-padding-header: 0.625rem 0.75rem;
     --ohne-padding-body: 0;
-  }
-
-  .o-overview-recent-header {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-
-  .o-overview-recent-header svg {
-    color: hsl(var(--ohne-muted-foreground));
-    font-size: 1rem;
   }
 
   .o-overview-recent-empty {
@@ -291,12 +277,8 @@ export function overviewRecentEdits(search: OverviewSearch): Child {
           ),
         ],
         {
-          header: h(
-            'div',
-            { class: 'o-overview-recent-header' },
-            icon('history'),
-            h('span', null, () => t('dashboard.overview.recentEdits')),
-          ),
+          title: 'dashboard.overview.recentEdits',
+          icon: 'history',
         },
       );
       el.classList.add('o-overview-recent');
