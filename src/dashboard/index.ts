@@ -338,6 +338,8 @@ export { structureAccepts, structureDropIndex } from './ui/structure-model.ts';
 export type { StructureDragSource } from './ui/structure-model.ts';
 export { structure } from './ui/structure.ts';
 export type { StructureHandle, StructureOptions } from './ui/structure.ts';
+export { searchInput } from './ui/search-input.ts';
+export type { SearchInput, SearchInputOptions } from './ui/search-input.ts';
 export { switchInput } from './ui/switch.ts';
 export type { SwitchOptions } from './ui/switch.ts';
 export type { TableColumn, TableSelection, TableSort } from './ui/table-model.ts';

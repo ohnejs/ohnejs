@@ -7,7 +7,7 @@ import { aiMeta } from './_ai-meta.ts';
 import { currentModel, setPickedModel } from './_ai-model-pick.ts';
 import { clearTurns, turns, turnSettled } from './turn-store.ts';
 
-const SEARCH_INPUT = '.o-palette .o-search-input input';
+const SEARCH_INPUT = '.o-palette .ohne-search-input input';
 
 css`
   .o-ai-new-question {

@@ -20,6 +20,7 @@ import {
   useT,
   verticalMenu,
   when,
+  searchInput,
 } from 'ohnejs/dashboard';
 import {
   computed,
@@ -62,7 +63,6 @@ import {
   paletteView,
   resetPalette,
 } from './palette-state.ts';
-import { searchInput } from './search-input.ts';
 
 /**
  * The hits a search answers per group, and each page a "Load more" adds.

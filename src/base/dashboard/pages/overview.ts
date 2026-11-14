@@ -9,12 +9,12 @@ import {
   useDocumentTitle,
   useT,
   when,
+  searchInput,
 } from 'ohnejs/dashboard';
 import { computed, effect, isString, onCleanup, type Ref, ref, searchTokens } from 'ohnejs/utils';
 
 import { overviewQuickCreate } from '../components/overview-quick-create.ts';
 import { overviewRecentEdits } from '../components/overview-recent-edits.ts';
-import { searchInput } from '../components/search-input.ts';
 import { shellSlots } from '../components/shell-slots.ts';
 
 /**
