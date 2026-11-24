@@ -254,6 +254,8 @@ export type {
   DynamicSelectOptions,
   DynamicSelectPaginatedChoices,
 } from './ui/dynamic-select.ts';
+export { elapsed } from './ui/elapsed.ts';
+export type { ElapsedOptions } from './ui/elapsed.ts';
 export { facts } from './ui/facts.ts';
 export type { FactRow, FactsOptions } from './ui/facts.ts';
 export { fieldLabel } from './ui/field-label.ts';
@@ -286,6 +288,8 @@ export type {
   Step,
   ToolbarOptions,
 } from './ui/layout.ts';
+export { levelMeter } from './ui/level-meter.ts';
+export type { LevelMeterOptions } from './ui/level-meter.ts';
 export { list } from './ui/list.ts';
 export type { ListOptions } from './ui/list.ts';
 export { loaded } from './ui/loaded.ts';
