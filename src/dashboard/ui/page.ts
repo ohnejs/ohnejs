@@ -67,6 +67,7 @@ css`
   .ohne-page-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    margin-bottom: var(--ohne-layout-gap);
     row-gap: 0.25em;
     align-items: center;
   }
@@ -159,7 +160,8 @@ css`
 `;
 
 /**
- * A dashboard page's content: one header with the `h1`, then the children stacked with gap step `2`.
+ * A dashboard page's content: one header with the `h1`, then the children stacked with gap step `0`.
+ * The header sits at step `2` from them.
  * The title also names the browser tab while the page lives, so the two never drift apart.
  * The header's actions sit at the right of the title's line and move under the heading below `md`.
  *
@@ -178,7 +180,7 @@ export function page(options: PageOptions, ...children: Child[]): HTMLElement {
   useDocumentTitle(title);
   return h(
     'div',
-    { class: `ohne-page ${gapClass(2)}` },
+    { class: `ohne-page ${gapClass(0)}` },
     h(
       'header',
       { class: 'ohne-page-header' },

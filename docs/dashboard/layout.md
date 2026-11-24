@@ -50,7 +50,8 @@ page(
 - `actions` sit at the end of the header, and move under the heading on a page narrower than `md`.
 
 `page` is what sits inside the [frame](./pages.md#the-frame): the frame draws the sidebar and the
-chrome, `page` everything from the heading down. Its children stack with gap step `2`.
+chrome, `page` everything from the heading down. Its children stack with gap step `0`, a step `2`
+below the header.
 
 ## Gap steps
 
