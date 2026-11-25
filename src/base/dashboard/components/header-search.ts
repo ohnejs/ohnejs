@@ -84,6 +84,7 @@ css`
       justify-content: center;
       width: calc(2em + 0.25rem);
       padding: 0;
+      color: hsl(var(--ohne-foreground));
     }
 
     .o-header-search > span,

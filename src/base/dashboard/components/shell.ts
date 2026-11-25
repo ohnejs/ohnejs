@@ -193,7 +193,7 @@ css`
 
     .o-layout-transition .o-sidebar {
       transition: var(--ohne-transition);
-      transition-property: visibility transform;
+      transition-property: visibility, transform;
       transition-duration: var(--ohne-overlay-transition-duration);
     }
 
@@ -209,7 +209,7 @@ css`
 
     .o-layout-transition .o-main {
       transition: var(--ohne-transition);
-      transition-property: opacity filter transform;
+      transition-property: opacity, filter, transform;
       transition-duration: var(--ohne-overlay-transition-duration);
     }
 
@@ -259,7 +259,7 @@ css`
 
     .o-layout-wide.o-layout-transition .o-sidebar {
       transition: var(--ohne-transition);
-      transition-property: visibility transform;
+      transition-property: visibility, transform;
       transition-duration: var(--ohne-overlay-transition-duration);
     }
 
@@ -275,7 +275,7 @@ css`
 
     .o-layout-wide.o-layout-transition .o-main {
       transition: var(--ohne-transition);
-      transition-property: opacity filter transform;
+      transition-property: opacity, filter, transform;
       transition-duration: var(--ohne-overlay-transition-duration);
     }
 

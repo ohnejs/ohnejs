@@ -15,7 +15,7 @@ css`
     justify-content: center;
     min-height: 100dvh;
     transition: var(--ohne-transition);
-    transition-property: opacity filter transform;
+    transition-property: opacity, filter, transform;
     transition-duration: var(--ohne-overlay-transition-duration);
   }
 
