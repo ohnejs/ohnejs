@@ -40,6 +40,7 @@ const FRAMEWORK_KEYS: KeyTree = {
     frameAncestors: true,
     scriptSrc: true,
     name: true,
+    favicon: true,
     install: {
       shortName: true,
       icons: true,

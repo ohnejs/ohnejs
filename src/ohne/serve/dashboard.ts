@@ -6,7 +6,7 @@ import type { HandlerContext, Route } from '../routes/route.ts';
 
 import { cspHash } from '../../utils/crypto/csp-hash.ts';
 import { etag } from '../../utils/etag/etag.ts';
-import { exists } from '../../utils/fs/index.ts';
+import { exists, findFile } from '../../utils/fs/index.ts';
 import { createImportMapResolver } from '../../utils/imports/create-import-map-resolver.ts';
 import {
   cacheControl,
@@ -23,6 +23,7 @@ import {
   languageFallbacks,
   last,
   MAX_PORT,
+  mediaCategory,
   messageGroup,
   mimeTypeFor,
   normalizeBasePath,
@@ -124,7 +125,7 @@ const KERNEL_ENTRY = `${MODULE_BASE}/dashboard/boot.ts`;
 const RELOAD_CLIENT = `${MODULE_BASE}/dashboard/runtime/reload-client.ts`;
 
 /**
- * The favicon: the ohne mark at rest, the solid dot, as an inline SVG data URI.
+ * The default favicon: the ohne mark at rest, the solid dot, as an inline SVG data URI.
  * The fills are the foundation's foreground colours, light and dark, so the tab icon matches the UI.
  */
 const FAVICON = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><style>circle{fill:%23260d1c}@media(prefers-color-scheme:dark){circle{fill:%23fafafa}}</style><circle cx='24' cy='24' r='18'/></svg>`;
@@ -297,6 +298,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const framing = `frame-ancestors ${config?.frameAncestors?.join(' ') || "'none'"}`;
   const install = config?.install;
   const name = config?.name ?? 'ohne';
+  const favicon = await faviconLink(config?.favicon, appRoots);
   const failedIcon = iconShape('cloud-off') ?? '';
   const modules = createModuleTable([...KERNEL_MOUNTS, { base: APP_MODULE_BASE, roots: appRoots }]);
   await modules.scan();
@@ -331,6 +333,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
       importmap,
       preloads([...entries, ...boot, ...pages.map((page) => page.url)], imports, scanned),
       name,
+      favicon,
       install,
     );
     response.headers.set('etag', etag(html));
@@ -705,6 +708,28 @@ function installHead(install: Install, name: string): string {
 }
 
 /**
+ * The shell's icon link: the image file `favicon` names in `appRoots`, else the ohne dot.
+ */
+async function faviconLink(favicon: string | undefined, appRoots: string[]): Promise<string> {
+  if (isUndefined(favicon)) return `<link rel="icon" type="image/svg+xml" href="${FAVICON}" />`;
+  const type = mimeTypeFor(favicon);
+  if (isUndefined(type) || mediaCategory(type) !== 'image') {
+    throw ohneError({
+      title: `Favicon \`${favicon}\` is not an image`,
+      body: ['Set `dashboard.favicon` to an image file, like `favicon.svg` or `favicon.png`.'],
+    });
+  }
+  if (isNull(await findFile(appRoots, favicon))) {
+    throw ohneError({
+      title: `Favicon \`${favicon}\` not found`,
+      body: ['Put the file in your dashboard folder, or fix the path in `dashboard.favicon`.'],
+    });
+  }
+  const href = escapeXML(appFileURL(favicon));
+  return `<link rel="icon" type="${parseMediaType(type).type}" href="${href}" />`;
+}
+
+/**
  * The served URL of `path`, a file in the dashboard folder.
  */
 function appFileURL(path: string): string {
@@ -731,6 +756,7 @@ function shellDocument(
   importmap: string,
   preload: string[],
   name: string,
+  favicon: string,
   install: Install | undefined,
 ): string {
   const config = jsonForScript({ apiURL, name, pages, boot, defaultLanguage, messageGroups });
@@ -750,7 +776,7 @@ function shellDocument(
     />
     ${themeColor(install?.themeColor)}
     <title>${escapeXML(name)}</title>
-    <link rel="icon" type="image/svg+xml" href="${FAVICON}" />${isUndefined(install) ? '' : installHead(install, name)}
+    ${favicon}${isUndefined(install) ? '' : installHead(install, name)}
     <script>${COLOR_MODE}</script>
     <style>${CANVAS}</style>
     <script type="importmap">${importmap}</script>${links}

@@ -234,6 +234,7 @@ export default defineConfig({
 | `frameAncestors` | -       | Origins of the pages allowed to show the dashboard in an iframe. Unset, no page may frame it.                                                                                         |
 | `scriptSrc`      | -       | Extra script sources, such as a CDN. Unset, the dashboard runs only its own scripts.                                                                                                  |
 | `name`           | `ohne`  | The app's name, in every tab title.                                                                                                                                                   |
+| `favicon`        | -       | The tab icon, an image file in your dashboard folder, such as `favicon.svg`. Unset, the tab shows the ohne dot.                                                                       |
 | `install`        | -       | Makes the dashboard [installable as an app](#installing-the-dashboard).                                                                                                               |
 | `menu`           | -       | The [sidebar nodes](../dashboard/pages.md#the-sidebar), keyed by id. Every layer patches them by id, so you can move, relabel, or hide what a layer declares.                         |
 

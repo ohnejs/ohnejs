@@ -704,6 +704,12 @@ export interface Config {
     name?: string;
 
     /**
+     * The tab icon, an image file in your dashboard folder, such as `favicon.svg`.
+     * Omitted, the tab shows the ohne dot.
+     */
+    favicon?: string;
+
+    /**
      * Makes the dashboard installable to a home screen or desktop as its own app.
      * Set, the dashboard serves a web app manifest at `/manifest.webmanifest`.
      * File paths are relative to your dashboard folder, so `icons/192.png` is `dashboard/icons/192.png`.

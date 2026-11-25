@@ -786,6 +786,84 @@ describe('serveDashboard', () => {
     strictEqual(body.includes('prefers-color-scheme: dark)" content'), false);
   });
 
+  it('shows the ohne dot as the favicon by default', async () => {
+    const body = (await req(await serve('favicon-default'), '/')).body;
+    match(body, /<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,<svg /);
+  });
+
+  it('links and serves the `dashboard.favicon` file, under the same policy', async () => {
+    const dir = makeApp('favicon-file');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { dashboard: { favicon: 'icons/tab.svg' } };",
+    );
+    mkdirSync(join(dir, 'dashboard', 'icons'), { recursive: true });
+    writeFileSync(join(dir, 'dashboard', 'icons', 'tab.svg'), '<svg/>');
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    const shell = await req(port, '/');
+    strictEqual(
+      shell.body.includes('<link rel="icon" type="image/svg+xml" href="/m/app/icons/tab.svg" />'),
+      true,
+    );
+    strictEqual(shell.body.includes('data:image/svg+xml'), false);
+    match(
+      shell.headers['content-security-policy'] as string,
+      /^frame-ancestors 'none'; script-src 'self'( 'sha256-[\w+/=]+'){3}$/,
+    );
+    const icon = await req(port, '/m/app/icons/tab.svg');
+    strictEqual(icon.status, 200);
+    strictEqual(icon.headers['content-type'], 'image/svg+xml; charset=utf-8');
+    strictEqual(icon.body, '<svg/>');
+  });
+
+  it("finds a stacked layer's favicon in its dashboard folder", async () => {
+    const base = makeApp('favicon-base');
+    writeFileSync(
+      join(base, 'ohne.config.ts'),
+      "export default { dashboard: { favicon: 'tab.png' } };",
+    );
+    mkdirSync(join(base, 'dashboard'));
+    writeFileSync(join(base, 'dashboard', 'tab.png'), 'png');
+    const dir = makeApp('favicon-app');
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'app', type: 'module', dependencies: { base: '*' } }),
+    );
+    writeFileSync(join(dir, 'ohne.config.ts'), "export default { layers: ['base'] }\n");
+    mkdirSync(join(dir, 'node_modules'));
+    symlinkSync(base, join(dir, 'node_modules', 'base'), 'dir');
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    const body = (await req(port, '/')).body;
+    strictEqual(body.includes('<link rel="icon" type="image/png" href="/m/app/tab.png" />'), true);
+    strictEqual((await req(port, '/m/app/tab.png')).headers['content-type'], 'image/png');
+  });
+
+  it('refuses to boot with a favicon that is not an image', async () => {
+    const dir = makeApp('favicon-type');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { dashboard: { favicon: 'sw.ts' } };",
+    );
+    mkdirSync(join(dir, 'dashboard'));
+    writeFileSync(join(dir, 'dashboard', 'sw.ts'), '');
+    await rejects(serveDashboard(dir), /Favicon `sw\.ts` is not an image/);
+  });
+
+  it('refuses to boot with a favicon outside the dashboard folder', async () => {
+    for (const favicon of ['missing.svg', '../outside.svg']) {
+      const dir = makeApp('favicon-missing');
+      writeFileSync(
+        join(dir, 'ohne.config.ts'),
+        `export default { dashboard: { favicon: '${favicon}' } };`,
+      );
+      mkdirSync(join(dir, 'dashboard'));
+      writeFileSync(join(dir, 'outside.svg'), '<svg/>');
+      await rejects(serveDashboard(dir), /Favicon `.*` not found/);
+    }
+  });
+
   it('serves the configured service worker at the root, type-stripped', async () => {
     const dir = makeApp('install-sw');
     writeFileSync(
