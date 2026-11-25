@@ -83,6 +83,46 @@ describe('select', () => {
     strictEqual(find(live, 'ohne-select-placeholder')?.textContent, 'Alliance');
   });
 
+  it('leaves out a group without choices', () => {
+    const root = select(ref<string>('cet'), () => [
+      { group: 'Europe', choices: [{ value: 'cet', label: 'CET' }] },
+      { group: 'Asia', choices: [] },
+    ]);
+    flush();
+    strictEqual(
+      textsOf(root as unknown as FakeElement, 'ohne-select-group-label').join(),
+      'Europe',
+    );
+  });
+
+  it('shows the empty line when there is nothing to pick', () => {
+    const root = select(ref<string>(''), () => []);
+    flush();
+    strictEqual(find(root, 'ohne-select-empty')?.textContent, 'Nothing here yet');
+  });
+
+  it('resizes the open list as choices arrive', () => {
+    const computed = globalThis.getComputedStyle;
+    Object.assign(window, { innerHeight: 800 });
+    Object.assign(globalThis, {
+      getComputedStyle: () => ({
+        getPropertyValue: (name: string) => (name === 'font-size' ? '16px' : ''),
+      }),
+    });
+    const loaded = ref<{ value: string }[]>([]);
+    const root = select(ref<string>(''), () => [{ group: 'Clients', choices: loaded.value }]);
+    const combobox = find(root, 'ohne-select')!;
+    const height = (): string | undefined =>
+      /height: (\d+)px/.exec(find(root, 'ohne-select-choices')?.getAttribute('style') ?? '')?.[1];
+    fire(combobox, 'click');
+    flush();
+    strictEqual(height(), '36');
+    loaded.value = [{ value: 'a' }, { value: 'b' }];
+    flush();
+    strictEqual(height(), '104');
+    Object.assign(globalThis, { getComputedStyle: computed });
+  });
+
   describe('keyboard and focus', () => {
     const choices = (): { value: string; label: string }[] => [
       { value: 'utc', label: 'UTC' },

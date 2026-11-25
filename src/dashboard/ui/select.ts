@@ -10,12 +10,13 @@ import { computed } from '../../utils/reactive/computed.ts';
 import { onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
+import { untracked } from '../../utils/reactive/untracked.ts';
 import { foldedRange } from '../../utils/search/folded-range.ts';
 import { searchByKeywords } from '../../utils/search/search-by-keywords.ts';
 import { css } from '../render/css.ts';
 import { h } from '../render/h.ts';
 import { when } from '../render/when.ts';
-import { resolveText, type Text } from '../runtime/text.ts';
+import { defaultText, resolveText, type Text } from '../runtime/text.ts';
 import { lockScroll } from './_scroll-lock.ts';
 import { type Primitive } from './button-group.ts';
 import { nearestContainer } from './container.ts';
@@ -273,6 +274,18 @@ css`
   .ohne-select-group-label-offset {
     top: 1em;
   }
+
+  .ohne-select-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(2em + 0.25rem - 2px);
+    color: hsl(var(--ohne-muted-foreground));
+  }
+
+  .ohne-select-empty span {
+    font-size: calc(1em - 0.0625rem);
+  }
 `;
 
 /**
@@ -345,6 +358,12 @@ export function select<T extends Primitive>(
   let unlockWindow: (() => void) | undefined;
   let unlockContainer: (() => void) | undefined;
 
+  const entries = (): (SelectChoice<T> | SelectChoiceGroup<T>)[] =>
+    choices().filter((entry) => !('group' in entry) || entry.choices.length > 0);
+
+  const rowCount = (): number =>
+    entries().reduce((acc, entry) => acc + ('group' in entry ? entry.choices.length + 1 : 1), 0);
+
   const flatChoices = (): SelectChoice<T>[] =>
     choices().flatMap((choice) => ('group' in choice ? choice.choices : choice));
 
@@ -385,11 +404,17 @@ export function select<T extends Primitive>(
     const pane = options.scrollContainer ?? nearestContainer(combobox);
     unlockWindow = lockScroll(document.documentElement);
     unlockContainer = pane ? lockScroll(pane) : undefined;
+    place();
+    raiseToTopLayer(choicesEl);
 
-    const items = choices().reduce(
-      (acc, choice) => acc + ('group' in choice ? choice.choices.length + 1 : 1),
-      0,
-    );
+    highlightedChoice.value = selectedChoice.value;
+    scrollToHighlighted();
+    mousePaused.value = true;
+    event?.preventDefault();
+  };
+
+  const place = (): void => {
+    const items = Math.max(rowCount(), 1);
     const { itemHeight } = calcItemSizes();
     const rootRect = combobox.getBoundingClientRect();
     const parentHeight = window.innerHeight;
@@ -418,12 +443,6 @@ export function select<T extends Primitive>(
     choicesBox.value =
       `position: fixed; top: ${rootRect.top - 1}px; left: ${rootRect.left - 1}px; ` +
       `width: ${rootRect.width + 2}px; `;
-    raiseToTopLayer(choicesEl);
-
-    highlightedChoice.value = selectedChoice.value;
-    scrollToHighlighted();
-    mousePaused.value = true;
-    event?.preventDefault();
   };
 
   const close = (event?: Event): void => {
@@ -513,7 +532,7 @@ export function select<T extends Primitive>(
     const { em, itemHeight } = calcItemSizes();
     let offset = 0;
     let found = false;
-    for (const entry of choices()) {
+    for (const entry of entries()) {
       if ('group' in entry) {
         for (const { value } of entry.choices) {
           if (value === highlightedChoice.value?.value) {
@@ -636,8 +655,16 @@ export function select<T extends Primitive>(
     );
 
   const scrollableEl = scrollable(
-    () =>
-      choices().map((entry) =>
+    () => {
+      const shown = entries();
+      if (shown.length === 0) {
+        return h(
+          'span',
+          { class: 'ohne-select-empty' },
+          h('span', null, () => defaultText('dashboard.noItems', 'Nothing here yet')),
+        );
+      }
+      return shown.map((entry) =>
         'group' in entry
           ? h(
               'div',
@@ -654,7 +681,8 @@ export function select<T extends Primitive>(
               entry.choices.map(choiceRow),
             )
           : choiceRow(entry),
-      ),
+      );
+    },
     {
       onScrollStep: scrollChoices,
       expose: (handle) => {
@@ -747,6 +775,11 @@ export function select<T extends Primitive>(
     fieldIcon('selector'),
     choicesEl,
   );
+
+  effect(() => {
+    rowCount();
+    if (untracked(() => isExpanded.value)) place();
+  });
 
   if (options.id) {
     listenTrigger(`focus:${options.id}`, () => {
