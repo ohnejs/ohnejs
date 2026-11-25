@@ -183,6 +183,7 @@ export * from './layers/use-layers.ts';
 export * from './layers/validate-config-dirs.ts';
 export * from './layers/validate-config-keys.ts';
 export * from './layers/validate-frame-ancestors.ts';
+export * from './layers/validate-script-src.ts';
 export * from './lifecycle/on-shutdown.ts';
 export * from './lifecycle/use-shutdown.ts';
 export * from './messages/collect-messages.ts';

@@ -1,8 +1,10 @@
+import type { Config } from '../layers/config.ts';
 import type { MessageMeta } from '../messages/messages.ts';
 import type { MessageCatalog } from '../messages/use-messages.ts';
 import type { OhneLayer } from '../project/resolve-ohne-layers.ts';
 import type { HandlerContext, Route } from '../routes/route.ts';
 
+import { cspHash } from '../../utils/crypto/csp-hash.ts';
 import { etag } from '../../utils/etag/etag.ts';
 import { exists } from '../../utils/fs/index.ts';
 import { createImportMapResolver } from '../../utils/imports/create-import-map-resolver.ts';
@@ -22,7 +24,9 @@ import {
   last,
   MAX_PORT,
   messageGroup,
+  mimeTypeFor,
   normalizeBasePath,
+  parseMediaType,
   type PageRoute,
   relativePath,
   resolveCatalog,
@@ -126,12 +130,73 @@ const RELOAD_CLIENT = `${MODULE_BASE}/dashboard/runtime/reload-client.ts`;
 const FAVICON = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><style>circle{fill:%23260d1c}@media(prefers-color-scheme:dark){circle{fill:%23fafafa}}</style><circle cx='24' cy='24' r='18'/></svg>`;
 
 /**
+ * Where the dashboard serves its web app manifest, once `dashboard.install` is set.
+ */
+const MANIFEST_PATH = '/manifest.webmanifest';
+
+/**
+ * Where the dashboard serves `dashboard.install.serviceWorker`, at the root so its scope is every page.
+ */
+const SERVICE_WORKER_PATH = '/sw.js';
+
+/**
+ * The installed app's settings, `dashboard.install`.
+ */
+type Install = NonNullable<NonNullable<Config['dashboard']>['install']>;
+
+const LIGHT_CANVAS = 'hsl(210 22.2% 96.5%)';
+const DARK_CANVAS = 'hsl(234 16.7% 11.8%)';
+
+/**
+ * The pre-paint script that sets the color mode class, so a dark page never flashes light.
+ */
+const COLOR_MODE = `
+      try {
+        var mode = localStorage.getItem('ohne-color-mode');
+        var dark =
+          mode === 'dark' ||
+          (mode !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.add(dark ? 'dark' : 'light');
+      } catch {}
+    `;
+
+/**
+ * The script that reloads once over a failed kernel load, then shows the boot failure state.
+ */
+const BOOT_GUARD = `
+      {
+        const kernel = document.getElementById('ohne-boot');
+        const fail = (event) => {
+          if (event.target !== window && event.target !== kernel) return;
+          removeEventListener('error', fail, true);
+          try {
+            if (sessionStorage.getItem('${RELOADED}') === null) {
+              sessionStorage.setItem('${RELOADED}', '1');
+              return location.reload();
+            }
+          } catch {}
+          const failed = document.getElementById('ohne-boot-failed').content.cloneNode(true);
+          failed.querySelector('button').addEventListener('click', () => location.reload());
+          document.getElementById('app').replaceChildren(failed);
+        };
+        addEventListener('error', fail, true);
+        const booted = () => {
+          removeEventListener('error', fail, true);
+          try {
+            sessionStorage.removeItem('${RELOADED}');
+          } catch {}
+        };
+        addEventListener('ohne-booted', booted, { once: true });
+      }
+    `;
+
+/**
  * The background the shell paints before the kernel's stylesheets load, copied from `--ohne-background`.
  * No stylesheet sets `color-scheme` later, so this is the document's only one.
  */
 const CANVAS = `
-      :root { color-scheme: light; background: hsl(210 22.2% 96.5%) }
-      .dark { color-scheme: dark; background: hsl(234 16.7% 11.8%) }
+      :root { color-scheme: light; background: ${LIGHT_CANVAS} }
+      .dark { color-scheme: dark; background: ${DARK_CANVAS} }
     `;
 
 /**
@@ -230,6 +295,8 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   const defaultLanguage = resolveDefaultLanguage();
   const reload = useEnv().get('DASHBOARD_RELOAD');
   const framing = `frame-ancestors ${config?.frameAncestors?.join(' ') || "'none'"}`;
+  const install = config?.install;
+  const name = config?.name ?? 'ohne';
   const failedIcon = iconShape('cloud-off') ?? '';
   const modules = createModuleTable([...KERNEL_MOUNTS, { base: APP_MODULE_BASE, roots: appRoots }]);
   await modules.scan();
@@ -238,7 +305,6 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   // A framed dashboard could be clickjacked into a save or a delete; only listed pages may frame it.
   const renderShell = async (): Promise<string | undefined> => {
     const response = useResponse();
-    response.headers.set('content-security-policy', framing);
     response.headers.set('cache-control', cacheControl({ noCache: true }));
     const scanned = await modules.scan();
     const messages = await loadMessages(layers);
@@ -247,6 +313,11 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
       (file) => `${APP_MODULE_BASE}/${file.module}`,
     );
     const imports = importMap(scanned);
+    const importmap = jsonForScript({ imports });
+    response.headers.set(
+      'content-security-policy',
+      `${framing}; ${scriptPolicy(importmap, config?.scriptSrc ?? [])}`,
+    );
     const entries = reload ? [KERNEL_ENTRY, RELOAD_CLIENT] : [KERNEL_ENTRY];
     const html = shellDocument(
       apiURL,
@@ -257,7 +328,10 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
       bootFailed(messages, defaultLanguage, failedIcon),
       reload,
       imports,
+      importmap,
       preloads([...entries, ...boot, ...pages.map((page) => page.url)], imports, scanned),
+      name,
+      install,
     );
     response.headers.set('etag', etag(html));
 
@@ -269,6 +343,7 @@ export async function serveDashboard(from: string = process.cwd()): Promise<HTTP
   };
 
   const routes: Route[] = [
+    ...installRoutes(install, name, appRoots),
     synthetic('/', renderShell),
     synthetic('/[...path]', renderShell),
     synthetic(`${APP_MODULE_BASE}/[...path]`, ({ params }: HandlerContext) =>
@@ -559,6 +634,84 @@ function preloads(
 }
 
 /**
+ * The `script-src` directive that allows the dashboard's own origin, `sources`, and the shell's inline scripts.
+ * The importmap changes with every module's bytes, so its hash is taken from the `importmap` being served.
+ */
+function scriptPolicy(importmap: string, sources: string[]): string {
+  const hashes = [COLOR_MODE, importmap, BOOT_GUARD].map(cspHash);
+  return ['script-src', "'self'", ...hashes, ...sources].join(' ');
+}
+
+/**
+ * The routes that make the dashboard installable: its web app manifest and the optional service worker.
+ */
+function installRoutes(install: Install | undefined, name: string, appRoots: string[]): Route[] {
+  if (isUndefined(install)) return [];
+  const manifest = synthetic(MANIFEST_PATH, () => {
+    const response = useResponse();
+    response.headers.set('content-type', 'application/manifest+json');
+    response.headers.set('cache-control', cacheControl({ noCache: true }));
+    return JSON.stringify(webManifest(install, name));
+  });
+  const worker = install.serviceWorker;
+  if (isUndefined(worker)) return [manifest];
+  return [manifest, synthetic(SERVICE_WORKER_PATH, () => sendFile(appRoots, worker))];
+}
+
+/**
+ * The web app manifest for `install`, a standalone app that starts at, and spans, the dashboard's root.
+ */
+function webManifest(install: Install, name: string): Record<string, unknown> {
+  return {
+    name,
+    short_name: install.shortName,
+    start_url: '/',
+    scope: '/',
+    display: 'standalone',
+    theme_color: install.themeColor,
+    background_color: install.backgroundColor,
+    icons: (install.icons ?? []).map((icon) => {
+      const type = mimeTypeFor(icon.src);
+      return {
+        src: appFileURL(icon.src),
+        sizes: icon.sizes,
+        type: isUndefined(type) ? undefined : parseMediaType(type).type,
+        purpose: icon.purpose,
+      };
+    }),
+  };
+}
+
+/**
+ * The shell's `theme-color`: the configured `color`, else the canvas in each color scheme.
+ */
+function themeColor(color: string | undefined): string {
+  if (!isUndefined(color)) return `<meta name="theme-color" content="${escapeXML(color)}" />`;
+  return `<meta name="theme-color" media="(prefers-color-scheme: light)" content="${LIGHT_CANVAS}" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="${DARK_CANVAS}" />`;
+}
+
+/**
+ * The head tags of an installable dashboard: the manifest link, and the home-screen tags iOS reads.
+ */
+function installHead(install: Install, name: string): string {
+  const touchIcon = isUndefined(install.appleTouchIcon)
+    ? ''
+    : `\n    <link rel="apple-touch-icon" href="${escapeXML(appFileURL(install.appleTouchIcon))}" />`;
+  return `
+    <link rel="manifest" href="${MANIFEST_PATH}" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="${escapeXML(install.shortName ?? name)}" />${touchIcon}`;
+}
+
+/**
+ * The served URL of `path`, a file in the dashboard folder.
+ */
+function appFileURL(path: string): string {
+  return joinPath(APP_MODULE_BASE, path);
+}
+
+/**
  * The single-page shell: the pre-paint color-mode script, the config, the importmap, and the kernel.
  * A module script's `src` and a preload's `href` skip the importmap, so the shell writes fingerprinted URLs.
  * The preloads follow the importmap, since a browser ignores an importmap that comes after a module fetch.
@@ -575,9 +728,12 @@ function shellDocument(
   failed: string,
   reload: boolean,
   imports: Record<string, string>,
+  importmap: string,
   preload: string[],
+  name: string,
+  install: Install | undefined,
 ): string {
-  const config = jsonForScript({ apiURL, pages, boot, defaultLanguage, messageGroups });
+  const config = jsonForScript({ apiURL, name, pages, boot, defaultLanguage, messageGroups });
   const links = preload
     .map((href) => `\n    <link rel="modulepreload" href="${escapeXML(href)}" />`)
     .join('');
@@ -588,52 +744,23 @@ function shellDocument(
 <html lang="${defaultLanguage}">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ohne</title>
-    <link rel="icon" type="image/svg+xml" href="${FAVICON}" />
-    <script>
-      try {
-        var mode = localStorage.getItem('ohne-color-mode');
-        var dark =
-          mode === 'dark' ||
-          (mode !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.classList.add(dark ? 'dark' : 'light');
-      } catch {}
-    </script>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    ${themeColor(install?.themeColor)}
+    <title>${escapeXML(name)}</title>
+    <link rel="icon" type="image/svg+xml" href="${FAVICON}" />${isUndefined(install) ? '' : installHead(install, name)}
+    <script>${COLOR_MODE}</script>
     <style>${CANVAS}</style>
-    <script type="importmap">${jsonForScript({ imports })}</script>${links}
+    <script type="importmap">${importmap}</script>${links}
   </head>
   <body>
     <div id="app"></div>
     ${failed}
     <script type="application/json" id="ohne-config">${config}</script>
     <script type="module" src="${imports[KERNEL_ENTRY] ?? KERNEL_ENTRY}" id="ohne-boot"></script>
-    <script>
-      {
-        const kernel = document.getElementById('ohne-boot');
-        const fail = (event) => {
-          if (event.target !== window && event.target !== kernel) return;
-          removeEventListener('error', fail, true);
-          try {
-            if (sessionStorage.getItem('${RELOADED}') === null) {
-              sessionStorage.setItem('${RELOADED}', '1');
-              return location.reload();
-            }
-          } catch {}
-          const failed = document.getElementById('ohne-boot-failed').content.cloneNode(true);
-          failed.querySelector('button').addEventListener('click', () => location.reload());
-          document.getElementById('app').replaceChildren(failed);
-        };
-        addEventListener('error', fail, true);
-        const booted = () => {
-          removeEventListener('error', fail, true);
-          try {
-            sessionStorage.removeItem('${RELOADED}');
-          } catch {}
-        };
-        addEventListener('ohne-booted', booted, { once: true });
-      }
-    </script>${reloadClient}
+    <script>${BOOT_GUARD}</script>${reloadClient}
   </body>
 </html>
 `;

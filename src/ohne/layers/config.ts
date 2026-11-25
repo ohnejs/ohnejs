@@ -689,6 +689,99 @@ export interface Config {
     frameAncestors?: string[];
 
     /**
+     * Extra sources the dashboard may run scripts from, such as `https://cdn.example.com`.
+     * Unset, the dashboard runs only its own scripts.
+     * A stacked layer's list never reaches the app.
+     */
+    scriptSrc?: string[];
+
+    /**
+     * The app's name, in every tab title and as the installed app's name.
+     *
+     * @default
+     * 'ohne'
+     */
+    name?: string;
+
+    /**
+     * Makes the dashboard installable to a home screen or desktop as its own app.
+     * Set, the dashboard serves a web app manifest at `/manifest.webmanifest`.
+     * File paths are relative to your dashboard folder, so `icons/192.png` is `dashboard/icons/192.png`.
+     * A stacked layer's `install` never reaches the app, since its service worker would control every page.
+     *
+     * @example
+     * ```ts
+     * {
+     *   shortName: 'Acme',
+     *   icons: [
+     *     { src: 'icons/192.png', sizes: '192x192' },
+     *     { src: 'icons/512.png', sizes: '512x512' },
+     *     { src: 'icons/maskable.png', sizes: '512x512', purpose: 'maskable' },
+     *   ],
+     *   appleTouchIcon: 'icons/180.png',
+     *   serviceWorker: 'sw.ts',
+     * }
+     * ```
+     */
+    install?: {
+      /**
+       * The name under the home-screen icon, where `dashboard.name` would not fit.
+       * Omitted, the home screen shows `dashboard.name`.
+       */
+      shortName?: string;
+
+      /**
+       * The app icons, each a PNG or SVG file with its `sizes`, such as `192x192`.
+       *
+       * @default
+       * []
+       */
+      icons?: {
+        /**
+         * The icon file.
+         */
+        src: string;
+
+        /**
+         * The icon's pixel size, such as `512x512`, or `any` for an SVG.
+         */
+        sizes: string;
+
+        /**
+         * A `maskable` icon fills its square edge to edge, so a launcher can crop it to any shape.
+         * A `monochrome` icon is one color on transparent, tinted by the system.
+         *
+         * @default
+         * 'any'
+         */
+        purpose?: 'any' | 'maskable' | 'monochrome';
+      }[];
+
+      /**
+       * The home-screen icon on iOS, an opaque 180 by 180 PNG, which iOS prefers over `icons`.
+       */
+      appleTouchIcon?: string;
+
+      /**
+       * The color of the browser bar and the installed app's title bar, such as `#0f172a`.
+       * Omitted, it follows the dashboard's background in light and dark mode.
+       */
+      themeColor?: string;
+
+      /**
+       * The color of the splash screen while the installed app starts.
+       */
+      backgroundColor?: string;
+
+      /**
+       * A service worker file, served at `/sw.js` so it can control the whole dashboard.
+       * A `.ts` file is served type-stripped, so keep it self-contained: only type imports.
+       * Register it from a boot file with `navigator.serviceWorker.register('/sw.js')`.
+       */
+      serviceWorker?: string;
+    };
+
+    /**
      * The dashboard sidebar, as nodes keyed by id.
      * Every layer patches the nodes by id, field by field, so a closer layer reshapes a deeper one's.
      * A collection is a node keyed by its name, placed under `collections` unless it names a `parent`.
@@ -951,6 +1044,8 @@ export const BASE_STRATEGIES: LayerStrategies = {
   'dashboard.apiURL': 'own',
   'dashboard.origin': 'own',
   'dashboard.frameAncestors': 'own',
+  'dashboard.scriptSrc': 'own',
+  'dashboard.install': 'own',
   'dashboard.menu': 'assign-entries',
   'database.dialect': 'own',
   'database.url': 'own',

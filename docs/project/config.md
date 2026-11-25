@@ -232,12 +232,50 @@ export default defineConfig({
 | `apiURL`         | -       | Absolute base URL of the API the browser calls, including any `api.basePath`. Unset, it is derived from `api`.                                                                        |
 | `origin`         | -       | Absolute origin the browser reaches the dashboard at. The API's [CORS](../api/middleware.md#cors) accepts credentialed requests from it. Unset, it is derived from `host` and `port`. |
 | `frameAncestors` | -       | Origins of the pages allowed to show the dashboard in an iframe. Unset, no page may frame it.                                                                                         |
+| `scriptSrc`      | -       | Extra script sources, such as a CDN. Unset, the dashboard runs only its own scripts.                                                                                                  |
+| `name`           | `ohne`  | The app's name, in every tab title.                                                                                                                                                   |
+| `install`        | -       | Makes the dashboard [installable as an app](#installing-the-dashboard).                                                                                                               |
 | `menu`           | -       | The [sidebar nodes](../dashboard/pages.md#the-sidebar), keyed by id. Every layer patches them by id, so you can move, relabel, or hide what a layer declares.                         |
 
 The defaults fit local development, where the browser reaches both servers directly. In production,
 give `apiURL` and `origin` the public URLs instead.
 [Deployment](../production/deployment.md#what-a-deploy-needs) covers the pair behind a proxy, where
 a wrong `origin` makes the browser block every dashboard request.
+
+### Installing the dashboard
+
+Set `install` and the dashboard serves a web app manifest, so a phone can add it to the home
+screen and a desktop browser can install it as its own window.
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  dashboard: {
+    name: 'Acme Admin',
+    install: {
+      shortName: 'Acme',
+      icons: [
+        { src: 'icons/192.png', sizes: '192x192' },
+        { src: 'icons/512.png', sizes: '512x512' },
+      ],
+      appleTouchIcon: 'icons/180.png',
+      serviceWorker: 'sw.ts',
+    },
+  },
+});
+```
+
+Paths are relative to your dashboard folder. The service worker is served at `/sw.js`, so it
+controls every dashboard page. It is served on its own, so it can import types but no code. Register
+it from a [boot file](../dashboard/pages.md#boot-files):
+
+```ts
+// dashboard/boot/service-worker.ts
+navigator.serviceWorker.register('/sw.js');
+```
 
 ## The database
 
@@ -349,8 +387,8 @@ Some keys resolve differently:
 - **Own** - never inherited. A layer's value applies to that layer alone. An own key you leave unset
   takes the framework default, even if a layer sets it. These are `dirs`, `printer`, `api.port`,
   `api.host`, `dashboard.port`, `dashboard.host`, `dashboard.apiURL`, `dashboard.origin`,
-  `dashboard.frameAncestors`, `database.dialect`, `database.url`, and
-  `database.sync.force`.
+  `dashboard.frameAncestors`, `dashboard.scriptSrc`, `dashboard.install`, `database.dialect`,
+  `database.url`, and `database.sync.force`.
 
 A base layer and your project both set `api`:
 

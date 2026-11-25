@@ -38,6 +38,16 @@ const FRAMEWORK_KEYS: KeyTree = {
     apiURL: true,
     origin: true,
     frameAncestors: true,
+    scriptSrc: true,
+    name: true,
+    install: {
+      shortName: true,
+      icons: true,
+      appleTouchIcon: true,
+      themeColor: true,
+      backgroundColor: true,
+      serviceWorker: true,
+    } satisfies Section<NonNullable<Config['dashboard']>['install']>,
     menu: true,
   } satisfies Section<Config['dashboard']>,
   database: {

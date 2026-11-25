@@ -7,6 +7,7 @@ import { joinPath } from '../../utils/index.ts';
 import { validateMenu } from '../dashboard/validate-menu.ts';
 import { validateConfigDirs } from '../layers/validate-config-dirs.ts';
 import { validateFrameAncestors } from '../layers/validate-frame-ancestors.ts';
+import { validateScriptSrc } from '../layers/validate-script-src.ts';
 
 /**
  * A directory's config, split by ownership.
@@ -77,6 +78,8 @@ export async function readLayerConfig(
   if (input.dirs) validateConfigDirs(input.dirs, configFile);
   const frameAncestors = input.dashboard?.frameAncestors;
   if (frameAncestors) validateFrameAncestors(frameAncestors, configFile);
+  const scriptSrc = input.dashboard?.scriptSrc;
+  if (scriptSrc) validateScriptSrc(scriptSrc, configFile);
   validateMenu(input.dashboard?.menu, configFile);
 
   const layerFile = joinPath(dir, 'ohne.layer.ts');

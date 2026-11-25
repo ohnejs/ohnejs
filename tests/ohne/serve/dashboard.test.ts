@@ -1,6 +1,7 @@
 import type { AddressInfo } from 'node:net';
 
 import { deepStrictEqual, match, notStrictEqual, rejects, strictEqual } from 'node:assert';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -45,6 +46,22 @@ function importsOf(body: string): Record<string, string> {
   return (JSON.parse(map) as { imports: Record<string, string> }).imports;
 }
 
+/**
+ * The text of every inline script a browser runs, so a JSON data block is left out.
+ */
+function inlineScripts(body: string): string[] {
+  return [...body.matchAll(/<script(?: type="importmap")?>(.*?)<\/script>/gs)].map(
+    (m) => m[1] ?? '',
+  );
+}
+
+/**
+ * The `frame-ancestors` directive of a response's policy.
+ */
+function framingOf(res: { headers: Record<string, unknown> }): string {
+  return String(res.headers['content-security-policy']).split('; ')[0]!;
+}
+
 describe('serveDashboard', () => {
   let root: string;
   let http: HTTPServer | undefined;
@@ -58,6 +75,13 @@ describe('serveDashboard', () => {
 
   async function serve(name: string): Promise<number> {
     http = await serveDashboard(makeApp(name));
+    return (http.server.address() as AddressInfo).port;
+  }
+
+  async function serveWith(name: string, config: string): Promise<number> {
+    const dir = makeApp(name);
+    writeFileSync(join(dir, 'ohne.config.ts'), `export default ${config};\n`);
+    http = await serveDashboard(dir);
     return (http.server.address() as AddressInfo).port;
   }
 
@@ -113,7 +137,7 @@ describe('serveDashboard', () => {
   it('refuses to be framed by any page', async () => {
     const port = await serve('frame');
     const res = await req(port, '/collections/pages');
-    strictEqual(res.headers['content-security-policy'], "frame-ancestors 'none'");
+    strictEqual(framingOf(res), "frame-ancestors 'none'");
   });
 
   it('lets only the listed origins frame it', async () => {
@@ -125,8 +149,8 @@ describe('serveDashboard', () => {
     http = await serveDashboard(dir);
     const port = (http.server.address() as AddressInfo).port;
     const policy = 'frame-ancestors https://ohne.dev http://localhost:3000';
-    strictEqual((await req(port, '/')).headers['content-security-policy'], policy);
-    strictEqual((await req(port, '/collections/pages')).headers['content-security-policy'], policy);
+    strictEqual(framingOf(await req(port, '/')), policy);
+    strictEqual(framingOf(await req(port, '/collections/pages')), policy);
   });
 
   it('refuses framing when the list is empty', async () => {
@@ -137,7 +161,7 @@ describe('serveDashboard', () => {
     );
     http = await serveDashboard(dir);
     const res = await req((http.server.address() as AddressInfo).port, '/');
-    strictEqual(res.headers['content-security-policy'], "frame-ancestors 'none'");
+    strictEqual(framingOf(res), "frame-ancestors 'none'");
   });
 
   it("never inherits a stacked layer's frame ancestors", async () => {
@@ -156,7 +180,7 @@ describe('serveDashboard', () => {
     symlinkSync(base, join(dir, 'node_modules', 'base'), 'dir');
     http = await serveDashboard(dir);
     const res = await req((http.server.address() as AddressInfo).port, '/');
-    strictEqual(res.headers['content-security-policy'], "frame-ancestors 'none'");
+    strictEqual(framingOf(res), "frame-ancestors 'none'");
   });
 
   it('refuses to boot with an invalid frame ancestor', async () => {
@@ -699,5 +723,151 @@ describe('serveDashboard', () => {
     strictEqual(typeof tag, 'string');
     const second = await req(port, '/m/icon/note', { 'if-none-match': tag as string });
     strictEqual(second.status, 304);
+  });
+
+  it('is not installable unless configured', async () => {
+    const port = await serve('install-off');
+    const body = (await req(port, '/')).body;
+    strictEqual(body.includes('<title>ohne</title>'), true);
+    strictEqual(body.includes('"name":"ohne"'), true);
+    strictEqual(body.includes('rel="manifest"'), false);
+    strictEqual(body.includes('apple-mobile-web-app'), false);
+    match(body, /name="theme-color" media="\(prefers-color-scheme: dark\)"/);
+    strictEqual((await req(port, '/manifest.webmanifest')).body, body);
+    strictEqual((await req(port, '/sw.js')).body, body);
+  });
+
+  it('serves a standalone web app manifest under `dashboard.install`', async () => {
+    const port = await serveWith(
+      'install-manifest',
+      `{ dashboard: { name: 'Acme Admin', install: {
+        shortName: 'Acme',
+        themeColor: '#0f172a',
+        backgroundColor: '#ffffff',
+        icons: [
+          { src: 'icons/512.png', sizes: '512x512' },
+          { src: 'icons/mark.svg', sizes: 'any', purpose: 'maskable' },
+        ],
+      } } }`,
+    );
+    const res = await req(port, '/manifest.webmanifest');
+    strictEqual(res.status, 200);
+    strictEqual(res.headers['content-type'], 'application/manifest+json');
+    deepStrictEqual(JSON.parse(res.body), {
+      name: 'Acme Admin',
+      short_name: 'Acme',
+      start_url: '/',
+      scope: '/',
+      display: 'standalone',
+      theme_color: '#0f172a',
+      background_color: '#ffffff',
+      icons: [
+        { src: '/m/app/icons/512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/m/app/icons/mark.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+      ],
+    });
+  });
+
+  it('names the shell after the app and links its manifest and home-screen icon', async () => {
+    const port = await serveWith(
+      'install-head',
+      `{ dashboard: { name: 'Acme & Co', install: {
+        appleTouchIcon: 'icons/180.png',
+        themeColor: '#0f172a',
+      } } }`,
+    );
+    const body = (await req(port, '/')).body;
+    strictEqual(body.includes('<title>Acme &amp; Co</title>'), true);
+    strictEqual(body.includes('"name":"Acme & Co"'), true);
+    strictEqual(body.includes('<link rel="manifest" href="/manifest.webmanifest" />'), true);
+    strictEqual(body.includes('<link rel="apple-touch-icon" href="/m/app/icons/180.png" />'), true);
+    strictEqual(body.includes('name="apple-mobile-web-app-title" content="Acme &amp; Co"'), true);
+    strictEqual(body.includes('<meta name="theme-color" content="#0f172a" />'), true);
+    strictEqual(body.includes('prefers-color-scheme: dark)" content'), false);
+  });
+
+  it('serves the configured service worker at the root, type-stripped', async () => {
+    const dir = makeApp('install-sw');
+    writeFileSync(
+      join(dir, 'ohne.config.ts'),
+      "export default { dashboard: { install: { serviceWorker: 'sw.ts' } } };",
+    );
+    mkdirSync(join(dir, 'dashboard'));
+    writeFileSync(join(dir, 'dashboard', 'sw.ts'), 'const version: number = 1;\n');
+    http = await serveDashboard(dir);
+    const res = await req((http.server.address() as AddressInfo).port, '/sw.js');
+    strictEqual(res.status, 200);
+    match(res.headers['content-type'] as string, /javascript/);
+    strictEqual(res.headers['cache-control'], 'no-cache');
+    match(res.body, /^const version\s+= 1;/);
+  });
+
+  it('allows scripts only from itself, by hash for each inline one, plus `scriptSrc`', async () => {
+    const port = await serveWith(
+      'csp-scripts',
+      "{ dashboard: { scriptSrc: ['https://cdn.example.com'] } }",
+    );
+    const res = await req(port, '/');
+    const policy = res.headers['content-security-policy'] as string;
+    const [framing, scripts] = policy.split('; ');
+    strictEqual(framing, "frame-ancestors 'none'");
+    const sources = (scripts ?? '').split(' ');
+    strictEqual(sources[0], 'script-src');
+    strictEqual(sources[1], "'self'");
+    strictEqual(sources.at(-1), 'https://cdn.example.com');
+    const inline = inlineScripts(res.body);
+    strictEqual(inline.length, 3);
+    for (const text of inline) {
+      const hash = `'sha256-${createHash('sha256').update(text).digest('base64')}'`;
+      strictEqual(sources.includes(hash), true);
+    }
+  });
+
+  it('runs only its own scripts by default', async () => {
+    const port = await serve('csp-default');
+    const policy = (await req(port, '/')).headers['content-security-policy'] as string;
+    match(policy, /; script-src 'self'( 'sha256-[\w+/=]+'){3}$/);
+  });
+
+  it("never inherits a stacked layer's script sources", async () => {
+    const base = makeApp('csp-base');
+    writeFileSync(
+      join(base, 'ohne.config.ts'),
+      "export default { dashboard: { scriptSrc: ['https://evil.example'] } };",
+    );
+    const dir = makeApp('csp-app');
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'app', type: 'module', dependencies: { base: '*' } }),
+    );
+    writeFileSync(join(dir, 'ohne.config.ts'), "export default { layers: ['base'] }\n");
+    mkdirSync(join(dir, 'node_modules'));
+    symlinkSync(base, join(dir, 'node_modules', 'base'), 'dir');
+    http = await serveDashboard(dir);
+    const res = await req((http.server.address() as AddressInfo).port, '/');
+    strictEqual(String(res.headers['content-security-policy']).includes('evil'), false);
+  });
+
+  it("never inherits a stacked layer's `install`", async () => {
+    const base = makeApp('install-base');
+    writeFileSync(
+      join(base, 'ohne.config.ts'),
+      "export default { dashboard: { install: { serviceWorker: 'sw.ts' } } };",
+    );
+    mkdirSync(join(base, 'dashboard'));
+    writeFileSync(join(base, 'dashboard', 'sw.ts'), 'const version = 1;\n');
+    const dir = makeApp('install-app');
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: 'app', type: 'module', dependencies: { base: '*' } }),
+    );
+    writeFileSync(join(dir, 'ohne.config.ts'), "export default { layers: ['base'] }\n");
+    mkdirSync(join(dir, 'node_modules'));
+    symlinkSync(base, join(dir, 'node_modules', 'base'), 'dir');
+    http = await serveDashboard(dir);
+    const port = (http.server.address() as AddressInfo).port;
+    const shell = (await req(port, '/')).body;
+    strictEqual(shell.includes('rel="manifest"'), false);
+    strictEqual((await req(port, '/sw.js')).body, shell);
   });
 });
