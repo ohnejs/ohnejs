@@ -374,6 +374,7 @@ export default defineConfig({
 });
 ```
 
+- Passkeys need the [`COOKIE_SECRET`](../project/env.md#the-built-ins) env var.
 - A passkey belongs to a domain, by default the dashboard's host name. If users sign in elsewhere,
   pass it as `passkeys: { rpID: 'example.com', origin: 'https://example.com' }`. Changing it later
   orphans every passkey.
