@@ -16,6 +16,12 @@ describe('decodeText', () => {
     throws(() => decodeText(new Uint8Array([0xff])), TypeError);
   });
 
+  it('drops a leading byte order mark unless asked to keep it', () => {
+    const bytes = new Uint8Array([0xef, 0xbb, 0xbf, 0x61]);
+    strictEqual(decodeText(bytes), 'a');
+    strictEqual(decodeText(bytes, { keepBOM: true }), '\uFEFFa');
+  });
+
   it('stays usable after a throw', () => {
     throws(() => decodeText(new Uint8Array([0xff])));
     strictEqual(decodeText(new TextEncoder().encode('ok')), 'ok');

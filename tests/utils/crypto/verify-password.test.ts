@@ -38,5 +38,6 @@ describe('verifyPassword', () => {
     strictEqual(await verifyPassword('hunter2', 'scrypt$32768$8$1$onlyfourfields'), false);
     strictEqual(await verifyPassword('hunter2', 'scrypt$32768$8$1$c2FsdA$'), false);
     strictEqual(await verifyPassword('hunter2', ''), false);
+    strictEqual(await verifyPassword('hunter2', null), false);
   });
 });

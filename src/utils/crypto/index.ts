@@ -1,3 +1,4 @@
+export * from './csp-hash.ts';
 export * from './digest.ts';
 export * from './fingerprint.ts';
 export * from './hash-password.ts';

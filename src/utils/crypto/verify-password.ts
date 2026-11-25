@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 
+import { isNull } from '../is/is-null.ts';
 import { scryptDerive } from './_scrypt.ts';
 
 /**
@@ -7,16 +8,18 @@ import { scryptDerive } from './_scrypt.ts';
  * The stored parameters drive the derivation, so an old hash still verifies after the cost is raised.
  * The comparison is constant-time, so its duration never reveals how close a wrong password was.
  *
- * A malformed or unparseable stored hash can never match a password, so it returns `false`, never throws.
+ * A missing, malformed or unparseable stored hash never matches, so it returns `false`, never throws.
  *
  * @example
  * ```ts
  * const stored = await hashPassword('hunter2')
  * await verifyPassword('hunter2', stored) // -> true
  * await verifyPassword('wrong', stored)   // -> false
+ * await verifyPassword('hunter2', null)   // -> false
  * ```
  */
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+export async function verifyPassword(password: string, stored: string | null): Promise<boolean> {
+  if (isNull(stored)) return false;
   const parts = stored.split('$');
   if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
 
