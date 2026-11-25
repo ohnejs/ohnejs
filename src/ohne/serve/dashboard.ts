@@ -472,7 +472,6 @@ function serveFrom(
  *
  * Adds the event-stream route the browser subscribes to and tracks every open stream.
  * A `'reload'` IPC message from the dev supervisor, sent on a dashboard-file change, broadcasts to them.
- * On shutdown the streams close first, so an idle one never holds the server's drain open.
  */
 function liveReload(routes: Route[]): void {
   const clients = new Set<EventStream>();
@@ -487,10 +486,7 @@ function liveReload(routes: Route[]): void {
     if (message === 'reload') for (const client of clients) client.send('reload');
   };
   process.on('message', onMessage);
-  onShutdown(() => {
-    process.off('message', onMessage);
-    for (const client of clients) client.close();
-  });
+  onShutdown(() => void process.off('message', onMessage));
 }
 
 /**

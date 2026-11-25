@@ -103,7 +103,7 @@ export function streamStep(
   run: StepRun,
   opening?: { event: string; data: unknown },
 ): ReadableStream<Uint8Array> {
-  const stream = sendEvents({ heartbeat: HEARTBEAT, onClose: run.release });
+  const stream = sendEvents({ heartbeat: HEARTBEAT, drain: true, onClose: run.release });
   if (!isUndefined(opening)) send(stream, opening.event, opening.data);
   useEvent().waitUntil(runStep(run, stream).finally(() => stream.close()));
   return stream.body;

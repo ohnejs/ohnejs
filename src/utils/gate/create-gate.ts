@@ -41,8 +41,9 @@ export interface Gate {
    * Returns `null` the moment the gate is closing or closed, so the caller refuses the new unit.
    * The release fn is idempotent: a second call is a no-op.
    * `onCancel` is how `cancel` asks this unit to stop while it is in flight.
+   * `onClose` is how `close` asks it to finish early, as the drain begins.
    */
-  enter(onCancel?: (reason: unknown) => void): (() => void) | null;
+  enter(onCancel?: (reason: unknown) => void, onClose?: () => void): (() => void) | null;
 
   /**
    * Asks every unit still in flight to stop, calling the `onCancel` each passed to `enter` with `reason`.
@@ -104,7 +105,7 @@ export interface Gate {
  */
 export function createGate(): Gate {
   let state: 'open' | 'closing' | 'closed' = 'open';
-  const units = new Set<{ onCancel?: (reason: unknown) => void }>();
+  const units = new Set<{ onCancel?: (reason: unknown) => void; onClose?: () => void }>();
   let closePromise: Promise<GateDrain> | undefined;
   let onDrained: (() => void) | undefined;
   let idle: PromiseWithResolvers<void> | undefined;
@@ -120,9 +121,9 @@ export function createGate(): Gate {
   };
 
   return {
-    enter(onCancel) {
+    enter(onCancel, onClose) {
       if (state !== 'open') return null;
-      const unit = { onCancel };
+      const unit = { onCancel, onClose };
       units.add(unit);
       return () => {
         if (units.delete(unit)) settle();
@@ -138,7 +139,7 @@ export function createGate(): Gate {
         state = 'closed';
         return (closePromise = Promise.resolve({ drained: true, pending: 0 }));
       }
-      return (closePromise = new Promise((resolve) => {
+      closePromise = new Promise((resolve) => {
         const clearTimer = isUndefined(options?.timeout)
           ? undefined
           : longTimeout(() => {
@@ -149,7 +150,9 @@ export function createGate(): Gate {
           clearTimer?.();
           resolve({ drained: true, pending: 0 });
         };
-      }));
+      });
+      for (const unit of units) unit.onClose?.();
+      return closePromise;
     },
     settled() {
       if (units.size === 0) return Promise.resolve();

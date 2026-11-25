@@ -217,4 +217,24 @@ describe('createGate', () => {
     gate.cancel();
     strictEqual(cancelled, 1);
   });
+
+  it('close asks every unit in flight to finish early', async () => {
+    const gate = createGate();
+    const heard: string[] = [];
+    const sylvanas = gate.enter(undefined, () => heard.push('Sylvanas'))!;
+    gate.enter(undefined, () => heard.push('Anduin'))!();
+    gate.enter();
+    const closing = gate.close({ timeout: 50 });
+    deepStrictEqual(heard, ['Sylvanas']);
+    sylvanas();
+    deepStrictEqual(await closing, { drained: false, pending: 1 });
+  });
+
+  it('drains when every unit releases as close asks', async () => {
+    const gate = createGate();
+    let release: (() => void) | null = null;
+    release = gate.enter(undefined, () => release?.());
+    deepStrictEqual(await gate.close(), { drained: true, pending: 0 });
+    strictEqual(gate.state, 'closed');
+  });
 });

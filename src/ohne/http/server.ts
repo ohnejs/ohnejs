@@ -23,6 +23,7 @@ import { createCIDRMatcher, createHostMatcher } from '../../utils/net/index.ts';
 import { applyHook } from '../hooks/apply-hook.ts';
 import { useHooks } from '../hooks/use-hooks.ts';
 import { usePrinter } from '../printer/use-printer.ts';
+import { endEventStreams } from './_event-streams.ts';
 import { releaseConnection } from './_request-body.ts';
 import { isAnswered, logUnhandled, routeTarget } from './_unhandled.ts';
 import { clientIP, sendResponse, toRequest, toURL } from './adapter.ts';
@@ -310,7 +311,11 @@ async function handle(
     return;
   }
   const controller = new AbortController();
-  const release = gate.enter((reason) => controller.abort(reason));
+  let event: Event | undefined;
+  const release = gate.enter(
+    (reason) => controller.abort(reason),
+    () => event && endStreams(event, res),
+  );
   if (isNull(release)) {
     res.statusCode = 503;
     res.setHeader('Connection', 'close');
@@ -320,7 +325,6 @@ async function handle(
   }
 
   let drain: (() => Promise<void>) | undefined;
-  let event: Event | undefined;
   let unhold: (() => void) | undefined;
   let route: Route | undefined;
   try {
@@ -370,6 +374,7 @@ async function handle(
       });
       drain = dispatched.drain;
       event = dispatched.event;
+      if (gate.state !== 'open') endStreams(event, res);
       await sendResponse(res, dispatched.response);
     } else {
       await sendResponse(res, errorResponse(match));
@@ -406,6 +411,15 @@ async function handle(
     unhold?.();
     release();
   }
+}
+
+/**
+ * Ends `event`'s event streams, closing their connection once answered so a reconnect reaches another server.
+ */
+function endStreams(event: Event, res: ServerResponse): void {
+  if (!endEventStreams(event)) return;
+  const socket = res.req.socket;
+  res.once('finish', () => socket.end());
 }
 
 /**

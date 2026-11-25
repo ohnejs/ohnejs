@@ -1,7 +1,8 @@
 import { parseDuration } from '../../utils/duration/parse-duration.ts';
 import { isUndefined } from '../../utils/is/is-undefined.ts';
 import { formatSSE, type FormatSSEOptions } from '../../utils/sse/format-sse.ts';
-import { useResponse } from './use-response.ts';
+import { trackEventStream } from './_event-streams.ts';
+import { useEvent } from './use-event.ts';
 
 const OPEN = ': open\n\n';
 const PING = ': ping\n\n';
@@ -13,7 +14,7 @@ const MAX_QUEUED_FRAMES = 1024;
 export interface EventStream {
   /**
    * The response body to return from the handler.
-   * The socket stays open until `close` is called or the client disconnects.
+   * The socket stays open until the stream ends.
    */
   body: ReadableStream<Uint8Array>;
 
@@ -48,6 +49,15 @@ export interface SendEventsOptions {
    * Omitted, the stream sends nothing between events.
    */
   heartbeat?: number | string;
+
+  /**
+   * Whether a graceful shutdown waits for the stream to end, rather than ending it as the drain begins.
+   * Set it for a stream that ends by itself, so a shutdown does not cut it short.
+   *
+   * @default
+   * false
+   */
+  drain?: boolean;
 }
 
 /**
@@ -55,7 +65,7 @@ export interface SendEventsOptions {
  *
  * Sets `text/event-stream` and `cache-control: no-cache`, then returns a body the handler returns as is.
  * The transport pipes the stream to the socket, so each `send` flushes an event and the socket stays open.
- * `close` ends it; a client disconnect ends it too, and either way `onClose` runs once.
+ * `close` ends it; a client disconnect or a server shutdown ends it too, and either way `onClose` runs once.
  * A `heartbeat` pings on an interval until then, so an idle proxy keeps the connection.
  * Call it inside a request.
  *
@@ -72,7 +82,8 @@ export interface SendEventsOptions {
  * ```
  */
 export function sendEvents(options: SendEventsOptions = {}): EventStream {
-  const headers = useResponse().headers;
+  const event = useEvent();
+  const { headers } = event.response;
   headers.set('content-type', 'text/event-stream');
   headers.set('cache-control', 'no-cache');
 
@@ -80,12 +91,20 @@ export function sendEvents(options: SendEventsOptions = {}): EventStream {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   let open = true;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
+  let untrack: (() => void) | undefined;
 
   const finish = (): void => {
     if (!open) return;
     open = false;
     clearInterval(heartbeat);
+    untrack?.();
     options.onClose?.();
+  };
+
+  const close = (): void => {
+    if (!open) return;
+    controller.close();
+    finish();
   };
 
   /**
@@ -119,16 +138,13 @@ export function sendEvents(options: SendEventsOptions = {}): EventStream {
     heartbeat = setInterval(() => push(ping), parseDuration(options.heartbeat));
     heartbeat.unref();
   }
+  if (!options.drain) untrack = trackEventStream(event, close);
 
   return {
     body,
     send(data, frameOptions) {
       if (open) push(encoder.encode(formatSSE(data, frameOptions)));
     },
-    close() {
-      if (!open) return;
-      controller.close();
-      finish();
-    },
+    close,
   };
 }

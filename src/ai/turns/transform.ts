@@ -250,7 +250,7 @@ export async function readTransformRecords(
  * The handler returns the body as is.
  */
 export function streamTransform(run: TransformRun): ReadableStream<Uint8Array> {
-  const stream = sendEvents({ heartbeat: HEARTBEAT, onClose: run.release });
+  const stream = sendEvents({ heartbeat: HEARTBEAT, drain: true, onClose: run.release });
   useEvent().waitUntil(runTransform(run, stream).finally(() => stream.close()));
   return stream.body;
 }

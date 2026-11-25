@@ -12,7 +12,11 @@ import { isUndefined } from '../is/is-undefined.ts';
  * getOrSet(formats, 'de', () => new Intl.NumberFormat('de')) // -> the same formatter
  * ```
  */
-export function getOrSet<K, V>(map: Map<K, V>, key: K, create: () => V): V {
+export function getOrSet<K, V>(
+  map: { get(key: K): V | undefined; set(key: K, value: V): unknown },
+  key: K,
+  create: () => V,
+): V {
   const existing = map.get(key);
   if (!isUndefined(existing)) return existing;
   const value = create();

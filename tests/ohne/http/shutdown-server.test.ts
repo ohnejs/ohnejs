@@ -1,14 +1,17 @@
+import type { IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { ok, strictEqual } from 'node:assert';
 import { once } from 'node:events';
+import { Agent, get } from 'node:http';
 import { before, describe, it } from 'node:test';
 
-import type { AnyHandler, Route } from '../../../src/ohne/index.ts';
+import type { AnyHandler, EventStream, Route } from '../../../src/ohne/index.ts';
 
 import {
   createRouter,
   createServer,
+  sendEvents,
   shutdownServer,
   usePrinter,
   useRequest,
@@ -19,6 +22,14 @@ import { collectGarbage } from './_gc.ts';
 
 function makeRoute(pattern: string, handler: AnyHandler): Route {
   return { method: 'GET', pattern, file: `${pattern}.ts`, layer: 'test', handler };
+}
+
+async function listen(routes: Route[]) {
+  const { server, gate } = createServer(createRouter(routes));
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const { port } = server.address() as AddressInfo;
+  return { server, gate, url: `http://127.0.0.1:${port}` };
 }
 
 async function waitFor(condition: () => boolean): Promise<void> {
@@ -235,5 +246,104 @@ describe('shutdownServer', () => {
     ]);
     strictEqual(winner, 'shutdown');
     strictEqual(gate.pending, 0);
+  });
+
+  it('ends an open event stream instead of waiting for it', async () => {
+    let closed = false;
+    const route = makeRoute('/events', () => sendEvents({ onClose: () => (closed = true) }).body);
+    const { server, gate, url } = await listen([route]);
+
+    const res = await fetch(`${url}/events`);
+    const body = res.text();
+    await shutdownServer(server, gate);
+    strictEqual(await body, ': open\n\n');
+    strictEqual(closed, true);
+  });
+
+  it('still drains a request in flight beside an event stream', async () => {
+    let release!: () => void;
+    const work = new Promise<void>((resolve) => (release = resolve));
+    const slow = makeRoute('/slow', async () => {
+      await work;
+      return 'done';
+    });
+    const events = makeRoute('/events', () => sendEvents().body);
+    const { server, gate, url } = await listen([slow, events]);
+
+    const stream = await fetch(`${url}/events`);
+    const inflight = fetch(`${url}/slow`);
+    await waitFor(() => gate.pending === 2);
+
+    let settled = false;
+    const shutdown = shutdownServer(server, gate).then(() => (settled = true));
+    strictEqual(await stream.text(), ': open\n\n');
+    await sleep(20);
+    strictEqual(settled, false);
+
+    release();
+    strictEqual(await (await inflight).text(), 'done');
+    await shutdown;
+  });
+
+  it('ends an event stream its handler opens once the drain began', async () => {
+    let release!: () => void;
+    const work = new Promise<void>((resolve) => (release = resolve));
+    const route = makeRoute('/events', async () => {
+      await work;
+      return sendEvents().body;
+    });
+    const { server, gate, url } = await listen([route]);
+
+    const inflight = fetch(`${url}/events`);
+    await waitFor(() => gate.pending === 1);
+    const shutdown = shutdownServer(server, gate);
+    release();
+    strictEqual(await (await inflight).text(), ': open\n\n');
+    await shutdown;
+  });
+
+  it('waits for an event stream opened with `drain`', async () => {
+    let stream!: EventStream;
+    const route = makeRoute('/events', () => (stream = sendEvents({ drain: true })).body);
+    const { server, gate, url } = await listen([route]);
+
+    const res = await fetch(`${url}/events`);
+    let settled = false;
+    const shutdown = shutdownServer(server, gate).then(() => (settled = true));
+    await sleep(20);
+    strictEqual(settled, false);
+
+    stream.send('Tyrande');
+    stream.close();
+    strictEqual(await res.text(), ': open\n\ndata: Tyrande\n\n');
+    await shutdown;
+  });
+
+  it('closes the connection of an event stream it ends while the drain goes on', async () => {
+    let release!: () => void;
+    const work = new Promise<void>((resolve) => (release = resolve));
+    const slow = makeRoute('/slow', async () => {
+      await work;
+      return 'done';
+    });
+    const events = makeRoute('/events', () => sendEvents().body);
+    const { server, gate, url } = await listen([slow, events]);
+    const agent = new Agent({ keepAlive: true });
+
+    const res = await new Promise<IncomingMessage>((resolve) =>
+      get(`${url}/events`, { agent }, resolve),
+    );
+    res.resume();
+    const inflight = fetch(`${url}/slow`);
+    await waitFor(() => gate.pending === 2);
+
+    const shutdown = shutdownServer(server, gate);
+    await once(res.socket, 'close');
+    strictEqual(gate.state, 'closing');
+
+    release();
+    await inflight;
+    await shutdown;
+    agent.destroy();
   });
 });
