@@ -6,7 +6,7 @@ import { isString } from '../is/is-string.ts';
 import { isUndefined } from '../is/is-undefined.ts';
 import { coerceToken, type SearchParamValue } from './coerce-token.ts';
 
-const ENCODE = new Set([' ', '"', '#', '<', '>', "'", '%', '&', '[', ']', '{', '}', ',', ':']);
+const ENCODE = new Set([' ', '"', '#', '<', '>', "'", '%', '&', '+', '[', ']', '{', '}', ',', ':']);
 
 /**
  * Percent-encodes control and non-ASCII characters, those in `ENCODE`, and `=` when `encodeEquals` is set.

@@ -34,6 +34,19 @@ describe('stringifySearchParams', () => {
     strictEqual(stringifySearchParams({ s: '[x]' }), 's=%5Bx%5D');
     strictEqual(stringifySearchParams({ s: 'a b&c' }), 's=a%20b%26c');
     strictEqual(stringifySearchParams({ s: "it's" }), 's=it%27s');
+    strictEqual(stringifySearchParams({ 'a+b': '+4917' }), 'a%2Bb=%2B4917');
+  });
+
+  it('writes strings URLSearchParams reads back unchanged', () => {
+    for (const s of ['+4917', 'a b', 'c++ & d', '100%', 'a=b', 'ü € 😀', '%2B']) {
+      strictEqual(new URLSearchParams(stringifySearchParams({ [s]: s })).get(s), s);
+      deepStrictEqual(parseSearchParams(stringifySearchParams({ [s]: s })), { [s]: s });
+    }
+  });
+
+  it('reads back what URLSearchParams writes for a plus', () => {
+    const search = new URLSearchParams({ n: '+4917', k: 'a+b=c&d' }).toString();
+    deepStrictEqual(parseSearchParams(search), { n: '+4917', k: 'a+b=c&d' });
   });
 
   it('keeps operators and structure readable', () => {
