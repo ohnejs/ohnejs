@@ -1,15 +1,17 @@
 import {
+  applyHook,
   badRequest,
   defineHandler,
+  notFound,
   queryUntyped,
   readJSONBody,
   unauthorized,
   useDatabase,
 } from 'ohnejs';
-import { isString, isUndefined, normalizeEmail } from 'ohnejs/utils';
+import { isNull, isString, isUndefined, normalizeEmail } from 'ohnejs/utils';
 import { passwordNeedsRehash, verifyPassword } from 'ohnejs/utils/crypto';
 
-import type { User } from '../../auth/types.ts';
+import type { CredentialRejection, User } from '../../auth/types.ts';
 
 import { translate } from '../../../ohne/http/translate.ts';
 import { enforceLoginRateLimit } from '../../auth/_login-rate-limit.ts';
@@ -33,9 +35,11 @@ import { toUser } from '../../auth/to-user.ts';
  * A process already running its share of password checks, or one client network running one, answers `503`.
  * A `503` or a `400` costs no attempt.
  * A body past 4 KB is a `413`.
+ * While `auth.password` is `false`, it answers `404`.
  */
 export default defineHandler(
   async (): Promise<User> => {
+    if (!useAuthConfig().passwordSignIn) throw notFound();
     const body = await readJSONBody<{
       email?: unknown;
       password?: unknown;
@@ -48,11 +52,16 @@ export default defineHandler(
       throw badRequest(translate('auth.invalidCredentials'));
 
     const release = acquirePasswordPermit();
-    const user = await enforceLoginRateLimit()
+    const verdict = await enforceLoginRateLimit()
       .then(() => verifyCredentials(email, password))
       .finally(release);
+    if ('rejected' in verdict) {
+      await applyHook('auth:credential-rejected', verdict.rejected);
+      throw unauthorized(translate('auth.invalidCredentials'));
+    }
+    const { user } = verdict;
 
-    await createSession(user.UUID, remember);
+    await createSession(user.UUID, { method: 'password', remember });
     return toUser(user, await accountLayout(toUser(user)));
   },
   { maxBodySize: '4kb' },
@@ -60,23 +69,34 @@ export default defineHandler(
 
 /**
  * The user `email` names, once `password` matches, rehashed when its stored cost is outdated.
- * An unknown email spends a `dummyVerify`, then answers the same `401` a wrong password does.
+ * A refusal resolves what `auth:credential-rejected` receives, so the hook runs after the permit is back.
+ * An unknown email or a user without a password spends a `dummyVerify`, so it takes as long as a wrong one.
  */
 async function verifyCredentials(
   email: string,
   password: string,
-): Promise<Record<string, unknown> & { UUID: string; password: string }> {
+): Promise<
+  { user: Record<string, unknown> & { UUID: string } } | { rejected: CredentialRejection }
+> {
+  const address = normalizeEmail(email);
   const user = (await queryUntyped('Users')
     .select('password', ...userColumns())
-    .where({ email: normalizeEmail(email) })
-    .findFirst()) as (Record<string, unknown> & { UUID: string; password: string }) | undefined;
+    .where({ email: address })
+    .findFirst()) as
+    | (Record<string, unknown> & { UUID: string; password: string | null })
+    | undefined;
 
   if (isUndefined(user)) {
     await dummyVerify(password);
-    throw unauthorized(translate('auth.invalidCredentials'));
+    return { rejected: { method: 'password', email: address } };
   }
-  if (!(await verifyPassword(password, user.password)))
-    throw unauthorized(translate('auth.invalidCredentials'));
+  if (isNull(user.password)) {
+    await dummyVerify(password);
+    return { rejected: { method: 'password', email: address, user: user.UUID } };
+  }
+  if (!(await verifyPassword(password, user.password))) {
+    return { rejected: { method: 'password', email: address, user: user.UUID } };
+  }
 
   if (passwordNeedsRehash(user.password, useAuthConfig().password)) {
     await useDatabase().transaction(async (tx) => {
@@ -84,5 +104,5 @@ async function verifyCredentials(
       await queryUntyped('Users').use(tx).where({ UUID: user.UUID }).update({ password });
     });
   }
-  return user;
+  return { user };
 }

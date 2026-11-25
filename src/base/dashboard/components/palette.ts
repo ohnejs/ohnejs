@@ -108,8 +108,8 @@ css`
 
 css`
   .o-palette .ohne-popup-container {
-    max-height: min(40rem, calc(100% - 12dvh));
-    margin-top: 12dvh;
+    max-height: min(40rem, calc(100% - var(--ohne-viewport-height, 100dvh) * 0.12));
+    margin-top: calc(var(--ohne-viewport-height, 100dvh) * 0.12);
   }
 
   .o-palette .ohne-popup-footer:not(:empty) {

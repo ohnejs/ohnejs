@@ -96,7 +96,9 @@ css`
     .o-header-menu-button {
       display: inline-flex;
     }
+  }
 
+  @media (max-width: 1024px) and (pointer: fine) {
     .o-header-container :where(.ohne-button, .ohne-icon-group, .o-header-search) {
       --ohne-size: -2;
     }

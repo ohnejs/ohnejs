@@ -1,6 +1,7 @@
 import { strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
+import { requireFreshSession } from '../../../src/base/auth/_reauth.ts';
 import * as auth from '../../../src/base/auth/index.ts';
 import { readReach, readScope } from '../../../src/base/collections-api/gate.ts';
 
@@ -11,5 +12,9 @@ describe('ohnejs/auth', () => {
 
   it('exports `readReach`, so a route of your own reads within the read guard', () => {
     strictEqual(auth.readReach, readReach);
+  });
+
+  it('exports `requireFreshSession`, so a sensitive route of your own asks for a fresh proof', () => {
+    strictEqual(auth.requireFreshSession, requireFreshSession);
   });
 });

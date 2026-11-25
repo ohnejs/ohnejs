@@ -2,6 +2,8 @@
   "account": {
     "appDefault": "App default",
     "changePassword": "Change password",
+    "confirm": "Confirm",
+    "confirmIdentity": "Confirm it is you",
     "confirmSignOutOtherDevices": "Are you sure you want to sign out from all other devices? Your current session will remain active.",
     "currentPassword": "Current password",
     "noAccess": "You do not have access to the page `{page}`",
@@ -232,6 +234,7 @@
   "install": {
     "firstName": "First name",
     "lastName": "Last name",
+    "passkeyMessage": "Next, your device asks you to create a passkey. You sign in with it from then on.",
     "submit": "Create account",
     "title": "Installation",
     "welcomeMessage": "Welcome to ohne! Enter your details to create your primary administrator account."
@@ -268,6 +271,7 @@
     "email": "Email",
     "failed": "The sign-in failed",
     "hidePassword": "Hide password",
+    "passkey": "Sign in with a passkey",
     "password": "Password",
     "rememberMe": "Remember me",
     "showPassword": "Show password",
@@ -323,6 +327,23 @@
     "loadMore": "Load more",
     "moreGroups": "More related groups hidden. Add a word to narrow it down.",
     "via": "{collection} via {target}"
+  },
+  "passkeys": {
+    "add": "Add passkey",
+    "added": "Passkey added",
+    "confirmRemove": "Remove the passkey `{name}`? You can no longer sign in with it.",
+    "device": "On this device only",
+    "empty": "No passkeys yet. Add one to sign in with Face ID, a fingerprint or a security key.",
+    "failed": "The passkey could not be saved",
+    "lastUsed": "Last used",
+    "name": "Name",
+    "neverUsed": "Never used",
+    "removed": "Passkey removed",
+    "rename": "Rename",
+    "renamed": "Passkey renamed",
+    "synced": "Synced",
+    "title": "Passkeys",
+    "unsupported": "This browser cannot use passkeys"
   },
   "points": "{points} pts",
   "range": {

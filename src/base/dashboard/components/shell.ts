@@ -83,7 +83,8 @@ css`
     max-width: 108rem;
     height: 100dvh;
     margin: 0 -1rem;
-    padding: 0.5rem 1.5rem 1.5rem;
+    padding: max(0.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right))
+      max(1.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left));
     outline: none;
   }
 
@@ -178,12 +179,13 @@ css`
     .o-sidebar {
       position: fixed;
       z-index: 99;
-      top: calc(3.25rem + 1px);
+      top: calc(2.75rem + 1px + max(0.5rem, env(safe-area-inset-top)));
       left: 0;
-      bottom: 1rem;
-      width: 17rem;
+      bottom: max(1rem, env(safe-area-inset-bottom));
+      width: min(17rem, 85vw);
       max-width: 100%;
       margin: 0;
+      padding-left: env(safe-area-inset-left);
       background-color: hsl(var(--ohne-background));
       visibility: hidden;
       transform: translateX(-100%);
@@ -291,7 +293,8 @@ css`
   @media (max-width: 767px) {
     .o-layout {
       margin: 0;
-      padding: 0.5rem;
+      padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right))
+        max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
     }
 
     .o-layout::after {
@@ -305,6 +308,7 @@ css`
 
     .o-sidebar {
       bottom: 0;
+      padding-bottom: env(safe-area-inset-bottom);
     }
 
     .o-default-layout .o-wrapper::before,

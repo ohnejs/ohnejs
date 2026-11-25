@@ -1,4 +1,6 @@
 export { readReach, readScope } from '../collections-api/gate.ts';
+export { passkeysDefinition } from '../collections/Passkeys.ts';
+export { requireFreshSession } from './_reauth.ts';
 export { sessionsDefinition } from '../collections/Sessions.ts';
 export { usersDefinition } from '../collections/Users.ts';
 export * from './account-layout.ts';

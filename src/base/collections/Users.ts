@@ -1,5 +1,5 @@
 import { defineCollection, field } from 'ohnejs';
-import { checkLength } from 'ohnejs/utils';
+import { checkLength, isEmpty } from 'ohnejs/utils';
 
 import type {} from '../fields/_augment.ts';
 
@@ -15,6 +15,7 @@ import { manageUsers } from '../auth/manage-users.ts';
  * `password` takes a plaintext password on write; the field type stores its scrypt hash, never the text.
  * A new password needs at least `auth.password.minLength` characters, whichever route writes it.
  * A sign-in's rehash is no new password, so a shorter one set before the rule keeps working.
+ * While `auth.password` is `false`, a user may have no password: it holds `null` and signs in with a passkey.
  * The hash is write-only: no read returns it unless a trusted `select` names it explicitly.
  * `firstName` and `lastName` name the person; both are optional.
  * `roles` holds the user's role names; the capabilities of every held role union.
@@ -52,15 +53,18 @@ const users = defineCollection({
     }),
 
     password: field('password', {
+      nullable: true,
       readable: false,
       label: 'auth.users.password.label',
+      default: () => (useAuthConfig().passwordSignIn ? '' : null),
       validators: [
-        (value, { tx }) =>
-          passwordRehashes.has(tx)
-            ? undefined
-            : failureMessage(
-                checkLength(value.length, { min: useAuthConfig().password.minLength }),
-              ),
+        (value, { tx }) => {
+          if (passwordRehashes.has(tx)) return undefined;
+          if (isEmpty(value)) return 'validation.required';
+          return failureMessage(
+            checkLength(value.length, { min: useAuthConfig().password.minLength }),
+          );
+        },
       ],
     }),
 

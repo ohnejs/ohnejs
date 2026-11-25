@@ -1012,7 +1012,7 @@ describe('account', () => {
     );
     const fields = keyBy(body.accountFields, (entry) => entry.name);
     strictEqual(fields.password?.readable, false);
-    strictEqual(fields.password?.required, true);
+    strictEqual(fields.password?.required, false);
     strictEqual(fields.dateFormat?.expandable?.expanded, false);
     strictEqual(fields.dateFormat?.description, undefined);
   });

@@ -2,6 +2,8 @@
   "account": {
     "appDefault": "Zadano u aplikaciji",
     "changePassword": "Promijeni lozinku",
+    "confirm": "Potvrdi",
+    "confirmIdentity": "Potvrdite da ste to vi",
     "confirmSignOutOtherDevices": "Da li zaista želite da se odjavite sa svih drugih uređaja? Vaša trenutna sesija ostaje aktivna.",
     "currentPassword": "Trenutna lozinka",
     "noAccess": "Nemate pristup stranici `{page}`",
@@ -232,6 +234,7 @@
   "install": {
     "firstName": "Ime",
     "lastName": "Prezime",
+    "passkeyMessage": "Zatim će vaš uređaj tražiti da kreirate passkey. Od tada se prijavljujete njime.",
     "submit": "Kreiraj račun",
     "title": "Instalacija",
     "welcomeMessage": "Dobrodošli u ohne! Unesite svoje podatke da kreirate primarni administratorski račun."
@@ -268,6 +271,7 @@
     "email": "E-mail",
     "failed": "Prijava nije uspjela",
     "hidePassword": "Sakrij lozinku",
+    "passkey": "Prijava passkeyem",
     "password": "Lozinka",
     "rememberMe": "Zapamti me",
     "showPassword": "Prikaži lozinku",
@@ -323,6 +327,23 @@
     "loadMore": "Učitaj još",
     "moreGroups": "Više povezanih grupa je skriveno. Dodaj riječ da suziš pretragu.",
     "via": "{collection} preko {target}"
+  },
+  "passkeys": {
+    "add": "Dodaj passkey",
+    "added": "Passkey dodan",
+    "confirmRemove": "Ukloniti passkey `{name}`? Više se nećete moći prijaviti njime.",
+    "device": "Samo na ovom uređaju",
+    "empty": "Još nema passkeyeva. Dodajte jedan za prijavu putem Face ID-a, otiska prsta ili sigurnosnog ključa.",
+    "failed": "Passkey nije moguće sačuvati",
+    "lastUsed": "Posljednje korišteno",
+    "name": "Naziv",
+    "neverUsed": "Nikad korišteno",
+    "removed": "Passkey uklonjen",
+    "rename": "Preimenuj",
+    "renamed": "Passkey preimenovan",
+    "synced": "Sinhronizovano",
+    "title": "Passkeyevi",
+    "unsupported": "Ovaj preglednik ne može koristiti passkeyeve"
   },
   "points": "{points} bod.",
   "range": {

@@ -8,13 +8,11 @@ import {
   unauthorized,
 } from 'ohnejs';
 import { hasKey, isEmpty, isPlainObject, isString, isUndefined, pick } from 'ohnejs/utils';
-import { verifyPassword } from 'ohnejs/utils/crypto';
 
 import type { User } from '../../auth/types.ts';
 
 import { validationError } from '../../../ohne/query/write/errors.ts';
-import { enforceLoginRateLimit } from '../../auth/_login-rate-limit.ts';
-import { acquirePasswordPermit } from '../../auth/_password-permits.ts';
+import { checkPassword } from '../../auth/_check-password.ts';
 import { accountFields, accountLayout } from '../../auth/account-layout.ts';
 import { requireUser } from '../../auth/require-user.ts';
 import { toUser } from '../../auth/to-user.ts';
@@ -41,10 +39,7 @@ export default defineHandler(async (): Promise<User> => {
   if (hasKey(input, 'password')) {
     if (!isString(currentPassword) || isEmpty(currentPassword))
       throw validationError({ currentPassword: 'validation.required' });
-    const release = acquirePasswordPermit();
-    await enforceLoginRateLimit()
-      .then(() => checkPassword(user.UUID, currentPassword))
-      .finally(release);
+    await checkPassword(user.UUID, currentPassword, 'currentPassword');
   }
   const [record] = await queryUntyped('Users')
     .linkReach(linkReach)
@@ -53,13 +48,3 @@ export default defineHandler(async (): Promise<User> => {
   if (isUndefined(record)) throw unauthorized();
   return toUser(record, layout);
 });
-
-/**
- * Answers `422` on `currentPassword` unless `password` is the one the user signs in with.
- */
-async function checkPassword(UUID: string, password: string): Promise<void> {
-  const row = await queryUntyped('Users').select('password').where({ UUID }).findFirst();
-  if (isUndefined(row)) throw unauthorized();
-  if (!isString(row.password) || !(await verifyPassword(password, row.password)))
-    throw validationError({ currentPassword: 'auth.incorrectPassword' });
-}

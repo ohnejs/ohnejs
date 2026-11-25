@@ -36,6 +36,10 @@ GET   /auth/me
 PATCH /auth/me      { "timezone": "Europe/Berlin", "dateFormat": "DD.MM.YYYY" }
 # -> 200 the user, 422 with per-field messages, or 401 when signed out
 
+# Confirm who you are with { password } or { credential }, so sensitive changes pass for a while.
+POST  /auth/reauth  { "password": "correct horse" }
+# -> 200 { "ok": true }, 422 on a wrong password, or 401 when signed out
+
 # Whether first-user setup is still pending.
 GET   /auth/install
 # -> 200 { "required": true }, or { "required": false } once a user exists
@@ -102,7 +106,7 @@ export default defineHandler(async () => {
 
   const record = await query('Users').createOrThrow({ email, password });
 
-  await createSession(record.UUID);
+  await createSession(record.UUID, { method: 'password' });
   return toUser(record, await accountLayout(toUser(record)));
 });
 ```
@@ -237,10 +241,37 @@ To manage sessions from your own code, import the same helpers the endpoints use
 ```ts
 import { createSession, destroySession, useSession } from 'ohnejs/auth';
 
-await createSession(user.UUID);        // opens a remembered session and writes the cookie
-await createSession(user.UUID, false); // the same, on the transient lifetime
-await useSession();                    // the current session row, or null
-await destroySession();                // ends the session and clears the cookie
+await createSession(user.UUID, { method: 'password' });                  // a remembered session, with its cookie
+await createSession(user.UUID, { method: 'password', remember: false }); // on the transient lifetime
+await useSession();                                                      // the current session row, or null
+await destroySession();                                                  // ends the session, clears the cookie
+```
+
+`method` names how the user signed in, for the [`auth:signed-in` hook](#auditing-sign-ins).
+
+### Sensitive changes
+
+For a route that should ask the user to prove who they are again, call `requireFreshSession`. It
+passes for `auth.reauthMaxAge` after a sign-in or a confirmation, five minutes by default:
+
+```ts
+// api/billing.delete.ts
+import { defineHandler } from 'ohnejs';
+import { requireFreshSession } from 'ohnejs/auth';
+
+export default defineHandler(async () => {
+  const { user } = await requireFreshSession();
+  // cancel the user's plan
+  return { ok: true };
+});
+```
+
+A stale session gets a `403` with `{ reauth: true }`, and `POST /auth/reauth` clears it. In the
+dashboard, send the request through `withReauth` from `ohnejs/dashboard`. It asks for a passkey or
+the password, then sends the request again:
+
+```ts
+const response = await withReauth(() => api('DELETE /billing'));
 ```
 
 ### Cross-site requests
@@ -269,11 +300,12 @@ export default defineConfig({
     transientSessionMaxAge: '1d',                // the lifetime without remember me
     cookieName: 'session',                       // the session cookie's name
     loginRateLimit: { limit: 10, window: '1m' }, // sign-in attempts per client network
+    reauthMaxAge: '5m',                          // how long a sensitive change needs no new proof
   },
 });
 ```
 
-Every field is optional, and the values above are the defaults. Both lifetimes take a duration
+Every field is optional, and the values above are the defaults. The lifetimes take a duration
 string like `'2h'` or a number of milliseconds.
 
 ### Password length
@@ -323,6 +355,32 @@ raise `cost` (a power of two, so the next step is `65536`) until a sign-in takes
 server. That keeps hashing cheap for you and expensive for an attacker. An old password still works
 after you raise the cost, because each stored hash includes the cost it was made with.
 
+### Passkeys
+
+Set `auth.passkeys` to let users sign in with a passkey: Face ID, Touch ID, Windows Hello, or a
+security key. The login page gets a passkey button, and the account page a card to add, rename, and
+remove passkeys. Set `auth.password: false` as well to make passkeys the only way in.
+
+```ts
+// ohne.config.ts
+import { defineConfig } from 'ohnejs';
+
+export default defineConfig({
+  layers: ['ohnejs/base'],
+  auth: {
+    passkeys: true,
+    password: false,
+  },
+});
+```
+
+- A passkey belongs to a domain, by default the dashboard's host name. If users sign in elsewhere,
+  pass it as `passkeys: { rpID: 'example.com', origin: 'https://example.com' }`. Changing it later
+  orphans every passkey.
+- With `password: false`, an account adds its first passkey right after a sign-in. The install page
+  does it for the administrator. Your [signup](#creating-accounts) creates the user without a
+  password, calls `createSession`, then calls `registerPasskey` from `ohnejs/dashboard`. Add passkeys for your existing users before you turn passwords off.
+
 ## Password guessing
 
 `POST /auth/login` gives one client network ten attempts a minute. Past that, a sign-in gets a
@@ -339,6 +397,29 @@ The dashboard's login form waits out either answer.
 Behind a proxy, set [`api.trustProxy`](../production/deployment.md#behind-a-proxy), or every client
 shares one IP. Attempts count where [rate limits](../api/rate-limiting.md#across-processes) do,
 in each process's memory unless you choose a shared store.
+
+## Auditing sign-ins
+
+Two hooks report sign-ins, so you can log them or send an alert. Both run inside the request, so
+`useEvent().ip` names the client:
+
+```ts
+// boot/sign-in-audit.ts
+import { hook, useEvent } from 'ohnejs';
+
+hook('auth:signed-in', ({ user, method }) => {
+  console.info('signed in', user, method, useEvent().ip);
+});
+
+hook('auth:credential-rejected', ({ method, email }) => {
+  console.warn('refused', method, email, useEvent().ip);
+});
+```
+
+- `auth:signed-in` fires for every session `createSession` opens. A throw refuses the sign-in: the
+  session is removed and no cookie is sent.
+- `auth:credential-rejected` fires for a wrong password or a refused passkey, at sign-in and when a
+  user confirms who they are.
 
 ## Rolling your own
 

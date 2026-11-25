@@ -73,6 +73,12 @@ css`
     }
   }
 
+  @media (hover: none) {
+    .o-header-search > kbd {
+      display: none;
+    }
+  }
+
   @media (max-width: 767px) {
     .o-header-search {
       justify-content: center;

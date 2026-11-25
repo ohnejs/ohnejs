@@ -1,10 +1,13 @@
 {
   "alreadyInstalled": "Već instalirano",
   "incorrectPassword": "Pogrešna lozinka",
+  "invalidPasskey": "Ovaj passkey nije prihvaćen",
   "invalidCredentials": "Netačna email adresa ili lozinka",
   "invalidRoles": "Uloge moraju biti lista naziva uloga",
   "invalidTimezone": "Nevažeća vremenska zona `{timezone}`",
   "lastAdmin": "Ne možete ukloniti posljednjeg administratora",
+  "lastPasskey": "Ne možete ukloniti svoj posljednji passkey dok je prijava lozinkom isključena",
+  "reauthRequired": "Potvrdite da ste to vi da nastavite",
   "roleNotGrantable": "Ne možete dodijeliti ulogu `{role}`",
   "unknownRole": "Nepoznata uloga `{role}`",
   "unknownLanguage": "Nepoznat jezik `{language}`",
@@ -77,6 +80,44 @@
     "expiresAt": {
       "label": "Ističe",
       "description": "Kada sesija prestaje važiti, u milisekundama epohe."
+    },
+    "verifiedAt": {
+      "label": "Potvrđeno",
+      "description": "Kada je korisnik u ovoj sesiji posljednji put potvrdio ko je."
+    }
+  },
+  "passkeys": {
+    "label": "Passkeyevi",
+    "defaultName": "Passkey",
+    "user": {
+      "label": "Korisnik"
+    },
+    "name": {
+      "label": "Naziv"
+    },
+    "credentialID": {
+      "label": "ID akreditiva"
+    },
+    "publicKey": {
+      "label": "Javni ključ"
+    },
+    "signCount": {
+      "label": "Brojač potpisa"
+    },
+    "transports": {
+      "label": "Načini prijenosa"
+    },
+    "backupEligible": {
+      "label": "Može se sinhronizovati"
+    },
+    "backedUp": {
+      "label": "Sinhronizovano"
+    },
+    "createdAt": {
+      "label": "Kreirano"
+    },
+    "lastUsedAt": {
+      "label": "Posljednje korišteno"
     }
   }
 }

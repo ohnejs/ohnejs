@@ -15,5 +15,18 @@ describe('useAuthConfig', () => {
     strictEqual(config.password.cost, 1024);
     strictEqual(config.password.blockSize, 8);
     strictEqual(config.password.parallelization, 1);
+    strictEqual(config.passkeys, false);
+    strictEqual(config.passwordSignIn, true);
+  });
+
+  it('reads `password: false` as password sign-in off, keeping the default rules', () => {
+    useLayers().add({ path: '/auth-config-off-test', input: { auth: { password: false } } });
+    try {
+      const config = useAuthConfig();
+      strictEqual(config.passwordSignIn, false);
+      strictEqual(config.password.cost, 32_768);
+    } finally {
+      useLayers().remove('/auth-config-off-test');
+    }
   });
 });

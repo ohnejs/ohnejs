@@ -60,34 +60,36 @@ Since `undefined` means "no change", a filter can never thread `undefined` as a 
 
 ## The hooks at a glance
 
-Every built-in hook, by the lifecycle it belongs to. The table holds all but `auth:account-layout`,
-which [the account page](../dashboard/account.md#extending-the-page) covers.
+Every built-in hook, by the lifecycle it belongs to. The `auth:` hooks link to the guides that
+cover them.
 
-| Hook                                                                | Kind   | Fires                                                            |
-| ------------------------------------------------------------------- | ------ | ---------------------------------------------------------------- |
-| [`server:ready`](#serverready)                                      | action | the API server is listening                                      |
-| [`request:complete`](#requestcomplete)                              | action | a dispatched request finished, background work done              |
-| [`middleware:resolve`](#middlewareresolve)                          | filter | a request's middleware list resolved, before it runs             |
-| [`handler:result`](#handlerresult)                                  | filter | a handler returned, before its value serializes                  |
-| [`error:response`](#errorresponse)                                  | filter | a request threw, on the error response                           |
-| [`response:send`](#responsesend)                                    | filter | a dispatched response is about to return to the transport        |
-| [`response:headers`](#responseheaders)                              | filter | any response's headers, the last step before the socket          |
-| [`record:before-change`](#recordbefore-change)                      | filter | a create or update input, before coercion                        |
-| [`record:validate`](#recordvalidate)                                | filter | a create or update, after coercion, before the write             |
-| [`record:after-create`](#recordafter-create)                        | filter | a created record, re-read, before create returns                 |
-| [`record:before-update`](#recordbefore-update)                      | action | an update, before it writes its rows                             |
-| [`record:after-update`](#recordafter-update)                        | action | each record an update touched, re-read                           |
-| [`record:condition`](#recordcondition)                              | filter | an update or delete `WHERE`, before it matches rows              |
-| [`record:before-delete`](#recordbefore-delete)                      | action | a delete, before it removes its rows                             |
-| [`record:committed`](#recordcommitted)                              | action | a write committed, outside the transaction                       |
-| [`query:filter`](#queryfilter)                                      | filter | a read's `QueryIR`, before it compiles to SQL                    |
-| [`query:records`](#queryrecords)                                    | filter | a row read's assembled records, before it returns                |
-| [`query:complete`](#querycomplete)                                  | action | a row read finished, with its timing                             |
-| [`populate:targets`](#populatetargets)                              | filter | a populate node's target records, before they are attached       |
-| [`schema:synced`](#schemasynced)                                    | action | the schema reconcile committed                                   |
-| [`dashboard:menu`](#dashboardmenu)                                  | filter | the dashboard sidebar resolved, before discovery answers         |
-| [`dashboard:meta`](#dashboardmeta)                                  | action | the discovery payload assembled, before `GET /dashboard` answers |
-| [`auth:account-layout`](../dashboard/account.md#extending-the-page) | filter | the account page layout, and what `PATCH /auth/me` accepts       |
+| Hook                                                                      | Kind   | Fires                                                            |
+| ------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------- |
+| [`server:ready`](#serverready)                                            | action | the API server is listening                                      |
+| [`request:complete`](#requestcomplete)                                    | action | a dispatched request finished, background work done              |
+| [`middleware:resolve`](#middlewareresolve)                                | filter | a request's middleware list resolved, before it runs             |
+| [`handler:result`](#handlerresult)                                        | filter | a handler returned, before its value serializes                  |
+| [`error:response`](#errorresponse)                                        | filter | a request threw, on the error response                           |
+| [`response:send`](#responsesend)                                          | filter | a dispatched response is about to return to the transport        |
+| [`response:headers`](#responseheaders)                                    | filter | any response's headers, the last step before the socket          |
+| [`record:before-change`](#recordbefore-change)                            | filter | a create or update input, before coercion                        |
+| [`record:validate`](#recordvalidate)                                      | filter | a create or update, after coercion, before the write             |
+| [`record:after-create`](#recordafter-create)                              | filter | a created record, re-read, before create returns                 |
+| [`record:before-update`](#recordbefore-update)                            | action | an update, before it writes its rows                             |
+| [`record:after-update`](#recordafter-update)                              | action | each record an update touched, re-read                           |
+| [`record:condition`](#recordcondition)                                    | filter | an update or delete `WHERE`, before it matches rows              |
+| [`record:before-delete`](#recordbefore-delete)                            | action | a delete, before it removes its rows                             |
+| [`record:committed`](#recordcommitted)                                    | action | a write committed, outside the transaction                       |
+| [`query:filter`](#queryfilter)                                            | filter | a read's `QueryIR`, before it compiles to SQL                    |
+| [`query:records`](#queryrecords)                                          | filter | a row read's assembled records, before it returns                |
+| [`query:complete`](#querycomplete)                                        | action | a row read finished, with its timing                             |
+| [`populate:targets`](#populatetargets)                                    | filter | a populate node's target records, before they are attached       |
+| [`schema:synced`](#schemasynced)                                          | action | the schema reconcile committed                                   |
+| [`dashboard:menu`](#dashboardmenu)                                        | filter | the dashboard sidebar resolved, before discovery answers         |
+| [`dashboard:meta`](#dashboardmeta)                                        | action | the discovery payload assembled, before `GET /dashboard` answers |
+| [`auth:account-layout`](../dashboard/account.md#extending-the-page)       | filter | the account page layout, and what `PATCH /auth/me` accepts       |
+| [`auth:signed-in`](../auth/authentication.md#auditing-sign-ins)           | action | a sign-in opened a session                                       |
+| [`auth:credential-rejected`](../auth/authentication.md#auditing-sign-ins) | action | a password or a passkey was refused                              |
 
 ## Server lifecycle
 

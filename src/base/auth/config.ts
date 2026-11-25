@@ -1,4 +1,4 @@
-import { type RouteRateLimit, useConfig } from 'ohnejs';
+import { type Config, type RouteRateLimit, useConfig } from 'ohnejs';
 import { withDefaults } from 'ohnejs/utils';
 
 declare module 'ohnejs' {
@@ -38,6 +38,15 @@ declare module 'ohnejs' {
       transientSessionMaxAge?: number | string;
 
       /**
+       * How long after a user proves who they are a sensitive change goes through without asking again.
+       * Signing in counts as proof, and so does `POST /auth/reauth`.
+       *
+       * @default
+       * '5m'
+       */
+      reauthMaxAge?: number | string;
+
+      /**
        * Name of the cookie the session token travels in.
        *
        * @default
@@ -61,50 +70,81 @@ declare module 'ohnejs' {
       loginRateLimit?: RouteRateLimit | false;
 
       /**
+       * Lets users sign in with a passkey: Face ID, Touch ID, Windows Hello or a security key.
+       * `true` scopes passkeys to the dashboard's origin and its host name.
+       * Pass `rpID` and `origin` when users sign in elsewhere, such as on your own site.
+       *
+       * @default
+       * false
+       *
+       * @example
+       * ```ts
+       * auth: { passkeys: { rpID: 'example.com', origin: 'https://example.com' } }
+       * ```
+       */
+      passkeys?:
+        | boolean
+        | {
+            /**
+             * The domain passkeys belong to: the sign-in page's host name, or a parent of it.
+             * Changing it later orphans every registered passkey.
+             */
+            rpID?: string;
+
+            /**
+             * The origin or origins a passkey ceremony may run on.
+             */
+            origin?: string | string[];
+          };
+
+      /**
        * The rules for passwords: how long a new one must be, and how hard each is to hash with scrypt.
        * Costlier hashing resists cracking better but makes every sign-in slower.
        * The defaults suit most servers.
+       * `false` turns password sign-in off, so users sign in with a passkey only.
        */
-      password?: {
-        /**
-         * The fewest characters a new password may have.
-         * Every write of `Users.password` checks it, so the install page, sign-up and the dashboard all do.
-         * Signing in never does, so raising it never locks out an account whose password is shorter.
-         *
-         * @default
-         * 8
-         */
-        minLength?: number;
+      password?:
+        | false
+        | {
+            /**
+             * The fewest characters a new password may have.
+             * Every write of `Users.password` checks it: the install page, sign-up and the dashboard.
+             * Signing in never does, so raising it never locks out an account whose password is shorter.
+             *
+             * @default
+             * 8
+             */
+            minLength?: number;
 
-        /**
-         * The main dial for how hard a stored password is to crack.
-         * Higher is safer but slower, and each doubling doubles the work; it must be a power of two.
-         * The one setting worth tuning: raise it until a sign-in takes about 100ms on your server, then stop.
-         *
-         * @default
-         * 32768
-         */
-        cost?: number;
+            /**
+             * The main dial for how hard a stored password is to crack.
+             * Higher is safer but slower, and each doubling doubles the work; it must be a power of two.
+             * The one setting worth tuning: raise it until a sign-in takes about 100ms on your server.
+             *
+             * @default
+             * 32768
+             */
+            cost?: number;
 
-        /**
-         * How much memory each hash uses.
-         * More memory is what makes cracking with cheap parallel hardware expensive.
-         * Leave it at the default unless you have measured a reason to change it.
-         *
-         * @default
-         * 8
-         */
-        blockSize?: number;
+            /**
+             * How much memory each hash uses.
+             * More memory is what makes cracking with cheap parallel hardware expensive.
+             * Leave it at the default unless you have measured a reason to change it.
+             *
+             * @default
+             * 8
+             */
+            blockSize?: number;
 
-        /**
-         * How many independent passes each hash runs.
-         * Leave it at the default; raise it only to spend more CPU cores on a single hash.
-         *
-         * @default
-         * 1
-         */
-        parallelization?: number;
-      };
+            /**
+             * How many independent passes each hash runs.
+             * Leave it at the default; raise it only to spend more CPU cores on a single hash.
+             *
+             * @default
+             * 1
+             */
+            parallelization?: number;
+          };
     };
   }
 }
@@ -124,6 +164,11 @@ export interface ResolvedAuthConfig {
   transientSessionMaxAge: number | string;
 
   /**
+   * How long a proof of who the user is lets sensitive changes through.
+   */
+  reauthMaxAge: number | string;
+
+  /**
    * Name of the cookie the session token travels in.
    */
   cookieName: string;
@@ -132,6 +177,16 @@ export interface ResolvedAuthConfig {
    * How often one client network may try to sign in, or `false` for no limit.
    */
   loginRateLimit: RouteRateLimit | false;
+
+  /**
+   * Whether passkeys sign users in, and where they belong when set as an object.
+   */
+  passkeys: NonNullable<NonNullable<Config['auth']>['passkeys']>;
+
+  /**
+   * Whether users may sign in with a password.
+   */
+  passwordSignIn: boolean;
 
   /**
    * The password rules: the minimum length, and the scrypt cost passed to `hashPassword`.
@@ -166,20 +221,28 @@ export interface ResolvedAuthConfig {
 export const AUTH_DEFAULTS = {
   sessionMaxAge: '30d',
   transientSessionMaxAge: '1d',
+  reauthMaxAge: '5m',
   cookieName: 'session',
   loginRateLimit: { limit: 10, window: '1m' },
+  passkeys: false,
   password: {
     minLength: 8,
     cost: 32_768,
     blockSize: 8,
     parallelization: 1,
   },
-} satisfies ResolvedAuthConfig;
+} satisfies Omit<ResolvedAuthConfig, 'passwordSignIn'>;
 
 /**
  * Returns the resolved auth settings, `Config.auth` merged over the layer defaults.
+ * `auth.password: false` resolves to the default password rules with `passwordSignIn` off.
  * Valid wherever config is, so the auth routes and helpers read one consistent shape.
  */
 export function useAuthConfig(): ResolvedAuthConfig {
-  return withDefaults(useConfig().auth ?? {}, AUTH_DEFAULTS);
+  const { password, ...auth } = useConfig().auth ?? {};
+  return {
+    ...withDefaults(auth, AUTH_DEFAULTS),
+    password: withDefaults(password === false ? {} : (password ?? {}), AUTH_DEFAULTS.password),
+    passwordSignIn: password !== false,
+  };
 }

@@ -12,6 +12,7 @@ import type { User } from '../../auth/types.ts';
 
 import { translate } from '../../../ohne/http/translate.ts';
 import { accountLayout } from '../../auth/account-layout.ts';
+import { useAuthConfig } from '../../auth/config.ts';
 import { createSession } from '../../auth/create-session.ts';
 import { toUser } from '../../auth/to-user.ts';
 
@@ -24,6 +25,7 @@ import { toUser } from '../../auth/to-user.ts';
  * The check reads past any app scope, so a hidden user still disarms it.
  * The field pipeline validates the input; a failure answers `422` with per-field messages.
  * Success opens a persistent session, sets the cookie, and answers the `User` like login.
+ * While `auth.password` is `false`, the admin is created without a password and adds a passkey next.
  */
 export default defineHandler(async (): Promise<User> => {
   const body = (await readJSONBody<Record<string, unknown> | null>()) ?? {};
@@ -37,11 +39,11 @@ export default defineHandler(async (): Promise<User> => {
       .createOrThrow({
         ...pick(body, names),
         email: body.email,
-        password: body.password,
+        password: useAuthConfig().passwordSignIn ? body.password : null,
         roles: ['admin'],
       });
   }, 'immediate');
 
-  await createSession(record.UUID as string);
+  await createSession(record.UUID as string, { method: 'install' });
   return toUser(record, await accountLayout(toUser(record)));
 });

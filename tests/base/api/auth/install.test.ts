@@ -109,6 +109,19 @@ describe('POST /auth/install', () => {
     await reset();
   });
 
+  it('creates a passkey-only admin without a password', async () => {
+    useLayers().add({ path: '/auth-install-passkey-test', input: { auth: { password: false } } });
+    try {
+      const response = await call(ROUTES.post, { email: 'first@example.com', password: 'ignored' });
+      strictEqual(response.status, 200);
+      const row = await queryUntyped('Users').select('password').findFirst();
+      strictEqual(row?.password, null);
+    } finally {
+      useLayers().remove('/auth-install-passkey-test');
+      await reset();
+    }
+  });
+
   it('fires `record:committed` once for the first user', async () => {
     const events: RecordCommitted[] = [];
     hook('record:committed', (event) => {

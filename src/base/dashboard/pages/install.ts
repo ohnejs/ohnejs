@@ -7,22 +7,27 @@ import {
   h,
   icon,
   navigate,
+  passkeysSupported,
   prose,
+  registerPasskey,
   sessionUser,
   textInput,
   toast,
   useAction,
   useDocumentTitle,
   useT,
+  when,
 } from 'ohnejs/dashboard';
-import { effect, isNullish, isPlainObject, ref } from 'ohnejs/utils';
+import { effect, isNull, isNullish, isPlainObject, ref } from 'ohnejs/utils';
 
 import { authLayout } from '../components/auth-layout.ts';
+import { authMethods } from '../components/auth-methods.ts';
 import { authLogo } from '../components/logo.ts';
 
 /**
  * The install page: the first-user setup card on the auth layout.
  * A welcome note, the name, email, and password create the primary administrator account.
+ * While password sign-in is off, the password gives way to the first passkey, created right after.
  * The server signs the new account in; success lands on home through a full document load.
  * An installed system redirects to the login page; a signed-in visitor goes home.
  */
@@ -82,9 +87,14 @@ function installForm(): HTMLElement {
     passwordError.value = errors.password ?? '';
   };
 
+  const passwordless = (): boolean => authMethods()?.password === false;
+
   const install = useAction('POST /auth/install', {
     // `sessionUser` resolves once per document, so the fresh cookie needs a full load to count.
-    onDone: () => location.assign('/'),
+    onDone: async () => {
+      if (passwordless()) await addFirstPasskey();
+      location.assign('/');
+    },
     onError: (error) => {
       if (error.status === 403) navigate('/login', { replace: true });
       else if (error.status === 422) showErrors(fieldErrors(error.data));
@@ -93,13 +103,14 @@ function installForm(): HTMLElement {
   });
 
   const submit = (): void => {
+    if (passwordless() && !passkeysSupported()) return;
     showErrors({});
     void install.run({
       body: {
         firstName: firstName.value === '' ? null : firstName.value,
         lastName: lastName.value === '' ? null : lastName.value,
         email: email.value,
-        password: password.value,
+        password: passwordless() ? undefined : password.value,
       },
     });
   };
@@ -157,24 +168,51 @@ function installForm(): HTMLElement {
       }),
       { label: 'dashboard.login.email', error: () => emailError.value },
     ),
-    formField(
-      textInput(password, {
-        type: () => (revealed.value ? 'text' : 'password'),
-        autocomplete: 'new-password',
-        id: 'password',
-        name: 'password',
-        suffix: reveal,
-      }),
-      { label: 'dashboard.login.password', error: () => passwordError.value },
+    when(
+      () => !passwordless(),
+      () =>
+        formField(
+          textInput(password, {
+            type: () => (revealed.value ? 'text' : 'password'),
+            autocomplete: 'new-password',
+            id: 'password',
+            name: 'password',
+            suffix: reveal,
+          }),
+          { label: 'dashboard.login.password', error: () => passwordError.value },
+        ),
+    ),
+    when(passwordless, () =>
+      formField(
+        prose(
+          h('p', { class: 'ohne-muted' }, () =>
+            t(
+              passkeysSupported()
+                ? 'dashboard.install.passkeyMessage'
+                : 'dashboard.passkeys.unsupported',
+            ),
+          ),
+        ),
+      ),
     ),
     formField(
       button(() => t('dashboard.install.submit'), {
         type: 'submit',
         class: 'ohne-w-full',
+        disabled: () => passwordless() && !passkeysSupported(),
         loading: () => install.busy(),
       }),
     ),
   );
+}
+
+/**
+ * Asks the new admin to create the first passkey; a failure toasts, and they can add one on the account page.
+ */
+async function addFirstPasskey(): Promise<void> {
+  const response = await registerPasskey().catch(() => undefined);
+  if (isNull(response) || response?.ok === true) return;
+  toast(useT()('dashboard.passkeys.failed'), { type: 'error' });
 }
 
 /**

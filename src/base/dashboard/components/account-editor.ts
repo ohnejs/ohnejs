@@ -36,11 +36,13 @@ import {
   untracked,
 } from 'ohnejs/utils';
 
+import { authMethods } from './auth-methods.ts';
 import { contentLocale } from './content-language-switcher.ts';
 import { currentPasswordPopup } from './current-password-popup.ts';
 import { historyButtons } from './history-buttons.ts';
 import { historyScrollState } from './history-scroll-state.ts';
 import { History } from './history.ts';
+import { passkeysCard } from './passkeys-card.ts';
 import { editFields } from './record-editor.ts';
 
 /**
@@ -73,6 +75,10 @@ css`
     padding: 0.75rem;
   }
 
+  .o-account-passkeys {
+    margin-top: 0.75rem;
+  }
+
   .o-account-fields {
     border: 0;
     margin: 0;
@@ -91,6 +97,7 @@ css`
  * Cmd/Ctrl+S saves while no overlay is open.
  * Save patches the dirty fields through `updateSessionUser`; a `422` routes onto the rows it names.
  * A new password asks for the current one first.
+ * While the app offers passkeys, a card below the form manages the user's own.
  * A saved language change keeps the form: its labels follow the language in place.
  */
 export function accountEditor(): Child {
@@ -257,6 +264,10 @@ export function accountEditor(): Child {
       'div',
       { class: 'o-account-main' },
       h('fieldset', { class: 'o-account-fields', disabled: () => busy.value }, () => live.render()),
+      when(
+        () => authMethods()?.passkeys === true,
+        () => h('div', { class: 'o-account-passkeys' }, passkeysCard()),
+      ),
     );
 
     const containerEl = container([headerEl, mainEl]);

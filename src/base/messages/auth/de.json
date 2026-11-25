@@ -1,10 +1,13 @@
 {
   "alreadyInstalled": "Bereits installiert",
   "incorrectPassword": "Falsches Passwort",
+  "invalidPasskey": "Dieser Passkey wurde nicht akzeptiert",
   "invalidCredentials": "E-Mail-Adresse oder Passwort ist falsch",
   "invalidRoles": "Rollen müssen eine Liste von Rollennamen sein",
   "invalidTimezone": "Ungültige Zeitzone `{timezone}`",
   "lastAdmin": "Den letzten Administrator kannst du nicht entfernen",
+  "lastPasskey": "Deinen letzten Passkey kannst du nicht entfernen, solange die Anmeldung mit Passwort aus ist",
+  "reauthRequired": "Bestätige, dass du es bist, um fortzufahren",
   "roleNotGrantable": "Die Rolle `{role}` kannst du nicht vergeben",
   "unknownRole": "Unbekannte Rolle `{role}`",
   "unknownLanguage": "Unbekannte Sprache `{language}`",
@@ -77,6 +80,44 @@
     "expiresAt": {
       "label": "Läuft ab am",
       "description": "Wann die Sitzung ungültig wird, in Epoch-Millisekunden."
+    },
+    "verifiedAt": {
+      "label": "Bestätigt am",
+      "description": "Wann der Benutzer in dieser Sitzung zuletzt bestätigt hat, wer er ist."
+    }
+  },
+  "passkeys": {
+    "label": "Passkeys",
+    "defaultName": "Passkey",
+    "user": {
+      "label": "Benutzer"
+    },
+    "name": {
+      "label": "Name"
+    },
+    "credentialID": {
+      "label": "Credential-ID"
+    },
+    "publicKey": {
+      "label": "Öffentlicher Schlüssel"
+    },
+    "signCount": {
+      "label": "Signaturzähler"
+    },
+    "transports": {
+      "label": "Transportwege"
+    },
+    "backupEligible": {
+      "label": "Synchronisierbar"
+    },
+    "backedUp": {
+      "label": "Synchronisiert"
+    },
+    "createdAt": {
+      "label": "Erstellt am"
+    },
+    "lastUsedAt": {
+      "label": "Zuletzt verwendet am"
     }
   }
 }

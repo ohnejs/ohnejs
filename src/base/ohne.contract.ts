@@ -122,9 +122,9 @@ export interface InstallBody {
   email: string;
 
   /**
-   * The first user's password.
+   * The first user's password, required unless `auth.password` is `false`.
    */
-  password: string;
+  password?: string;
 
   /**
    * The first user's first name, kept when `Users` declares it.
@@ -138,6 +138,155 @@ export interface InstallBody {
 }
 
 /**
+ * One of the signed-in user's passkeys, as the `/auth/passkey` routes answer it.
+ */
+export interface Passkey {
+  /**
+   * The passkey's stable identifier.
+   */
+  UUID: string;
+
+  /**
+   * The label the user gave it.
+   */
+  name: string;
+
+  /**
+   * Whether it syncs across the user's devices, like an iCloud Keychain or Google Password Manager passkey.
+   */
+  synced: boolean;
+
+  /**
+   * When it was added, in epoch milliseconds.
+   */
+  createdAt: number;
+
+  /**
+   * When it last signed in or confirmed, in epoch milliseconds.
+   */
+  lastUsedAt: number | null;
+}
+
+/**
+ * A credential a passkey prompt may offer.
+ */
+export interface PasskeyDescriptor {
+  /**
+   * Always `'public-key'`.
+   */
+  type: 'public-key';
+
+  /**
+   * The credential id, base64url.
+   */
+  id: string;
+
+  /**
+   * How the browser may reach the authenticator, such as `'internal'` or `'usb'`.
+   */
+  transports: string[];
+}
+
+/**
+ * The options `navigator.credentials.get` takes, in the JSON `parseRequestOptionsFromJSON` reads.
+ */
+export interface PasskeyRequestOptions {
+  /**
+   * The challenge to sign, base64url.
+   */
+  challenge: string;
+
+  /**
+   * The RP ID the passkey must belong to.
+   */
+  rpId: string;
+
+  /**
+   * How long the prompt may stay open, in milliseconds.
+   */
+  timeout: number;
+
+  /**
+   * Always `'required'`: the passkey must verify the user by Face ID, fingerprint or PIN.
+   */
+  userVerification: 'required';
+
+  /**
+   * The signed-in user's own passkeys, or none to let any passkey of the site answer.
+   */
+  allowCredentials: PasskeyDescriptor[];
+}
+
+/**
+ * The options `navigator.credentials.create` takes, in the JSON `parseCreationOptionsFromJSON` reads.
+ */
+export interface PasskeyCreationOptions {
+  /**
+   * The challenge to sign, base64url.
+   */
+  challenge: string;
+
+  /**
+   * The site the passkey belongs to.
+   */
+  rp: { id: string; name: string };
+
+  /**
+   * The account the passkey signs in to, its `id` the user's `UUID` in base64url.
+   */
+  user: { id: string; name: string; displayName: string };
+
+  /**
+   * The signature algorithms accepted, as COSE identifiers.
+   */
+  pubKeyCredParams: { type: 'public-key'; alg: number }[];
+
+  /**
+   * How long the prompt may stay open, in milliseconds.
+   */
+  timeout: number;
+
+  /**
+   * Always `'none'`: the authenticator's make is not asked for.
+   */
+  attestation: 'none';
+
+  /**
+   * A discoverable passkey that verifies the user.
+   */
+  authenticatorSelection: {
+    residentKey: 'required';
+    requireResidentKey: true;
+    userVerification: 'required';
+  };
+
+  /**
+   * The user's passkeys already registered, so the same authenticator is not added twice.
+   */
+  excludeCredentials: PasskeyDescriptor[];
+}
+
+/**
+ * A passkey's answer to a challenge, as `PublicKeyCredential.toJSON()` gives it.
+ */
+export interface PasskeyCredential {
+  /**
+   * The credential id, base64url.
+   */
+  id: string;
+
+  /**
+   * Always `'public-key'`.
+   */
+  type: string;
+
+  /**
+   * The authenticator's response, its fields base64url.
+   */
+  response: Record<string, unknown>;
+}
+
+/**
  * The contracts of the `auth` routes.
  */
 export interface Routes {
@@ -148,4 +297,22 @@ export interface Routes {
   'PATCH /auth/me': { body: AccountBody; response: User };
   'GET /auth/install': { response: { required: boolean } };
   'POST /auth/install': { body: InstallBody; response: User };
+  'GET /auth/methods': { response: { password: boolean; passkeys: boolean } };
+  'POST /auth/reauth': {
+    body: { password: string } | { credential: PasskeyCredential };
+    response: { ok: true };
+  };
+  'POST /auth/passkey/options': { response: PasskeyRequestOptions };
+  'POST /auth/passkey/login': {
+    body: { credential: PasskeyCredential; remember?: boolean };
+    response: User;
+  };
+  'POST /auth/passkey/register/options': { response: PasskeyCreationOptions };
+  'POST /auth/passkey/register': {
+    body: { credential: PasskeyCredential; name?: string };
+    response: Passkey;
+  };
+  'GET /auth/passkey': { response: Passkey[] };
+  'PATCH /auth/passkey/[uuid]': { body: { name: string }; response: Passkey };
+  'DELETE /auth/passkey/[uuid]': { response: null };
 }

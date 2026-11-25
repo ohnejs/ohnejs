@@ -21,6 +21,15 @@ describe('ohnejs/base contract', () => {
       'PATCH /auth/me': true,
       'GET /auth/install': true,
       'POST /auth/install': true,
+      'GET /auth/methods': true,
+      'POST /auth/reauth': true,
+      'POST /auth/passkey/options': true,
+      'POST /auth/passkey/login': true,
+      'POST /auth/passkey/register/options': true,
+      'POST /auth/passkey/register': true,
+      'GET /auth/passkey': true,
+      'PATCH /auth/passkey/[uuid]': true,
+      'DELETE /auth/passkey/[uuid]': true,
     };
     const served = (await collectRoutes([{ name: 'base', dir: BASE }]))
       .map((route) => routeID(route.method, route.pattern))

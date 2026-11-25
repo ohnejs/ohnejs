@@ -1,12 +1,13 @@
 import { deepStrictEqual, doesNotMatch, match, ok, strictEqual } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import type { User } from '../../../../src/base/auth/types.ts';
+import type { SignIn, User } from '../../../../src/base/auth/types.ts';
 import type { AnyHandler, Route } from '../../../../src/ohne/routes/route.ts';
 
 import loginHandler from '../../../../src/base/api/auth/login.post.ts';
 import logoutHandler from '../../../../src/base/api/auth/logout.post.ts';
 import meHandler from '../../../../src/base/api/auth/me.get.ts';
+import { createSession } from '../../../../src/base/auth/create-session.ts';
 import SessionsCollection from '../../../../src/base/collections/Sessions.ts';
 import UsersCollection from '../../../../src/base/collections/Users.ts';
 import datePatternField from '../../../../src/base/fields/date-pattern.ts';
@@ -22,6 +23,7 @@ import { buildDesiredSchema } from '../../../../src/ohne/database/schema/desired
 import { syncDatabase } from '../../../../src/ohne/database/schema/sync.ts';
 import { registerDatabase, registerDialect } from '../../../../src/ohne/database/use-database.ts';
 import { useFields } from '../../../../src/ohne/fields/use-fields.ts';
+import { hook } from '../../../../src/ohne/hooks/hook.ts';
 import { dispatch } from '../../../../src/ohne/http/dispatch.ts';
 import { useEvent } from '../../../../src/ohne/http/use-event.ts';
 import { DEFAULTS } from '../../../../src/ohne/layers/config.ts';
@@ -30,7 +32,7 @@ import { useMiddleware } from '../../../../src/ohne/middleware/use-middleware.ts
 import { usePrinter } from '../../../../src/ohne/printer/use-printer.ts';
 import { queryUntyped } from '../../../../src/ohne/query/query.ts';
 import { defineHandler } from '../../../../src/ohne/routes/define-handler.ts';
-import { parseDuration } from '../../../../src/utils/index.ts';
+import { isUndefined, parseDuration } from '../../../../src/utils/index.ts';
 import { connectTest, dialect } from '../../../_dialect.ts';
 
 usePrinter().configure({ stream: { write: () => true } });
@@ -287,5 +289,30 @@ describe('createSession sweeps expired rows', () => {
       rows.filter((row) => row.user !== sweeper && row.expiresAt > Date.now()).length >= 1,
       true,
     );
+  });
+});
+
+describe('createSession called the 0.9 way', () => {
+  const signIns: SignIn[] = [];
+  hook('auth:signed-in', (signIn) => void signIns.push(signIn));
+
+  async function open(email: string, remember?: boolean): Promise<Response> {
+    const user = (await queryUntyped('Users').createOrThrow({ email, password: 'correct horse' }))
+      .UUID as string;
+    const handler = defineHandler(async () => {
+      await (isUndefined(remember) ? createSession(user) : createSession(user, remember));
+      return null;
+    });
+    return call(route('POST', '/signup', handler as AnyHandler));
+  }
+
+  it('remembers a session opened with the user alone', async () => {
+    match(sessionCookie(await open('legacy-kept@example.com')), /Max-Age=\d+/);
+    strictEqual(signIns.at(-1)?.method, 'custom');
+  });
+
+  it('keeps a session opened with `false` transient', async () => {
+    doesNotMatch(sessionCookie(await open('legacy-brief@example.com', false)), /Max-Age/);
+    strictEqual(signIns.at(-1)?.method, 'custom');
   });
 });

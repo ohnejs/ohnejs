@@ -2,6 +2,8 @@
   "account": {
     "appDefault": "App-Standard",
     "changePassword": "Passwort ändern",
+    "confirm": "Bestätigen",
+    "confirmIdentity": "Bestätige, dass du es bist",
     "confirmSignOutOtherDevices": "Möchtest du dich wirklich von allen anderen Geräten abmelden? Deine aktuelle Sitzung bleibt aktiv.",
     "currentPassword": "Aktuelles Passwort",
     "noAccess": "Du hast keinen Zugriff auf die Seite `{page}`",
@@ -232,6 +234,7 @@
   "install": {
     "firstName": "Vorname",
     "lastName": "Nachname",
+    "passkeyMessage": "Als Nächstes fragt dein Gerät, ob du einen Passkey erstellen möchtest. Damit meldest du dich ab dann an.",
     "submit": "Konto erstellen",
     "title": "Installation",
     "welcomeMessage": "Willkommen bei ohne! Gib deine Daten ein, um das primäre Administratorkonto zu erstellen."
@@ -268,6 +271,7 @@
     "email": "E-Mail",
     "failed": "Die Anmeldung ist fehlgeschlagen",
     "hidePassword": "Passwort verbergen",
+    "passkey": "Mit Passkey anmelden",
     "password": "Passwort",
     "rememberMe": "Angemeldet bleiben",
     "showPassword": "Passwort anzeigen",
@@ -323,6 +327,23 @@
     "loadMore": "Mehr laden",
     "moreGroups": "Weitere verwandte Gruppen ausgeblendet. Gib ein weiteres Wort ein, um die Suche einzugrenzen.",
     "via": "{collection} über {target}"
+  },
+  "passkeys": {
+    "add": "Passkey hinzufügen",
+    "added": "Passkey hinzugefügt",
+    "confirmRemove": "Den Passkey `{name}` entfernen? Du kannst dich dann nicht mehr damit anmelden.",
+    "device": "Nur auf diesem Gerät",
+    "empty": "Noch keine Passkeys. Füge einen hinzu, um dich mit Face ID, Fingerabdruck oder Sicherheitsschlüssel anzumelden.",
+    "failed": "Der Passkey konnte nicht gespeichert werden",
+    "lastUsed": "Zuletzt verwendet",
+    "name": "Name",
+    "neverUsed": "Nie verwendet",
+    "removed": "Passkey entfernt",
+    "rename": "Umbenennen",
+    "renamed": "Passkey umbenannt",
+    "synced": "Synchronisiert",
+    "title": "Passkeys",
+    "unsupported": "Dieser Browser kann keine Passkeys verwenden"
   },
   "points": "{points} Pkt.",
   "range": {

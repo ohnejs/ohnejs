@@ -9,7 +9,9 @@ import { useUser } from '../auth/use-user.ts';
  * Scopes an exposed operation to the caller's own sessions.
  * An anonymous caller is refused as the identical `404`, so the endpoint reveals nothing.
  */
-const ownSessions = async (): Promise<AccessScope<'expiresAt' | 'tokenHash' | 'user'> | false> => {
+const ownSessions = async (): Promise<
+  AccessScope<'expiresAt' | 'tokenHash' | 'user' | 'verifiedAt'> | false
+> => {
   const user = await useUser();
   return isNull(user) ? false : { where: { user: user.UUID } };
 };
@@ -21,6 +23,7 @@ const ownSessions = async (): Promise<AccessScope<'expiresAt' | 'tokenHash' | 'u
  * A leaked database therefore cannot reconstruct a usable session.
  * The hash is `readable: false`, so no read returns it unless a trusted `select` names it explicitly.
  * `expiresAt` is epoch milliseconds; a session past it is treated as gone.
+ * `verifiedAt` is when the user last proved who they are, so a sensitive change can ask for a fresh one.
  * Deleting a user cascades to their sessions, so a removed account cannot leave a session behind.
  * The API exposes `read` and `delete` to the session's own user alone, scoped by `access`.
  */
@@ -50,6 +53,12 @@ const sessions = defineCollection({
       index: true,
       label: 'auth.sessions.expiresAt.label',
       description: 'auth.sessions.expiresAt.description',
+    }),
+
+    verifiedAt: field('dateTime', {
+      nullable: true,
+      label: 'auth.sessions.verifiedAt.label',
+      description: 'auth.sessions.verifiedAt.description',
     }),
   },
 });

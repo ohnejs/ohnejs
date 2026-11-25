@@ -1,10 +1,13 @@
 {
   "alreadyInstalled": "Already installed",
   "incorrectPassword": "Incorrect password",
+  "invalidPasskey": "This passkey was not accepted",
   "invalidCredentials": "Incorrect email or password",
   "invalidRoles": "Roles must be a list of role names",
   "invalidTimezone": "Invalid time zone `{timezone}`",
   "lastAdmin": "You cannot remove the last administrator",
+  "lastPasskey": "You cannot remove your last passkey while password sign-in is off",
+  "reauthRequired": "Confirm it is you to continue",
   "roleNotGrantable": "You cannot grant the role `{role}`",
   "unknownRole": "Unknown role `{role}`",
   "unknownLanguage": "Unknown language `{language}`",
@@ -77,6 +80,44 @@
     "expiresAt": {
       "label": "Expires at",
       "description": "When the session stops being valid, as epoch milliseconds."
+    },
+    "verifiedAt": {
+      "label": "Verified at",
+      "description": "When the user last proved who they are on this session."
+    }
+  },
+  "passkeys": {
+    "label": "Passkeys",
+    "defaultName": "Passkey",
+    "user": {
+      "label": "User"
+    },
+    "name": {
+      "label": "Name"
+    },
+    "credentialID": {
+      "label": "Credential ID"
+    },
+    "publicKey": {
+      "label": "Public key"
+    },
+    "signCount": {
+      "label": "Signature counter"
+    },
+    "transports": {
+      "label": "Transports"
+    },
+    "backupEligible": {
+      "label": "Can sync"
+    },
+    "backedUp": {
+      "label": "Synced"
+    },
+    "createdAt": {
+      "label": "Created at"
+    },
+    "lastUsedAt": {
+      "label": "Last used at"
     }
   }
 }

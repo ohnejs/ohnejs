@@ -6,12 +6,18 @@ import {
   h,
   icon,
   login,
+  loginWithPasskey,
+  type LoginOutcome,
+  passkeysSupported,
+  prose,
   textInput,
   toast,
   useT,
+  when,
 } from 'ohnejs/dashboard';
 import { effect, isNull, isUndefined, ref } from 'ohnejs/utils';
 
+import { authMethods } from './auth-methods.ts';
 import { loginDefaults } from './login-defaults.ts';
 import { shellSlots } from './shell-slots.ts';
 
@@ -31,12 +37,12 @@ export interface LoginFormOptions {
 }
 
 /**
- * The email and password sign-in form.
+ * The sign-in form: email and password, a passkey button, or both, as `GET /auth/methods` answers.
  * An empty field earns its message under the input.
  * Wrong credentials, an unreachable server, and any other refusal each raise a toast, once per attempt.
  * A throttled attempt keeps the form from submitting until the server's `Retry-After` has passed.
  * The password input reveals through its suffix button.
- * Enter submits from any control, including the remember-me checkbox.
+ * Enter submits from any control, the remember-me checkbox included; without passwords it asks for a passkey.
  * A success updates `sessionUser`, so the page hosting the form owns the navigation.
  * The fields start from `loginDefaults`.
  * The `loginFields` shell slot renders above the submit button, and the `login` slot after `footer`.
@@ -58,13 +64,7 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     if (!isUndefined(defaults.password)) password.value = defaults.password;
   });
 
-  const submit = async (): Promise<void> => {
-    if (busy.value) return;
-    emailError.value = email.value === '';
-    passwordError.value = password.value === '';
-    if (emailError.value || passwordError.value) return;
-    busy.value = true;
-    const outcome = await login(email.value, password.value, remember.value);
+  const settle = (outcome: LoginOutcome): void => {
     if (outcome.kind === 'throttled') {
       const seconds = outcome.retryAfter;
       toast(t('dashboard.login.throttled', { seconds }), { type: 'error' });
@@ -72,10 +72,31 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
       return;
     }
     busy.value = false;
-    if (outcome.kind === 'invalid') toast(t('auth.invalidCredentials'), { type: 'error' });
     if (outcome.kind === 'unreachable') toast(t('dashboard.login.unreachable'), { type: 'error' });
     if (outcome.kind === 'failed') toast(t('dashboard.login.failed'), { type: 'error' });
   };
+
+  const submit = async (): Promise<void> => {
+    if (busy.value) return;
+    emailError.value = email.value === '';
+    passwordError.value = password.value === '';
+    if (emailError.value || passwordError.value) return;
+    busy.value = true;
+    const outcome = await login(email.value, password.value, remember.value);
+    if (outcome.kind === 'invalid') toast(t('auth.invalidCredentials'), { type: 'error' });
+    settle(outcome);
+  };
+
+  const signInWithPasskey = async (): Promise<void> => {
+    if (busy.value || !passkeysSupported()) return;
+    busy.value = true;
+    const outcome = await loginWithPasskey(remember.value);
+    if (outcome.kind === 'invalid') toast(t('auth.invalidPasskey'), { type: 'error' });
+    settle(outcome);
+  };
+
+  const primary = (): Promise<void> =>
+    authMethods()?.password === false ? signInWithPasskey() : submit();
 
   // One persistent button whose icon swaps in place, so a click never unmounts the focused node.
   const reveal = button(
@@ -110,7 +131,7 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
   rememberRow.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    void submit();
+    void primary();
   });
 
   return h(
@@ -118,39 +139,69 @@ export function loginForm(options: LoginFormOptions = {}): HTMLElement {
     {
       onSubmit: (event: SubmitEvent) => {
         event.preventDefault();
-        void submit();
+        void primary();
       },
     },
     options.header,
-    formField(
-      textInput(email, {
-        autocomplete: 'email',
-        // A browser refuses autofocus in a cross-origin frame and logs the refusal.
-        autofocus: window.self === window.top,
-        id: 'email',
-        name: 'email',
-      }),
-      {
-        label: 'dashboard.login.email',
-        error: () => (emailError.value ? t('validation.required') : ''),
-      },
-    ),
-    formField(
-      textInput(password, {
-        type: () => (revealed.value ? 'text' : 'password'),
-        autocomplete: 'current-password',
-        id: 'password',
-        name: 'password',
-        suffix: reveal,
-      }),
-      {
-        label: 'dashboard.login.password',
-        error: () => (passwordError.value ? t('validation.required') : ''),
-      },
+    when(
+      () => authMethods()?.password !== false,
+      () => [
+        formField(
+          textInput(email, {
+            autocomplete: 'email',
+            // A browser refuses autofocus in a cross-origin frame and logs the refusal.
+            autofocus: window.self === window.top,
+            id: 'email',
+            name: 'email',
+          }),
+          {
+            label: 'dashboard.login.email',
+            error: () => (emailError.value ? t('validation.required') : ''),
+          },
+        ),
+        formField(
+          textInput(password, {
+            type: () => (revealed.value ? 'text' : 'password'),
+            autocomplete: 'current-password',
+            id: 'password',
+            name: 'password',
+            suffix: reveal,
+          }),
+          {
+            label: 'dashboard.login.password',
+            error: () => (passwordError.value ? t('validation.required') : ''),
+          },
+        ),
+      ],
     ),
     formField(rememberRow),
     ...shellSlots('loginFields').map((render) => render()),
-    formField(button(() => t('dashboard.login.submit'), { type: 'submit', class: 'ohne-w-full' })),
+    when(
+      () => authMethods()?.password !== false,
+      () =>
+        formField(
+          button(() => t('dashboard.login.submit'), { type: 'submit', class: 'ohne-w-full' }),
+        ),
+    ),
+    when(
+      () => authMethods()?.password === false && !passkeysSupported(),
+      () =>
+        formField(
+          prose(h('p', { class: 'ohne-muted' }, () => t('dashboard.passkeys.unsupported'))),
+        ),
+    ),
+    when(
+      () => authMethods()?.passkeys === true && passkeysSupported(),
+      () =>
+        formField(
+          button(() => t('dashboard.login.passkey'), {
+            icon: 'fingerprint',
+            variant: authMethods()?.password === false ? 'primary' : 'outline',
+            class: 'ohne-w-full',
+            onClick: () => void signInWithPasskey(),
+          }),
+        ),
+    ),
     options.footer,
     ...shellSlots('login').map((render) => render()),
   );

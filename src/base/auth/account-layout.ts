@@ -3,6 +3,8 @@ import { isUndefined, jsonClone, layoutFieldNames } from 'ohnejs/utils';
 
 import type { User } from './types.ts';
 
+import { useAuthConfig } from './config.ts';
+
 declare module 'ohnejs' {
   interface Hooks {
     /**
@@ -35,6 +37,7 @@ export const DEFAULT_ACCOUNT_LAYOUT: FieldLayout = [
 
 /**
  * Resolves the account page layout for `user`: the `auth:account-layout` hook over a copy of the default.
+ * While `auth.password` is `false`, the default leaves out the password card.
  * The result is as the hook left it; `accountFields` reads the editable names out of it.
  *
  * @example
@@ -44,7 +47,10 @@ export const DEFAULT_ACCOUNT_LAYOUT: FieldLayout = [
  * ```
  */
 export async function accountLayout(user: User): Promise<FieldLayout> {
-  return applyHook('auth:account-layout', jsonClone([...DEFAULT_ACCOUNT_LAYOUT]), { user });
+  const layout = useAuthConfig().passwordSignIn
+    ? DEFAULT_ACCOUNT_LAYOUT
+    : DEFAULT_ACCOUNT_LAYOUT.filter((node) => !layoutFieldNames([node]).includes('password'));
+  return applyHook('auth:account-layout', jsonClone([...layout]), { user });
 }
 
 /**
