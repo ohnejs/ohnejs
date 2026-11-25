@@ -279,8 +279,9 @@ export class SQLiteDialect extends Dialect {
   }
 
   /**
-   * Runs its own `BEGIN`/`COMMIT`/`ROLLBACK` with `foreign_keys = OFF` hoisted outside the transaction.
+   * Runs its own `BEGIN IMMEDIATE`/`COMMIT`/`ROLLBACK` with `foreign_keys = OFF` hoisted outside it.
    * The pragma no-ops inside one, which is why this never delegates to the adapter's `transaction`.
+   * A sync reads before it writes, so the write lock is taken up front to keep those reads fresh.
    * `foreign_keys = ON` is restored on both the commit and the rollback path.
    * With `options.commit` false the success path rolls back too, so a rehearsal writes nothing.
    */
@@ -292,7 +293,7 @@ export class SQLiteDialect extends Dialect {
     const commit = options.commit ?? true;
     await db.exec('PRAGMA foreign_keys = OFF');
     try {
-      await db.exec('BEGIN');
+      await db.exec('BEGIN IMMEDIATE');
       try {
         const result = await fn(db);
         await db.exec(commit ? 'COMMIT' : 'ROLLBACK');

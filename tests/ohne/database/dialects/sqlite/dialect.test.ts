@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { describe, it } from 'node:test';
 
 import type { DatabaseAdapter } from '../../../../../src/ohne/database/adapter.ts';
@@ -622,6 +623,28 @@ describe('SQLiteDialect', () => {
       );
       deepStrictEqual(await db.query('PRAGMA foreign_keys'), [nullObj({ foreign_keys: 1 })]);
       await db.close();
+    });
+
+    it('holds the write lock from the start, so a sibling cannot stale its reads', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'ohne-sqlite-'));
+      const path = join(root, 'app.db');
+      const db = await dialect.connect(path);
+      await db.exec('CREATE TABLE t (v TEXT)');
+      const sibling = new DatabaseSync(path);
+      sibling.exec('PRAGMA busy_timeout = 0');
+      let siblingError: unknown;
+      await dialect.schemaTransaction(db, async (tx) => {
+        await tx.query('SELECT * FROM t');
+        siblingError = await errorOf(
+          Promise.try(() => sibling.exec("INSERT INTO t VALUES ('sibling')")),
+        );
+        await tx.run("INSERT INTO t VALUES ('sync')");
+      });
+      strictEqual(dialect.isBusy(siblingError), true);
+      deepStrictEqual(await db.query('SELECT v FROM t'), [nullObj({ v: 'sync' })]);
+      sibling.close();
+      await db.close();
+      rmSync(root, { recursive: true, force: true });
     });
 
     it('rethrows the failure that made SQLite roll back on its own', async () => {
