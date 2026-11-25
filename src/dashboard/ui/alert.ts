@@ -111,7 +111,7 @@ css`
   .ohne-alert-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5em;
+    gap: var(--ohne-gap);
     margin-top: 0.75em;
   }
 `;

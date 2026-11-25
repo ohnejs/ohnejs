@@ -95,7 +95,7 @@ css`
 
   .ohne-dialog-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--ohne-gap);
     justify-content: flex-end;
     flex-wrap: wrap;
   }

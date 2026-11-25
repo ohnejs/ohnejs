@@ -113,7 +113,7 @@ css`
   .ohne-page-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5em;
+    gap: var(--ohne-gap);
     align-items: center;
     margin-top: 0.5em;
   }

@@ -338,7 +338,7 @@ css`
   .ohne-section-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--ohne-gap);
     align-items: center;
   }
 
