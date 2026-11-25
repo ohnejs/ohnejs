@@ -11,7 +11,7 @@ const CHECKERBOARD_DARK =
  * `ohne-clamp` reads its line count from `--ohne-clamp` (default 1).
  * `ohne-no-transition` on `<body>` suppresses every transition during a theme switch.
  * `ohne-checkerboard` paints the transparency grid behind a translucent color or image, in either theme.
- * `ohne-hit` grows a small control's tap area to 40px on a coarse pointer, keeping its look.
+ * `ohne-hit` grows a small control's tap area to 44px on a coarse pointer, keeping its look.
  */
 css`
   .ohne-primary {
@@ -162,7 +162,7 @@ css`
     .ohne-hit::after {
       content: '';
       position: absolute;
-      inset: min(0px, 50% - 1.25rem);
+      inset: min(0px, 50% - 1.375rem);
     }
   }
 `;

@@ -17,8 +17,12 @@ Object.assign(FakeElement.prototype, {
       (byType.get(type) ?? []).filter((held) => held !== listener),
     );
   },
-  append(this: FakeElement, ...nodes: FakeElement[]) {
-    for (const node of nodes) this.appendChild(node);
+  append(this: FakeElement, ...nodes: (FakeElement | string)[]) {
+    for (const node of nodes) {
+      this.appendChild(
+        typeof node === 'string' ? (document.createTextNode(node) as unknown as FakeElement) : node,
+      );
+    }
   },
   closest: () => null,
   querySelector: () => null,

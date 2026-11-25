@@ -13,6 +13,7 @@ describe('useDocumentTitle', () => {
         getElementById: () => ({
           textContent: JSON.stringify({
             apiURL: 'http://api',
+            name: 'Acme',
             defaultLanguage: 'en',
             messageGroups: [],
           }),
@@ -25,13 +26,13 @@ describe('useDocumentTitle', () => {
     const page = effectScope();
     const popup = effectScope();
     page.run(() => useDocumentTitle('Posts'));
-    strictEqual(document.title, 'Posts - ohne');
+    strictEqual(document.title, 'Posts - Acme');
     popup.run(() => useDocumentTitle(() => 'Edit post'));
-    strictEqual(document.title, 'Edit post - ohne');
+    strictEqual(document.title, 'Edit post - Acme');
     popup.dispose();
-    strictEqual(document.title, 'Posts - ohne');
+    strictEqual(document.title, 'Posts - Acme');
     page.dispose();
-    strictEqual(document.title, 'ohne');
+    strictEqual(document.title, 'Acme');
   });
 
   it('pops a title that ends below the newest, keeping the newest shown', () => {
@@ -40,22 +41,22 @@ describe('useDocumentTitle', () => {
     below.run(() => useDocumentTitle('Below'));
     above.run(() => useDocumentTitle('Above'));
     below.dispose();
-    strictEqual(document.title, 'Above - ohne');
+    strictEqual(document.title, 'Above - Acme');
     above.dispose();
-    strictEqual(document.title, 'ohne');
+    strictEqual(document.title, 'Acme');
   });
 
   it('follows a getter and shows the bare name while it reads empty', () => {
     const scope = effectScope();
     const name = ref<string | undefined>(undefined);
     scope.run(() => useDocumentTitle(() => name.value));
-    strictEqual(document.title, 'ohne');
+    strictEqual(document.title, 'Acme');
     name.value = 'Hello';
-    strictEqual(document.title, 'Hello - ohne');
+    strictEqual(document.title, 'Hello - Acme');
     name.value = '';
-    strictEqual(document.title, 'ohne');
+    strictEqual(document.title, 'Acme');
     scope.dispose();
     name.value = 'Stale';
-    strictEqual(document.title, 'ohne');
+    strictEqual(document.title, 'Acme');
   });
 });

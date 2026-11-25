@@ -140,6 +140,10 @@ css`
 
   /* A scrolling group clips its items, so they fill it rather than take ohne-hit. */
   @media (pointer: coarse) {
+    .ohne-button-group {
+      height: max(calc(2em + 0.25rem), 2.75rem);
+    }
+
     .ohne-button-group-item {
       position: relative;
     }

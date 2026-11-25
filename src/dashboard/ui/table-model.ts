@@ -1,6 +1,7 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
 import type { Text } from '../runtime/text.ts';
+import type { Step } from './layout.ts';
 
 import { isNullish } from '../../utils/is/is-nullish.ts';
 import { isNumber } from '../../utils/is/is-number.ts';
@@ -69,6 +70,12 @@ export interface TableColumn<T> {
    * A wrapping column falls back to `16rem`.
    */
   minWidth?: string;
+
+  /**
+   * The table width step under which the column hides.
+   * The first column always shows.
+   */
+  hideUnder?: Step;
 }
 
 /**

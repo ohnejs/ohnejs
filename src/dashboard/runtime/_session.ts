@@ -10,7 +10,8 @@ export type LoginOutcome =
     }
   | {
       /**
-       * The server refused the email and password with a `401`, never saying which was wrong.
+       * The server refused the email and password, or the passkey, with a `401`.
+       * It never says whether the email or the password was wrong.
        */
       kind: 'invalid';
     }
@@ -19,6 +20,12 @@ export type LoginOutcome =
        * The request never completed: a network failure.
        */
       kind: 'unreachable';
+    }
+  | {
+      /**
+       * The user dismissed the passkey prompt; nothing was sent.
+       */
+      kind: 'cancelled';
     }
   | {
       /**

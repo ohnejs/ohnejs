@@ -205,4 +205,5 @@ card(table(() => raiders.value, { key, columns, maxHeight: '24rem' }), { flush: 
 - The checkbox and first columns stick to the left, the actions to the right.
 - Cells stay on one line; `wrap: true` lets a column wrap, at least `minWidth` or `16rem` wide.
 - `fixed: true` keeps the set `width` of each column and truncates longer text.
+- `hideUnder: 'sm'` hides a column while the table is narrower than that [step](./layout.md#container-steps); the first column always shows.
 - Inside a container narrower than `30rem`, the first column narrows and wraps.

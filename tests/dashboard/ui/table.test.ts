@@ -344,6 +344,26 @@ describe('table', () => {
     flush();
     strictEqual(panel(), undefined);
   });
+
+  it('marks a hideUnder column on its header, cells and fixed col, never the first column', () => {
+    const root = raidTable(() => RAIDERS, {
+      fixed: true,
+      columns: {
+        name: { ...COLUMNS.name!, hideUnder: 'md' },
+        role: { ...COLUMNS.role!, hideUnder: 'sm' },
+        level: COLUMNS.level!,
+      },
+    });
+    const hides = (cells: FakeElement[]): string[] =>
+      cells.map(
+        (cell) => (cell.getAttribute('class') ?? '').match(/ohne-table-hide-\w+/)?.[0] ?? '',
+      );
+    deepStrictEqual(hides(byTag(root, 'COL')), ['', 'ohne-table-hide-sm', '']);
+    deepStrictEqual(hides(byTag(root, 'TH')), ['', 'ohne-table-hide-sm', '']);
+    for (const row of bodyRows(root)) {
+      deepStrictEqual(hides(byTag(row, 'TD')), ['', 'ohne-table-hide-sm', '']);
+    }
+  });
 });
 
 describe('table selection', () => {

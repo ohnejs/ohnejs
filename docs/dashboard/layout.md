@@ -237,3 +237,5 @@ css`
 
 - Read the kit's tokens, so the rule follows the theme and dark mode.
 - Reach for a layout option before a margin. A margin fights the gap steps.
+- A fixed element at the bottom adds `var(--ohne-keyboard-inset, 0px)` to its offset and caps its
+  height at `var(--ohne-viewport-height, 100dvh)`, so it stays above the on-screen keyboard.

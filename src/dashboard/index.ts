@@ -151,7 +151,14 @@ export type {
   DashboardTable,
 } from './runtime/meta.ts';
 export {
+  createPasskey,
+  getPasskey,
+  passkeysSupported,
+  registerPasskey,
+} from './runtime/passkey.ts';
+export {
   login,
+  loginWithPasskey,
   logout,
   sessionUser,
   setLanguageFallback,
@@ -318,6 +325,7 @@ export { prose, renderProse } from './ui/prose.ts';
 export type { ProseOptions, RenderProseOptions } from './ui/prose.ts';
 export { qrCode } from './ui/qr-code.ts';
 export type { QRCodeOptions } from './ui/qr-code.ts';
+export { withReauth } from './ui/reauth.ts';
 export { relativeTime } from './ui/relative-time.ts';
 export { resizer } from './ui/resizer.ts';
 export type { ResizerOptions } from './ui/resizer.ts';

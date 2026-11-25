@@ -356,6 +356,22 @@ css`
     margin-top: 0.125rem;
     margin-left: calc(1.5em + 0.125rem);
   }
+
+  @media (pointer: coarse) {
+    .ohne-vertical-menu-item + .ohne-vertical-menu-item,
+    .ohne-vertical-menu-submenu {
+      margin-top: 0.25rem;
+    }
+
+    .ohne-vertical-menu-item-button,
+    .ohne-vertical-menu-item-toggle {
+      height: 2.75rem;
+    }
+
+    .ohne-vertical-menu-item-toggle {
+      width: 2.75rem;
+    }
+  }
 `;
 
 let sequence = 0;

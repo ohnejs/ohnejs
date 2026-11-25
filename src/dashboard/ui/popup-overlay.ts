@@ -136,12 +136,17 @@ css`
   .ohne-popup {
     position: fixed;
     z-index: 100;
-    top: 0;
+    top: var(--ohne-viewport-top, 0px);
     right: 0;
-    bottom: 0;
+    bottom: var(--ohne-keyboard-inset, 0px);
     left: 0;
+    --inset: 1rem;
     display: flex;
-    padding: 1rem;
+    /* Above the keyboard, the home indicator is already covered. */
+    padding: max(var(--inset), env(safe-area-inset-top))
+      max(var(--inset), env(safe-area-inset-right))
+      max(var(--inset), env(safe-area-inset-bottom) - var(--ohne-keyboard-inset, 0px))
+      max(var(--inset), env(safe-area-inset-left));
     outline: none;
   }
 
@@ -246,7 +251,15 @@ css`
 
   @media (max-width: 767px) {
     .ohne-popup {
-      padding: 0.5rem;
+      --inset: 0.5rem;
+    }
+
+    .ohne-popup:not(.ohne-popup-full-height) .ohne-popup-footer {
+      position: sticky;
+      z-index: 1;
+      bottom: 0;
+      background-color: hsl(var(--ohne-card));
+      border-radius: 0 0 var(--ohne-radius) var(--ohne-radius);
     }
 
     .ohne-popup-title.ohne-truncate {

@@ -230,7 +230,10 @@ css`
   }
 
   :where([data-sonner-toaster][data-y-position='bottom']) {
-    bottom: max(var(--offset), env(safe-area-inset-bottom));
+    bottom: calc(
+      var(--ohne-keyboard-inset, 0px) +
+        max(var(--offset), env(safe-area-inset-bottom) - var(--ohne-keyboard-inset, 0px))
+    );
   }
 
   :where([data-sonner-toast]) {
@@ -491,7 +494,10 @@ css`
     }
 
     [data-sonner-toaster][data-y-position='bottom'] {
-      bottom: 20px;
+      bottom: calc(
+        var(--ohne-keyboard-inset, 0px) +
+          max(20px, env(safe-area-inset-bottom) - var(--ohne-keyboard-inset, 0px))
+      );
     }
 
     [data-sonner-toaster][data-y-position='top'] {

@@ -49,6 +49,11 @@ export interface MenuAction {
   disabled?: () => boolean;
 
   /**
+   * A hover tooltip on the row while it returns a text, like why the row is disabled.
+   */
+  tooltip?: () => Text | null;
+
+  /**
    * The hotkey whose platform label shows right-aligned on the row, e.g. `Cmd + D` for `duplicate`.
    * Pressing it while the menu is open picks the row; once closed, the key does whatever `useHotkeys` binds.
    */

@@ -1,4 +1,5 @@
 import type { LoginOutcome } from './_session.ts';
+import type { APIRouteID } from './known-api-routes.ts';
 import type { DashboardLanguage } from './use-dashboard-language.ts';
 
 import { isNull } from '../../utils/is/is-null.ts';
@@ -12,6 +13,7 @@ import { api } from './api.ts';
 import { dashboardConfig } from './config.ts';
 import { loadLanguage } from './messages.ts';
 import { invalidateDashboardMeta, resetDashboardMeta } from './meta.ts';
+import { getPasskey } from './passkey.ts';
 import { requestDashboardLanguage } from './set-dashboard-language.ts';
 import { requestedLanguage } from './use-dashboard-language.ts';
 
@@ -182,11 +184,40 @@ export async function login(
   password: string,
   remember = false,
 ): Promise<LoginOutcome> {
+  return signIn('POST /auth/login', { email, password, remember });
+}
+
+/**
+ * Signs in with a passkey the user picks and confirms with Face ID, a fingerprint or a PIN.
+ * Success updates `sessionUser` as `login` does, and `remember` picks the session's lifetime the same way.
+ * A dismissed prompt reads as `cancelled`.
+ * A passkey the server refuses, or one the device cannot use, reads as `invalid`.
+ */
+export async function loginWithPasskey(remember = false): Promise<LoginOutcome> {
+  let options: Response;
+  try {
+    options = await api('POST /auth/passkey/options');
+  } catch {
+    return { kind: 'unreachable' };
+  }
+  if (!options.ok) return loginRefusal(options);
+  const credential = await getPasskey(
+    (await options.json()) as PublicKeyCredentialRequestOptionsJSON,
+  ).catch(() => undefined);
+  if (isUndefined(credential)) return { kind: 'invalid' };
+  if (isNull(credential)) return { kind: 'cancelled' };
+  return signIn('POST /auth/passkey/login', { credential, remember });
+}
+
+/**
+ * Posts a sign-in to `route` and, on success, stores the answered user as the session's.
+ */
+async function signIn(route: APIRouteID, body: Record<string, unknown>): Promise<LoginOutcome> {
   let response: Response;
   try {
-    response = await api('POST /auth/login', {
+    response = await api(route, {
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password, remember }),
+      body: JSON.stringify(body),
     });
   } catch {
     return { kind: 'unreachable' };

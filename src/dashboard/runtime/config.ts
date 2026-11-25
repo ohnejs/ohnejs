@@ -13,6 +13,11 @@ export interface DashboardConfig {
   apiURL: string;
 
   /**
+   * The app's name, `dashboard.name`, else `ohne`.
+   */
+  name: string;
+
+  /**
    * The page route manifest, ordered most-specific-first.
    */
   pages: PageRoute[];

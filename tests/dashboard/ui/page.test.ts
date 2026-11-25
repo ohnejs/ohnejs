@@ -12,6 +12,7 @@ before(() => {
     getElementById: () => ({
       textContent: JSON.stringify({
         apiURL: 'http://api',
+        name: 'ohne',
         defaultLanguage: 'en',
         messageGroups: [],
       }),

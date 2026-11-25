@@ -1,5 +1,6 @@
 import type { Ref } from '../../utils/reactive/ref.ts';
 import type { Child } from '../render/insert.ts';
+import type { Step } from './layout.ts';
 import type { MenuGroup } from './menu.ts';
 import type { TableColumn, TableSelection, TableSort } from './table-model.ts';
 
@@ -29,6 +30,7 @@ import { button } from './button.ts';
 import { checkbox } from './checkbox.ts';
 import { contextMenu } from './context-menu.ts';
 import { icon } from './icon.ts';
+import { STEP_WIDTHS } from './layout.ts';
 import { menu } from './menu.ts';
 import { pagination } from './pagination.ts';
 import { emptyState, errorState, skeleton } from './states.ts';
@@ -562,6 +564,21 @@ css`
       white-space: normal;
     }
   }
+
+  ${(Object.entries(STEP_WIDTHS) as [Step, string][])
+    .map(([step, width], index, steps) => {
+      const hidden = steps
+        .slice(index)
+        .map(([larger]) => `.ohne-table-hide-${larger}`)
+        .join(', ');
+      const lastVisible = `:not(:has(~ :not(${hidden})))`;
+      return `@container (width < ${width}) {
+        .ohne-table-hide-${step} { display: none; }
+        .ohne-table-grid :where(th, td)${lastVisible} { padding-right: 0.75rem; }
+        .ohne-table-openable:focus-visible > td${lastVisible} { --ohne-table-ring-end: -0.125rem 0; }
+      }`;
+    })
+    .join('\n')}
 `;
 
 /**
@@ -1032,8 +1049,9 @@ export function table<T, K extends string | number, C extends string = string>(
           'colgroup',
           null,
           when(showChecks, () => h('col', { class: 'ohne-table-check-col' })),
-          entries.map(([, column]) =>
+          entries.map(([, column], index) =>
             h('col', {
+              class: hideClass(column, index),
               style: sizeStyle(
                 column.width ?? (isSafari ? column.minWidth : undefined),
                 column.minWidth,
@@ -1132,8 +1150,18 @@ function cellClass<T>(column: TableColumn<T>, index: number): string | undefined
     index === 0 ? 'ohne-table-first' : '',
     column.align === 'end' ? 'ohne-table-end' : '',
     column.wrap ? 'ohne-table-wrap' : '',
+    hideClass(column, index) ?? '',
   ].filter((name) => name !== '');
   return classes.length === 0 ? undefined : classes.join(' ');
+}
+
+/**
+ * The class that hides a column under its `hideUnder` step, never on the first column.
+ */
+function hideClass<T>(column: TableColumn<T>, index: number): string | undefined {
+  return index === 0 || isUndefined(column.hideUnder)
+    ? undefined
+    : `ohne-table-hide-${column.hideUnder}`;
 }
 
 /**

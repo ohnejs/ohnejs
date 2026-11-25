@@ -16,6 +16,7 @@ import { dropdownItem } from './dropdown-item.ts';
 import { hotkeyLabels, hotkeySpecs, matchHotkey } from './hotkey-match.ts';
 import { isMac } from './hotkeys.ts';
 import { icon } from './icon.ts';
+import { attachTooltip } from './tooltip.ts';
 import './tokens.ts';
 
 css`
@@ -88,7 +89,7 @@ export function menuRows(groups: readonly MenuGroup[], close: () => void): Child
  * One action row, ignoring picks while disabled.
  */
 function row(item: MenuAction, indent: boolean, close: () => void): HTMLElement {
-  const { disabled, hotkey, label } = item;
+  const { disabled, hotkey, label, tooltip } = item;
   const keys = isUndefined(hotkey) ? [] : hotkeyLabels(isMac())[hotkey].split(' + ');
   const el = dropdownItem(
     [
@@ -120,6 +121,14 @@ function row(item: MenuAction, indent: boolean, close: () => void): HTMLElement 
   el.setAttribute('role', 'menuitem');
   if (!isUndefined(hotkey)) {
     el.setAttribute('aria-keyshortcuts', ariaKeyShortcut(hotkeySpecs(isMac())[hotkey]));
+  }
+  if (!isUndefined(tooltip)) {
+    onCleanup(
+      attachTooltip(el, () => {
+        const text = tooltip();
+        return isNull(text) ? null : resolveText(text);
+      }),
+    );
   }
   if (!isUndefined(disabled)) {
     batchedEffect(() => {

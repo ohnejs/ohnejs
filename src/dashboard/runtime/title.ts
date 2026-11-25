@@ -5,17 +5,18 @@ import { effectScope, onCleanup } from '../../utils/reactive/effect-scope.ts';
 import { effect } from '../../utils/reactive/effect.ts';
 import { ref } from '../../utils/reactive/ref.ts';
 import { untracked } from '../../utils/reactive/untracked.ts';
+import { dashboardConfig } from './config.ts';
 import { resolveText, type Text } from './text.ts';
 
 const titles = ref<readonly (() => string | undefined)[]>([]);
 let writing = false;
 
 /**
- * Names the browser tab `title - ohne` while the calling scope lives.
+ * Names the browser tab `title - name` while the calling scope lives, `name` being the app's name.
  * The title resolves live, so it follows async data and a language switch.
- * An `undefined` or empty title leaves the bare `ohne`.
+ * An `undefined` or empty title leaves the bare name.
  * The most recent live call wins; once its scope ends, the one before it shows again.
- * With none live, the tab reads `ohne`.
+ * With none live, the tab reads the bare name.
  *
  * @example
  * ```ts
@@ -40,5 +41,6 @@ export function useDocumentTitle(title: Text | (() => string | undefined)): void
  */
 function writeTitle(): void {
   const title = last(titles.value)?.();
-  document.title = title ? `${stripCodeSpans(title)} - ohne` : 'ohne';
+  const { name } = dashboardConfig();
+  document.title = title ? `${stripCodeSpans(title)} - ${name}` : name;
 }

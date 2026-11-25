@@ -97,6 +97,24 @@ describe('menu', () => {
     fire(trigger, 'click');
   });
 
+  it('shows a row tooltip on hover while it returns a text', () => {
+    const reason = ref<string | null>('Locked until noon');
+    const trigger = fake(
+      menu(button('Actions'), [[{ label: 'Open the vault', tooltip: () => reason.value }]]),
+    );
+    const tooltip = (): string | undefined =>
+      findElement(body(), (element) => hasClass(element, 'ohne-tooltip-root'))?.textContent;
+    fire(trigger, 'click');
+    flush();
+    fire(row('Open the vault'), 'mouseenter');
+    strictEqual(tooltip(), 'Locked until noon');
+    fire(row('Open the vault'), 'mouseleave');
+    reason.value = null;
+    fire(row('Open the vault'), 'mouseenter');
+    strictEqual(tooltip(), undefined);
+    fire(trigger, 'click');
+  });
+
   it('closes on Escape and marks it handled, so no page hotkey takes it', async () => {
     const trigger = fake(menu(button('Actions'), [[{ label: 'Hearthstone' }]]));
     fire(trigger, 'click');
