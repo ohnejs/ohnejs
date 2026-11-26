@@ -77,6 +77,7 @@ describe('generateRoutes', () => {
     const out = readFileSync(bucketFile(paths, 'node'), 'utf8');
 
     strictEqual(out.includes("import { useRoutes } from 'ohnejs';"), true);
+    strictEqual(out.includes("import { resolvePath } from 'ohnejs/utils';"), true);
     strictEqual(out.includes('interface KnownRoutes {'), true);
     strictEqual(out.includes("'/health': typeof h0;"), true);
     strictEqual(out.includes("'GET /': typeof h1;"), true);
@@ -86,6 +87,10 @@ describe('generateRoutes', () => {
     strictEqual(out.includes("routes.register('/health', {"), true);
     strictEqual(out.includes('method: null,'), true);
     strictEqual(out.includes("pattern: '/users/[id]',"), true);
+    strictEqual(
+      out.includes("file: resolvePath('../../api/health.ts', import.meta.dirname),"),
+      true,
+    );
     strictEqual(out.includes("layer: 'a',"), true);
     strictEqual(out.includes("layer: 'app',"), true);
     strictEqual(out.includes('handler: h2,'), true);

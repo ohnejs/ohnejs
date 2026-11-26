@@ -65,6 +65,7 @@ import {
   type ShapeContext,
   type ShapeOwner,
 } from './read-shape.ts';
+import { registeredFiles } from './registered-files.ts';
 import { schemaEntries } from './with-stack-registries.ts';
 
 /**
@@ -645,6 +646,7 @@ async function writeNode(
   const deletions = disabledFields.filter((name) => builtins.has(name));
   const augmented = fields.filter((fieldType) => !builtins.has(fieldType.name));
 
+  const registeredFile = await registeredFiles(dir);
   const code = createCodeBuilder();
   const uses = [
     collections.length > 0 ? 'useCollections' : null,
@@ -654,6 +656,9 @@ async function writeNode(
   ].filter(isString);
   if (uses.length > 0) {
     code.line(`import { ${uses.join(', ')} } from 'ohnejs';`);
+    if (collections.length + blocks.length + migrations.length > 0) {
+      code.line("import { resolvePath } from 'ohnejs/utils';");
+    }
     code.line();
   }
   collections.forEach((collection, i) => {
@@ -713,7 +718,7 @@ async function writeNode(
       code.indent(() => {
         code.line(`name: ${name},`);
         code.line(`collection: c${i},`);
-        code.line(`file: ${literalString(collection.file)},`);
+        code.line(`file: ${registeredFile(collection.file)},`);
       });
       code.line('});');
     });
@@ -737,7 +742,7 @@ async function writeNode(
       code.indent(() => {
         code.line(`name: ${name},`);
         code.line(`block: b${i},`);
-        code.line(`file: ${literalString(block.file)},`);
+        code.line(`file: ${registeredFile(block.file)},`);
       });
       code.line('});');
     });
@@ -751,7 +756,7 @@ async function writeNode(
       code.indent(() => {
         code.line(`name: ${literalString(migration.name)},`);
         code.line(`migration: m${i},`);
-        code.line(`file: ${literalString(migration.file)},`);
+        code.line(`file: ${registeredFile(migration.file)},`);
       });
       code.line('});');
     });

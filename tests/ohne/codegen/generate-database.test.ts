@@ -88,7 +88,11 @@ describe('generateDatabase', () => {
     ok(out.includes("migrations.register('dep/001-keys', {"));
     ok(out.includes("migrations.register('app/001-posts', {"));
     ok(out.indexOf('dep/001-keys') < out.indexOf('app/001-posts'));
-    ok(out.includes(`file: '${join(dep, 'migrations', '001-keys.ts')}',`));
+    ok(
+      out.includes(
+        "file: resolvePath('../../packages/dep/migrations/001-keys.ts', import.meta.dirname),",
+      ),
+    );
   });
 
   it('writes empty modules when no layer has definitions', async () => {
@@ -169,7 +173,7 @@ describe('generateDatabase', () => {
         "collections.register('Posts', {\n" +
           "  name: 'Posts',\n" +
           '  collection: c0,\n' +
-          `  file: '${join(app, 'collections', 'Posts.ts')}',\n` +
+          "  file: resolvePath('../../collections/Posts.ts', import.meta.dirname),\n" +
           '});',
       ),
     );
@@ -659,7 +663,7 @@ describe('generateDatabase', () => {
         "blocks.register('CTA', {\n" +
           "  name: 'CTA',\n" +
           '  block: b0,\n' +
-          `  file: '${join(app, 'blocks', 'CTA.ts')}',\n` +
+          "  file: resolvePath('../../blocks/CTA.ts', import.meta.dirname),\n" +
           '});',
       ),
     );
@@ -668,7 +672,7 @@ describe('generateDatabase', () => {
         "blocks.register('Hero', {\n" +
           "  name: 'Hero',\n" +
           '  block: b1,\n' +
-          `  file: '${join(app, 'blocks', 'Hero.ts')}',\n` +
+          "  file: resolvePath('../../blocks/Hero.ts', import.meta.dirname),\n" +
           '});',
       ),
     );

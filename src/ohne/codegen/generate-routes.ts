@@ -13,6 +13,7 @@ import { collectRoutes } from '../routes/collect-routes.ts';
 import { type RouteMeta, routeID } from '../routes/route.ts';
 import { BANNER, codegenDir } from './codegen-dir.ts';
 import { linkedPaths } from './linked-paths.ts';
+import { registeredFiles } from './registered-files.ts';
 
 /**
  * Generates the route table from every layer's API directory.
@@ -72,10 +73,14 @@ async function writeNode(
   routes: readonly RouteMeta[],
   linked: (path: string) => string,
 ): Promise<string> {
+  const registeredFile = await registeredFiles(dir);
   const code = createCodeBuilder();
-  code.line(
-    routes.length === 0 ? "import type {} from 'ohnejs';" : "import { useRoutes } from 'ohnejs';",
-  );
+  if (routes.length === 0) {
+    code.line("import type {} from 'ohnejs';");
+  } else {
+    code.line("import { useRoutes } from 'ohnejs';");
+    code.line("import { resolvePath } from 'ohnejs/utils';");
+  }
   routes.forEach((route, i) => {
     code.line(`import h${i} from ${literalString(importSpecifier(dir, linked(route.file)))};`);
   });
@@ -102,7 +107,7 @@ async function writeNode(
       code.indent(() => {
         code.line(`method: ${isNull(route.method) ? 'null' : literalString(route.method)},`);
         code.line(`pattern: ${literalString(route.pattern)},`);
-        code.line(`file: ${literalString(route.file)},`);
+        code.line(`file: ${registeredFile(route.file)},`);
         code.line(`layer: ${literalString(route.layer)},`);
         code.line(`handler: h${i},`);
       });
