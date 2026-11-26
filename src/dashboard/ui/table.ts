@@ -529,10 +529,6 @@ css`
     padding-top: 0.75rem;
   }
 
-  .ohne-card-body-flush > .ohne-table > .ohne-pagination {
-    padding: var(--ohne-padding-footer, 0.75rem);
-  }
-
   /* A flush card does not clip its body, so the table rounds the corners it shares with the card. */
   .ohne-card
     > :is(.ohne-card-body-flush:first-child, :empty + .ohne-card-body-flush)
